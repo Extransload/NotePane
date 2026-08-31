@@ -1299,6 +1299,25 @@ function installIpcHandlers() {
     return note;
   });
 
+  ipcMain.handle("notes:versions:list", (event, noteId) => {
+    const resolvedNoteId = noteId || getNoteIdForWebContents(event.sender);
+    return resolvedNoteId ? store.listNoteVersions(resolvedNoteId) : [];
+  });
+
+  ipcMain.handle("notes:versions:create", (event, payload) => {
+    const resolvedNoteId = payload?.noteId || getNoteIdForWebContents(event.sender);
+    return resolvedNoteId ? store.createNoteVersion(resolvedNoteId, payload) : null;
+  });
+
+  ipcMain.handle("notes:versions:restore", (event, payload) => {
+    const resolvedNoteId = payload?.noteId || getNoteIdForWebContents(event.sender);
+    const note = resolvedNoteId
+      ? store.restoreNoteVersion(resolvedNoteId, payload?.versionId)
+      : null;
+    if (note) broadcastNotesChanged({ activeNote: note });
+    return note;
+  });
+
   ipcMain.handle("export:note", async (event, payload) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (!window) {

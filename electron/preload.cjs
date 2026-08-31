@@ -21,6 +21,9 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
   updateEditorPreferences: (payload) =>
     ipcRenderer.invoke("editor-preferences:update", payload),
   saveContent: (payload) => ipcRenderer.invoke("notes:save-content", payload),
+  listNoteVersions: (noteId) => ipcRenderer.invoke("notes:versions:list", noteId),
+  createNoteVersion: (payload) => ipcRenderer.invoke("notes:versions:create", payload),
+  restoreNoteVersion: (payload) => ipcRenderer.invoke("notes:versions:restore", payload),
   updateAppearance: (payload) =>
     ipcRenderer.invoke("notes:update-appearance", payload),
   detachNote: (noteId) => ipcRenderer.invoke("notes:detach", noteId),

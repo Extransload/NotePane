@@ -82,6 +82,59 @@ test("Electron app opens a sticky window and persists editor content", async () 
   }
 });
 
+test("Cmd/Ctrl+S immediately creates a version-history snapshot", async () => {
+  const userDataDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "notepane-version-history-"),
+  );
+  const exportDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "notepane-version-history-export-"),
+  );
+  const electronApp = await launchApp(userDataDirectory, exportDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await page.getByRole("paragraph").filter({ hasText: /^$/ }).last().click();
+    await page.keyboard.insertText("version shortcut snapshot");
+    await page.keyboard.press(modifierShortcut("S"));
+    await expect(page.locator(".sticky-toast-success")).toHaveText("Saved");
+
+    const historyPath = path.join(userDataDirectory, "note-history.json");
+    await expect.poll(() => fs.existsSync(historyPath)).toBe(true);
+    await expect.poll(() => {
+      const history = JSON.parse(fs.readFileSync(historyPath, "utf8"));
+      return Object.values(history.notes).flat().some((version) =>
+        version.markdown.includes("version shortcut snapshot"),
+      );
+    }).toBe(true);
+
+    await page.getByRole("button", { name: "Version history" }).click();
+    await expect(page.getByRole("dialog", { name: "Version history" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Version history" }))
+      .toContainText("version shortcut snapshot");
+    await expect(page.getByRole("dialog", { name: "Version history" }))
+      .toContainText("Saved manually");
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Shift+Backslash then Space changes an empty paragraph into a quote", async () => {
+  const userDataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "notepane-quote-shortcut-"));
+  const exportDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "notepane-quote-shortcut-export-"));
+  const electronApp = await launchApp(userDataDirectory, exportDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await page.getByRole("paragraph").filter({ hasText: /^$/ }).last().click();
+    await page.keyboard.press("Shift+\\");
+    await page.keyboard.press("Space");
+    await page.keyboard.type("Shortcut quote");
+    await expect(page.locator("[data-content-type='quote']").filter({ hasText: "Shortcut quote" })).toBeVisible();
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron exports and imports a complete portable workspace backup", async () => {
   const userDataDirectory = fs.mkdtempSync(
     path.join(os.tmpdir(), "notepane-electron-"),

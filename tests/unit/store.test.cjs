@@ -56,6 +56,36 @@ test("creates, saves, and reloads a local note", () => {
   assert.equal(reloaded.seedDemoContent, false);
 });
 
+test("stores, reloads, and restores note versions", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+  const note = store.createNote({ width: 900, height: 700 });
+
+  store.updateContent({
+    noteId: note.id,
+    blocksJSON: JSON.stringify([{ type: "paragraph", content: "First" }]),
+    markdown: "First",
+  });
+  const first = store.createNoteVersion(note.id, { source: "manual" });
+  store.updateContent({
+    noteId: note.id,
+    blocksJSON: JSON.stringify([{ type: "paragraph", content: "Second" }]),
+    markdown: "Second",
+  });
+  const second = store.createNoteVersion(note.id, { source: "manual" });
+
+  assert.equal(store.createNoteVersion(note.id).id, second.id);
+  const reloadedVersions = new StickyStore(directory).listNoteVersions(note.id);
+  assert.deepEqual(reloadedVersions.slice(0, 2).map((item) => item.id), [second.id, first.id]);
+  assert.deepEqual(reloadedVersions.slice(0, 2).map((item) => item.source), ["manual", "manual"]);
+
+  const restored = store.restoreNoteVersion(note.id, first.id);
+  assert.match(restored.blocksJSON, /First/);
+  assert.match(new StickyStore(directory).getNote(note.id).blocksJSON, /First/);
+  assert.equal(store.listNoteVersions(note.id).length, 3);
+  assert.equal(store.listNoteVersions(note.id).at(-1).source, "auto");
+});
+
 test("creates a note with an optional initial theme", () => {
   const directory = createTemporaryDirectory();
   const store = new StickyStore(directory);

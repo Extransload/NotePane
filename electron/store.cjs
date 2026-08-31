@@ -5,6 +5,9 @@ const { randomUUID } = require("crypto");
 const DEFAULT_NOTE_TITLE = "Untitled";
 const NOTE_PANE_BACKUP_FORMAT = "notepane-backup";
 const NOTE_PANE_BACKUP_VERSION = 1;
+const NOTE_HISTORY_VERSION = 2;
+const MAX_NOTE_HISTORY = 50;
+const NOTE_HISTORY_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_NOTE_TITLE_MAX_LENGTH = 48;
 const DEFAULT_APP_THEME = Object.freeze({
   mode: "light",
@@ -217,6 +220,8 @@ class StickyStore {
   constructor(userDataPath) {
     this.directoryPath = userDataPath;
     this.filePath = path.join(userDataPath, "notes.json");
+    this.historyFilePath = path.join(userDataPath, "note-history.json");
+    this.history = {};
     this.state = {
       appTheme: DEFAULT_APP_THEME,
       layoutMode: DEFAULT_LAYOUT_MODE,
@@ -224,6 +229,7 @@ class StickyStore {
       notes: [],
     };
     this.load();
+    this.loadHistory();
   }
 
   load() {
@@ -330,6 +336,71 @@ class StickyStore {
 
   getStoredNote(noteId) {
     return this.state.notes.find((note) => note.id === noteId) ?? null;
+  }
+
+  loadHistory() {
+    if (!fs.existsSync(this.historyFilePath)) return;
+    try {
+      const parsed = JSON.parse(fs.readFileSync(this.historyFilePath, "utf8"));
+      this.history = parsed && typeof parsed.notes === "object" ? parsed.notes : {};
+    } catch (error) {
+      this.history = {};
+      console.error("[NotePane] Failed to load note-history.json:", error);
+    }
+  }
+
+  saveHistory() {
+    writeJsonAtomic(this.historyFilePath, {
+      version: NOTE_HISTORY_VERSION,
+      notes: this.history,
+    });
+  }
+
+  listNoteVersions(noteId) {
+    return Array.isArray(this.history[noteId]) ? [...this.history[noteId]] : [];
+  }
+
+  createNoteVersion(noteId, snapshot = {}) {
+    const note = this.getNote(noteId);
+    if (!note) return null;
+    const version = {
+      id: randomUUID(),
+      createdAt: Date.now(),
+      title: typeof snapshot.title === "string" ? snapshot.title : note.title,
+      titleManuallyEdited: Boolean(snapshot.titleManuallyEdited ?? note.titleManuallyEdited),
+      blocksJSON: normalizeBlocksJSON(snapshot.blocksJSON ?? note.blocksJSON),
+      markdown: typeof snapshot.markdown === "string" ? snapshot.markdown : note.markdown,
+      source:
+        snapshot.source === "manual" || snapshot.source === "restore"
+          ? snapshot.source
+          : "auto",
+    };
+    const versions = this.listNoteVersions(noteId);
+    const latest = versions[0];
+    if (latest && latest.blocksJSON === version.blocksJSON && latest.markdown === version.markdown) {
+      return latest;
+    }
+    this.history[noteId] = [version, ...versions].slice(0, MAX_NOTE_HISTORY);
+    this.saveHistory();
+    return version;
+  }
+
+  restoreNoteVersion(noteId, versionId) {
+    const version = this.listNoteVersions(noteId).find((item) => item.id === versionId);
+    if (!version) return null;
+    const current = this.getNote(noteId);
+    this.createNoteVersion(noteId, { ...current, source: "restore" });
+    const note = this.updateContent({
+      noteId,
+      blocksJSON: version.blocksJSON,
+      markdown: version.markdown,
+    });
+    if (note && version.titleManuallyEdited) {
+      note.title = version.title;
+      note.titleManuallyEdited = true;
+      this.save();
+    }
+    return note;
   }
 
   createNote(bounds, options = {}) {
@@ -471,7 +542,9 @@ class StickyStore {
     }
 
     this.state.notes.splice(noteIndex, 1);
+    delete this.history[noteId];
     this.save();
+    this.saveHistory();
 
     return {
       deleted: true,
@@ -554,8 +627,18 @@ class StickyStore {
       return null;
     }
 
-    note.blocksJSON = normalizeBlocksJSON(blocksJSON);
-    note.markdown = typeof markdown === "string" ? markdown : "";
+    const nextBlocksJSON = normalizeBlocksJSON(blocksJSON);
+    const nextMarkdown = typeof markdown === "string" ? markdown : "";
+    const contentChanged = note.blocksJSON !== nextBlocksJSON || note.markdown !== nextMarkdown;
+    const latestVersion = this.listNoteVersions(noteId)[0];
+    if (
+      contentChanged &&
+      (!latestVersion || Date.now() - latestVersion.createdAt >= NOTE_HISTORY_INTERVAL_MS)
+    ) {
+      this.createNoteVersion(noteId, { ...note, source: "auto" });
+    }
+    note.blocksJSON = nextBlocksJSON;
+    note.markdown = nextMarkdown;
     if (!note.titleManuallyEdited) {
       note.title = deriveAutomaticTitleFromContent(note.blocksJSON, note.markdown);
     }

@@ -12,6 +12,7 @@ import { codeBlockOptions } from "@blocknote/code-block";
 import {
   BlockNoteSchema,
   createCodeBlockSpec,
+  createExtension,
   createHeadingBlockSpec,
   createStyleSpecFromTipTapMark,
   defaultBlockSpecs,
@@ -40,6 +41,8 @@ import {
   Ellipsis,
   Eye,
   FileDown,
+  History,
+  ArrowLeftRight,
   Heading4,
   Palette,
   PanelLeftClose,
@@ -226,6 +229,46 @@ const notionInlineCodeStyle = createStyleSpecFromTipTapMark(
 const schema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
+    quote: {
+      ...defaultBlockSpecs.quote,
+      extensions: [
+        ...(defaultBlockSpecs.quote.extensions ?? []),
+        createExtension({
+          key: "notepane-quote-pipe-shortcut",
+          keyboardShortcuts: {
+            Space: ({ editor }) => {
+              const { block } = editor.getTextCursorPosition();
+              if (block.type !== "paragraph") {
+                return false;
+              }
+
+              const marker = (block.content ?? [])
+                .filter((content) => content.type === "text")
+                .map((content) => content.text)
+                .join("");
+              if (marker !== "|" && marker !== "\\") {
+                return false;
+              }
+
+              editor.updateBlock(block, {
+                type: "quote",
+                props: {},
+                content: [],
+              });
+              return true;
+            },
+          },
+          inputRules: [
+            {
+              find: /^[|\\]\s$/,
+              replace() {
+                return { type: "quote", props: {} };
+              },
+            },
+          ],
+        }),
+      ],
+    },
     heading: createHeadingBlockSpec({ levels: [1, 2, 3, 4] }),
   },
 }).extend({
@@ -1515,11 +1558,17 @@ function StickyEditor({
   const [activeImageBlockId, setActiveImageBlockId] = useState(null);
   const [cropState, setCropState] = useState(null);
   const [exportToast, setExportToast] = useState(null);
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [noteVersions, setNoteVersions] = useState([]);
+  const [isVersionBusy, setIsVersionBusy] = useState(false);
   const [editorFontSizeToast, setEditorFontSizeToast] = useState("");
   const [tableOfContentsEntries, setTableOfContentsEntries] = useState(() =>
     extractTableOfContentsEntries(initialEditorContent),
   );
   const saveTimerRef = useRef(null);
+  const saveRetryTimerRef = useRef(null);
+  const saveQueueRef = useRef(Promise.resolve());
+  const isEditorDirtyRef = useRef(false);
   const appearanceTimerRef = useRef(null);
   const sessionAppearanceTimerRef = useRef(null);
   const exportToastTimerRef = useRef(null);
@@ -1744,31 +1793,81 @@ function StickyEditor({
     blocksJSON: JSON.stringify(editor.document),
   }), [editor, note]);
 
-  const saveNow = useCallback(async () => {
-    const blocksJSON = JSON.stringify(editor.document);
-    if (blocksJSON === lastSavedBlocksRef.current) {
-      return;
+  const saveNow = useCallback((options = {}) => {
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    if (!electronApi?.saveContent) {
+      return saveQueueRef.current;
     }
 
-    lastSavedBlocksRef.current = blocksJSON;
+    const pendingSave = saveQueueRef.current.then(async () => {
+      const blocksJSON = JSON.stringify(editor.document);
+      if (blocksJSON === lastSavedBlocksRef.current) {
+        isEditorDirtyRef.current = false;
+        return;
+      }
 
-    let markdown = "";
-    try {
-      markdown = await editor.blocksToMarkdownLossy(editor.document);
-    } catch {
-      markdown = "";
-    }
+      let markdown = "";
+      try {
+        markdown = await editor.blocksToMarkdownLossy(editor.document);
+      } catch {
+        markdown = "";
+      }
 
-    const savedNote = await electronApi?.saveContent({
-      noteId: note.id,
-      blocksJSON,
-      markdown,
+      const savedNote = await electronApi.saveContent({
+        noteId: note.id,
+        blocksJSON,
+        markdown,
+      });
+      lastSavedBlocksRef.current = blocksJSON;
+      isEditorDirtyRef.current = JSON.stringify(editor.document) !== blocksJSON;
+      if (savedNote?.id) {
+        setTitle(getNoteDisplayTitle(savedNote, editor.document));
+        onNoteChanged(savedNote);
+      }
+      if (isEditorDirtyRef.current) {
+        saveTimerRef.current = window.setTimeout(() => {
+          saveTimerRef.current = null;
+          void saveNow();
+        }, 180);
+      }
     });
-    if (savedNote?.id) {
-      setTitle(getNoteDisplayTitle(savedNote, editor.document));
-      onNoteChanged(savedNote);
-    }
+
+    saveQueueRef.current = pendingSave.catch(() => {
+      isEditorDirtyRef.current = true;
+      if (saveRetryTimerRef.current) {
+        window.clearTimeout(saveRetryTimerRef.current);
+      }
+      saveRetryTimerRef.current = window.setTimeout(() => {
+        saveRetryTimerRef.current = null;
+        void saveNow();
+      }, 1000);
+    });
+
+    return options.throwOnError ? pendingSave : saveQueueRef.current;
   }, [editor, note.id, onNoteChanged]);
+
+  const saveVersionNow = useCallback(async () => {
+    await saveNow({ throwOnError: true });
+    const markdown = await editor.blocksToMarkdownLossy(editor.document);
+    const version = await electronApi?.createNoteVersion?.({
+      noteId: note.id,
+      title: getNoteDisplayTitle(note, editor.document),
+      titleManuallyEdited: isTitleManuallyEdited(note),
+      blocksJSON: JSON.stringify(editor.document),
+      markdown,
+      source: "manual",
+    });
+    if (version && isVersionHistoryOpen) {
+      setNoteVersions((current) => [
+        version,
+        ...current.filter((item) => item.id !== version.id),
+      ]);
+    }
+    return version;
+  }, [editor, isVersionHistoryOpen, note, saveNow]);
 
   const scheduleSave = useCallback(() => {
     if (!electronApi) {
@@ -1779,7 +1878,10 @@ function StickyEditor({
       window.clearTimeout(saveTimerRef.current);
     }
 
-    saveTimerRef.current = window.setTimeout(saveNow, 180);
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      void saveNow();
+    }, 180);
   }, [saveNow]);
 
   const refreshTableOfContents = useCallback(() => {
@@ -1792,8 +1894,56 @@ function StickyEditor({
     }
     updateAutomaticTitleFromBlocks(editor.document);
     refreshTableOfContents();
+    isEditorDirtyRef.current = true;
     scheduleSave();
   }, [editor, refreshTableOfContents, scheduleSave, updateAutomaticTitleFromBlocks]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      if (isEditorDirtyRef.current) {
+        void saveNow();
+      }
+    }, 30000);
+    const flushWhenHidden = () => {
+      if (document.visibilityState === "hidden" && isEditorDirtyRef.current) {
+        void saveNow();
+      }
+    };
+    document.addEventListener("visibilitychange", flushWhenHidden);
+    window.addEventListener("pagehide", flushWhenHidden);
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", flushWhenHidden);
+      window.removeEventListener("pagehide", flushWhenHidden);
+    };
+  }, [saveNow]);
+
+  const openVersionHistory = useCallback(async () => {
+    setIsVersionHistoryOpen(true);
+    setIsVersionBusy(true);
+    try {
+      setNoteVersions(await electronApi?.listNoteVersions?.(note.id) ?? []);
+    } finally {
+      setIsVersionBusy(false);
+    }
+  }, [note.id]);
+
+  const restoreVersion = useCallback(async (version) => {
+    setIsVersionBusy(true);
+    try {
+      await saveNow();
+      const restored = await electronApi?.restoreNoteVersion?.({ noteId: note.id, versionId: version.id });
+      if (!restored) return;
+      const blocks = JSON.parse(restored.blocksJSON);
+      editor.replaceBlocks(editor.document, blocks);
+      lastSavedBlocksRef.current = restored.blocksJSON;
+      setTitle(restored.title);
+      onNoteChanged(restored);
+      setNoteVersions(await electronApi.listNoteVersions(note.id));
+    } finally {
+      setIsVersionBusy(false);
+    }
+  }, [editor, note.id, onNoteChanged, saveNow]);
 
   useEffect(() => {
     refreshTableOfContents();
@@ -2240,6 +2390,15 @@ function StickyEditor({
         return;
       }
 
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        void saveVersionNow().then(
+          () => showExportToast("Saved", "success"),
+          () => showExportToast("Save failed", "error"),
+        );
+        return;
+      }
+
       if (
         event.target instanceof Element &&
         event.target.closest("input, textarea, select, .preferences-window")
@@ -2340,6 +2499,8 @@ function StickyEditor({
     requestNewSession,
     toggleTableOfContents,
     toggleLayoutMode,
+    saveVersionNow,
+    showExportToast,
   ]);
 
   useEffect(() => {
@@ -2347,9 +2508,10 @@ function StickyEditor({
       !isColorPanelOpen &&
       !isPreferencesWindowOpen &&
       !isStickySettingsOpen &&
-      !isStickyTrashConfirmOpen &&
-      !isStickyActionBarOpen &&
-      !pendingSessionTrashNote &&
+       !isStickyTrashConfirmOpen &&
+       !isStickyActionBarOpen &&
+       !isVersionHistoryOpen &&
+       !pendingSessionTrashNote &&
       !sessionTabMenu &&
       !sessionColorPanelNoteId
     ) {
@@ -2364,6 +2526,7 @@ function StickyEditor({
         setIsStickySettingsOpen(false);
         setIsStickyTrashConfirmOpen(false);
         setIsStickyActionBarOpen(false);
+        setIsVersionHistoryOpen(false);
         setPendingSessionTrashNote(null);
         setSessionTabMenu(null);
         setSessionColorPanelNoteId(null);
@@ -2380,6 +2543,7 @@ function StickyEditor({
     isStickySettingsOpen,
     isStickyTrashConfirmOpen,
     isStickyActionBarOpen,
+    isVersionHistoryOpen,
     pendingSessionTrashNote,
     sessionColorPanelNoteId,
     sessionTabMenu,
@@ -3552,6 +3716,9 @@ function StickyEditor({
       if (saveTimerRef.current) {
         window.clearTimeout(saveTimerRef.current);
       }
+      if (saveRetryTimerRef.current) {
+        window.clearTimeout(saveRetryTimerRef.current);
+      }
       if (appearanceTimerRef.current) {
         window.clearTimeout(appearanceTimerRef.current);
       }
@@ -3904,6 +4071,16 @@ function StickyEditor({
               aria-label="Session sidebar controls"
             >
               <div className="session-sidebar-footer-row">
+                <button
+                  type="button"
+                  className="preferences-icon-button has-tooltip"
+                  aria-label="Version history"
+                  data-tooltip="Version history"
+                  onMouseDown={preventFocusLoss}
+                  onClick={() => void openVersionHistory()}
+                >
+                  <History aria-hidden="true" size={17} strokeWidth={2} />
+                </button>
                 <ExportPdfButton
                   shortcut={getEnabledShortcut("exportPdf")}
                   onClick={() => void exportNote()}
@@ -4063,6 +4240,15 @@ function StickyEditor({
           ))}
         </section>
       </div>
+      {isVersionHistoryOpen && (
+        <VersionHistoryPanel
+          versions={noteVersions}
+          isBusy={isVersionBusy}
+          theme={appThemeMode}
+          onClose={() => setIsVersionHistoryOpen(false)}
+          onRestore={(version) => void restoreVersion(version)}
+        />
+      )}
       {layoutTransition && (
         <LayoutTransitionOverlay transition={layoutTransition} />
       )}
@@ -4487,6 +4673,95 @@ function StickyToast({ toast }) {
         </button>
       )}
     </div>
+  );
+}
+
+function VersionHistoryPanel({ versions, isBusy, theme, onClose, onRestore }) {
+  const [selectedVersionId, setSelectedVersionId] = useState(versions[0]?.id ?? null);
+  const selectedVersion = versions.find((version) => version.id === selectedVersionId) ?? versions[0];
+  const previewContent = useMemo(
+    () => parseBlocksJSON(selectedVersion?.blocksJSON) ?? EMPTY_BLOCKS,
+    [selectedVersion],
+  );
+  const previewEditor = useCreateBlockNote({
+    schema,
+    initialContent: previewContent,
+  });
+
+  useEffect(() => {
+    if (!selectedVersion) return;
+    previewEditor.replaceBlocks(previewEditor.document, previewContent);
+  }, [previewContent, previewEditor, selectedVersion]);
+
+  return createPortal(
+    <div className="version-history-backdrop" role="presentation" onMouseDown={onClose}>
+      <section
+        className="version-history-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="version-history-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="version-history-header">
+          <h2 id="version-history-title">Version history</h2>
+          <button
+            type="button"
+            aria-label="Close version history"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onClose();
+            }}
+          >×</button>
+        </div>
+        <div className="version-history-body">
+          <div className="version-history-preview" aria-label="Version preview">
+            {selectedVersion ? (
+              <BlockNoteView
+                editor={previewEditor}
+                editable={false}
+                theme={theme}
+                formattingToolbar={false}
+                sideMenu={false}
+                slashMenu={false}
+              />
+            ) : (
+              <p className="version-history-empty">No saved versions yet.</p>
+            )}
+          </div>
+          <div className="version-history-list">
+            {versions.length === 0 && <p className="version-history-empty">No saved versions yet.</p>}
+            {versions.map((version) => (
+              <button
+                type="button"
+                className={`version-history-item${version.id === selectedVersion?.id ? " is-selected" : ""}`}
+                key={version.id}
+                onClick={() => setSelectedVersionId(version.id)}
+              >
+                <time dateTime={new Date(version.createdAt).toISOString()}>
+                  {new Date(version.createdAt).toLocaleString()}
+                </time>
+                <span className={`version-history-source version-history-source-${version.source ?? "auto"}`}>
+                  {version.source === "manual"
+                    ? "Saved manually"
+                    : version.source === "restore"
+                      ? "Before restore"
+                      : "Auto-saved"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+        {selectedVersion && (
+          <div className="version-history-footer">
+            <button type="button" disabled={isBusy} onClick={() => onRestore(selectedVersion)}>
+              {isBusy ? "Restoring..." : "Restore this version"}
+            </button>
+          </div>
+        )}
+      </section>
+    </div>,
+    document.body,
   );
 }
 
@@ -6193,10 +6468,9 @@ function LayoutModeSwitch({ mode, compact = false, shortcut, onChange }) {
       onMouseDown={preventFocusLoss}
       onClick={onChange}
     >
-      <ModeTransitionIcon
-        fromMode={mode}
-        toMode={targetMode}
-        compact={compact}
+      <ArrowLeftRight
+        className="notepane-action-icon notepane-mode-switch-icon"
+        aria-hidden="true"
       />
     </button>
   );
