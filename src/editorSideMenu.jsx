@@ -16,10 +16,19 @@ import {
 import { ArrowRightLeft, Palette, Trash2 } from "lucide-react";
 import { EditorColorPickerSections } from "./editorColorFormatting.jsx";
 
-export function NotePaneSideMenuController({ portalElement, recentColors, onColorUsed }) {
+export function NotePaneSideMenuController({
+  portalElement,
+  recentColors,
+  onColorUsed,
+}) {
   const editor = useBlockNoteEditor();
   const SideMenu = useCallback(
-    () => <NotePaneSideMenu recentColors={recentColors} onColorUsed={onColorUsed} />,
+    () => (
+      <NotePaneSideMenu
+        recentColors={recentColors}
+        onColorUsed={onColorUsed}
+      />
+    ),
     [onColorUsed, recentColors],
   );
   const blockId = useExtensionState("sideMenu", {
@@ -40,7 +49,7 @@ export function NotePaneSideMenuController({ portalElement, recentColors, onColo
       if (!button?.querySelector("[data-test='dragHandle']")) {
         return;
       }
-      const block = editor.domElement.querySelector(
+      const block = editor.domElement?.querySelector(
         `.bn-block-outer[data-id="${escapeCssAttribute(blockIdRef.current)}"]`,
       );
       if (block) {
@@ -55,12 +64,32 @@ export function NotePaneSideMenuController({ portalElement, recentColors, onColo
         "--notepane-drag-preview-width",
       );
     };
+    const clearHandleSelectionHint = () => {
+      editor.domElement?.removeAttribute("data-notepane-handle-block-id");
+    };
+    const rememberBlockFromDragHandle = (event) => {
+      const handle = event.target instanceof Element
+        ? event.target.closest(".bn-side-menu button[aria-expanded]")
+        : null;
+      if (!handle || !blockIdRef.current) {
+        return;
+      }
+      editor.domElement?.setAttribute(
+        "data-notepane-handle-block-id",
+        blockIdRef.current,
+      );
+    };
     ownerDocument.addEventListener("dragstart", preserveDragPreviewWidth, true);
     ownerDocument.addEventListener("dragend", clearDragPreviewWidth, true);
+    ownerDocument.addEventListener("mousedown", clearHandleSelectionHint, true);
+    ownerDocument.addEventListener("click", rememberBlockFromDragHandle, true);
     return () => {
       ownerDocument.removeEventListener("dragstart", preserveDragPreviewWidth, true);
       ownerDocument.removeEventListener("dragend", clearDragPreviewWidth, true);
+      ownerDocument.removeEventListener("mousedown", clearHandleSelectionHint, true);
+      ownerDocument.removeEventListener("click", rememberBlockFromDragHandle, true);
       clearDragPreviewWidth();
+      clearHandleSelectionHint();
     };
   }, [editor]);
 
@@ -74,7 +103,12 @@ export function NotePaneSideMenuController({ portalElement, recentColors, onColo
 
 function NotePaneSideMenu({ recentColors, onColorUsed }) {
   const DragHandleMenu = useCallback(
-    () => <NotePaneDragHandleMenu recentColors={recentColors} onColorUsed={onColorUsed} />,
+    () => (
+      <NotePaneDragHandleMenu
+        recentColors={recentColors}
+        onColorUsed={onColorUsed}
+      />
+    ),
     [onColorUsed, recentColors],
   );
 
@@ -86,7 +120,10 @@ function NotePaneSideMenu({ recentColors, onColorUsed }) {
   );
 }
 
-function NotePaneDragHandleMenu({ recentColors, onColorUsed }) {
+function NotePaneDragHandleMenu({
+  recentColors,
+  onColorUsed,
+}) {
   const Components = useComponentsContext();
   const [activePanel, setActivePanel] = useState(null);
 

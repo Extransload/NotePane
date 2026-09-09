@@ -283,6 +283,11 @@ function closeFocusedTabOrWindow() {
     return;
   }
 
+  if (store?.getLayoutMode?.() !== "sticky") {
+    window.webContents.send("tabs:close-requested");
+    return;
+  }
+
   window.close();
 }
 
@@ -815,7 +820,7 @@ function buildMenu() {
         },
         { type: "separator" },
         {
-          label: "Close Window",
+          label: isTabsMode ? "Close Tab" : "Close Window",
           accelerator: getMenuAccelerator("closeWindow"),
           click: closeFocusedTabOrWindow,
         },
@@ -1326,8 +1331,21 @@ function installIpcHandlers() {
 
     const title = sanitizeFileName(payload?.title, "notepane-note");
     const type = payload?.type ?? "pdf";
+    if (type === "md") {
+      if (typeof payload?.markdown !== "string") {
+        throw new Error("Markdown export content is missing.");
+      }
+      return saveBuffer({
+        window,
+        buffer: Buffer.from(payload.markdown, "utf8"),
+        defaultName: `${title}.md`,
+        dialogTitle: "Export note as Markdown",
+        filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+      });
+    }
+
     if (type !== "pdf") {
-      throw new Error("Only PDF export is supported.");
+      throw new Error("Unsupported note export format.");
     }
 
     const buffer = await window.webContents.printToPDF({
@@ -1433,17 +1451,20 @@ function installIpcHandlers() {
   ipcMain.handle("assets:save-url", async (event, payload) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     const asset = await readAssetFromUrl(payload?.url);
+    const isImage = payload?.kind !== "file";
     const defaultName = sanitizeFileName(
       payload?.defaultName,
-      `image.${extensionForMime(asset.mimeType)}`,
+      `${isImage ? "image" : "file"}.${extensionForMime(asset.mimeType)}`,
     );
 
     return saveBuffer({
       window,
       buffer: asset.buffer,
       defaultName,
-      dialogTitle: "Save image",
-      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }],
+      dialogTitle: isImage ? "Save image" : "Save file",
+      filters: isImage
+        ? [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }]
+        : [{ name: "All files", extensions: ["*"] }],
     });
   });
 

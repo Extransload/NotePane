@@ -47,6 +47,11 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
     ipcRenderer.on("notes:create-requested", listener);
     return () => ipcRenderer.removeListener("notes:create-requested", listener);
   },
+  onCloseTabRequested: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on("tabs:close-requested", listener);
+    return () => ipcRenderer.removeListener("tabs:close-requested", listener);
+  },
   onAppThemeChanged: (callback) => {
     const listener = (_event, appTheme) => callback(appTheme);
     ipcRenderer.on("app-theme:changed", listener);

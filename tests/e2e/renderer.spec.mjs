@@ -84,7 +84,7 @@ test("keeps sticky chrome outside the editable BlockNote surface", async ({ page
   await expect(page.getByRole("button", { name: "Theme" })).toHaveCount(0);
   await expect(page.getByRole("switch", { name: "Theme mode" })).toHaveCount(0);
   await expect(page.getByTestId("session-sidebar-footer")).toBeVisible();
-  await expect(page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Export PDF" }))
+  await expect(page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Export" }))
     .toBeVisible();
   await expect(page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Preferences" }))
     .toBeVisible();
@@ -111,7 +111,7 @@ test("keeps sticky chrome outside the editable BlockNote surface", async ({ page
   await expect(page.getByRole("slider", { name: "Theme color" })).toHaveCount(0);
   await expect(page.getByLabel("Background transparency")).toHaveCount(0);
   await expect(page.getByRole("slider", { name: "Color opacity" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
   await expect(page.locator("[aria-label='NotePane wordmark']")).toBeVisible();
   await expect(page.getByTestId("session-sidebar").locator("[aria-label='NotePane wordmark']"))
     .toBeVisible();
@@ -128,7 +128,7 @@ test("keeps sticky chrome outside the editable BlockNote surface", async ({ page
   await expect(page.locator(".sticky-grip")).toHaveCount(0);
 
   await clickLastEmptyParagraph(page);
-  await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
 
   const dragRegions = await page.evaluate(() => {
     const header = document.querySelector("[data-testid='sticky-header']");
@@ -489,14 +489,32 @@ test("shows table of contents in tab mode only when enabled from preferences", a
       width: Math.round(toc.getBoundingClientRect().width),
     };
   });
-  expect(tocMetrics.width).toBeGreaterThanOrEqual(200);
+  expect(tocMetrics.width).toBeLessThanOrEqual(48);
   expect(tocMetrics.maxHeight).toBeGreaterThanOrEqual(600);
-  expect(tocMetrics.editorPaddingRight).toBeGreaterThanOrEqual(tocMetrics.width);
+  expect(tocMetrics.editorPaddingRight).toBe(0);
   expect(tocMetrics.entryWhiteSpace).toBe("normal");
   expect(tocMetrics.entryTextOverflow).toBe("clip");
   expect(tocMetrics.listOverflowX).toBe("hidden");
   expect(tocMetrics.listOverflowY).toBe("auto");
   expect(tocMetrics.listScrollWidth).toBeLessThanOrEqual(tocMetrics.listClientWidth);
+  const activeHeading = tableOfContents.getByRole("button", {
+    name: /Jump to NotePane, heading level 1/,
+  });
+  await expect(activeHeading).toHaveAttribute("aria-current", "location");
+  await page.evaluate(() => {
+    const surface = document.querySelector(".sticky-editor-surface");
+    const heading = [...document.querySelectorAll(".sticky-editor-surface .bn-block-outer")]
+      .find((element) => element.textContent?.includes("Launch checklist"));
+    if (!surface || !heading) throw new Error("Launch checklist heading was not rendered");
+    surface.scrollTop = Math.max(0, heading.offsetTop - 48);
+    surface.dispatchEvent(new Event("scroll"));
+  });
+  await expect(tableOfContents.getByRole("button", {
+    name: /Jump to Launch checklist, heading level 1/,
+  })).toHaveAttribute("aria-current", "location");
+  await tableOfContents.hover();
+  await expect.poll(() => tableOfContents.evaluate((toc) => Math.round(toc.getBoundingClientRect().width))).toBeGreaterThanOrEqual(200);
+  await expect(tableOfContents.getByText("Contents")).toBeVisible();
   await page.keyboard.press(modifierShortcut("+"));
   const fontSizeToast = page.locator(".editor-font-size-toast");
   await expect(fontSizeToast).toBeVisible();
@@ -546,6 +564,44 @@ test("shows table of contents in tab mode only when enabled from preferences", a
     "data-layout-mode",
     "tabs",
   );
+});
+
+test("centers the editor by default and toggles a wide canvas from the control or shortcut", async ({ page }) => {
+  await loadTemplatePreview(page);
+
+  const surface = page.getByTestId("sticky-editor-surface");
+  const widthMetrics = () => page.evaluate(() => {
+    const surfaceElement = document.querySelector("[data-testid='sticky-editor-surface']");
+    const editorElement = surfaceElement?.querySelector(".bn-editor");
+    const codeElement = surfaceElement?.querySelector("[data-content-type='codeBlock']");
+    if (!surfaceElement || !editorElement || !codeElement) throw new Error("Editor width elements were not rendered");
+    return {
+      mode: surfaceElement.getAttribute("data-editor-width"),
+      surfaceLeft: surfaceElement.getBoundingClientRect().left,
+      surfaceWidth: surfaceElement.getBoundingClientRect().width,
+      editorWidth: editorElement.getBoundingClientRect().width,
+      editorContentWidth: editorElement.clientWidth - Number.parseFloat(getComputedStyle(editorElement).paddingLeft) - Number.parseFloat(getComputedStyle(editorElement).paddingRight),
+      editorLeft: editorElement.getBoundingClientRect().left,
+      codeWidth: codeElement.getBoundingClientRect().width,
+    };
+  });
+
+  const reading = await widthMetrics();
+  expect(reading.mode).toBe("reading");
+  expect(reading.editorWidth).toBeLessThan(reading.surfaceWidth - 120);
+  expect(Math.abs(reading.editorLeft - reading.surfaceLeft - ((reading.surfaceWidth - reading.editorWidth) / 2))).toBeLessThanOrEqual(2);
+  expect(Math.abs(reading.codeWidth - reading.editorContentWidth)).toBeLessThanOrEqual(2);
+
+  await page.getByRole("button", { name: "Use wide editor" }).click();
+  await expect(surface).toHaveAttribute("data-editor-width", "wide");
+  await expect(page.getByRole("button", { name: "Use reading width" })).toBeVisible();
+
+  const wide = await widthMetrics();
+  expect(wide.editorWidth).toBeGreaterThan(reading.editorWidth + 100);
+  expect(Math.abs(wide.codeWidth - wide.editorContentWidth)).toBeLessThanOrEqual(2);
+
+  await page.keyboard.press(modifierShortcut("Shift+W"));
+  await expect(surface).toHaveAttribute("data-editor-width", "reading");
 });
 
 test("keeps tab and command select-all outside the editor from moving chrome focus or selecting chrome", async ({ page }) => {
@@ -952,7 +1008,7 @@ test("uses sticky pastel color and carries it back to the session tab", async ({
 
   await openStickyActionBar(page);
   await expect(stickyPinButton).toBeVisible();
-  await expect(page.getByRole("button", { name: "Export PDF" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export" })).toBeVisible();
   await expect(stickyModeButton).toBeVisible();
   await expect(stickySettingsButton).toBeVisible();
   await expect(stickyTrashButton).toBeVisible();
@@ -1042,7 +1098,7 @@ test("uses sticky pastel color and carries it back to the session tab", async ({
     actionIconTone: "palette",
     headerActionButtonLabels: [
       "Pin window",
-      "Export PDF",
+      "Export",
       "Switch to Tab sessions mode",
       "Sticky settings",
       "Move note to trash",
@@ -1918,25 +1974,24 @@ async function expectNewSessionButtonBelowLastTab(page) {
   expect(layout.distanceFromSidebarBottom).toBeGreaterThan(160);
 }
 
-test("exports PDF from the button and keyboard shortcut without a format menu", async ({ page }) => {
+test("opens an export format menu from the button and keyboard shortcut", async ({ page }) => {
   await clickLastEmptyParagraph(page);
-  const exportButton = page.getByRole("button", { name: "Export PDF" });
+  const exportButton = page.getByRole("button", { name: "Export" });
   await expect(exportButton).toBeVisible();
 
   await exportButton.click();
+  const exportMenu = page.getByRole("menu", { name: "Export format" });
+  await expect(exportMenu).toBeVisible();
+  await expect(exportMenu.getByRole("menuitem", { name: /PDF/ })).toBeVisible();
+  await expect(exportMenu.getByRole("menuitem", { name: /Markdown/ })).toBeVisible();
+  await exportMenu.getByRole("menuitem", { name: /Markdown/ }).click();
   await expect(page.locator(".sticky-toast-error"))
-    .toHaveText("PDF export is available in the desktop app.");
+    .toHaveText("Note export is available in the desktop app.");
   await expect(page.locator(".sticky-toast-error"))
     .toHaveCount(0, { timeout: 4000 });
 
   await page.keyboard.press(modifierShortcut("Shift+E"));
-
-  await expect(page.getByRole("menu", { name: "Export format" }))
-    .toHaveCount(0);
-  await expect(page.locator(".sticky-toast-error"))
-    .toHaveText("PDF export is available in the desktop app.");
-  await expect(page.locator(".sticky-toast-error"))
-    .toHaveCount(0, { timeout: 4000 });
+  await expect(page.getByRole("menu", { name: "Export format" })).toBeVisible();
 });
 
 test("keeps adaptive tooltips visible from every viewport edge", async ({ page }) => {
@@ -2936,6 +2991,7 @@ test("opens BlockNote slash menu with core demo commands", async ({ page }) => {
     "Video",
     "Audio",
     "File",
+    "Import Markdown",
     "Toggle Heading 1",
     "Toggle Heading 4",
   ]) {
@@ -2956,6 +3012,29 @@ test("opens BlockNote slash menu with core demo commands", async ({ page }) => {
   ).getByRole("button", {
     name: "Empty toggle. Click to add a block.",
   })).toHaveCount(0);
+});
+
+test("imports Markdown through the slash-command upload modal, including drag and drop", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/import");
+  await page.getByText("Import Markdown", { exact: true }).click();
+
+  const importDialog = page.getByRole("dialog", { name: "Import Markdown" });
+  await expect(importDialog).toBeVisible();
+  await expect(importDialog.getByText("Drop a .md file here")).toBeVisible();
+  await expect(importDialog.getByText("or click to choose a file")).toBeVisible();
+
+  await importDialog.locator(".markdown-import-dropzone").evaluate((dropzone) => {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(new File([
+      "# Dropped Markdown\n\n- Imported with drag and drop",
+    ], "dropped.md", { type: "text/markdown" }));
+    dropzone.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer }));
+  });
+
+  await expect(page.getByRole("heading", { name: "Dropped Markdown" })).toBeVisible();
+  await expect(page.getByText("Imported with drag and drop", { exact: true })).toBeVisible();
+  await expect(importDialog).toHaveCount(0);
 });
 
 test("creates four toggle heading levels with Notion-style shortcuts", async ({ page }) => {
@@ -4566,11 +4645,8 @@ test("focuses table cells without changing their drag selection behavior", async
   const tableCellCount = await page.locator(".bn-editor table td, .bn-editor table th").count();
   await activeCell.getByText("Tabs", { exact: true }).click();
 
-  await expect(page.locator(".notepane-table-cell-focus-ring"))
-    .toHaveAttribute("data-cell-text", "Tabs");
-  const focusedCellStyle = await page.locator(".notepane-table-cell-focus-ring")
-    .evaluate((ring) => {
-      const style = getComputedStyle(ring);
+  const focusedCellStyle = await activeCell.evaluate((cell) => {
+      const style = getComputedStyle(cell);
       return {
         backgroundColor: style.backgroundColor,
         borderWidth: style.borderWidth,
@@ -4580,17 +4656,10 @@ test("focuses table cells without changing their drag selection behavior", async
     });
   expect(focusedCellStyle).toEqual({
     backgroundColor: "rgba(0, 0, 0, 0)",
-    borderWidth: "0px",
+    borderWidth: "1px",
     boxShadow: "rgba(139, 92, 246, 0.58) 0px 0px 0px 2px inset",
     transitionDuration: "0s",
   });
-  await expect.poll(() => page.locator(".notepane-table-cell-focus-ring")
-    .evaluate((ring) => {
-      const rect = ring.getBoundingClientRect();
-      const pixelRatio = window.devicePixelRatio || 1;
-      return [rect.top, rect.right, rect.bottom, rect.left]
-        .every((edge) => Number.isInteger(edge * pixelRatio));
-    })).toBe(true);
 
   await expect(page.locator(".bn-table-handle, .bn-table-cell-handle").first())
     .toBeVisible();
@@ -4789,7 +4858,7 @@ test("resizes selected table cells live and auto-fits columns on double click", 
   const liveFocusedWidth = (await cell.boundingBox()).width;
   expect(liveFocusedWidth).toBeGreaterThan(initialWidth + 40);
   await expect.poll(async () => (
-    await page.locator(".notepane-table-cell-focus-ring").boundingBox()
+    await cell.boundingBox()
   )?.width).toBeCloseTo(liveFocusedWidth, 0);
   await page.mouse.up();
 
@@ -4821,6 +4890,62 @@ test("resizes selected table cells live and auto-fits columns on double click", 
   expect((await cell.boundingBox()).width).toBeLessThan(90);
 });
 
+test("copies a table when its block is selected from the six-dot handle", async ({ page }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+
+  const table = page.getByRole("table").first();
+  const tableBlock = table.locator("xpath=ancestor::div[contains(@class, 'bn-block-outer')][1]");
+  await tableBlock.hover();
+  const dragHandle = page.locator(".bn-side-menu [data-test='dragHandle']:visible").last();
+  await expect(dragHandle).toBeVisible();
+  await dragHandle.click();
+  await page.keyboard.press(modifierShortcut("C"));
+
+  await expect.poll(async () => page.evaluate(() => navigator.clipboard.readText()))
+    .toContain("Tabs");
+});
+
+test("promotes a cross-block text drag into a block selection", async ({ page }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+
+  const start = page.getByText("A focused workspace for persistent notes", { exact: false }).first();
+  const end = page.getByText("Create one session per meeting", { exact: false }).first();
+  const startBox = await start.boundingBox();
+  const endBox = await end.boundingBox();
+  expect(startBox).not.toBeNull();
+  expect(endBox).not.toBeNull();
+
+  await page.mouse.move(startBox.x + 8, startBox.y + startBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(endBox.x + endBox.width - 8, endBox.y + endBox.height / 2, { steps: 8 });
+  const selectedBlocks = page.locator('.bn-editor [data-block-selected="true"]');
+  await expect(selectedBlocks).not.toHaveCount(0);
+  const expandedCount = await selectedBlocks.count();
+  expect(expandedCount).toBeGreaterThan(1);
+  await page.mouse.move(startBox.x + 20, startBox.y + startBox.height / 2, { steps: 4 });
+  await expect(selectedBlocks).toHaveCount(1);
+  await page.mouse.move(endBox.x + 30, endBox.y + endBox.height / 2, { steps: 8 });
+  await expect(selectedBlocks).toHaveCount(expandedCount);
+  await page.mouse.up();
+  await expect(selectedBlocks).toHaveCount(expandedCount);
+  await expect(page.locator('.bn-editor')).toHaveAttribute('data-block-selection', 'true');
+  expect(await selectedBlocks.first().locator(':scope > .bn-block').evaluate(el => getComputedStyle(el).backgroundColor))
+    .not.toBe("rgba(0, 0, 0, 0)");
+  await page.keyboard.press(modifierShortcut("C"));
+
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toContain("A focused workspace for persistent notes");
+  expect(copied).toContain("Create one session per meeting");
+  expect(copied).not.toContain("Pin a sticky window");
+  expect(await start.evaluate(el => getComputedStyle(el, '::selection').backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  await start.click();
+  await expect(selectedBlocks).toHaveCount(0);
+});
+
 test("keeps the focused table cell border attached through scroll and column resize", async ({ page }) => {
   await loadTemplatePreview(page);
   await page.getByRole("button", { name: "Use this template" }).click();
@@ -4828,8 +4953,7 @@ test("keeps the focused table cell border attached through scroll and column res
     name: "Drafting, comparing, and organizing sessions",
   }).first();
   await cell.click();
-  await expect(page.locator(".notepane-table-cell-focus-ring"))
-    .toHaveAttribute("data-cell-text", "Drafting, comparing, and organizing sessions");
+  await expectFocusedTableCellBorderToMatch(page, cell);
 
   await page.getByTestId("sticky-editor-surface").evaluate((surface) => {
     surface.scrollTop += 120;
@@ -4891,8 +5015,7 @@ test("does not focus the first cell when clicking blank table surface", async ({
     name: "Drafting, comparing, and organizing sessions",
   }).first();
   await focusedCell.click();
-  await expect(page.locator(".notepane-table-cell-focus-ring"))
-    .toHaveAttribute("data-cell-text", "Drafting, comparing, and organizing sessions");
+  await expectFocusedTableCellBorderToMatch(page, focusedCell);
 
   await page.getByRole("table").evaluate((table) => {
     table.dispatchEvent(new PointerEvent("pointerdown", {
@@ -4910,7 +5033,9 @@ test("does not focus the first cell when clicking blank table surface", async ({
     }));
   });
 
-  await expect(page.locator(".notepane-table-cell-focus-ring")).toHaveCount(0);
+  await expect.poll(() => focusedCell.evaluate((cell) => (
+    getComputedStyle(cell).boxShadow
+  ))).not.toContain("0px 0px 0px 2px");
 });
 
 test("auto-fits table columns from the current font size within the editor width", async ({ page }) => {
@@ -4922,7 +5047,13 @@ test("auto-fits table columns from the current font size within the editor width
   ));
   const cell = tableCells.nth(tabsCellIndex);
   await expect(cell).toContainText("Tabs");
-
+  const initialTableBounds = await page.evaluate(() => ({
+    tableWidth: document.querySelector(".bn-editor table")?.getBoundingClientRect().width ?? 0,
+    innerWidth: document.querySelector(".bn-editor .tableWrapper-inner")?.getBoundingClientRect().width ?? 0,
+  }));
+  expect(initialTableBounds.tableWidth).toBeGreaterThanOrEqual(
+    initialTableBounds.innerWidth - 1,
+  );
   const autoFitColumn = async () => {
     const box = await cell.boundingBox();
     await page.mouse.dblclick(
@@ -4957,6 +5088,35 @@ test("auto-fits table columns from the current font size within the editor width
   expect(bounds.columnWidth).toBeLessThanOrEqual(bounds.editorWidth + 1);
 });
 
+test("keeps resized tables inside a local horizontal scroller", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+
+  const geometry = await page.getByRole("table").first().evaluate((table) => {
+    const wrapper = table.closest(".tableWrapper");
+    const surface = table.closest("[data-testid='sticky-editor-surface']");
+    for (const cell of table.querySelectorAll("td, th")) {
+      cell.setAttribute("data-colwidth", "520");
+    }
+    for (const column of table.querySelectorAll("col")) {
+      column.style.width = "520px";
+    }
+    table.style.setProperty("width", "1560px", "important");
+
+    return {
+      wrapperClientWidth: wrapper?.clientWidth ?? 0,
+      wrapperScrollWidth: wrapper?.scrollWidth ?? 0,
+      surfaceClientWidth: surface?.clientWidth ?? 0,
+      surfaceScrollWidth: surface?.scrollWidth ?? 0,
+    };
+  });
+
+  expect(geometry.wrapperScrollWidth).toBeGreaterThan(geometry.wrapperClientWidth);
+  expect(geometry.surfaceScrollWidth).toBeLessThanOrEqual(
+    geometry.surfaceClientWidth + 1,
+  );
+});
+
 test("deletes the current block with Command+X when no text is selected", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   await page.keyboard.type("delete this block");
@@ -4967,16 +5127,129 @@ test("deletes the current block with Command+X when no text is selected", async 
     .toBeVisible();
 });
 
-test("shows image download and crop tools after selecting an image", async ({ page }) => {
+test("shows image download and crop actions in one toolbar", async ({ page }) => {
   await loadTemplatePreview(page);
-  await page.locator("img.bn-visual-media").first().click();
+  const image = page.locator("img.bn-visual-media").first();
+  await image.click();
 
-  const imageTools = page.getByRole("toolbar", { name: "Image tools" });
+  const imageTools = page.locator(".notepane-formatting-toolbar:visible");
   await expect(imageTools).toBeVisible();
-  await expect(imageTools.getByRole("button", { name: "Download image" })).toBeVisible();
+  await expect(imageTools.locator(".notepane-file-download-button")).toBeVisible();
+  await expect(imageTools.getByRole("button", { name: "Crop image" })).toBeVisible();
+  await imageTools.getByRole("button", { name: "Replace image" }).click();
+  const replacePanel = page.locator(".bn-panel:visible");
+  await expect(replacePanel).toBeVisible();
+  await expect(replacePanel.locator("[data-test='upload-input']")).toBeVisible();
+  await expect.poll(async () => (
+    await replacePanel.boundingBox()
+  )?.width).toBeGreaterThanOrEqual(480);
+  await page.keyboard.press("Escape");
+  await expect(replacePanel).toHaveCount(0);
+  await image.click();
+  await expect(imageTools).toBeVisible();
   await imageTools.getByRole("button", { name: "Crop image" }).click();
-  await expect(page.getByRole("dialog", { name: "Crop image" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Apply crop" })).toBeVisible();
+  const cropDialog = page.getByRole("dialog", { name: "Crop image" });
+  await expect(cropDialog).toBeVisible();
+  const cropVisuals = await cropDialog.evaluate((dialog) => {
+    const frame = dialog.querySelector(".crop-image-frame");
+    const image = dialog.querySelector(".crop-image-canvas img");
+    const selection = dialog.querySelector(".crop-selection");
+    const frameRect = frame?.getBoundingClientRect();
+    const imageRect = image?.getBoundingClientRect();
+    const selectionStyle = selection && getComputedStyle(selection);
+    return {
+      imageFitsFrame: Boolean(
+        frameRect && imageRect &&
+          imageRect.left >= frameRect.left &&
+          imageRect.right <= frameRect.right &&
+          imageRect.top >= frameRect.top &&
+          imageRect.bottom <= frameRect.bottom,
+      ),
+      grid: selectionStyle?.backgroundImage ?? "",
+      mask: selectionStyle?.boxShadow ?? "",
+    };
+  });
+  expect(cropVisuals.imageFitsFrame).toBe(true);
+  expect(cropVisuals.grid).toContain("linear-gradient");
+  expect(cropVisuals.mask).not.toContain("9999");
+  await expect(cropDialog.locator(".crop-resize-handle")).toHaveCount(8);
+
+  const originalSource = await cropDialog
+    .locator(".crop-image-canvas img")
+    .getAttribute("src");
+  const cropImage = cropDialog.locator(".crop-image-canvas img");
+  const cropImageBox = await cropImage.boundingBox();
+  expect(cropImageBox).not.toBeNull();
+  await expect.poll(async () => (
+    await cropDialog.locator(".crop-selection").boundingBox()
+  )?.width).toBeCloseTo(cropImageBox.width, 0);
+  const resizeFromHandle = async (handle, x, y) => {
+    const handleBox = await cropDialog
+      .getByRole("button", { name: `Resize crop from ${handle}`, exact: true })
+      .boundingBox();
+    expect(handleBox).not.toBeNull();
+    await page.mouse.move(handleBox.x + (handleBox.width / 2), handleBox.y + (handleBox.height / 2));
+    await page.mouse.down();
+    await page.mouse.move(cropImageBox.x + (cropImageBox.width * x), cropImageBox.y + (cropImageBox.height * y));
+    await page.mouse.up();
+  };
+  await resizeFromHandle("right", 0.8, 0.5);
+  await resizeFromHandle("bottom", 0.5, 0.8);
+  await expect.poll(async () => (
+    await cropDialog.locator(".crop-selection").boundingBox()
+  )?.width).toBeCloseTo(cropImageBox.width * 0.8, 0);
+  await expect.poll(async () => (
+    await cropDialog.locator(".crop-selection").boundingBox()
+  )?.height).toBeCloseTo(cropImageBox.height * 0.8, 0);
+  const selectionBox = await cropDialog.locator(".crop-selection").boundingBox();
+  expect(selectionBox).not.toBeNull();
+  await page.mouse.move(
+    selectionBox.x + (selectionBox.width / 2),
+    selectionBox.y + (selectionBox.height / 2),
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    selectionBox.x + (selectionBox.width / 2) + (cropImageBox.width * 0.1),
+    selectionBox.y + (selectionBox.height / 2) + (cropImageBox.height * 0.1),
+  );
+  await page.mouse.up();
+  await expect.poll(async () => (
+    await cropDialog.locator(".crop-selection").boundingBox()
+  )?.x).toBeCloseTo(cropImageBox.x + (cropImageBox.width * 0.1), 0);
+  await expect.poll(async () => (
+    await cropDialog.locator(".crop-selection").boundingBox()
+  )?.y).toBeCloseTo(cropImageBox.y + (cropImageBox.height * 0.1), 0);
+  await cropDialog.getByRole("button", { name: "Apply crop" }).click();
+  await expect(cropDialog).toHaveCount(0);
+
+  await image.click();
+  await imageTools.getByRole("button", { name: "Crop image" }).click();
+  await expect(cropDialog).toBeVisible();
+  await expect(cropDialog.locator(".crop-image-canvas img")).toHaveAttribute(
+    "src",
+    originalSource,
+  );
+  await expect.poll(async () => (
+    await cropDialog.locator(".crop-selection").boundingBox()
+  )?.width).toBeCloseTo(cropImageBox.width * 0.8, 0);
+  await expect.poll(async () => (
+    await cropDialog.locator(".crop-selection").boundingBox()
+  )?.height).toBeCloseTo(cropImageBox.height * 0.8, 0);
+  await expect.poll(async () => (
+    await cropDialog.locator(".crop-selection").boundingBox()
+  )?.x).toBeCloseTo(cropImageBox.x + (cropImageBox.width * 0.1), 0);
+  await expect.poll(async () => (
+    await cropDialog.locator(".crop-selection").boundingBox()
+  )?.y).toBeCloseTo(cropImageBox.y + (cropImageBox.height * 0.1), 0);
+
+  await cropDialog.getByRole("button", { name: "Apply crop" }).click();
+  await expect(cropDialog).toHaveCount(0);
+  await image.click();
+  await imageTools.getByRole("button", { name: "Crop image" }).click();
+  await expect(cropDialog.locator(".crop-image-canvas img")).toHaveAttribute(
+    "src",
+    originalSource,
+  );
 });
 
 async function clickLastEmptyParagraph(page) {
@@ -4996,16 +5269,9 @@ async function expectEditorFocused(page) {
 
 async function expectFocusedTableCellBorderToMatch(page, cell) {
   await expect.poll(async () => {
-    const [cellBox, ringBox, label] = await Promise.all([
-      cell.boundingBox(),
-      page.locator(".notepane-table-cell-focus-ring").boundingBox(),
-      page.locator(".notepane-table-cell-focus-ring").getAttribute("data-cell-text"),
-    ]);
-    return label === "Drafting, comparing, and organizing sessions" &&
-      Math.abs((cellBox?.x ?? 0) - (ringBox?.x ?? 0)) <= 1 &&
-      Math.abs((cellBox?.y ?? 0) - (ringBox?.y ?? 0)) <= 1 &&
-      Math.abs((cellBox?.width ?? 0) - (ringBox?.width ?? 0)) <= 1 &&
-      Math.abs((cellBox?.height ?? 0) - (ringBox?.height ?? 0)) <= 1;
+    return await cell.evaluate((element) => (
+      getComputedStyle(element).boxShadow.includes("0px 0px 0px 2px")
+    ));
   }).toBe(true);
 }
 

@@ -43,7 +43,10 @@ test("Electron app opens a sticky window and persists editor content", async () 
     });
     await page.getByRole("paragraph").filter({ hasText: /^$/ }).last().click();
     await page.keyboard.insertText("electron persistence probe");
-    await page.getByRole("button", { name: "Export PDF" }).click();
+    await page.getByRole("button", { name: "Export" }).click();
+    await page.getByRole("menu", { name: "Export format" })
+      .getByRole("menuitem", { name: /PDF/ })
+      .click();
     await expect(page.locator(".sticky-toast-success"))
       .toHaveText("PDF exported");
     await expect(page.locator(".sticky-toast-success"))
@@ -53,6 +56,17 @@ test("Electron app opens a sticky window and persists editor content", async () 
     await expect.poll(() => fs.existsSync(notesPath)).toBe(true);
     await expect.poll(
       () => fs.existsSync(path.join(exportDirectory, "Project note.pdf")),
+      { timeout: 20_000 },
+    )
+      .toBe(true);
+
+    await page.getByRole("button", { name: "Export" }).click();
+    await page.getByRole("menu", { name: "Export format" })
+      .getByRole("menuitem", { name: /Markdown/ })
+      .click();
+    await expect(page.locator(".sticky-toast-success")).toHaveText("Markdown exported");
+    await expect.poll(
+      () => fs.existsSync(path.join(exportDirectory, "Project note.md")),
       { timeout: 20_000 },
     )
       .toBe(true);
@@ -75,8 +89,42 @@ test("Electron app opens a sticky window and persists editor content", async () 
     expect(notes[0].alwaysOnTop).toBe(false);
     expect(fs.statSync(path.join(exportDirectory, "Project note.pdf")).size)
       .toBeGreaterThan(1000);
+    expect(fs.readFileSync(path.join(exportDirectory, "Project note.md"), "utf8"))
+      .toContain("electron persistence probe");
     expect(fs.existsSync(path.join(exportDirectory, "Project note.png")))
       .toBe(false);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("/import inserts a Markdown file as editor blocks", async () => {
+  const userDataDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "notepane-markdown-import-"),
+  );
+  const importDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "notepane-markdown-source-"),
+  );
+  const importPath = path.join(importDirectory, "meeting-notes.md");
+  fs.writeFileSync(
+    importPath,
+    "# Imported meeting notes\n\n- First decision\n- Second decision\n\nA **formatted** paragraph.",
+  );
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await page.getByRole("paragraph").filter({ hasText: /^$/ }).last().click();
+    await page.keyboard.type("/import");
+    await page.getByText("Import Markdown", { exact: true }).click();
+    const importDialog = page.getByRole("dialog", { name: "Import Markdown" });
+    await expect(importDialog).toBeVisible();
+    await importDialog.getByLabel("Choose Markdown file").setInputFiles(importPath);
+
+    await expect(page.getByRole("heading", { name: "Imported meeting notes" }))
+      .toBeVisible();
+    await expect(page.getByText("First decision", { exact: true })).toBeVisible();
+    await expect(page.getByText("formatted", { exact: true })).toBeVisible();
   } finally {
     await electronApp.close();
   }
@@ -466,36 +514,17 @@ test("Electron menu actions respect tabs/sticky modes and toggle always-on-top",
     }).toBe(1);
     await expect(page.getByRole("tab")).toHaveCount(2);
 
-    if (process.platform === "darwin") {
-      await clickMenuItem(electronApp, "Close Window");
-      await expect.poll(async () => {
-        return await electronApp.evaluate(({ BrowserWindow }) => {
-          return BrowserWindow.getAllWindows().length;
-        });
-      }).toBe(0);
-      await expect.poll(() => {
-        const state = getStoredTrashState(userDataDirectory);
-        return {
-          activeCount: state.activeNoteIds.length,
-          trashedCount: state.trashedNoteIds.length,
-        };
-      }).toEqual({
-        activeCount: 2,
-        trashedCount: 0,
+    await clickMenuItem(electronApp, "Close Tab");
+    await expect.poll(async () => {
+      return await electronApp.evaluate(({ BrowserWindow }) => {
+        return BrowserWindow.getAllWindows().length;
       });
-
-      await electronApp.evaluate(({ app }) => {
-        app.emit("activate");
-      });
-      await expect.poll(async () => {
-        return await electronApp.evaluate(({ BrowserWindow }) => {
-          return BrowserWindow.getAllWindows().length;
-        });
-      }).toBe(1);
-      page = getOpenPages(electronApp)[0] ?? await electronApp.firstWindow();
-      await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
-      await expect(page.getByRole("tab")).toHaveCount(2);
-    }
+    }).toBe(1);
+    await expect(page.getByRole("tab")).toHaveCount(1);
+    await expect.poll(() => getStoredTrashState(userDataDirectory)).toEqual({
+      activeNoteIds: [expect.any(String)],
+      trashedNoteIds: [expect.any(String)],
+    });
 
     await clickMenuItem(electronApp, "New Note");
     await chooseBlankSessionTemplate(page);
@@ -504,14 +533,14 @@ test("Electron menu actions respect tabs/sticky modes and toggle always-on-top",
         return BrowserWindow.getAllWindows().length;
       });
     }).toBe(1);
-    await expect(page.getByRole("tab")).toHaveCount(3);
+    await expect(page.getByRole("tab")).toHaveCount(2);
 
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
     await expect.poll(async () => {
       return await electronApp.evaluate(({ BrowserWindow }) => {
         return BrowserWindow.getAllWindows().length;
       });
-    }).toBe(3);
+    }).toBe(2);
     await expect.poll(async () => {
       return await electronApp.evaluate(({ BrowserWindow }) => {
         return BrowserWindow.getAllWindows().map((window) => window.getBounds());
@@ -542,6 +571,35 @@ test("Electron menu actions respect tabs/sticky modes and toggle always-on-top",
         );
       });
     }).toBe(true);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Cmd/Ctrl+W closes the tab with confirmation", async () => {
+  const userDataDirectory = fs.mkdtempSync(
+    path.join(os.tmpdir(), "notepane-close-tab-shortcut-"),
+  );
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const emptyParagraph = page.getByRole("paragraph").filter({ hasText: /^$/ }).last();
+    await emptyParagraph.click();
+    await page.keyboard.insertText("Close me");
+
+    await page.keyboard.press(modifierShortcut("W"));
+    const closeDialog = page.getByRole("dialog", { name: "Close tab confirmation" });
+    await expect(closeDialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(closeDialog).toHaveCount(0);
+
+    await page.keyboard.press(modifierShortcut("W"));
+    await expect(closeDialog).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(closeDialog).toHaveCount(0);
+    await expect(page.locator(".sticky-toast-success")).toContainText("closed");
+    await expect.poll(() => page.getByRole("tab").count()).toBe(1);
   } finally {
     await electronApp.close();
   }

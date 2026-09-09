@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { formatKeyboardShortcut } from "@blocknote/core";
 import { TableHandlesExtension } from "@blocknote/core/extensions";
-import { Combine, SplitSquareHorizontal } from "lucide-react";
+import { Combine, Crop, Download, SplitSquareHorizontal } from "lucide-react";
 import {
   BasicTextStyleButton,
   blockTypeSelectItems as getBlockTypeSelectItems,
@@ -34,7 +34,6 @@ const CONTEXTUAL_FORMATTING_TOOL_KEYS = new Set([
   "replaceFileButton",
   "fileRenameButton",
   "fileDeleteButton",
-  "fileDownloadButton",
   "filePreviewButton",
 ]);
 const FORMATTING_TOOLBAR_FLOATING_OPTIONS = {
@@ -78,6 +77,9 @@ export function applyEditorColor(editor, colorChoice) {
 export function RecentColorFormattingToolbarController({
   recentColors,
   onColorUsed,
+  onCropImage,
+  onDownloadImage,
+  activeImageBlockId,
   portalElement,
   hidden = false,
 }) {
@@ -87,9 +89,12 @@ export function RecentColorFormattingToolbarController({
         {...props}
         recentColors={recentColors}
         onColorUsed={onColorUsed}
+        onCropImage={onCropImage}
+        onDownloadImage={onDownloadImage}
+        activeImageBlockId={activeImageBlockId}
       />
     ),
-    [onColorUsed, recentColors],
+    [activeImageBlockId, onColorUsed, onCropImage, onDownloadImage, recentColors],
   );
 
   if (hidden) {
@@ -109,6 +114,9 @@ function RecentColorFormattingToolbar({
   blockTypeSelectItems,
   recentColors,
   onColorUsed,
+  onCropImage,
+  onDownloadImage,
+  activeImageBlockId,
 }) {
   const Components = useComponentsContext();
   const editor = useBlockNoteEditor();
@@ -128,6 +136,18 @@ function RecentColorFormattingToolbar({
       return false;
     },
   });
+  const selectedFileBlock = useEditorState({
+    editor,
+    selector: ({ editor: currentEditor }) => {
+      const selectedBlocks = currentEditor.getSelection()?.blocks || [
+        currentEditor.getTextCursorPosition().block,
+      ];
+      return selectedBlocks.length === 1 && selectedBlocks[0]?.type === "file"
+        ? selectedBlocks[0]
+        : null;
+    },
+  });
+  const isFileContext = Boolean(selectedFileBlock);
   const supportedBlockTypeSelectItems = (
     blockTypeSelectItems ?? getBlockTypeSelectItems(editor.dictionary)
   ).filter(
@@ -136,6 +156,10 @@ function RecentColorFormattingToolbar({
   const contextualItems = getFormattingToolbarItems(supportedBlockTypeSelectItems).filter(
     (item) => CONTEXTUAL_FORMATTING_TOOL_KEYS.has(item.key),
   );
+  const imageBlock = activeImageBlockId ? editor.getBlock(activeImageBlockId) : null;
+  const downloadableBlock = imageBlock?.type === "image"
+    ? imageBlock
+    : selectedFileBlock;
 
   if (!Components) {
     return null;
@@ -146,38 +170,59 @@ function RecentColorFormattingToolbar({
       className={[
         "bn-toolbar bn-formatting-toolbar notepane-formatting-toolbar",
         isInsideTableCell ? "is-table-context" : "",
+        isFileContext ? "is-file-context" : "",
       ].filter(Boolean).join(" ")}
     >
-      {!isInsideTableCell && (
+      {!isInsideTableCell && !isFileContext && (
         <div className="notepane-formatting-type-row">
           <BlockTypeSelect items={supportedBlockTypeSelectItems} />
         </div>
       )}
-      <div
-        className="notepane-formatting-actions"
-        role="group"
-        aria-label="Text formatting"
-      >
-        <RecentColorStyleButton
-          recentColors={recentColors}
-          onColorUsed={onColorUsed}
-        />
-        <BasicTextStyleButton basicTextStyle="bold" />
-        <BasicTextStyleButton basicTextStyle="italic" />
-        <BasicTextStyleButton basicTextStyle="underline" />
-        <BasicTextStyleButton basicTextStyle="strike" />
-        <CreateLinkButton />
-        <BasicTextStyleButton basicTextStyle="code" />
-        <TextAlignButton textAlignment="left" />
-        <TextAlignButton textAlignment="center" />
-        <TextAlignButton textAlignment="right" />
-      </div>
+      {!isFileContext && (
+        <div
+          className="notepane-formatting-actions"
+          role="group"
+          aria-label="Text formatting"
+        >
+          <RecentColorStyleButton
+            recentColors={recentColors}
+            onColorUsed={onColorUsed}
+          />
+          <BasicTextStyleButton basicTextStyle="bold" />
+          <BasicTextStyleButton basicTextStyle="italic" />
+          <BasicTextStyleButton basicTextStyle="underline" />
+          <BasicTextStyleButton basicTextStyle="strike" />
+          <CreateLinkButton />
+          <BasicTextStyleButton basicTextStyle="code" />
+          <TextAlignButton textAlignment="left" />
+          <TextAlignButton textAlignment="center" />
+          <TextAlignButton textAlignment="right" />
+        </div>
+      )}
       <div
         className="notepane-formatting-contextual-actions"
         role="group"
         aria-label="Selected item actions"
       >
         {contextualItems}
+        {downloadableBlock && onDownloadImage && (
+          <Components.FormattingToolbar.Button
+            className="bn-button notepane-file-download-button"
+            label={`Download ${downloadableBlock.type}`}
+            mainTooltip={`Download ${downloadableBlock.type}`}
+            icon={<Download />}
+            onClick={() => onDownloadImage(downloadableBlock)}
+          />
+        )}
+        {imageBlock?.type === "image" && onCropImage && (
+          <Components.FormattingToolbar.Button
+            className="bn-button notepane-image-crop-button"
+            label="Crop image"
+            mainTooltip="Crop image"
+            icon={<Crop />}
+            onClick={() => onCropImage(imageBlock)}
+          />
+        )}
         <TableCellMergeSplitButton />
       </div>
     </Components.FormattingToolbar.Root>

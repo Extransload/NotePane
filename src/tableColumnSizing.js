@@ -229,5 +229,7 @@ function updateTableColumnWidth(view, cellPosition, width) {
     return false;
   }
   view.dispatch(transaction);
+  const tableElement = findTableElementAtPosition(view, tableStart);
+  tableElement?.style.setProperty("width", "auto", "important");
   return true;
 }

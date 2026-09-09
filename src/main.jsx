@@ -1,3 +1,4 @@
+import { BlockDragSelection } from "./blockDragSelection.js";
 import React, {
   useCallback,
   useEffect,
@@ -11,12 +12,18 @@ import { createRoot } from "react-dom/client";
 import { codeBlockOptions } from "@blocknote/code-block";
 import {
   BlockNoteSchema,
+  createBlockConfig,
+  createBlockSpec,
   createCodeBlockSpec,
   createExtension,
   createHeadingBlockSpec,
+  createImageBlockConfig,
   createStyleSpecFromTipTapMark,
   defaultBlockSpecs,
   defaultStyleSpecs,
+  imageParse,
+  imageRender,
+  imageToExternalHTML,
 } from "@blocknote/core";
 import {
   filterSuggestionItems,
@@ -32,7 +39,13 @@ import {
 } from "@blocknote/react";
 import { offset, shift, size } from "@floating-ui/react";
 import { TextSelection } from "@tiptap/pm/state";
-import { CellSelection, mergeCells, splitCell } from "prosemirror-tables";
+import {
+  CellSelection,
+  columnResizingPluginKey,
+  mergeCells,
+  splitCell,
+} from "prosemirror-tables";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import {
   Check,
   Cog,
@@ -44,6 +57,8 @@ import {
   History,
   ArrowLeftRight,
   Heading4,
+  Maximize2,
+  Minimize2,
   Palette,
   PanelLeftClose,
   PanelLeftOpen,
@@ -226,9 +241,36 @@ const notionInlineCodeStyle = createStyleSpecFromTipTapMark(
   "boolean",
 );
 
+// Keep the uploaded source separate from the rendered crop. The current crop
+// remains the block URL, while every later crop operation starts from this URL.
+const createNonDestructiveImageBlockSpec = createBlockSpec(
+  createBlockConfig(() => {
+    const imageConfig = createImageBlockConfig();
+    return {
+      ...imageConfig,
+      propSchema: {
+        ...imageConfig.propSchema,
+        originalUrl: { default: "" },
+        cropX: { default: undefined, type: "number" },
+        cropY: { default: undefined, type: "number" },
+        cropWidth: { default: undefined, type: "number" },
+        cropHeight: { default: undefined, type: "number" },
+      },
+    };
+  }),
+  () => ({
+    meta: { fileBlockAccept: ["image/*"] },
+    parse: imageParse(),
+    render: imageRender(),
+    toExternalHTML: imageToExternalHTML(),
+    runsBefore: ["file"],
+  }),
+);
+
 const schema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
+    image: createNonDestructiveImageBlockSpec(),
     quote: {
       ...defaultBlockSpecs.quote,
       extensions: [
@@ -380,6 +422,7 @@ const DEFAULT_KEYBOARD_SHORTCUTS = {
   moveTabRight: "Mod+Shift+]",
   toggleSidebar: "Mod+Shift+B",
   toggleLayoutMode: "Mod+Shift+T",
+  toggleEditorWidth: "Mod+Shift+W",
   toggleTableOfContents: "Mod+Shift+O",
   toggleThemeMode: "Mod+Shift+L",
   exportPdf: "Mod+Shift+E",
@@ -534,7 +577,18 @@ const STICKY_PASTEL_PALETTE = [
   "#ffe4ca",
 ];
 const DEFAULT_STICKY_ACCENT_COLOR = STICKY_PASTEL_PALETTE[0];
-const DEFAULT_CROP = { x: 0.1, y: 0.1, width: 0.8, height: 0.8 };
+const DEFAULT_CROP = { x: 0, y: 0, width: 1, height: 1 };
+const MIN_CROP_SIZE = 0.02;
+const CROP_RESIZE_HANDLES = [
+  { id: "nw", label: "top left" },
+  { id: "n", label: "top" },
+  { id: "ne", label: "top right" },
+  { id: "e", label: "right" },
+  { id: "se", label: "bottom right" },
+  { id: "s", label: "bottom" },
+  { id: "sw", label: "bottom left" },
+  { id: "w", label: "left" },
+];
 const SIDEBAR_DEFAULT_WIDTH = 204;
 const SIDEBAR_MIN_WIDTH = 156;
 const SIDEBAR_MAX_WIDTH = 340;
@@ -544,6 +598,7 @@ const EXPORT_TOAST_TIMEOUT_MS = 2600;
 const TRASH_UNDO_TOAST_TIMEOUT_MS = 5200;
 const FONT_SIZE_TOAST_TIMEOUT_MS = 1400;
 const SLASH_MENU_MAX_HEIGHT = 400;
+const MAX_MARKDOWN_IMPORT_FILE_SIZE = 512 * 1024 * 1024;
 
 function createSlashMenuFloatingUIOptions() {
   return {
@@ -593,6 +648,7 @@ function App() {
   );
   const [recentEditorColors, setRecentEditorColors] = useState([]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isEditorWide, setIsEditorWide] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [sessionUndoToast, setSessionUndoToast] = useState(null);
   const [layoutTransition, setLayoutTransition] = useState(null);
@@ -643,7 +699,7 @@ function App() {
     setSessionUndoToast(null);
   }, []);
 
-  const showSessionMovedToTrashToast = useCallback(({ noteId, title }) => {
+  const showSessionMovedToTrashToast = useCallback(({ noteId, title, source = "trash" }) => {
     if (sessionUndoToastTimerRef.current) {
       window.clearTimeout(sessionUndoToastTimerRef.current);
       sessionUndoToastTimerRef.current = null;
@@ -652,6 +708,7 @@ function App() {
     setSessionUndoToast({
       noteId,
       title: normalizeTitle(title),
+      source,
     });
     sessionUndoToastTimerRef.current = window.setTimeout(() => {
       setSessionUndoToast(null);
@@ -1162,6 +1219,8 @@ function App() {
         appTheme={appTheme}
         layoutMode={layoutMode}
         isSidebarOpen={isSidebarOpen}
+        isEditorWide={isEditorWide}
+        onEditorWidthChange={setIsEditorWide}
         setIsSidebarOpen={setIsSidebarOpen}
         sidebarWidth={sidebarWidth}
         setSidebarWidth={setSidebarWidth}
@@ -1186,8 +1245,11 @@ function App() {
       />
       {sessionUndoToast && (
         <StickyToast
-          toast={{
-            message: `${sessionUndoToast.title} moved to Trash.`,
+        toast={{
+            message:
+              sessionUndoToast.source === "close"
+                ? `${sessionUndoToast.title} closed.`
+                : `${sessionUndoToast.title} moved to Trash.`,
             tone: "success",
             action: {
               label: "Undo",
@@ -1207,6 +1269,8 @@ function StickyEditor({
   appTheme,
   layoutMode,
   isSidebarOpen,
+  isEditorWide,
+  onEditorWidthChange,
   setIsSidebarOpen,
   sidebarWidth,
   setSidebarWidth,
@@ -1246,6 +1310,7 @@ function StickyEditor({
 
   const editor = useCreateBlockNote({
     schema,
+    extensions: [BlockDragSelection],
     initialContent: initialEditorContent,
     tabBehavior: "prefer-indent",
     tables: {
@@ -1283,7 +1348,35 @@ function StickyEditor({
   const codeBlockToolTargets = useCodeBlockToolTargets();
 
   useEffect(() => {
+    const copySelectedBlock = (event) => {
+      if (
+        event.type !== "copy" ||
+        !event.clipboardData
+      ) {
+        return false;
+      }
+
+      const selectedBlocks = getBlocksForClipboard(editor);
+      if (selectedBlocks.length === 0) {
+        return false;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      const externalHTML = editor.blocksToHTMLLossy(selectedBlocks);
+      const clipboardHTML = editor.blocksToFullHTML(selectedBlocks);
+      const markdown = editor.blocksToMarkdownLossy(selectedBlocks);
+      event.clipboardData.clearData();
+      event.clipboardData.setData("blocknote/html", clipboardHTML);
+      event.clipboardData.setData("text/html", externalHTML);
+      event.clipboardData.setData("text/plain", markdown);
+      return true;
+    };
+
     const normalizeEditorClipboardText = (event) => {
+      if (copySelectedBlock(event)) {
+        return;
+      }
       if (!isEditorShortcutTarget(event.target) || !event.clipboardData) {
         return;
       }
@@ -1300,11 +1393,11 @@ function StickyEditor({
       }
     };
 
-    document.addEventListener("copy", normalizeEditorClipboardText);
-    document.addEventListener("cut", normalizeEditorClipboardText);
+    document.addEventListener("copy", normalizeEditorClipboardText, true);
+    document.addEventListener("cut", normalizeEditorClipboardText, true);
     return () => {
-      document.removeEventListener("copy", normalizeEditorClipboardText);
-      document.removeEventListener("cut", normalizeEditorClipboardText);
+      document.removeEventListener("copy", normalizeEditorClipboardText, true);
+      document.removeEventListener("cut", normalizeEditorClipboardText, true);
     };
   }, [editor]);
 
@@ -1312,89 +1405,64 @@ function StickyEditor({
   const editorSurfaceRef = useRef(null);
   const suppressFocusedTableCellRef = useRef(false);
   const pendingTableExtensionFocusRef = useRef(null);
-  const focusedTableCellElementRef = useRef(null);
-  const focusedTableCellResizeObserverRef = useRef(null);
-  const [focusedTableCellRect, setFocusedTableCellRect] = useState(null);
+  const focusedTableDecorationsRef = useRef(null);
   const [isTableCellSelectionDismissed, setIsTableCellSelectionDismissed] =
     useState(false);
   const [isMultiTableCellSelection, setIsMultiTableCellSelection] = useState(
     false,
   );
-  const updateFocusedTableCell = useCallback(() => {
-    if (suppressFocusedTableCellRef.current) {
-      focusedTableCellResizeObserverRef.current?.disconnect();
-      focusedTableCellElementRef.current = null;
-      setFocusedTableCellRect(null);
-      return;
-    }
-
+  const updateFocusedTableCell = useCallback(() => {}, []);
+  useEffect(() => {
     const view = editor.prosemirrorView;
-    const selection = view?.state.selection;
-    const preservedCell = pendingTableExtensionFocusRef.current
-      ? getTableCellElementForSnapshot(editor, pendingTableExtensionFocusRef.current)
-      : null;
-    const cellRange = getCurrentTableCellRange(selection);
-    const cellNode = cellRange ? view?.nodeDOM(cellRange.cellPos) : null;
-    const selectedCell = (cellNode instanceof Element ? cellNode : cellNode?.parentElement)
-      ?.closest("td, th");
-    const cell = preservedCell || selectedCell;
-    if (
-      (!preservedCell && !selection?.empty) ||
-      !cell ||
-      cell.classList.contains("selectedCell")
-    ) {
-      focusedTableCellResizeObserverRef.current?.disconnect();
-      focusedTableCellElementRef.current = null;
-      setFocusedTableCellRect(null);
-      return;
-    }
-    if (focusedTableCellElementRef.current !== cell) {
-      focusedTableCellResizeObserverRef.current?.disconnect();
-      focusedTableCellElementRef.current = cell;
-      focusedTableCellResizeObserverRef.current?.observe(cell);
-    }
-    const rect = cell.getBoundingClientRect();
-    const pixelRatio = window.devicePixelRatio || 1;
-    const snapToDevicePixel = (value) => (
-      Math.round(value * pixelRatio) / pixelRatio
-    );
-    const left = snapToDevicePixel(rect.left);
-    const top = snapToDevicePixel(rect.top);
-    const right = snapToDevicePixel(rect.right);
-    const bottom = snapToDevicePixel(rect.bottom);
-    setFocusedTableCellRect({
-      top,
-      left,
-      width: right - left,
-      height: bottom - top,
-      text: cell.textContent?.trim() || "",
-    });
-  }, [editor]);
-  useEffect(() => {
-    const observer = new ResizeObserver(() => {
-      window.requestAnimationFrame(updateFocusedTableCell);
-    });
-    focusedTableCellResizeObserverRef.current = observer;
-    if (focusedTableCellElementRef.current) {
-      observer.observe(focusedTableCellElementRef.current);
-    }
-    return () => {
-      observer.disconnect();
-      focusedTableCellResizeObserverRef.current = null;
-    };
-  }, [updateFocusedTableCell]);
-  useEffect(() => {
-    const surface = editorSurfaceRef.current;
-    if (!surface) {
+    if (!view || view.isDestroyed) {
       return undefined;
     }
-
-    const updateAfterScroll = () => {
-      window.requestAnimationFrame(updateFocusedTableCell);
+    const decorations = (state) => {
+        if (
+          suppressFocusedTableCellRef.current ||
+          columnResizingPluginKey.getState(state)?.dragging
+        ) {
+          return DecorationSet.empty;
+        }
+        const selection = state.selection;
+        const isSingleCellSelection = Boolean(
+          selection.$anchorCell &&
+            selection.$headCell &&
+            selection.$anchorCell.pos === selection.$headCell.pos,
+        );
+        if (!selection.empty && !isSingleCellSelection && !pendingTableExtensionFocusRef.current) {
+          return DecorationSet.empty;
+        }
+        const preservedCell = pendingTableExtensionFocusRef.current
+          ? getTableCellElementForSnapshot(editor, pendingTableExtensionFocusRef.current)
+          : null;
+        const preservedRange = preservedCell
+          ? getCurrentTableCellRange({
+              $from: state.doc.resolve(view.posAtDOM(preservedCell, 0)),
+            })
+          : null;
+        const cellRange = preservedRange || getCurrentTableCellRange(selection);
+        const cellNode = cellRange ? state.doc.nodeAt(cellRange.cellPos) : null;
+        if (!cellRange || !cellNode) {
+          return DecorationSet.empty;
+        }
+        return DecorationSet.create(state.doc, [
+          Decoration.node(
+            cellRange.cellPos,
+            cellRange.cellPos + cellNode.nodeSize,
+            { class: "notepane-table-cell-focused" },
+          ),
+        ]);
+      };
+    focusedTableDecorationsRef.current = decorations;
+    view.setProps({ decorations });
+    return () => {
+      if (!view.isDestroyed) {
+        view.setProps({ decorations: undefined });
+      }
+      focusedTableDecorationsRef.current = null;
     };
-    surface.addEventListener("scroll", updateAfterScroll, { passive: true });
-    return () => surface.removeEventListener("scroll", updateAfterScroll);
-  }, [updateFocusedTableCell]);
+  }, [editor]);
   useEffect(() => {
     const isTableExtensionButton = (target) => (
       target instanceof Element && target.closest(
@@ -1545,6 +1613,7 @@ function StickyEditor({
         isEmptySessionDocument(initialEditorContent),
     );
   const [pendingSessionTrashNote, setPendingSessionTrashNote] = useState(null);
+  const [pendingSessionCloseNote, setPendingSessionCloseNote] = useState(null);
   const [sessionTabMenu, setSessionTabMenu] = useState(null);
   const [sessionColorPanelNoteId, setSessionColorPanelNoteId] = useState(null);
   const [isEditorActive, setIsEditorActive] = useState(false);
@@ -1558,6 +1627,8 @@ function StickyEditor({
   const [activeImageBlockId, setActiveImageBlockId] = useState(null);
   const [cropState, setCropState] = useState(null);
   const [exportToast, setExportToast] = useState(null);
+  const [exportFormatMenu, setExportFormatMenu] = useState(null);
+  const [isMarkdownImportOpen, setIsMarkdownImportOpen] = useState(false);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [noteVersions, setNoteVersions] = useState([]);
   const [isVersionBusy, setIsVersionBusy] = useState(false);
@@ -1565,6 +1636,8 @@ function StickyEditor({
   const [tableOfContentsEntries, setTableOfContentsEntries] = useState(() =>
     extractTableOfContentsEntries(initialEditorContent),
   );
+  const [activeTableOfContentsEntryIds, setActiveTableOfContentsEntryIds] =
+    useState(() => (tableOfContentsEntries[0]?.id ? [tableOfContentsEntries[0].id] : []));
   const saveTimerRef = useRef(null);
   const saveRetryTimerRef = useRef(null);
   const saveQueueRef = useRef(Promise.resolve());
@@ -1694,6 +1767,7 @@ function StickyEditor({
     }
     if (effectiveLayoutMode !== "tabs") {
       setPendingSessionTrashNote(null);
+      setPendingSessionCloseNote(null);
     }
   }, [effectiveLayoutMode, note.id]);
 
@@ -1720,12 +1794,15 @@ function StickyEditor({
       if (
         target.closest(".editor-font-setting-control") ||
         target.closest(".editor-floating-menu") ||
-        target.closest(".session-tab-context-menu")
+        target.closest(".session-tab-context-menu") ||
+        target.closest(".export-format-menu") ||
+        target.closest(".export-icon-button")
       ) {
         return;
       }
 
       setSessionTabMenu(null);
+      setExportFormatMenu(null);
       if (!target.closest(".sticky-header-actions")) {
         setIsStickyActionBarOpen(false);
       }
@@ -1884,9 +1961,59 @@ function StickyEditor({
     }, 180);
   }, [saveNow]);
 
+
   const refreshTableOfContents = useCallback(() => {
     setTableOfContentsEntries(extractTableOfContentsEntries(editor.document));
   }, [editor]);
+
+  useEffect(() => {
+    const surface = editorSurfaceRef.current;
+    if (!surface || !isTableOfContentsVisible || tableOfContentsEntries.length === 0) {
+      setActiveTableOfContentsEntryIds([]);
+      return undefined;
+    }
+
+    let frameId = 0;
+    const updateActiveHeading = () => {
+      frameId = 0;
+      const surfaceTop = surface.getBoundingClientRect().top;
+      const activationLine = surfaceTop + 48;
+      const blocks = tableOfContentsEntries
+        .map((entry) => ({ entry, element: getEditorBlockElement(entry.id) }))
+        .filter(({ element }) => element);
+      if (blocks.length === 0) return;
+
+      const currentIndex = blocks.reduce((index, block, nextIndex) => (
+        block.element.getBoundingClientRect().top <= activationLine ? nextIndex : index
+      ), 0);
+      const current = blocks[currentIndex];
+      const activeIds = [current.entry.id];
+      for (let index = currentIndex - 1; index >= 0; index -= 1) {
+        if (blocks[index].entry.level < current.entry.level) {
+          activeIds.push(blocks[index].entry.id);
+          break;
+        }
+      }
+
+      setActiveTableOfContentsEntryIds((previous) => (
+        previous.length === activeIds.length && previous.every((id, index) => id === activeIds[index])
+          ? previous
+          : activeIds
+      ));
+    };
+    const scheduleActiveHeadingUpdate = () => {
+      if (!frameId) frameId = window.requestAnimationFrame(updateActiveHeading);
+    };
+
+    surface.addEventListener("scroll", scheduleActiveHeadingUpdate, { passive: true });
+    window.addEventListener("resize", scheduleActiveHeadingUpdate);
+    scheduleActiveHeadingUpdate();
+    return () => {
+      surface.removeEventListener("scroll", scheduleActiveHeadingUpdate);
+      window.removeEventListener("resize", scheduleActiveHeadingUpdate);
+      if (frameId) window.cancelAnimationFrame(frameId);
+    };
+  }, [isTableOfContentsVisible, tableOfContentsEntries]);
 
   const handleEditorChange = useCallback(() => {
     if (!isEmptySessionDocument(editor.document)) {
@@ -2285,21 +2412,31 @@ function StickyEditor({
     void electronApi?.closeCurrentWindow?.();
   }, []);
 
-  const exportNote = useCallback(async () => {
+  const exportNote = useCallback(async (type = "pdf") => {
+    setExportFormatMenu(null);
     if (!electronApi) {
-      showExportToast("PDF export is available in the desktop app.", "error");
+      showExportToast("Note export is available in the desktop app.", "error");
       return;
     }
 
-    showExportToast("Exporting PDF...", "progress", { timeout: 0 });
-    document.body.classList.add("is-exporting");
+    const isPdf = type === "pdf";
+    showExportToast(`Exporting ${isPdf ? "PDF" : "Markdown"}...`, "progress", { timeout: 0 });
+    if (isPdf) {
+      document.body.classList.add("is-exporting");
+    }
     try {
-      await nextAnimationFrame();
-      await nextAnimationFrame();
+      if (isPdf) {
+        await nextAnimationFrame();
+        await nextAnimationFrame();
+      }
+      const markdown = isPdf
+        ? undefined
+        : await editor.blocksToMarkdownLossy(editor.document);
       const result = await electronApi?.exportNote({
         noteId: note.id,
         title: normalizeTitle(title),
-        type: "pdf",
+        type,
+        markdown,
       });
 
       if (result?.canceled) {
@@ -2307,13 +2444,63 @@ function StickyEditor({
         return;
       }
 
-      showExportToast("PDF exported", "success");
+      showExportToast(`${isPdf ? "PDF" : "Markdown"} exported`, "success");
     } catch (error) {
-      showExportToast(error.message || "PDF export failed.", "error");
+      showExportToast(error.message || `${isPdf ? "PDF" : "Markdown"} export failed.`, "error");
     } finally {
-      document.body.classList.remove("is-exporting");
+      if (isPdf) {
+        document.body.classList.remove("is-exporting");
+      }
     }
-  }, [hideExportToast, note.id, showExportToast, title]);
+  }, [editor, hideExportToast, note.id, showExportToast, title]);
+
+  const openExportFormatMenu = useCallback((event) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    setExportFormatMenu({
+      x: Math.round(bounds.right),
+      y: Math.round(bounds.top),
+    });
+  }, []);
+
+  const importMarkdownFile = useCallback(async (file) => {
+    if (!file || typeof file.text !== "function") {
+      throw new Error("Choose a Markdown file to import.");
+    }
+    if (!/\.(md|markdown)$/i.test(file.name || "")) {
+      throw new Error("Only .md and .markdown files can be imported.");
+    }
+    if (file.size > MAX_MARKDOWN_IMPORT_FILE_SIZE) {
+      throw new Error("This Markdown file is larger than the 512 MB import limit.");
+    }
+
+    try {
+      const markdown = await file.text();
+      const blocks = editor.tryParseMarkdownToBlocks(markdown);
+      if (blocks.length === 0) {
+        throw new Error("This Markdown file is empty.");
+      }
+      const cursorBlock = editor.getTextCursorPosition().block;
+      const insertedBlocks = editor.insertBlocks(blocks, cursorBlock, "after");
+      if (isEmptyParagraphBlock(cursorBlock)) {
+        editor.removeBlocks([cursorBlock]);
+      }
+      const firstInsertedBlock = insertedBlocks?.[0];
+      if (firstInsertedBlock) {
+        editor.focus();
+        try {
+          editor.setTextCursorPosition(firstInsertedBlock, "start");
+        } catch {
+          // Media-only Markdown imports may not expose a text cursor.
+        }
+      }
+      refreshTableOfContents();
+      scheduleSave();
+      setIsMarkdownImportOpen(false);
+      showExportToast(`${file.name || "Markdown file"} imported`, "success");
+    } catch (error) {
+      throw new Error(error.message || "Markdown import failed.");
+    }
+  }, [editor, refreshTableOfContents, scheduleSave, showExportToast]);
 
   const exportDataBackup = useCallback(async () => {
     if (!electronApi?.exportBackup) {
@@ -2418,6 +2605,12 @@ function StickyEditor({
         return;
       }
 
+      if (matchesEnabledKeyboardShortcut(event, "toggleEditorWidth")) {
+        event.preventDefault();
+        onEditorWidthChange?.((value) => !value);
+        return;
+      }
+
       if (matchesEnabledKeyboardShortcut(event, "toggleThemeMode")) {
         event.preventDefault();
         void onAppThemeModeChanged(appThemeMode === "dark" ? "light" : "dark");
@@ -2432,7 +2625,10 @@ function StickyEditor({
         setSessionTabMenu(null);
         setSessionColorPanelNoteId(null);
         setIsPreferencesWindowOpen(false);
-        void exportNote();
+        setExportFormatMenu({
+          x: Math.round(window.innerWidth / 2),
+          y: 52,
+        });
         return;
       }
 
@@ -2498,6 +2694,7 @@ function StickyEditor({
     focusEditor,
     requestNewSession,
     toggleTableOfContents,
+    onEditorWidthChange,
     toggleLayoutMode,
     saveVersionNow,
     showExportToast,
@@ -2510,10 +2707,13 @@ function StickyEditor({
       !isStickySettingsOpen &&
        !isStickyTrashConfirmOpen &&
        !isStickyActionBarOpen &&
-       !isVersionHistoryOpen &&
+      !isVersionHistoryOpen &&
        !pendingSessionTrashNote &&
+       !pendingSessionCloseNote &&
       !sessionTabMenu &&
       !sessionColorPanelNoteId
+      && !exportFormatMenu &&
+      !isMarkdownImportOpen
     ) {
       return undefined;
     }
@@ -2528,8 +2728,11 @@ function StickyEditor({
         setIsStickyActionBarOpen(false);
         setIsVersionHistoryOpen(false);
         setPendingSessionTrashNote(null);
+        setPendingSessionCloseNote(null);
         setSessionTabMenu(null);
         setSessionColorPanelNoteId(null);
+        setExportFormatMenu(null);
+        setIsMarkdownImportOpen(false);
       }
     };
 
@@ -2545,8 +2748,12 @@ function StickyEditor({
     isStickyActionBarOpen,
     isVersionHistoryOpen,
     pendingSessionTrashNote,
+    pendingSessionCloseNote,
+    pendingSessionCloseNote,
     sessionColorPanelNoteId,
     sessionTabMenu,
+    exportFormatMenu,
+    isMarkdownImportOpen,
   ]);
 
   useEffect(() => {
@@ -2861,7 +3068,9 @@ function StickyEditor({
         return;
       }
 
-      if (target.closest(".image-tools") || target.closest(".crop-dialog")) {
+      if (
+        target.closest(".image-tools, .bn-formatting-toolbar, .crop-dialog")
+      ) {
         return;
       }
 
@@ -2890,16 +3099,22 @@ function StickyEditor({
     };
   }, [editor]);
 
-  const downloadActiveImage = useCallback(async () => {
-    const block = findBlockById(editor.document, activeImageBlockId);
+  const downloadActiveImage = useCallback(async (selectedBlock) => {
+    const block = selectedBlock?.id
+      ? findBlockById(editor.document, selectedBlock.id) ?? selectedBlock
+      : findBlockById(editor.document, activeImageBlockId);
     const url = block?.props?.url;
     if (!url) {
       return;
     }
 
-    const defaultName = imageFileName(block.props.name, url);
+    const defaultName = block.props.name?.trim() || imageFileName("", url);
     if (electronApi?.saveAsset) {
-      await electronApi.saveAsset({ url, defaultName });
+      await electronApi.saveAsset({
+        url,
+        defaultName,
+        kind: block.type === "image" ? "image" : "file",
+      });
       return;
     }
 
@@ -2908,12 +3123,16 @@ function StickyEditor({
 
   const openCropDialog = useCallback(() => {
     const block = findBlockById(editor.document, activeImageBlockId);
-    const url = block?.props?.url;
+    const url = block?.props?.originalUrl || block?.props?.url;
     if (!url) {
       return;
     }
 
-    setCropState({ blockId: block.id, sourceUrl: url });
+    setCropState({
+      blockId: block.id,
+      sourceUrl: url,
+      crop: getStoredImageCrop(block.props),
+    });
   }, [activeImageBlockId, editor]);
 
   const startHeaderWindowDrag = useCallback(
@@ -2966,7 +3185,7 @@ function StickyEditor({
   );
 
   const applyCrop = useCallback(
-    (croppedDataUrl) => {
+    (croppedDataUrl, crop) => {
       const block = findBlockById(editor.document, cropState?.blockId);
       if (!block) {
         return;
@@ -2975,6 +3194,11 @@ function StickyEditor({
       editor.updateBlock(block, {
         props: {
           url: croppedDataUrl,
+          originalUrl: block.props.originalUrl || block.props.url,
+          cropX: crop.x,
+          cropY: crop.y,
+          cropWidth: crop.width,
+          cropHeight: crop.height,
           name: ensurePngName(block.props.name || "cropped-image.png"),
           showPreview: true,
         },
@@ -3172,7 +3396,7 @@ function StickyEditor({
   );
 
   const deleteSessionNote = useCallback(
-    async (sessionNote) => {
+    async (sessionNote, options = {}) => {
       if (removingSessionIds.has(sessionNote.id)) {
         return;
       }
@@ -3207,6 +3431,7 @@ function StickyEditor({
         onSessionMovedToTrash?.({
           noteId: sessionNote.id,
           title: deletedTitle,
+          source: options.source ?? "trash",
         });
       } finally {
         setRemovingSessionIds((currentIds) => {
@@ -3227,6 +3452,92 @@ function StickyEditor({
       onSessionMovedToTrash,
     ],
   );
+
+  const hasSessionContent = useCallback(
+    (sessionNote) => {
+      if (sessionNote.id === note.id) {
+        return !isEmptySessionDocument(editor.document);
+      }
+
+      if (sessionNote.seedDemoContent || Boolean(sessionNote.markdown?.trim())) {
+        return true;
+      }
+
+      return !isEmptySessionDocument(parseBlocksJSON(sessionNote.blocksJSON) ?? EMPTY_BLOCKS);
+    },
+    [editor.document, note.id],
+  );
+
+  const requestCloseCurrentTab = useCallback(() => {
+    if (effectiveLayoutMode !== "tabs") {
+      closeCurrentWindow();
+      return;
+    }
+
+    const currentSessionNote = visibleSessionNotes.find(
+      (sessionNote) => sessionNote.id === note.id,
+    );
+    if (!currentSessionNote || removingSessionIds.has(currentSessionNote.id)) {
+      return;
+    }
+
+    if (hasSessionContent(currentSessionNote)) {
+      setPendingSessionCloseNote(currentSessionNote);
+      return;
+    }
+
+    void deleteSessionNote(currentSessionNote, { source: "close" });
+  }, [
+    closeCurrentWindow,
+    deleteSessionNote,
+    effectiveLayoutMode,
+    hasSessionContent,
+    note.id,
+    removingSessionIds,
+    visibleSessionNotes,
+  ]);
+
+  const confirmCloseCurrentTab = useCallback(async () => {
+    const sessionNote = pendingSessionCloseNote;
+    if (!sessionNote) {
+      return;
+    }
+
+    setPendingSessionCloseNote(null);
+    await deleteSessionNote(sessionNote, { source: "close" });
+  }, [deleteSessionNote, pendingSessionCloseNote]);
+
+  useEffect(() => {
+    return electronApi?.onCloseTabRequested?.(requestCloseCurrentTab);
+  }, [requestCloseCurrentTab]);
+
+  useEffect(() => {
+    if (!pendingSessionCloseNote) {
+      return;
+    }
+
+    if (!visibleSessionNotes.some((sessionNote) => sessionNote.id === pendingSessionCloseNote.id)) {
+      setPendingSessionCloseNote(null);
+    }
+  }, [pendingSessionCloseNote, visibleSessionNotes]);
+
+  useEffect(() => {
+    const handleCloseShortcut = (event) => {
+      if (
+        !matchesEnabledKeyboardShortcut(event, "closeWindow") ||
+        isShortcutRecorderTarget(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      requestCloseCurrentTab();
+    };
+
+    document.addEventListener("keydown", handleCloseShortcut, true);
+    return () => document.removeEventListener("keydown", handleCloseShortcut, true);
+  }, [matchesEnabledKeyboardShortcut, requestCloseCurrentTab]);
 
   const confirmDeleteSessionNote = useCallback(async () => {
     const sessionNote = pendingSessionTrashNote;
@@ -3766,13 +4077,18 @@ function StickyEditor({
                 />
                 <ExportPdfButton
                   shortcut={getEnabledShortcut("exportPdf")}
-                  onClick={() => void exportNote()}
+                  onClick={openExportFormatMenu}
                 />
                 <LayoutModeSwitch
                   mode={normalizedLayoutMode}
                   compact
                   shortcut={getEnabledShortcut("toggleLayoutMode")}
                   onChange={toggleLayoutMode}
+                />
+                <EditorWidthSwitch
+                  wide={isEditorWide}
+                  shortcut={getEnabledShortcut("toggleEditorWidth")}
+                  onChange={() => onEditorWidthChange?.((value) => !value)}
                 />
                 <StickySettingsButton
                   active={isStickySettingsOpen}
@@ -4083,7 +4399,7 @@ function StickyEditor({
                 </button>
                 <ExportPdfButton
                   shortcut={getEnabledShortcut("exportPdf")}
-                  onClick={() => void exportNote()}
+                  onClick={openExportFormatMenu}
                 />
                 <PreferencesButton
                   shortcut={getEnabledShortcut("preferences")}
@@ -4095,6 +4411,11 @@ function StickyEditor({
                   compact={isSidebarCompact}
                   shortcut={getEnabledShortcut("toggleLayoutMode")}
                   onChange={toggleLayoutMode}
+                />
+                <EditorWidthSwitch
+                  wide={isEditorWide}
+                  shortcut={getEnabledShortcut("toggleEditorWidth")}
+                  onChange={() => onEditorWidthChange?.((value) => !value)}
                 />
               </div>
             </div>
@@ -4112,12 +4433,14 @@ function StickyEditor({
           className={[
             "sticky-editor-surface",
             isTableOfContentsVisible ? "has-table-of-contents" : "",
+            isEditorWide ? "is-editor-wide" : "is-editor-reading-width",
             note.seedDemoContent ? "is-template-session" : "",
             isMultiTableCellSelection ? "has-multi-table-cell-selection" : "",
           ].filter(Boolean).join(" ")}
           data-testid="sticky-editor-surface"
           data-editor-active={isEditorActive ? "true" : "false"}
           data-toc-visible={isTableOfContentsVisible ? "true" : "false"}
+          data-editor-width={isEditorWide ? "wide" : "reading"}
           onFocusCapture={() => {
             setIsEditorActive(true);
             setIsTableCellSelectionDismissed(false);
@@ -4138,14 +4461,24 @@ function StickyEditor({
             suppressFocusedTableCellRef.current = isBlankTableSurfacePointer(event);
             if (suppressFocusedTableCellRef.current) {
               event.preventDefault();
-              focusedTableCellResizeObserverRef.current?.disconnect();
-              focusedTableCellElementRef.current = null;
-              setFocusedTableCellRect(null);
+              const view = editor.prosemirrorView;
+              if (view && !view.isDestroyed) {
+                view.setProps({ decorations: () => DecorationSet.empty });
+              }
             }
           }}
-          onPointerUpCapture={() => {
+          onPointerUpCapture={(event) => {
             if (!suppressFocusedTableCellRef.current) {
-              window.requestAnimationFrame(updateFocusedTableCell);
+              const view = editor.prosemirrorView;
+              if (view && !view.isDestroyed && focusedTableDecorationsRef.current) {
+                view.setProps({ decorations: focusedTableDecorationsRef.current });
+              }
+              window.requestAnimationFrame(() => updateFocusedTableCell(event.target));
+            }
+          }}
+          onClickCapture={(event) => {
+            if (!suppressFocusedTableCellRef.current) {
+              window.requestAnimationFrame(() => updateFocusedTableCell(event.target));
             }
           }}
           onMouseDown={focusLastBlockFromEmptySurface}
@@ -4159,21 +4492,10 @@ function StickyEditor({
               {editorFontSizeToast}
             </div>
           )}
-          {focusedTableCellRect && (
-            <div
-              className="notepane-table-cell-focus-ring"
-              data-cell-text={focusedTableCellRect.text}
-              style={{
-                top: focusedTableCellRect.top,
-                left: focusedTableCellRect.left,
-                width: focusedTableCellRect.width,
-                height: focusedTableCellRect.height,
-              }}
-            />
-          )}
           {isTableOfContentsVisible && (
             <TableOfContentsRail
               entries={tableOfContentsEntries}
+              activeEntryIds={activeTableOfContentsEntryIds}
               onSelectEntry={selectTableOfContentsEntry}
             />
           )}
@@ -4217,10 +4539,16 @@ function StickyEditor({
             sideMenu={false}
             slashMenu={false}
           >
-            <NotePaneSlashMenuController editor={editor} />
+            <NotePaneSlashMenuController
+              editor={editor}
+              onImportMarkdown={() => setIsMarkdownImportOpen(true)}
+            />
             <RecentColorFormattingToolbarController
               recentColors={recentEditorColors}
               onColorUsed={onEditorColorUsed}
+              onCropImage={openCropDialog}
+              onDownloadImage={downloadActiveImage}
+              activeImageBlockId={activeImageBlockId}
               portalElement={document.body}
               hidden={isTableCellSelectionDismissed}
             />
@@ -4260,6 +4588,19 @@ function StickyEditor({
           onOpenColor={() => openSessionColorPanel(sessionTabMenuNote.id)}
         />
       )}
+      {exportFormatMenu && (
+        <ExportFormatMenu
+          x={exportFormatMenu.x}
+          y={exportFormatMenu.y}
+          onExport={(type) => void exportNote(type)}
+        />
+      )}
+      {isMarkdownImportOpen && (
+        <MarkdownImportDialog
+          onClose={() => setIsMarkdownImportOpen(false)}
+          onImport={importMarkdownFile}
+        />
+      )}
       {isColorPanelOpen && (
         <ColorPanel
           theme={theme}
@@ -4293,6 +4634,13 @@ function StickyEditor({
           noteTitle={getSessionDisplayTitle(pendingSessionTrashNote)}
           onCancel={() => setPendingSessionTrashNote(null)}
           onConfirm={() => void confirmDeleteSessionNote()}
+        />
+      )}
+      {pendingSessionCloseNote && (
+        <SessionCloseConfirmDialog
+          noteTitle={getSessionDisplayTitle(pendingSessionCloseNote)}
+          onCancel={() => setPendingSessionCloseNote(null)}
+          onConfirm={() => void confirmCloseCurrentTab()}
         />
       )}
       {isStickySettingsOpen && (
@@ -4329,21 +4677,12 @@ function StickyEditor({
           onClose={() => setIsPreferencesWindowOpen(false)}
         />
       )}
-      {activeImageBlockId && (
-        <div className="image-tools" role="toolbar" aria-label="Image tools">
-          <button type="button" onMouseDown={preventFocusLoss} onClick={downloadActiveImage}>
-            Download image
-          </button>
-          <button type="button" onMouseDown={preventFocusLoss} onClick={openCropDialog}>
-            Crop image
-          </button>
-        </div>
-      )}
       {exportToast && <StickyToast toast={exportToast} />}
       <AdaptiveTooltipPortal />
       {cropState && (
         <CropDialog
           sourceUrl={cropState.sourceUrl}
+          initialCrop={cropState.crop}
           onApply={applyCrop}
           onClose={() => setCropState(null)}
         />
@@ -4795,7 +5134,7 @@ function LayoutTransitionOverlay({ transition }) {
   );
 }
 
-function TableOfContentsRail({ entries, onSelectEntry }) {
+function TableOfContentsRail({ entries, activeEntryIds, onSelectEntry }) {
   return (
     <nav
       className="editor-table-of-contents"
@@ -4816,6 +5155,8 @@ function TableOfContentsRail({ entries, onSelectEntry }) {
               type="button"
               className="editor-toc-entry"
               data-heading-level={entry.level}
+              data-active={activeEntryIds.includes(entry.id) ? "true" : undefined}
+              aria-current={activeEntryIds.includes(entry.id) ? "location" : undefined}
               style={{ "--toc-indent": `${(entry.level - 1) * 10}px` }}
               aria-label={`Jump to ${entry.title}, heading level ${entry.level}`}
               onMouseDown={preventFocusLoss}
@@ -5168,6 +5509,7 @@ const PREFERENCE_SHORTCUT_COMMANDS = [
   { id: "moveTabRight", label: "Move tab right" },
   { id: "toggleSidebar", label: "Toggle sidebar" },
   { id: "toggleLayoutMode", label: "Toggle tabs / sticky" },
+  { id: "toggleEditorWidth", label: "Toggle editor width" },
   { id: "toggleTableOfContents", label: "Toggle table of contents" },
   { id: "toggleThemeMode", label: "Toggle light / dark" },
   { id: "exportPdf", label: "Export PDF" },
@@ -5921,6 +6263,24 @@ function SessionTrashConfirmDialog({
   );
 }
 
+function SessionCloseConfirmDialog({
+  noteTitle,
+  onCancel,
+  onConfirm,
+}) {
+  return (
+    <MoveToTrashConfirmDialog
+      noteTitle={noteTitle}
+      ariaLabel="Close tab confirmation"
+      title="Close this tab?"
+      message="This tab contains content. Close it?"
+      yesAriaLabelPrefix="Yes, close"
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+    />
+  );
+}
+
 function MoveToTrashConfirmDialog({
   noteTitle,
   ariaLabel,
@@ -6391,8 +6751,8 @@ function ExportPdfButton({ shortcut, onClick }) {
     <button
       type="button"
       className="export-icon-button preferences-icon-button has-tooltip"
-      aria-label="Export PDF"
-      data-tooltip={formatShortcutTooltip("Export PDF", shortcut)}
+      aria-label="Export"
+      data-tooltip={formatShortcutTooltip("Export", shortcut)}
       onMouseDown={preventFocusLoss}
       onClick={onClick}
     >
@@ -6476,6 +6836,28 @@ function LayoutModeSwitch({ mode, compact = false, shortcut, onChange }) {
   );
 }
 
+function EditorWidthSwitch({ wide = false, shortcut, onChange }) {
+  const actionLabel = wide ? "Use reading width" : "Use wide editor";
+  const Icon = wide ? Minimize2 : Maximize2;
+
+  return (
+    <button
+      type="button"
+      className="editor-width-button has-tooltip"
+      aria-label={actionLabel}
+      aria-pressed={wide}
+      data-tooltip={formatShortcutTooltip(actionLabel, shortcut)}
+      onMouseDown={preventFocusLoss}
+      onClick={onChange}
+    >
+      <Icon
+        className="notepane-action-icon notepane-editor-width-icon"
+        aria-hidden="true"
+      />
+    </button>
+  );
+}
+
 function SessionTabContextMenu({
   x,
   y,
@@ -6512,6 +6894,150 @@ function SessionTabContextMenu({
   );
 }
 
+function ExportFormatMenu({ x, y, onExport }) {
+  return (
+    <div
+      className="export-format-menu editor-floating-menu"
+      role="menu"
+      aria-label="Export format"
+      style={{
+        "--export-format-menu-x": `${x}px`,
+        "--export-format-menu-y": `${y}px`,
+      }}
+    >
+      <button
+        type="button"
+        role="menuitem"
+        onMouseDown={preventFocusLoss}
+        onClick={() => onExport("pdf")}
+      >
+        <FileDown aria-hidden="true" size={16} strokeWidth={2} />
+        <span className="export-format-menu-copy">
+          <strong>PDF</strong>
+          <small>Print-ready document</small>
+        </span>
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        onMouseDown={preventFocusLoss}
+        onClick={() => onExport("md")}
+      >
+        <Download aria-hidden="true" size={16} strokeWidth={2} />
+        <span className="export-format-menu-copy">
+          <strong>Markdown</strong>
+          <small>Editable .md file</small>
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function MarkdownImportDialog({ onClose, onImport }) {
+  const inputRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape" && !isImporting) {
+        onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => document.removeEventListener("keydown", handleKeyDown, true);
+  }, [isImporting, onClose]);
+
+  const importFiles = useCallback(async (files) => {
+    const file = Array.from(files || []).find((candidate) => candidate instanceof File);
+    if (!file) {
+      setError("Drop or choose a Markdown file.");
+      return;
+    }
+
+    setError("");
+    setIsImporting(true);
+    try {
+      await onImport(file);
+    } catch (error) {
+      setError(error.message || "Markdown import failed.");
+    } finally {
+      setIsImporting(false);
+    }
+  }, [onImport]);
+
+  return (
+    <div
+      className="preferences-backdrop markdown-import-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !isImporting) {
+          onClose();
+        }
+      }}
+    >
+      <section
+        className="markdown-import-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Import Markdown"
+      >
+        <header className="markdown-import-header">
+          <div>
+            <div className="markdown-import-title">Import Markdown</div>
+            <p>Insert a Markdown file at the current block.</p>
+          </div>
+          <button
+            type="button"
+            className="preferences-close-button"
+            aria-label="Close Markdown import"
+            disabled={isImporting}
+            onMouseDown={preventFocusLoss}
+            onClick={onClose}
+          >
+            ×
+          </button>
+        </header>
+        <input
+          ref={inputRef}
+          className="markdown-import-input"
+          type="file"
+          accept=".md,.markdown,text/markdown,text/plain"
+          aria-label="Choose Markdown file"
+          onChange={(event) => void importFiles(event.target.files)}
+        />
+        <button
+          type="button"
+          className={`markdown-import-dropzone${isDragging ? " is-dragging" : ""}`}
+          disabled={isImporting}
+          onClick={() => inputRef.current?.click()}
+          onDragEnter={(event) => {
+            event.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragOver={(event) => event.preventDefault()}
+          onDragLeave={(event) => {
+            if (event.currentTarget === event.target) {
+              setIsDragging(false);
+            }
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDragging(false);
+            void importFiles(event.dataTransfer.files);
+          }}
+        >
+          <Upload aria-hidden="true" size={22} strokeWidth={1.8} />
+          <strong>{isImporting ? "Importing…" : "Drop a .md file here"}</strong>
+          <span>or click to choose a file</span>
+        </button>
+        {error && <p className="markdown-import-error" role="alert">{error}</p>}
+      </section>
+    </div>
+  );
+}
+
 function NotePaneWordmark() {
   return (
     <div className="brand-wordmark" aria-label="NotePane wordmark">
@@ -6531,9 +7057,21 @@ function NotePaneWordmark() {
   );
 }
 
-function NotePaneSlashMenuController({ editor }) {
+function NotePaneSlashMenuController({ editor, onImportMarkdown }) {
   const floatingUIOptions = useMemo(createSlashMenuFloatingUIOptions, []);
   const getItems = useCallback(async (query) => {
+    const importMarkdown = {
+      title: "Import Markdown",
+      subtext: "Choose a Markdown file and insert it here",
+      aliases: ["import", "markdown", "md"],
+      group: "Import",
+      icon: <Upload size={18} />,
+      key: "import_markdown",
+      onItemClick: () => {
+        insertOrUpdateBlockForSlashMenu(editor, { type: "paragraph" });
+        onImportMarkdown?.();
+      },
+    };
     const toggleHeading4 = {
       title: "Toggle Heading 4",
       subtext: "Toggleable minor subsection heading",
@@ -6549,12 +7087,13 @@ function NotePaneSlashMenuController({ editor }) {
       },
     };
     const items = getDefaultReactSlashMenuItems(editor);
+    items.unshift(importMarkdown);
     const toggleHeading3Index = items.findIndex(
       (item) => item.key === "toggle_heading_3",
     );
     items.splice(toggleHeading3Index + 1, 0, toggleHeading4);
     return filterSuggestionItems(items, query);
-  }, [editor]);
+  }, [editor, onImportMarkdown]);
 
   return (
     <SuggestionMenuController
@@ -6952,10 +7491,10 @@ function ColorWheel({ hsv, ariaLabel, onChange }) {
   );
 }
 
-function CropDialog({ sourceUrl, onApply, onClose }) {
+function CropDialog({ sourceUrl, initialCrop, onApply, onClose }) {
   const imageRef = useRef(null);
-  const dragStartRef = useRef(null);
-  const [crop, setCrop] = useState(DEFAULT_CROP);
+  const cropInteractionRef = useRef(null);
+  const [crop, setCrop] = useState(() => normalizeCrop(initialCrop));
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -6969,7 +7508,19 @@ function CropDialog({ sourceUrl, onApply, onClose }) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  const startCrop = useCallback((event) => {
+  const startResize = useCallback((event, handle) => {
+    const point = getImagePoint(event, imageRef.current);
+    if (!point) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    cropInteractionRef.current = { crop, handle, mode: "resize", point };
+  }, [crop]);
+
+  const startMove = useCallback((event) => {
     const point = getImagePoint(event, imageRef.current);
     if (!point) {
       return;
@@ -6977,12 +7528,12 @@ function CropDialog({ sourceUrl, onApply, onClose }) {
 
     event.preventDefault();
     event.currentTarget.setPointerCapture?.(event.pointerId);
-    dragStartRef.current = point;
-    setCrop({ x: point.x, y: point.y, width: 0.001, height: 0.001 });
-  }, []);
+    cropInteractionRef.current = { crop, mode: "move", point };
+  }, [crop]);
 
-  const updateCrop = useCallback((event) => {
-    if (!dragStartRef.current) {
+  const updateCropInteraction = useCallback((event) => {
+    const interaction = cropInteractionRef.current;
+    if (!interaction) {
       return;
     }
 
@@ -6991,23 +7542,22 @@ function CropDialog({ sourceUrl, onApply, onClose }) {
       return;
     }
 
-    const start = dragStartRef.current;
-    const x = Math.min(start.x, point.x);
-    const y = Math.min(start.y, point.y);
-    const width = Math.max(Math.abs(point.x - start.x), 0.01);
-    const height = Math.max(Math.abs(point.y - start.y), 0.01);
-    setCrop({ x, y, width, height });
+    setCrop(
+      interaction.mode === "move"
+        ? moveCrop(interaction, point)
+        : resizeCrop(interaction, point),
+    );
   }, []);
 
-  const stopCrop = useCallback(() => {
-    dragStartRef.current = null;
+  const stopCropInteraction = useCallback(() => {
+    cropInteractionRef.current = null;
   }, []);
 
   const applySelectedCrop = useCallback(async () => {
     setError("");
     try {
       const croppedDataUrl = await cropImageToPng(imageRef.current, crop);
-      onApply(croppedDataUrl);
+      onApply(croppedDataUrl, crop);
     } catch (error) {
       setError(
         error.message ||
@@ -7021,30 +7571,45 @@ function CropDialog({ sourceUrl, onApply, onClose }) {
       <div className="crop-panel">
         <div
           className="crop-image-frame"
-          onPointerDown={startCrop}
-          onPointerMove={updateCrop}
-          onPointerUp={stopCrop}
-          onPointerCancel={stopCrop}
         >
-          <img
-            ref={imageRef}
-            src={sourceUrl}
-            crossOrigin="anonymous"
-            alt=""
-            draggable={false}
-          />
           <div
-            className="crop-selection"
-            style={{
-              left: `${crop.x * 100}%`,
-              top: `${crop.y * 100}%`,
-              width: `${crop.width * 100}%`,
-              height: `${crop.height * 100}%`,
-            }}
-          />
+            className="crop-image-canvas"
+          >
+            <img
+              ref={imageRef}
+              src={sourceUrl}
+              crossOrigin="anonymous"
+              alt=""
+              draggable={false}
+            />
+            <div
+              className="crop-selection"
+              style={{
+                left: `${crop.x * 100}%`,
+                top: `${crop.y * 100}%`,
+                width: `${crop.width * 100}%`,
+                height: `${crop.height * 100}%`,
+              }}
+              onPointerDown={startMove}
+              onPointerMove={updateCropInteraction}
+              onPointerUp={stopCropInteraction}
+              onPointerCancel={stopCropInteraction}
+            >
+              {CROP_RESIZE_HANDLES.map((handle) => (
+                <button
+                  key={handle.id}
+                  type="button"
+                  className="crop-resize-handle"
+                  data-handle={handle.id}
+                  aria-label={`Resize crop from ${handle.label}`}
+                  onPointerDown={(event) => startResize(event, handle.id)}
+                />
+              ))}
+            </div>
+          </div>
         </div>
         <div className="crop-actions">
-          <span>Drag on the image to choose a crop area.</span>
+          <span>Drag the grid to move it, or an edge or corner to resize.</span>
           <button type="button" onClick={onClose}>
             Cancel
           </button>
@@ -10554,6 +11119,55 @@ function selectAllEditorDocument(editor) {
   view.focus();
 }
 
+function getNodeSelectedBlocks(editor) {
+  const view = editor.prosemirrorView;
+  const selection = view?.state.selection;
+  if (!view || !selection) {
+    return [];
+  }
+
+  let blockId = null;
+  if ("node" in selection) {
+    const selectedElement = view.nodeDOM(selection.from);
+    const blockElement = (
+      selectedElement instanceof Element
+        ? selectedElement
+        : selectedElement?.parentElement
+    )?.closest?.(".bn-block-outer[data-id]");
+    blockId = blockElement?.getAttribute("data-id");
+  }
+  if (!blockId && selection.empty) {
+    blockId = view.dom.getAttribute("data-notepane-handle-block-id");
+  }
+  const block = blockId ? findBlockById(editor.document, blockId) : null;
+  return block ? [block] : [];
+}
+
+function getBlocksForClipboard(editor) {
+  const nodeSelectedBlocks = getNodeSelectedBlocks(editor);
+  if (nodeSelectedBlocks.length) {
+    return nodeSelectedBlocks;
+  }
+
+  const selection = editor.prosemirrorView?.state.selection;
+  if (selection?.toJSON().type === "notepane-block-range") {
+    const blocks = [];
+    editor.prosemirrorView.state.doc.nodesBetween(selection.from, selection.to, (node) => {
+      if (node.type.name !== "blockContainer") return;
+      const block = findBlockById(editor.document, node.attrs.id);
+      if (block) blocks.push(block);
+      return false;
+    });
+    return blocks;
+  }
+  if (selection?.$anchorCell || selection?.$headCell) {
+    return [];
+  }
+
+  const selectedBlocks = editor.getSelection()?.blocks;
+  return selectedBlocks?.length > 1 ? selectedBlocks : [];
+}
+
 function isEmptyEditorSurfacePointer(event) {
   if (event.button !== 0) {
     return false;
@@ -10599,11 +11213,10 @@ function isBlankTableSurfacePointer(event) {
 }
 
 function isEmptySessionDocument(blocks) {
-  if (!Array.isArray(blocks) || blocks.length !== 1) {
-    return false;
-  }
+  return Array.isArray(blocks) && blocks.length === 1 && isEmptyParagraphBlock(blocks[0]);
+}
 
-  const [block] = blocks;
+function isEmptyParagraphBlock(block) {
   if (block?.type !== "paragraph" || block.children?.length > 0) {
     return false;
   }
@@ -10623,12 +11236,27 @@ function isEmptySessionDocument(blocks) {
 
 function focusLastEditorBlock(editor) {
   const lastBlock = editor.document.at(-1);
+  if (lastBlock && isEmptyParagraphBlock(lastBlock)) {
+    editor.focus();
+    editor.setTextCursorPosition(lastBlock, "start");
+    return;
+  }
+
+  editor.focus();
+  const insertedBlocks = lastBlock
+    ? editor.insertBlocks([{ type: "paragraph" }], lastBlock.id, "after")
+    : editor.replaceBlocks([], [{ type: "paragraph" }]).insertedBlocks;
+  const insertedBlock = insertedBlocks?.[0];
+  if (insertedBlock) {
+    editor.setTextCursorPosition(insertedBlock, "start");
+    return;
+  }
+
   if (!lastBlock) {
     editor.focus();
     return;
   }
 
-  editor.focus();
   try {
     editor.setTextCursorPosition(lastBlock, "end");
     return;
@@ -10698,6 +11326,11 @@ function resolveBlocksForCut(editor, activeImageBlockId) {
   const selectedBlocks = editor.getSelection()?.blocks;
   if (selectedBlocks?.length) {
     return selectedBlocks;
+  }
+
+  const nodeSelectedBlocks = getNodeSelectedBlocks(editor);
+  if (nodeSelectedBlocks.length) {
+    return nodeSelectedBlocks;
   }
 
   const activeImageBlock = findBlockById(editor.document, activeImageBlockId);
@@ -10927,6 +11560,66 @@ function downloadInBrowser(url, fileName) {
 
 function preventFocusLoss(event) {
   event.preventDefault();
+}
+
+function getStoredImageCrop(props = {}) {
+  const crop = {
+    x: props.cropX,
+    y: props.cropY,
+    width: props.cropWidth,
+    height: props.cropHeight,
+  };
+  return Object.values(crop).every(Number.isFinite)
+    ? normalizeCrop(crop)
+    : { ...DEFAULT_CROP };
+}
+
+function normalizeCrop(crop = DEFAULT_CROP) {
+  const x = clamp(Number(crop.x), 0, 1 - MIN_CROP_SIZE, DEFAULT_CROP.x);
+  const y = clamp(Number(crop.y), 0, 1 - MIN_CROP_SIZE, DEFAULT_CROP.y);
+  const width = clamp(
+    Number(crop.width),
+    MIN_CROP_SIZE,
+    1 - x,
+    DEFAULT_CROP.width,
+  );
+  const height = clamp(
+    Number(crop.height),
+    MIN_CROP_SIZE,
+    1 - y,
+    DEFAULT_CROP.height,
+  );
+  return { x, y, width, height };
+}
+
+function resizeCrop({ crop, handle }, point) {
+  let left = crop.x;
+  let top = crop.y;
+  let right = crop.x + crop.width;
+  let bottom = crop.y + crop.height;
+
+  if (handle.includes("w")) {
+    left = clamp(point.x, 0, right - MIN_CROP_SIZE, left);
+  }
+  if (handle.includes("e")) {
+    right = clamp(point.x, left + MIN_CROP_SIZE, 1, right);
+  }
+  if (handle.includes("n")) {
+    top = clamp(point.y, 0, bottom - MIN_CROP_SIZE, top);
+  }
+  if (handle.includes("s")) {
+    bottom = clamp(point.y, top + MIN_CROP_SIZE, 1, bottom);
+  }
+
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+function moveCrop({ crop, point: startPoint }, point) {
+  return {
+    ...crop,
+    x: clamp(point.x - startPoint.x + crop.x, 0, 1 - crop.width, crop.x),
+    y: clamp(point.y - startPoint.y + crop.y, 0, 1 - crop.height, crop.y),
+  };
 }
 
 function getImagePoint(event, image) {
