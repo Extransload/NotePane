@@ -988,14 +988,28 @@ function StickyEditor({
       event.clipboardData.clearData();
       event.clipboardData.setData("blocknote/html", clipboardHTML);
       event.clipboardData.setData("text/html", externalHTML);
-      event.clipboardData.setData("text/plain", markdown);
+      // Lossy markdown drops Shift+Enter breaks and adds a structural trailing
+      // newline, so the plain text still goes through the editor normalizer.
+      event.clipboardData.setData(
+        "text/plain",
+        normalizeCopiedEditorPlainText(
+          editor,
+          markdown,
+          window.getSelection()?.toString() ?? "",
+        ),
+      );
       return true;
     };
 
+    // Block copies must pre-empt the editor, so they run in the capture phase
+    // and stop propagation once they own the clipboard.
+    const writeSelectedBlocks = (event) => {
+      copySelectedBlock(event);
+    };
+
+    // A text selection is serialised by the editor itself, so normalising has
+    // to happen in the bubble phase, after the editor has written text/plain.
     const normalizeEditorClipboardText = (event) => {
-      if (copySelectedBlock(event)) {
-        return;
-      }
       if (!isEditorShortcutTarget(event.target) || !event.clipboardData) {
         return;
       }
@@ -1012,11 +1026,15 @@ function StickyEditor({
       }
     };
 
-    document.addEventListener("copy", normalizeEditorClipboardText, true);
-    document.addEventListener("cut", normalizeEditorClipboardText, true);
+    document.addEventListener("copy", writeSelectedBlocks, true);
+    document.addEventListener("cut", writeSelectedBlocks, true);
+    document.addEventListener("copy", normalizeEditorClipboardText);
+    document.addEventListener("cut", normalizeEditorClipboardText);
     return () => {
-      document.removeEventListener("copy", normalizeEditorClipboardText, true);
-      document.removeEventListener("cut", normalizeEditorClipboardText, true);
+      document.removeEventListener("copy", writeSelectedBlocks, true);
+      document.removeEventListener("cut", writeSelectedBlocks, true);
+      document.removeEventListener("copy", normalizeEditorClipboardText);
+      document.removeEventListener("cut", normalizeEditorClipboardText);
     };
   }, [editor]);
 
