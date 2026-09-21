@@ -172,6 +172,10 @@ export function LayoutModeSwitch({ mode, compact = false, shortcut, onChange }) 
     >
       <ArrowLeftRight
         className="notepane-action-icon notepane-mode-switch-icon"
+        data-icon-family="system-symbol"
+        data-icon-pack="lucide"
+        data-icon-tone={targetMode}
+        data-icon-layout={compact ? "compact" : "expanded"}
         aria-hidden="true"
       />
     </button>
@@ -194,6 +198,9 @@ export function EditorWidthSwitch({ wide = false, shortcut, onChange }) {
     >
       <Icon
         className="notepane-action-icon notepane-editor-width-icon"
+        data-icon-family="system-symbol"
+        data-icon-pack="lucide"
+        data-icon-tone="editor-width"
         aria-hidden="true"
       />
     </button>
