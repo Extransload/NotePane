@@ -574,7 +574,10 @@
   padding: 0;
 }
 
-.session-sidebar.is-compact .session-sidebar-footer .layout-mode-button {
+/* Both buttons set justify-self: stretch at full width, which overrides the
+   footer row's justify-items: center once they shrink to a fixed icon width. */
+.session-sidebar.is-compact .session-sidebar-footer .layout-mode-button,
+.session-sidebar.is-compact .session-sidebar-footer .editor-width-button {
   justify-self: center;
 }
 
