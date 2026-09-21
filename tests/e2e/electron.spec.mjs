@@ -3,13 +3,25 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+// Each test writes to its own temporary user-data and export directories.
+// They are removed afterwards so runs do not leave hundreds behind in $TMPDIR.
+const temporaryDirectories = [];
+
+function createTemporaryDirectory(prefix) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  temporaryDirectories.push(directory);
+  return directory;
+}
+
+test.afterEach(() => {
+  while (temporaryDirectories.length > 0) {
+    fs.rmSync(temporaryDirectories.pop(), { recursive: true, force: true });
+  }
+});
+
 test("Electron app opens a sticky window and persists editor content", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
-  const exportDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-export-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  const exportDirectory = createTemporaryDirectory("notepane-export-");
   const electronApp = await launchApp(userDataDirectory, exportDirectory);
 
   try {
@@ -99,12 +111,8 @@ test("Electron app opens a sticky window and persists editor content", async () 
 });
 
 test("/import inserts a Markdown file as editor blocks", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-markdown-import-"),
-  );
-  const importDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-markdown-source-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-markdown-import-");
+  const importDirectory = createTemporaryDirectory("notepane-markdown-source-");
   const importPath = path.join(importDirectory, "meeting-notes.md");
   fs.writeFileSync(
     importPath,
@@ -131,12 +139,8 @@ test("/import inserts a Markdown file as editor blocks", async () => {
 });
 
 test("Cmd/Ctrl+S immediately creates a version-history snapshot", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-version-history-"),
-  );
-  const exportDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-version-history-export-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-version-history-");
+  const exportDirectory = createTemporaryDirectory("notepane-version-history-export-");
   const electronApp = await launchApp(userDataDirectory, exportDirectory);
 
   try {
@@ -167,8 +171,8 @@ test("Cmd/Ctrl+S immediately creates a version-history snapshot", async () => {
 });
 
 test("Shift+Backslash then Space changes an empty paragraph into a quote", async () => {
-  const userDataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "notepane-quote-shortcut-"));
-  const exportDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "notepane-quote-shortcut-export-"));
+  const userDataDirectory = createTemporaryDirectory("notepane-quote-shortcut-");
+  const exportDirectory = createTemporaryDirectory("notepane-quote-shortcut-export-");
   const electronApp = await launchApp(userDataDirectory, exportDirectory);
 
   try {
@@ -184,15 +188,9 @@ test("Shift+Backslash then Space changes an empty paragraph into a quote", async
 });
 
 test("Electron exports and imports a complete portable workspace backup", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
-  const exportDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-backup-export-"),
-  );
-  const importDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-backup-import-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  const exportDirectory = createTemporaryDirectory("notepane-backup-export-");
+  const importDirectory = createTemporaryDirectory("notepane-backup-import-");
   const importFilePath = path.join(importDirectory, "portable.notepane");
   writeInitialNotes(userDataDirectory, [
     {
@@ -307,9 +305,7 @@ test("Electron exports and imports a complete portable workspace backup", async 
 });
 
 test("Electron shows the NotePane template after the last tab is moved to trash", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
 
   try {
@@ -362,9 +358,7 @@ test("Electron shows the NotePane template after the last tab is moved to trash"
 });
 
 test("Electron keeps keyboard focus inside the editor during repeated Tab", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
 
   try {
@@ -408,9 +402,7 @@ test("Electron keeps keyboard focus inside the editor during repeated Tab", asyn
 });
 
 test("Electron keeps sticky windows bound to their original sessions during new-note commands", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [
     {
       id: "first-note",
@@ -480,9 +472,7 @@ test("Electron keeps sticky windows bound to their original sessions during new-
 });
 
 test("Electron menu actions respect tabs/sticky modes and toggle always-on-top", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
 
   try {
@@ -557,11 +547,14 @@ test("Electron menu actions respect tabs/sticky modes and toggle always-on-top",
     await electronApp.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows().at(-1)?.close();
     });
+    // Closing a sticky window records it as manually closed and does not
+    // recreate it, so one window is left. Expecting the pre-close count of two
+    // only passed when the poll sampled before Electron finished destroying it.
     await expect.poll(async () => {
       return await electronApp.evaluate(({ BrowserWindow }) => {
         return BrowserWindow.getAllWindows().length;
       });
-    }).toBe(2);
+    }).toBe(1);
 
     await clickMenuItem(electronApp, "Toggle Always On Top");
     await expect.poll(async () => {
@@ -577,9 +570,7 @@ test("Electron menu actions respect tabs/sticky modes and toggle always-on-top",
 });
 
 test("Cmd/Ctrl+W closes the tab with confirmation", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-close-tab-shortcut-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-close-tab-shortcut-");
   const electronApp = await launchApp(userDataDirectory);
 
   try {
@@ -606,9 +597,7 @@ test("Cmd/Ctrl+W closes the tab with confirmation", async () => {
 });
 
 test("Electron trash hides notes from tabs and sticky windows until restored", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [
     {
       id: "first-note",
@@ -668,9 +657,7 @@ test("Electron trash hides notes from tabs and sticky windows until restored", a
 });
 
 test("Electron sticky header trash confirms and does not duplicate fallback windows", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [
     {
       id: "first-note",
@@ -736,9 +723,7 @@ test("Electron sticky header trash confirms and does not duplicate fallback wind
 });
 
 test("Electron sticky close icon closes the current window with the platform shortcut", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [
     {
       id: "first-note",
@@ -800,9 +785,7 @@ test("Electron sticky close icon closes the current window with the platform sho
 });
 
 test("Electron creates sticky-mode tabs with a persisted default accent", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
 
   try {
@@ -873,9 +856,7 @@ test("Electron creates sticky-mode tabs with a persisted default accent", async 
 test("Electron exposes installed font families to the renderer", async () => {
   test.skip(process.platform !== "darwin", "Installed font enumeration currently uses macOS system_profiler.");
 
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
 
   try {
@@ -905,9 +886,7 @@ test("Electron exposes installed font families to the renderer", async () => {
 test("Electron vertically centers macOS traffic lights for tabs and sticky windows", async () => {
   test.skip(process.platform !== "darwin", "macOS traffic lights are only available on darwin.");
 
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [
     {
       id: "first-note",
@@ -959,9 +938,7 @@ test("Electron vertically centers macOS traffic lights for tabs and sticky windo
 test("Electron uses the native Windows title bar and frame", async () => {
   test.skip(process.platform !== "win32", "Windows window chrome is only available on win32.");
 
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
 
   try {
@@ -1028,9 +1005,7 @@ async function getFirstWindowBounds(electronApp) {
 }
 
 test("Electron returns to tab session mode after every sticky window is closed", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [
     {
       id: "first-note",
@@ -1105,9 +1080,7 @@ test("Electron returns to tab session mode after every sticky window is closed",
 });
 
 test("Electron sticky windows keep independent pin and color updates", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [
     {
       id: "first-note",
@@ -1217,9 +1190,7 @@ test("Electron sticky windows keep independent pin and color updates", async () 
 });
 
 test("Electron moves a sticky window when dragging its header", async () => {
-  const userDataDirectory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "notepane-electron-"),
-  );
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
 
   try {
@@ -1267,6 +1238,7 @@ async function launchApp(userDataDirectory, exportDirectory, extraEnvironment = 
     env: {
       ...process.env,
       BLOCKNOTE_STICKY_USER_DATA_DIR: userDataDirectory,
+      BLOCKNOTE_STICKY_QUIET: "1",
       ...(exportDirectory
         ? { BLOCKNOTE_STICKY_EXPORT_DIR: exportDirectory }
         : {}),

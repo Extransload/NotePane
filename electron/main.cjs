@@ -47,6 +47,9 @@ const userDataDirOverride = process.env.BLOCKNOTE_STICKY_USER_DATA_DIR;
 const exportDirectoryOverride = process.env.BLOCKNOTE_STICKY_EXPORT_DIR;
 const backupImportFileOverride = process.env.BLOCKNOTE_STICKY_IMPORT_FILE;
 const backupImportConfirmOverride = process.env.BLOCKNOTE_STICKY_IMPORT_CONFIRM;
+// Test runs set this so the suite never pulls the foreground away from
+// whatever else is on screen. Windows still open; they just do not focus.
+const quietTestMode = process.env.BLOCKNOTE_STICKY_QUIET === "1";
 const MAX_BACKUP_FILE_SIZE = 512 * 1024 * 1024;
 
 let store;
@@ -111,8 +114,7 @@ function createWindow(note, options = {}) {
   window.__notepaneReadyToShow = false;
   window.once("ready-to-show", () => {
     window.__notepaneReadyToShow = true;
-    window.show();
-    window.focus();
+    presentWindow(window);
   });
 
   window.on("moved", () => persistWindowBounds(window));
@@ -133,7 +135,9 @@ function createWindow(note, options = {}) {
       return;
     }
     if (!quitting && windows.size === 0) {
-      app.dock?.show();
+      if (!quietTestMode) {
+        app.dock?.show();
+      }
     }
   });
 
@@ -220,8 +224,7 @@ function requestNewNoteWindow() {
     return createNewNoteWindow();
   }
 
-  window.show();
-  window.focus();
+  presentWindow(window);
   window.webContents.send("notes:create-requested");
   return window;
 }
@@ -274,7 +277,9 @@ function focusNextWindow() {
 
   const focused = BrowserWindow.getFocusedWindow();
   const index = focused ? liveWindows.indexOf(focused) : -1;
-  liveWindows[(index + 1) % liveWindows.length].focus();
+  if (!quietTestMode) {
+    liveWindows[(index + 1) % liveWindows.length].focus();
+  }
 }
 
 function closeFocusedTabOrWindow() {
@@ -349,8 +354,7 @@ function openPreferences() {
     return;
   }
 
-  window.show();
-  window.focus();
+  presentWindow(window);
   window.webContents.send("preferences:open");
 }
 
@@ -462,7 +466,7 @@ function ensureTabsWindow(activeNoteId) {
       trash: store.listTrash(),
       activeNote: note,
     });
-    primaryEntry.window.show();
+    presentWindow(primaryEntry.window, { focus: false });
     return primaryEntry.window;
   }
 
@@ -519,6 +523,22 @@ function ensureWindowForNote(note) {
   }
 
   return createWindow(note);
+}
+
+function presentWindow(window, { focus = true } = {}) {
+  if (!window || window.isDestroyed()) {
+    return;
+  }
+
+  if (quietTestMode) {
+    revealWindow(window);
+    return;
+  }
+
+  window.show();
+  if (focus) {
+    window.focus();
+  }
 }
 
 function revealWindow(window) {
@@ -1244,7 +1264,9 @@ function installIpcHandlers() {
       closeWindowEntry(sourceEntry);
     }
 
-    primaryWindow?.focus();
+    if (!quietTestMode) {
+      primaryWindow?.focus();
+    }
 
     return {
       notes: store.listNotes(),
@@ -1803,6 +1825,9 @@ function clamp(value, minimum, maximum) {
 }
 
 app.whenReady().then(() => {
+  if (quietTestMode) {
+    app.dock?.hide();
+  }
   app.name = APP_NAME;
   app.setName(APP_NAME);
 
