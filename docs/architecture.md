@@ -15,8 +15,62 @@
 | `electron/main.cjs` | app lifecycle, tab/sticky window orchestration, native menu, note/session create/activate/delete/detach/attach IPC, export/download IPC |
 | `electron/store.cjs` | local JSON persistence |
 | `electron/preload.cjs` | safe renderer bridge |
-| `src/main.jsx` | BlockNote editor, sidebar sessions, layout mode switch, app theme state, preferences panel, export menu, image tools |
-| `src/styles.css` | transparent sticky shell CSS |
+| `src/main.jsx` | composition only: the `App` shell and the `StickyEditor` component that wires everything below together |
+| `src/styles.css` | ordered `@import` list for `src/styles/` |
+
+## Code map
+
+Renderer code is grouped by what it owns. Start here rather than reading `src/main.jsx` end to end.
+
+| Directory | Owns | Notable files |
+| --- | --- | --- |
+| `src/` | entry point and shared constants | `main.jsx`, `constants.js` |
+| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `selection.js`, `blocks.js`, `clipboard.js`, `images.js` |
+| `src/model/` | normalising and deriving stored data | `notes.js`, `preferences.js`, `keyboardShortcuts.js` |
+| `src/style/` | colour maths and computed inline styles | `colorMath.js`, `themeStyles.js` |
+| `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
+| `src/hooks/` | stateful behaviour lifted out of `StickyEditor` | `useNotePersistence.js`, `useEditorSurfaceShortcuts.js` |
+| `src/utils/` | small generic helpers | `values.js`, `dom.js`, `sessionTabAnimation.js` |
+| `src/styles/` | stylesheets, imported in cascade order | `tokens.css`, `chrome.css`, `blocknote.css` |
+
+### Where behaviour lives
+
+| To change this | Look here |
+| --- | --- |
+| Block schema, template content, custom blocks | `src/editor/schema.jsx` |
+| Text selection, table cell selection and navigation | `src/editor/selection.js` |
+| Block lookup, cut, table of contents extraction | `src/editor/blocks.js` |
+| Copy/paste normalisation and Markdown round-tripping | `src/editor/clipboard.js` |
+| Which element counts as an editor shortcut target | `src/editor/targets.js` |
+| BlockNote floating menu positioning and clamping | `src/editor/floatingMenus.js` |
+| Image download, crop geometry, upload | `src/editor/images.js` |
+| Code block language detection and prettifying | `src/editor/codeFormatting.js` |
+| Note titles, ordering, trash previews | `src/model/notes.js` |
+| Preference and font normalisation and defaults | `src/model/preferences.js` |
+| Shortcut parsing, matching, display labels | `src/model/keyboardShortcuts.js` |
+| Sticky shell and session tab computed styles | `src/style/themeStyles.js` |
+| Colour conversion and contrast | `src/style/colorMath.js` |
+| Saving, debouncing, version snapshots | `src/hooks/useNotePersistence.js` |
+| Keys handled on the editor surface | `src/hooks/useEditorSurfaceShortcuts.js` |
+| Window, session and tab-mode keyboard commands | `src/hooks/useKeyboardCommands.js` |
+| Session tab drag and drop | `src/hooks/useSessionTabDrag.js` |
+| Export and font-size toasts | `src/hooks/useStickyToasts.js` |
+
+`src/main.jsx` keeps only `App` (session list, theme and layout state, IPC subscriptions) and `StickyEditor`
+(editor instance, the remaining per-note state, and the rendered tree). A new non-trivial behaviour belongs in a
+module above, not in `main.jsx`.
+
+### Stylesheets
+
+`src/styles.css` contains nothing but `@import` lines. Later files intentionally override earlier ones, so the import
+order is part of the contract and must not be rearranged. The built stylesheet is byte-identical to the previous single
+file.
+
+### Reference check
+
+`npm run check:refs` parses every file under `src/` and fails on an identifier that is referenced but never declared,
+imported, or provided by the runtime. It runs in about a second and catches an import dropped during a refactor long
+before the browser suites would. It is the first step of both `verify:quick` and `verify`.
 
 The renderer owns editor behavior. The desktop shell does not override BlockNote keyboard or mouse behavior.
 

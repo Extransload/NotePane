@@ -30,7 +30,7 @@ Examples: localized CSS, copy, labels, icons, spacing, and non-interactive marku
 Examples: editor commands, clipboard behavior, BlockNote integrations, keyboard handling within one context, and React state changes.
 
 - Run `npm run verify:quick` once after the implementation stabilizes.
-- Run the smallest relevant Renderer test with `npx playwright test tests/e2e/renderer.spec.mjs --grep "<test name>"`.
+- Run the smallest relevant Renderer test with `npx playwright test tests/e2e/renderer --grep "<test name>"`.
 - Include adjacent regression tests only when the changed handler or state is shared by them.
 
 ### Tier 3: Electron or cross-cutting behavior
@@ -49,12 +49,17 @@ Examples: persistence, IPC, application menus, window routing, sticky-session id
 
 ## Efficient Test Commands
 
+- Undefined-reference check, about one second: `npm run check:refs`
 - Fast build, unit, and distribution checks: `npm run verify:quick`
 - Parallel browser-only suite: `npm run test:e2e:renderer`
 - Serial Electron-only suite: `npm run test:e2e:electron`
-- One Renderer contract: `npx playwright test tests/e2e/renderer.spec.mjs --grep "<test name>"`
+- One Renderer feature file: `npx playwright test tests/e2e/renderer/<feature>.spec.mjs`
+- One Renderer contract: `npx playwright test tests/e2e/renderer --grep "<test name>"`
 - One Electron contract: `npx playwright test tests/e2e/electron.spec.mjs --grep "<test name>"`
 - Full authoritative verification: `npm run verify`
+
+Run `npm run check:refs` after any change that moves code between files. It catches a dropped import immediately,
+which the build does not.
 
 Run focused tests while iterating. Do not rerun the full suite solely because a test locator or test-only assertion was corrected unless the production code changed again or the failure indicates a wider regression.
 
@@ -69,7 +74,14 @@ Do not increase sleeps, timeouts, or retries just to hide instability.
 
 ## Code Structure
 
-- `src/main.jsx` is already large. Put new non-trivial editor, keyboard, clipboard, formatting, or persistence logic in a focused module when practical.
+- Renderer code is grouped by ownership: `src/editor/`, `src/model/`, `src/style/`, `src/ui/`, `src/hooks/`, `src/utils/`.
+  `docs/architecture.md` has a code map naming the file for each kind of behavior. Read it before searching.
+- `src/main.jsx` holds composition only, that is `App` and `StickyEditor`. Put new non-trivial editor, keyboard,
+  clipboard, formatting, or persistence logic in the matching module, and lift new stateful behavior into `src/hooks/`.
+- `src/styles.css` is an ordered `@import` list. Add rules to the matching file in `src/styles/` and do not reorder
+  the imports, because later files deliberately override earlier ones.
+- Renderer tests are split by feature under `tests/e2e/renderer/`, with shared helpers in
+  `tests/e2e/support/renderer-helpers.mjs`. Add a test to the file that owns its feature.
 - Do not perform an unrelated large refactor as part of a small bug fix.
 - Keep BlockNote/ProseMirror state and rendered DOM behavior aligned; validate user-visible selection, focus, clipboard, and window identity rather than only checking function calls.
 - Prefer stable role, accessible-name, `data-testid`, or narrowly scoped locators in Playwright. Avoid broad selectors such as an unscoped `getByRole("toolbar")` when multiple toolbars can exist.
