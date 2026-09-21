@@ -802,6 +802,18 @@ test("rejects malformed, duplicate, and newer NotePane backups", () => {
   assert.equal(store.getNote(note.id).id, note.id);
 });
 
+// Each store test gets its own directory. They are removed at the end of the
+// run so repeated runs do not leave them behind in $TMPDIR.
+const temporaryDirectories = [];
+
 function createTemporaryDirectory() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), "notepane-store-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "notepane-store-"));
+  temporaryDirectories.push(directory);
+  return directory;
 }
+
+test.after(() => {
+  while (temporaryDirectories.length > 0) {
+    fs.rmSync(temporaryDirectories.pop(), { recursive: true, force: true });
+  }
+});
