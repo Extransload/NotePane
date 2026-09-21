@@ -700,10 +700,10 @@ test("uses sticky pastel color and carries it back to the session tab", async ({
     };
   });
 
-  expect(tabsModeButtonMetrics.buttonWidth).toBe(66);
-  expect(tabsModeButtonMetrics.footerControlCount).toBe(4);
+  expect(tabsModeButtonMetrics.buttonWidth).toBe(28);
+  expect(tabsModeButtonMetrics.footerControlCount).toBe(6);
   expect(tabsModeButtonMetrics.headerLayoutButtonCount).toBe(0);
-  expect(tabsModeButtonMetrics.iconWidth).toBe(58);
+  expect(tabsModeButtonMetrics.iconWidth).toBe(18);
   expect(tabsModeButtonMetrics.iconTone).toBe("sticky");
   expect(tabsModeButtonMetrics.labelCount).toBe(0);
   expect(tabsModeButtonMetrics.targetMode).toBe("sticky");
@@ -846,12 +846,13 @@ test("uses sticky pastel color and carries it back to the session tab", async ({
       "Pin window",
       "Export",
       "Switch to Tab sessions mode",
+      "Use wide editor",
       "Sticky settings",
       "Move note to trash",
       "Close window",
     ],
-    headerActionButtonCount: 6,
-    headerActionButtonWidths: [24, 24, 24, 24, 24, 24],
+    headerActionButtonCount: 7,
+    headerActionButtonWidths: [24, 24, 24, 24, 24, 24, 24],
     headerTitleCount: 0,
     headerTitleFormCount: 0,
     headerBackground: "rgb(255, 248, 217)",

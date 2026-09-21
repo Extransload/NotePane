@@ -388,6 +388,9 @@ test("auto-fits table columns from the current font size within the editor width
     initialTableBounds.innerWidth - 1,
   );
   const autoFitColumn = async () => {
+    // A larger font pushes the table below the viewport, so the double click
+    // has to follow the cell instead of its original coordinates.
+    await cell.scrollIntoViewIfNeeded();
     const box = await cell.boundingBox();
     await page.mouse.dblclick(
       box.x + box.width - 1,

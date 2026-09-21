@@ -147,7 +147,10 @@ test("centers the editor by default and toggles a wide canvas from the control o
     const surfaceElement = document.querySelector("[data-testid='sticky-editor-surface']");
     const editorElement = surfaceElement?.querySelector(".bn-editor");
     const codeElement = surfaceElement?.querySelector("[data-content-type='codeBlock']");
-    if (!surfaceElement || !editorElement || !codeElement) throw new Error("Editor width elements were not rendered");
+    // BlockNote pads .bn-block, so the real text column is narrower than the
+    // editor's own content box. Compare against a paragraph, not a computed value.
+    const paragraphElement = surfaceElement?.querySelector("[data-content-type='paragraph']");
+    if (!surfaceElement || !editorElement || !codeElement || !paragraphElement) throw new Error("Editor width elements were not rendered");
     return {
       mode: surfaceElement.getAttribute("data-editor-width"),
       surfaceLeft: surfaceElement.getBoundingClientRect().left,
@@ -156,6 +159,7 @@ test("centers the editor by default and toggles a wide canvas from the control o
       editorContentWidth: editorElement.clientWidth - Number.parseFloat(getComputedStyle(editorElement).paddingLeft) - Number.parseFloat(getComputedStyle(editorElement).paddingRight),
       editorLeft: editorElement.getBoundingClientRect().left,
       codeWidth: codeElement.getBoundingClientRect().width,
+      paragraphWidth: paragraphElement.getBoundingClientRect().width,
     };
   });
 
@@ -163,7 +167,7 @@ test("centers the editor by default and toggles a wide canvas from the control o
   expect(reading.mode).toBe("reading");
   expect(reading.editorWidth).toBeLessThan(reading.surfaceWidth - 120);
   expect(Math.abs(reading.editorLeft - reading.surfaceLeft - ((reading.surfaceWidth - reading.editorWidth) / 2))).toBeLessThanOrEqual(2);
-  expect(Math.abs(reading.codeWidth - reading.editorContentWidth)).toBeLessThanOrEqual(2);
+  expect(Math.abs(reading.codeWidth - reading.paragraphWidth)).toBeLessThanOrEqual(2);
 
   await page.getByRole("button", { name: "Use wide editor" }).click();
   await expect(surface).toHaveAttribute("data-editor-width", "wide");
@@ -171,7 +175,7 @@ test("centers the editor by default and toggles a wide canvas from the control o
 
   const wide = await widthMetrics();
   expect(wide.editorWidth).toBeGreaterThan(reading.editorWidth + 100);
-  expect(Math.abs(wide.codeWidth - wide.editorContentWidth)).toBeLessThanOrEqual(2);
+  expect(Math.abs(wide.codeWidth - wide.paragraphWidth)).toBeLessThanOrEqual(2);
 
   await page.keyboard.press(modifierShortcut("Shift+W"));
   await expect(surface).toHaveAttribute("data-editor-width", "reading");

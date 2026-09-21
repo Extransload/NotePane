@@ -253,7 +253,7 @@ test("resizes and collapses the sidebar from its right edge", async ({ page }) =
     const sidebarElement = document.querySelector("[data-testid='session-sidebar']");
     const footer = document.querySelector("[data-testid='session-sidebar-footer']");
     const layoutButton = footer.querySelector(".layout-mode-button");
-    const layoutIcon = layoutButton.querySelector(".notepane-mode-transition-icon");
+    const layoutIcon = layoutButton.querySelector(".notepane-mode-switch-icon");
     const sidebarRect = sidebarElement.getBoundingClientRect();
     const sidebarCenterX = sidebarRect.left + sidebarRect.width / 2;
     const buttonRects = [...footer.querySelectorAll("button")].map((button) => {
@@ -277,7 +277,7 @@ test("resizes and collapses the sidebar from its right edge", async ({ page }) =
       transitionArrowCount: layoutIcon.querySelectorAll(".mode-transition-arrow, .mode-transition-arrow-head").length,
     };
   });
-  expect(compactFooterMetrics.buttonRects).toHaveLength(4);
+  expect(compactFooterMetrics.buttonRects).toHaveLength(6);
   expect(compactFooterMetrics.buttonRects.every((rect) => rect.insideSidebar)).toBe(true);
   expect(compactFooterMetrics.buttonRects.every((rect) => rect.centerDelta <= 1)).toBe(true);
   expect(compactFooterMetrics.buttonRects.every((rect) => rect.width === 32)).toBe(true);
@@ -295,32 +295,21 @@ test("resizes and collapses the sidebar from its right edge", async ({ page }) =
   const expandedFooterMetrics = await page.evaluate(() => {
     const footer = document.querySelector("[data-testid='session-sidebar-footer']");
     const layoutButton = footer.querySelector(".layout-mode-button");
-    const layoutIcon = layoutButton.querySelector(".notepane-mode-transition-icon");
-    const tabGlyph = layoutIcon.querySelector(".mode-tabs-glyph");
-    const stickyGlyph = layoutIcon.querySelector(".mode-sticky-glyph");
-    const arrowRects = [
-      ...layoutIcon.querySelectorAll(".mode-transition-arrow, .mode-transition-arrow-head"),
-    ].map((element) => element.getBoundingClientRect());
-    const tabGlyphRect = tabGlyph.getBoundingClientRect();
-    const stickyGlyphRect = stickyGlyph.getBoundingClientRect();
-    const arrowLeft = Math.min(...arrowRects.map((rect) => rect.left));
-    const arrowRight = Math.max(...arrowRects.map((rect) => rect.right));
-    const arrowCenterX = arrowLeft + (arrowRight - arrowLeft) / 2;
-    const glyphGapCenterX = tabGlyphRect.right + (stickyGlyphRect.left - tabGlyphRect.right) / 2;
+    const layoutIcon = layoutButton.querySelector(".notepane-mode-switch-icon");
 
     return {
       layoutButtonWidth: Math.round(layoutButton.getBoundingClientRect().width),
       layoutIconWidth: Math.round(layoutIcon.getBoundingClientRect().width),
       layoutIconMode: layoutIcon.getAttribute("data-icon-layout"),
-      transitionArrowCount: layoutIcon.querySelectorAll(".mode-transition-arrow, .mode-transition-arrow-head").length,
-      transitionArrowCenterDelta: Math.abs(arrowCenterX - glyphGapCenterX),
+      layoutIconTone: layoutIcon.getAttribute("data-icon-tone"),
+      layoutIconFamily: layoutIcon.getAttribute("data-icon-family"),
     };
   });
-  expect(expandedFooterMetrics.layoutButtonWidth).toBe(66);
-  expect(expandedFooterMetrics.layoutIconWidth).toBe(58);
-  expect(expandedFooterMetrics.layoutIconMode).toBe("transition");
-  expect(expandedFooterMetrics.transitionArrowCount).toBe(2);
-  expect(expandedFooterMetrics.transitionArrowCenterDelta).toBeLessThanOrEqual(1);
+  expect(expandedFooterMetrics.layoutButtonWidth).toBe(38);
+  expect(expandedFooterMetrics.layoutIconWidth).toBe(18);
+  expect(expandedFooterMetrics.layoutIconMode).toBe("expanded");
+  expect(expandedFooterMetrics.layoutIconTone).toBe("sticky");
+  expect(expandedFooterMetrics.layoutIconFamily).toBe("system-symbol");
 });
 
 test("keeps the new session control aligned with session rows", async ({ page }) => {
