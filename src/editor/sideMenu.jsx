@@ -14,7 +14,7 @@ import {
   useExtensionState,
 } from "@blocknote/react";
 import { ArrowRightLeft, Palette, Trash2 } from "lucide-react";
-import { EditorColorPickerSections } from "./editorColorFormatting.jsx";
+import { EditorColorPickerSections } from "./colorFormatting.jsx";
 
 export function NotePaneSideMenuController({
   portalElement,

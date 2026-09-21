@@ -4,7 +4,8 @@ import path from "node:path";
 const projectRoot = process.cwd();
 const distIndexPath = path.join(projectRoot, "dist", "index.html");
 const packagePath = path.join(projectRoot, "package.json");
-const rendererPath = path.join(projectRoot, "src", "main.jsx");
+const rendererRoot = path.join(projectRoot, "src");
+const rendererPath = path.join(rendererRoot, "main.jsx");
 const mainPath = path.join(projectRoot, "electron", "main.cjs");
 
 assertFile(distIndexPath);
@@ -30,7 +31,9 @@ for (const dependency of requiredDependencies) {
   }
 }
 
-const renderer = fs.readFileSync(rendererPath, "utf8");
+// Renderer features are spread across src/ by ownership, so check the whole
+// tree rather than one file. See the code map in docs/architecture.md.
+const renderer = readRendererSources(rendererRoot);
 const requiredRendererSnippets = [
   "BlockNoteView",
   "portalElements={{ default: document.body }}",
@@ -143,6 +146,19 @@ for (const snippet of requiredMainSnippets) {
 }
 
 console.log("NotePane verification passed");
+
+function readRendererSources(directory) {
+  const parts = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      parts.push(readRendererSources(full));
+    } else if (/\.(js|jsx)$/.test(entry.name)) {
+      parts.push(fs.readFileSync(full, "utf8"));
+    }
+  }
+  return parts.join("\n");
+}
 
 function assertFile(filePath) {
   if (!fs.existsSync(filePath)) {
