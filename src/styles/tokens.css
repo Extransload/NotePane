@@ -1,0 +1,298 @@
+/* Colour tokens and page-level base styles for light and dark mode. */
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+:root {
+  --notepane-ui-font: Inter, "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --notepane-display-font: Inter, "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--notepane-ui-font);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+* {
+  scrollbar-color: var(--sticky-scrollbar-thumb) var(--sticky-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--sticky-scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 2px solid var(--sticky-scrollbar-track);
+  border-radius: 999px;
+  background: var(--sticky-scrollbar-thumb);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--sticky-scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--sticky-scrollbar-track);
+}
+
+body.theme-light,
+.sticky-shell {
+  --notepane-ui-font: Inter, "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --notepane-display-font: Inter, "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --brand-pane-cream: #fbf7ef;
+  --brand-pastel-sage: #ddefd4;
+  --brand-pastel-sky: #d9ecf8;
+  --brand-graphite-ink: #2f3437;
+  --sticky-effective-bg: #f5f5f2;
+  --sticky-shell-bg: #f5f5f2;
+  --sticky-header-bg: #f0f0ed;
+  --sticky-sidebar-bg: #f2f2ef;
+  --sticky-editor-bg: #f5f5f2;
+  --sticky-panel-bg: #f5f5f2;
+  --sticky-panel-text: #37352f;
+  --sticky-panel-muted: #787774;
+  --sticky-text-color: #37352f;
+  --sticky-muted-color: #787774;
+  --sticky-border-color: rgb(55 53 47 / 0.12);
+  --sticky-table-border-color: #8f8e89;
+  --sticky-table-active-bg: rgb(139 92 246 / 0.12);
+  --sticky-table-focused-border-color: rgb(139 92 246 / 0.58);
+  --sticky-table-control-border-color: #d2d1ce;
+  --sticky-table-control-bg: #f2f2f0;
+  --sticky-table-control-hover-bg: #ededeb;
+  --sticky-table-control-text: #37352f;
+  --sticky-table-control-shadow: 0 5px 12px rgb(55 53 47 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.28);
+  --sticky-portal-menu-bg: #f7f7f5;
+  --sticky-portal-menu-hover-bg: #ededeb;
+  --sticky-portal-menu-border-color: #d2d1ce;
+  --sticky-portal-menu-shadow: 0 12px 26px rgb(55 53 47 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.38);
+  --sticky-control-bg: rgb(255 255 255 / 0.76);
+  --sticky-control-hover-bg: rgb(242 242 240 / 0.95);
+  --sticky-danger-color: #a11d1d;
+  --sticky-code-bg: #0d1117;
+  --sticky-code-text: #f0f6fc;
+  --sticky-code-border: rgb(139 148 158 / 0.34);
+  --sticky-code-muted: #8b949e;
+  --sticky-inline-code-bg: rgb(135 131 120 / 0.16);
+  --sticky-inline-code-text: #bd3f3f;
+  --notepane-editor-gray-text: #9b9a97;
+  --notepane-editor-gray-bg: #ebeced;
+  --notepane-editor-brown-text: #64473a;
+  --notepane-editor-brown-bg: #e9e5e3;
+  --notepane-editor-red-text: #e03e3e;
+  --notepane-editor-red-bg: #fbe4e4;
+  --notepane-editor-orange-text: #d9730d;
+  --notepane-editor-orange-bg: #f6e9d9;
+  --notepane-editor-yellow-text: #dfab01;
+  --notepane-editor-yellow-bg: #fbf3db;
+  --notepane-editor-green-text: #4d6461;
+  --notepane-editor-green-bg: #ddedea;
+  --notepane-editor-blue-text: #0b6e99;
+  --notepane-editor-blue-bg: #ddebf1;
+  --notepane-editor-purple-text: #6940a5;
+  --notepane-editor-purple-bg: #eae4f2;
+  --notepane-editor-pink-text: #ad1a72;
+  --notepane-editor-pink-bg: #f4dfeb;
+  --sticky-menu-shadow: 0 10px 24px rgb(0 0 0 / 0.14);
+  --sticky-panel-shadow: 0 22px 54px rgb(0 0 0 / 0.18);
+  --sticky-scrollbar-track: color-mix(in srgb, var(--sticky-editor-bg) 90%, transparent);
+  --sticky-scrollbar-thumb: color-mix(in srgb, var(--sticky-text-color) 22%, transparent);
+  --sticky-scrollbar-thumb-hover: color-mix(in srgb, var(--sticky-text-color) 34%, transparent);
+  --default-tab-text-color: #37352f;
+  --icon-surface-fill: rgb(255 255 255 / 0.78);
+  --icon-muted-fill: rgb(55 53 47 / 0.08);
+  --icon-chrome-size: 20px;
+  --icon-chrome-color: #5d625f;
+  --icon-chrome-active-color: #2f3437;
+  --icon-tone-copy: #5c70c6;
+  --icon-tone-delete: #c14a4a;
+  --icon-tone-dock: #4b7faa;
+  --icon-tone-export: #2d8a62;
+  --icon-tone-palette: #a45bb9;
+  --icon-tone-pin: #c87535;
+  --icon-tone-pin-active: #d83b3b;
+  --icon-tone-restore: #2f8977;
+  --icon-tone-settings: #7b68c5;
+  --icon-tone-sidebar: #3f7fb8;
+  --icon-tone-sticky: #b47a23;
+  --icon-tone-tabs: #3f86b8;
+  --icon-tone-trash: #c14a4a;
+  --chrome-icon-button-width: 32px;
+  --chrome-icon-button-height: 30px;
+  --chrome-icon-button-radius: 9px;
+  --chrome-icon-button-bg: rgb(255 255 255 / 0.74);
+  --chrome-icon-button-hover-bg: rgb(242 242 240 / 0.92);
+  --chrome-icon-button-active-bg: rgb(55 53 47 / 0.08);
+  --chrome-icon-button-active-hover-bg: rgb(55 53 47 / 0.11);
+  --chrome-icon-button-border: rgb(55 53 47 / 0.14);
+  --chrome-icon-button-hover-border: rgb(55 53 47 / 0.22);
+  --chrome-icon-button-active-border: rgb(55 53 47 / 0.26);
+  --chrome-icon-button-shadow: 0 4px 10px rgb(0 0 0 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.42);
+  --session-tab-active-bg: #f1f1ef;
+  --session-tab-inactive-bg: #f1f1ef;
+  --session-tab-hover-bg: #f1f1ef;
+  --bn-colors-editor-text: var(--sticky-text-color);
+  --bn-colors-editor-background: transparent;
+  --bn-colors-menu-text: var(--sticky-panel-text);
+  --bn-colors-menu-background: var(--sticky-panel-bg);
+  --bn-colors-tooltip-text: var(--sticky-panel-text);
+  --bn-colors-tooltip-background: var(--sticky-control-hover-bg);
+  --bn-colors-hovered-text: var(--sticky-text-color);
+  --bn-colors-hovered-background: var(--sticky-control-hover-bg);
+  --bn-colors-selected-text: #ffffff;
+  --bn-colors-selected-background: #2f3437;
+  --bn-colors-disabled-text: #b7b7b4;
+  --bn-colors-disabled-background: #f1f1ef;
+  --bn-colors-border: rgb(55 53 47 / 0.12);
+  --bn-colors-shadow: rgb(0 0 0 / 0.16);
+  --bn-colors-side-menu: #8a8a86;
+}
+
+body.theme-light,
+body.theme-dark {
+  color: var(--sticky-text-color);
+}
+
+.sticky-shell {
+  display: flex;
+  position: relative;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--sticky-window-radius, 0);
+  outline: 0;
+  background: var(--sticky-shell-bg);
+  box-shadow: none;
+  color: var(--sticky-text-color);
+  font-family: var(--notepane-ui-font);
+  transition:
+    background 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
+}
+
+body.theme-dark,
+.sticky-shell.theme-dark {
+  --sticky-effective-bg: #191919;
+  --sticky-shell-bg: #191919;
+  --sticky-header-bg: #1f1f1f;
+  --sticky-sidebar-bg: #1a1a1a;
+  --sticky-editor-bg: #191919;
+  --sticky-panel-bg: #242424;
+  --sticky-panel-text: #f1f1ef;
+  --sticky-panel-muted: #a5a5a1;
+  --sticky-text-color: #f1f1ef;
+  --sticky-muted-color: #a5a5a1;
+  --sticky-border-color: rgb(255 255 255 / 0.12);
+  --sticky-table-border-color: #747471;
+  --sticky-table-active-bg: rgb(196 181 253 / 0.14);
+  --sticky-table-focused-border-color: rgb(196 181 253 / 0.62);
+  --sticky-table-control-border-color: #4b4b4a;
+  --sticky-table-control-bg: #161616;
+  --sticky-table-control-hover-bg: #151515;
+  --sticky-table-control-text: #f1f1ef;
+  --sticky-table-control-shadow: 0 7px 16px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.08);
+  --sticky-portal-menu-bg: #202020;
+  --sticky-portal-menu-hover-bg: #383838;
+  --sticky-portal-menu-border-color: #4b4b4a;
+  --sticky-portal-menu-shadow: 0 14px 34px rgb(0 0 0 / 0.46), inset 0 1px 0 rgb(255 255 255 / 0.08);
+  --sticky-control-bg: rgb(255 255 255 / 0.06);
+  --sticky-control-hover-bg: rgb(255 255 255 / 0.1);
+  --sticky-danger-color: #ff7b72;
+  --sticky-code-bg: #0d1117;
+  --sticky-code-text: #f0f6fc;
+  --sticky-code-border: rgb(139 148 158 / 0.34);
+  --sticky-code-muted: #8b949e;
+  --sticky-inline-code-bg: rgb(255 255 255 / 0.1);
+  --sticky-inline-code-text: #ff8a80;
+  --notepane-editor-gray-text: #bebdb8;
+  --notepane-editor-gray-bg: #9b9a97;
+  --notepane-editor-brown-text: #8e6552;
+  --notepane-editor-brown-bg: #64473a;
+  --notepane-editor-red-text: #ec4040;
+  --notepane-editor-red-bg: #be3434;
+  --notepane-editor-orange-text: #e3790d;
+  --notepane-editor-orange-bg: #b7600a;
+  --notepane-editor-yellow-text: #dfab01;
+  --notepane-editor-yellow-bg: #b58b00;
+  --notepane-editor-green-text: #6b8b87;
+  --notepane-editor-green-bg: #4d6461;
+  --notepane-editor-blue-text: #0e87bc;
+  --notepane-editor-blue-bg: #0b6e99;
+  --notepane-editor-purple-text: #8552d7;
+  --notepane-editor-purple-bg: #6940a5;
+  --notepane-editor-pink-text: #da208f;
+  --notepane-editor-pink-bg: #ad1a72;
+  --sticky-menu-shadow: 0 12px 34px rgb(0 0 0 / 0.4);
+  --sticky-panel-shadow: 0 22px 54px rgb(0 0 0 / 0.42);
+  --sticky-scrollbar-track: color-mix(in srgb, var(--sticky-editor-bg) 84%, transparent);
+  --sticky-scrollbar-thumb: color-mix(in srgb, var(--sticky-text-color) 28%, transparent);
+  --sticky-scrollbar-thumb-hover: color-mix(in srgb, var(--sticky-text-color) 42%, transparent);
+  --default-tab-text-color: #f1f1ef;
+  --icon-surface-fill: rgb(255 255 255 / 0.08);
+  --icon-muted-fill: rgb(255 255 255 / 0.12);
+  --icon-chrome-size: 20px;
+  --icon-chrome-color: #b8beb9;
+  --icon-chrome-active-color: #f1f1ef;
+  --icon-tone-copy: #a8bcff;
+  --icon-tone-delete: #ff8585;
+  --icon-tone-dock: #8fc7ff;
+  --icon-tone-export: #73d6a5;
+  --icon-tone-palette: #eda6ff;
+  --icon-tone-pin: #ffb16f;
+  --icon-tone-pin-active: #ff6f6f;
+  --icon-tone-restore: #75dcc8;
+  --icon-tone-settings: #b5a7ff;
+  --icon-tone-sidebar: #8ab8ff;
+  --icon-tone-sticky: #ffd36e;
+  --icon-tone-tabs: #91d0ff;
+  --icon-tone-trash: #ff8a8a;
+  --chrome-icon-button-width: 32px;
+  --chrome-icon-button-height: 30px;
+  --chrome-icon-button-radius: 9px;
+  --chrome-icon-button-bg: rgb(255 255 255 / 0.07);
+  --chrome-icon-button-hover-bg: rgb(255 255 255 / 0.11);
+  --chrome-icon-button-active-bg: rgb(255 255 255 / 0.12);
+  --chrome-icon-button-active-hover-bg: rgb(255 255 255 / 0.15);
+  --chrome-icon-button-border: rgb(255 255 255 / 0.14);
+  --chrome-icon-button-hover-border: rgb(255 255 255 / 0.24);
+  --chrome-icon-button-active-border: rgb(255 255 255 / 0.30);
+  --chrome-icon-button-shadow: 0 4px 12px rgb(0 0 0 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.08);
+  --session-tab-active-bg: #2a2a2a;
+  --session-tab-inactive-bg: #2a2a2a;
+  --session-tab-hover-bg: #2a2a2a;
+  --bn-colors-editor-text: var(--sticky-text-color);
+  --bn-colors-editor-background: transparent;
+  --bn-colors-menu-text: var(--sticky-panel-text);
+  --bn-colors-menu-background: var(--sticky-portal-menu-bg);
+  --bn-colors-tooltip-text: var(--sticky-panel-text);
+  --bn-colors-tooltip-background: var(--sticky-portal-menu-hover-bg);
+  --bn-colors-hovered-text: var(--sticky-text-color);
+  --bn-colors-hovered-background: var(--sticky-portal-menu-hover-bg);
+  --bn-colors-selected-text: #f1f1ef;
+  --bn-colors-selected-background: #3f3f3f;
+  --bn-colors-disabled-text: #666;
+  --bn-colors-disabled-background: #202020;
+  --bn-colors-border: rgb(255 255 255 / 0.12);
+  --bn-colors-shadow: rgb(0 0 0 / 0.48);
+  --bn-colors-side-menu: #9b9b98;
+}

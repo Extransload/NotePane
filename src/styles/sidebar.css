@@ -1,0 +1,666 @@
+/* Session sidebar: tab rows, reorder affordances, rename field. */
+
+.session-sidebar {
+  display: flex;
+  position: relative;
+  flex: 0 0 var(--session-sidebar-width, 204px);
+  flex-direction: column;
+  width: var(--session-sidebar-width, 204px);
+  min-width: var(--session-sidebar-width, 204px);
+  min-height: 0;
+  overflow: visible;
+  border-right: 1px solid var(--sticky-border-color);
+  background: var(--sticky-sidebar-bg);
+  box-shadow: inset -1px 0 0 rgb(255 255 255 / 0.04);
+  -webkit-app-region: no-drag;
+  transition:
+    background 160ms ease;
+}
+
+.session-sidebar.is-compact {
+  overflow: visible;
+}
+
+.session-sidebar-topbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 8px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--sticky-border-color) 70%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sticky-sidebar-bg) 96%, white),
+      var(--sticky-sidebar-bg)
+    );
+  -webkit-app-region: no-drag;
+}
+
+.session-sidebar.is-compact .session-sidebar-topbar {
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 6px;
+}
+
+.session-sidebar.is-compact .brand-wordmark {
+  display: none;
+}
+
+.session-sidebar.is-compact .sidebar-toggle {
+  width: var(--chrome-icon-button-width);
+  height: var(--chrome-icon-button-height);
+}
+
+.session-sidebar-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.session-sidebar-footer {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 7px;
+  padding: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--sticky-border-color) 70%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      var(--sticky-sidebar-bg),
+      color-mix(in srgb, var(--sticky-sidebar-bg) 94%, black)
+    );
+  -webkit-app-region: no-drag;
+}
+
+.session-sidebar-footer-row {
+  display: grid;
+  align-items: center;
+  width: 100%;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  min-width: 0;
+}
+
+.session-sidebar-footer .preferences-icon-button {
+  width: 100%;
+  min-width: 0;
+  height: var(--chrome-icon-button-height);
+  border-radius: var(--chrome-icon-button-radius);
+}
+
+.session-sidebar-footer .layout-mode-button {
+  display: grid;
+  justify-self: stretch;
+  width: 100%;
+  min-width: 0;
+  height: var(--chrome-icon-button-height);
+  place-items: center;
+  padding: 0;
+  border-radius: var(--chrome-icon-button-radius);
+}
+
+.session-sidebar-footer .editor-width-button {
+  display: grid;
+  justify-self: stretch;
+  width: 100%;
+  min-width: 0;
+  height: var(--chrome-icon-button-height);
+  place-items: center;
+  padding: 0;
+  border-radius: var(--chrome-icon-button-radius);
+}
+
+.session-sidebar-footer .editor-width-button .notepane-editor-width-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.session-sidebar-footer .layout-mode-button .notepane-mode-switch-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.session-sidebar-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.session-sidebar-content::-webkit-scrollbar-thumb {
+  border: 2px solid var(--sticky-scrollbar-track);
+  border-radius: 999px;
+  background: var(--sticky-scrollbar-thumb);
+}
+
+.session-sidebar-content::-webkit-scrollbar-track {
+  background: var(--sticky-scrollbar-track);
+}
+
+.sidebar-resize-handle {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: -4px;
+  width: 8px;
+  height: 100%;
+  cursor: col-resize;
+  -webkit-app-region: no-drag;
+}
+
+.sidebar-resize-handle::after {
+  position: absolute;
+  top: 12px;
+  right: 3px;
+  width: 2px;
+  height: calc(100% - 24px);
+  border-radius: 999px;
+  background: transparent;
+  content: "";
+  transition: background 120ms ease;
+}
+
+.sidebar-resize-handle:hover::after {
+  background: color-mix(in srgb, var(--brand-pastel-sky) 62%, var(--sticky-border-color));
+}
+
+.session-tab-button,
+.session-tab-edit,
+.session-delete-button,
+.session-add-button,
+.preferences-close-button,
+.preferences-icon-button,
+.layout-mode-button,
+.editor-width-button,
+.sticky-color-button,
+.sticky-pin-button,
+.sticky-trash-button,
+.sidebar-reopen-button,
+.dock-note-button,
+.image-tools button,
+.crop-actions button {
+  border: 1px solid var(--sticky-border-color);
+  border-radius: 7px;
+  background: var(--sticky-control-bg);
+  color: var(--sticky-text-color);
+  font: 700 11px/1 var(--notepane-ui-font);
+  cursor: pointer;
+  transition:
+    transform 130ms ease,
+    background 130ms ease,
+    color 130ms ease,
+    border-color 130ms ease,
+    opacity 130ms ease;
+}
+
+.session-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow: visible;
+  padding: 10px 8px 0;
+}
+
+.sidebar-reopen-button {
+  position: absolute;
+  z-index: 20;
+  left: 10px;
+  top: 10px;
+  display: grid;
+  width: 34px;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border-radius: var(--chrome-icon-button-radius);
+  border-color: var(--chrome-icon-button-border);
+  background: var(--chrome-icon-button-bg);
+  color: var(--icon-chrome-color) !important;
+  box-shadow: var(--chrome-icon-button-shadow);
+  -webkit-app-region: no-drag;
+}
+
+.sidebar-reopen-button:hover {
+  border-color: var(--chrome-icon-button-hover-border);
+  background: var(--chrome-icon-button-hover-bg);
+  transform: translateY(-1px);
+}
+
+.session-tab-row {
+  --session-tab-row-height: 31px;
+  --session-tab-index-width: 25px;
+  --session-tab-shortcut-width: 42px;
+  --session-tab-text-color: var(--default-tab-text-color);
+  --session-tab-inactive-text-color: color-mix(
+    in srgb,
+    var(--session-tab-text-color) 70%,
+    var(--sticky-muted-color)
+  );
+  --session-tab-border-color: transparent;
+  --session-tab-active-shadow: none;
+  --session-tab-inactive-shadow: none;
+  --session-tab-dot-bg: color-mix(in srgb, var(--session-tab-text-color) 16%, transparent);
+  --session-tab-dot-text-color: inherit;
+  --session-tab-offset-x: 0px;
+  --session-tab-reorder-y: 0px;
+  display: grid;
+  grid-template-columns:
+    var(--session-tab-index-width)
+    minmax(0, 1fr)
+    var(--session-tab-shortcut-width);
+  align-items: center;
+  width: 100%;
+  height: var(--session-tab-row-height);
+  max-height: var(--session-tab-row-height);
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--session-tab-inactive-bg);
+  box-shadow: var(--session-tab-inactive-shadow);
+  color: var(--session-tab-inactive-text-color);
+  cursor: grab;
+  line-height: 1;
+  transform: translate(var(--session-tab-offset-x), var(--session-tab-reorder-y));
+  transition:
+    transform 140ms ease,
+    background 140ms ease,
+    box-shadow 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    max-height 170ms ease,
+    opacity 140ms ease;
+}
+
+.session-tab-row.is-entering {
+  animation: sessionTabEnterVertical 190ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.session-tab-row.is-leaving {
+  pointer-events: none;
+  animation: sessionTabLeaveVertical 170ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+.session-tab-row.is-leaving .session-index-button,
+.session-tab-row.is-leaving .session-shortcut {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.session-tab-row.is-dragging {
+  opacity: 0.56;
+  cursor: grabbing;
+}
+
+.session-tab-row.is-reorder-animating {
+  z-index: 2;
+  will-change: transform;
+}
+
+.session-tab-row:not([draggable="true"]) {
+  cursor: default;
+}
+
+.session-tab-row:hover {
+  background: var(--session-tab-hover-bg);
+  --session-tab-offset-x: 1px;
+}
+
+.session-tab-row.active {
+  border-color: var(--session-tab-border-color);
+  background: var(--session-tab-active-bg);
+  box-shadow: var(--session-tab-active-shadow);
+  color: var(--session-tab-text-color);
+  --session-tab-offset-x: 2px;
+}
+
+.session-sidebar.is-compact .session-tabs {
+  gap: 7px;
+  padding: 9px 8px 0;
+}
+
+.session-sidebar.is-compact .session-tab-row {
+  --session-tab-row-height: 34px;
+  grid-template-columns: 1fr;
+  border-radius: 12px;
+}
+
+.session-sidebar.is-compact .session-tab-row:hover,
+.session-sidebar.is-compact .session-tab-row.active {
+  --session-tab-offset-x: 0px;
+}
+
+.session-tab-button,
+.session-tab-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0 8px;
+  border-color: transparent;
+  background: transparent;
+  color: inherit;
+  line-height: 1;
+  text-align: left;
+}
+
+.session-tab-button {
+  grid-column: 2;
+  justify-content: flex-start;
+  padding: 0 4px 0 0;
+}
+
+.session-tab-edit {
+  grid-column: 1 / -1;
+  padding: 0 8px;
+}
+
+.session-sidebar.is-compact .session-tab-button,
+.session-sidebar.is-compact .session-tab-edit {
+  grid-column: 1 / -1;
+  justify-content: center;
+  padding: 0;
+}
+
+.session-dot {
+  display: grid;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 0;
+  background: transparent;
+  color: var(--session-tab-dot-text-color);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.session-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-sidebar.is-compact .session-dot {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.session-sidebar.is-compact .session-name,
+.session-sidebar.is-compact .session-tab-trailing {
+  display: none;
+}
+
+.session-tab-edit input {
+  min-width: 0;
+  width: 100%;
+  height: 20px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: 650 12px/1 var(--notepane-ui-font);
+}
+
+.session-tab-trailing {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+}
+
+.session-index-button {
+  display: grid;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 0;
+  background: transparent;
+  color: color-mix(in srgb, currentColor 76%, transparent);
+  font: 800 10px/1 var(--notepane-ui-font);
+  line-height: 1;
+  -webkit-app-region: no-drag;
+  transition:
+    color 120ms ease;
+}
+
+.session-index-label,
+.session-index-delete {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  grid-area: 1 / 1;
+  place-items: center;
+  transform-origin: center;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.session-index-delete {
+  color: color-mix(in srgb, currentColor 72%, transparent);
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.session-index-delete-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.session-tab-row:hover .session-index-button:not(:disabled) .session-index-label,
+.session-index-button:focus-visible:not(:disabled) .session-index-label {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.session-tab-row:hover .session-index-button:not(:disabled) .session-index-delete,
+.session-index-button:focus-visible:not(:disabled) .session-index-delete {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.session-index-button:hover:not(:disabled),
+.session-index-button:focus-visible:not(:disabled) {
+  color: var(--sticky-danger-color);
+}
+
+.session-index-button:focus-visible {
+  outline: 1px solid color-mix(in srgb, currentColor 34%, transparent);
+  outline-offset: -4px;
+}
+
+.session-index-button:disabled {
+  color: color-mix(in srgb, currentColor 52%, transparent);
+  cursor: default;
+}
+
+.session-shortcut {
+  display: grid;
+  width: 36px;
+  height: 20px;
+  min-width: 0;
+  place-items: center;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: color-mix(in srgb, currentColor 70%, transparent);
+  font: 750 9px/1 var(--notepane-ui-font);
+  text-align: center;
+  white-space: nowrap;
+  transition: opacity 120ms ease;
+}
+
+.session-add-button {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: calc(100% - 16px);
+  height: 34px;
+  min-height: 34px;
+  margin: 8px 8px 10px;
+  padding: 0 10px;
+  border-style: dashed;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--sticky-muted-color);
+  line-height: 1;
+}
+
+.session-add-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.session-add-button span {
+  display: block;
+  line-height: 14px;
+}
+
+.session-add-button:hover {
+  background: var(--sticky-control-hover-bg);
+  color: var(--sticky-text-color);
+  transform: translateY(-1px);
+}
+
+.session-sidebar.is-compact .session-add-button {
+  width: calc(100% - 16px);
+  padding: 0;
+  border-radius: 12px;
+}
+
+.session-sidebar.is-compact .session-add-button span:last-child {
+  display: none;
+}
+
+.session-sidebar.is-compact .session-sidebar-footer {
+  align-items: center;
+  gap: 7px;
+  padding: 7px 6px;
+}
+
+.session-sidebar.is-compact .session-sidebar-footer-row {
+  grid-template-columns: 1fr;
+  gap: 6px;
+  justify-items: center;
+}
+
+.session-sidebar.is-compact .preferences-icon-button,
+.session-sidebar.is-compact .layout-mode-button,
+.session-sidebar.is-compact .editor-width-button {
+  width: var(--chrome-icon-button-width);
+  min-width: var(--chrome-icon-button-width);
+  height: var(--chrome-icon-button-height);
+  border-radius: var(--chrome-icon-button-radius);
+}
+
+.session-sidebar.is-compact .preferences-icon-button,
+.session-sidebar.is-compact .layout-mode-button,
+.session-sidebar.is-compact .editor-width-button {
+  padding: 0;
+}
+
+.session-sidebar.is-compact .session-sidebar-footer .layout-mode-button {
+  justify-self: center;
+}
+
+.session-sidebar.is-compact .preferences-icon-button .notepane-action-icon,
+.session-sidebar.is-compact .layout-mode-button .notepane-action-icon,
+.session-sidebar.is-compact .editor-width-button .notepane-action-icon {
+  width: var(--icon-chrome-size);
+  height: var(--icon-chrome-size);
+}
+
+.session-sidebar.is-compact .layout-mode-button .notepane-mode-transition-icon {
+  width: var(--icon-chrome-size);
+  height: var(--icon-chrome-size);
+}
+
+.sticky-title-form {
+  display: flex;
+  align-items: center;
+  min-width: 120px;
+  max-width: min(42vw, 320px);
+  height: 100%;
+  -webkit-app-region: no-drag;
+}
+
+.sticky-title-drag-label {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  min-width: 0;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--sticky-text-color);
+  cursor: default;
+  font: 760 13px/1 var(--notepane-ui-font);
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  -webkit-app-region: no-drag;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.sticky-title-drag-label:hover {
+  border-color: color-mix(in srgb, var(--sticky-border-color) 72%, transparent);
+  background: color-mix(in srgb, var(--sticky-control-bg) 72%, transparent);
+}
+
+.sticky-title-drag-label:active {
+  cursor: default;
+}
+
+.sticky-title-input {
+  width: 100%;
+  height: 30px;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  outline: none;
+  background: transparent;
+  color: var(--sticky-text-color);
+  font: 760 13px/1 var(--notepane-ui-font);
+  letter-spacing: 0;
+  -webkit-app-region: no-drag;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.sticky-title-input:hover,
+.sticky-title-input:focus {
+  border-color: var(--sticky-border-color);
+  background: var(--sticky-control-bg);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  opacity: 0;
+}

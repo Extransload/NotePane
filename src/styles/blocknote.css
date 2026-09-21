@@ -1,0 +1,963 @@
+/* Overrides for BlockNote's own markup, including its floating menus. */
+
+.bn-editor {
+  min-height: 100%;
+  color: var(--sticky-text-color);
+}
+
+.bn-editor > .bn-block-group > .bn-block-outer + .bn-block-outer {
+  margin-top: 8px;
+}
+
+/* BlockNote draws indentation guides for nested blocks. Keep the indentation,
+   but hide the vertical guide so Tab does not add a visible line. */
+.bn-editor
+  .bn-block-group
+  .bn-block:not(:has(.bn-toggle-wrapper))
+  .bn-block-group
+  .bn-block-outer:not([data-prev-depth-changed])::before {
+  border-left: none;
+}
+
+.bn-editor [data-content-type="heading"] {
+  line-height: 1.3;
+}
+
+.bn-editor [data-content-type="heading"][data-level="1"],
+.bn-editor [data-content-type="heading"]:has(h1) {
+  --level: 1.875em;
+}
+
+.bn-editor [data-content-type="heading"][data-level="2"] {
+  --level: 1.5em;
+}
+
+.bn-editor [data-content-type="heading"][data-level="3"] {
+  --level: 1.25em;
+}
+
+.bn-editor [data-content-type="heading"][data-level="4"] {
+  --level: 1em;
+}
+
+.bn-container,
+.bn-editor {
+  background: transparent;
+}
+
+.bn-editor [data-content-type]:not([data-text-color]),
+.bn-editor
+  .bn-block-content:not([data-text-color])
+  > .bn-inline-content:not([data-text-color]) {
+  color: var(--sticky-text-color);
+}
+
+.bn-editor
+  .bn-block-content:is([data-is-only-empty-block], [data-is-empty-and-focused]):has(.ProseMirror-trailingBreak:only-child)::after {
+  color: var(--sticky-muted-color) !important;
+  opacity: 0.9;
+}
+
+.bn-editor .bn-block-content[data-content-type="bulletListItem"]::before {
+  font-size: 1.12em;
+  line-height: 1;
+}
+
+.bn-editor
+  .bn-block-content[data-content-type="checkListItem"]
+  > div:has(> input) {
+  display: grid;
+  place-items: center;
+}
+
+.bn-editor
+  .bn-block-content[data-content-type="checkListItem"]
+  > div
+  > input {
+  width: 14px;
+  height: 14px;
+  margin-block: 0;
+}
+
+.bn-editor
+  .bn-block-content[data-content-type="toggleListItem"]
+  .bn-toggle-wrapper,
+.bn-editor
+  .bn-block-content[data-content-type="heading"][data-is-toggleable="true"]
+  .bn-toggle-wrapper {
+  align-items: flex-start;
+}
+
+.mantine-InputPlaceholder-placeholder {
+  color: var(--bn-colors-menu-text, var(--sticky-muted-color)) !important;
+  opacity: 0.72;
+}
+
+.bn-editor [data-content-type="codeBlock"],
+.bn-editor [data-content-type="codeBlock"] > pre,
+.bn-editor pre {
+  background-color: var(
+    --prosemirror-highlight-bg,
+    var(--sticky-code-bg)
+  ) !important;
+  color: var(--prosemirror-highlight, var(--sticky-code-text)) !important;
+}
+
+.bn-editor [data-content-type="codeBlock"] {
+  color-scheme: dark;
+  overflow: hidden;
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px var(--sticky-code-border);
+}
+
+.bn-editor [data-content-type="codeBlock"] > pre {
+  padding-top: 42px;
+}
+
+.code-block-tools {
+  position: absolute;
+  z-index: 4;
+  top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 8px;
+  background: rgb(15 15 15 / 0.76);
+  box-shadow: 0 5px 14px rgb(0 0 0 / 0.22);
+  opacity: 0.82;
+  transform: translateX(-100%);
+  backdrop-filter: blur(8px);
+  transition: opacity 130ms ease, border-color 130ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.code-block-tools:hover,
+.code-block-tools:focus-within {
+  border-color: rgb(255 255 255 / 0.18);
+  opacity: 1;
+}
+
+.code-block-tool-button {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgb(255 255 255 / 0.72);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.code-block-prettify-button {
+  width: auto;
+  min-width: 58px;
+  padding-inline: 8px;
+  font-family: var(--notepane-ui-font);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.code-block-tool-button:hover,
+.code-block-tool-button:focus-visible {
+  outline: none;
+  background: rgb(255 255 255 / 0.1);
+  color: #fff;
+}
+
+.code-block-tool-button:focus-visible {
+  box-shadow: 0 0 0 2px rgb(149 179 255 / 0.7);
+}
+
+.code-block-tool-button:disabled {
+  color: rgb(255 255 255 / 0.3);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.code-block-tool-button.is-success,
+.code-block-tool-button.is-unchanged {
+  color: #9ee6ad;
+}
+
+.code-block-tool-button.is-error {
+  color: #ffaaa3;
+}
+
+.code-block-tool-button svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2;
+}
+
+.bn-editor [data-content-type="codeBlock"] > pre,
+.bn-editor [data-content-type="codeBlock"] pre {
+  border-radius: inherit;
+}
+
+.bn-editor [data-content-type="codeBlock"] > div > select {
+  color: var(--sticky-code-muted) !important;
+}
+
+.bn-editor .bn-inline-content code {
+  padding: 0.12em 0.3em;
+  border: 0;
+  border-radius: 3px;
+  background-color: var(--sticky-inline-code-bg) !important;
+  box-decoration-break: clone;
+  color: var(--sticky-inline-code-text) !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85em;
+  font-weight: 500;
+  -webkit-box-decoration-break: clone;
+}
+
+.bn-editor [data-content-type="codeBlock"] code {
+  background-color: transparent !important;
+  color: var(--prosemirror-highlight, var(--sticky-code-text));
+}
+
+.bn-editor table,
+.bn-editor th,
+.bn-editor td,
+.bn-editor .bn-table-cell {
+  border-color: var(--sticky-table-border-color, var(--bn-colors-border)) !important;
+}
+
+.bn-editor [data-content-type="table"] .tableWrapper {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.bn-editor [data-content-type="table"] .tableWrapper-inner {
+  width: 100%;
+}
+
+.bn-editor [data-content-type="table"] table {
+  width: 100% !important;
+  max-width: none;
+}
+
+.bn-editor th,
+.bn-editor td,
+.bn-editor .bn-table-cell {
+  padding-inline: 6px !important;
+}
+
+.bn-editor :is(td, th).notepane-table-cell-focused,
+.bn-editor :is(td, th):focus-within,
+.bn-editor :is(td, th).selectedCell {
+  box-shadow: inset 0 0 0 2px var(--sticky-table-focused-border-color);
+}
+
+.bn-editor .selectedCell::after {
+  background: var(--sticky-table-active-bg) !important;
+  box-shadow: none;
+}
+
+.bn-editor:not(.ProseMirror-focused) .selectedCell::after {
+  background: transparent !important;
+}
+
+.bn-editor .bn-block-outer > .bn-block {
+  border-radius: 6px;
+  padding-inline: 8px;
+  transition:
+    background-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+@keyframes blockMenuSelectionIn {
+  from {
+    background-color: transparent;
+    box-shadow: inset 0 0 0 1px transparent;
+  }
+}
+
+.bn-editor [data-block-selected="true"] > .bn-block {
+  background-color: color-mix(
+    in srgb,
+    var(--sticky-note-accent-color, var(--sticky-text-color)) 4%,
+    transparent
+  );
+  border-radius: 2px;
+}
+
+.bn-editor[data-block-selection="true"] ::selection {
+  background: transparent;
+}
+
+body:has(.bn-editor[data-block-selection="true"]) .bn-formatting-toolbar {
+  display: none;
+}
+
+.bn-drag-preview {
+  opacity: 0.001 !important;
+  padding: 0 !important;
+  width: var(--notepane-drag-preview-width) !important;
+  box-sizing: border-box;
+}
+
+.bn-drag-preview > .bn-block-outer {
+  opacity: 0.56;
+  width: 100% !important;
+}
+
+.notepane-block-menu-item-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notepane-block-menu-item-content svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+.bn-table-handle,
+.bn-extend-button,
+.bn-table-cell-handle {
+  border-color: var(
+    --sticky-table-control-border-color,
+    var(--sticky-table-border-color, var(--bn-colors-border))
+  ) !important;
+  background: var(--sticky-table-control-bg) !important;
+  box-shadow: var(--sticky-table-control-shadow) !important;
+  color: var(--sticky-table-control-text) !important;
+}
+
+.bn-table-cell-handle {
+  display: none !important;
+}
+
+.bn-table-handle:hover,
+.bn-table-handle-dragging,
+.bn-extend-button:hover,
+.bn-extend-button-editing,
+.bn-table-cell-handle:hover {
+  background: var(--sticky-table-control-hover-bg) !important;
+  color: var(--sticky-table-control-text) !important;
+}
+
+:is(.bn-table-handle, .bn-extend-button, .bn-table-cell-handle) svg {
+  fill: currentColor !important;
+  color: currentColor !important;
+  stroke: currentColor !important;
+}
+
+.bn-menu-dropdown,
+.mantine-Menu-dropdown,
+.bn-table-handle-menu {
+  --bn-colors-menu-text: var(--sticky-panel-text);
+  --bn-colors-menu-background: var(--sticky-portal-menu-bg);
+  --bn-colors-hovered-text: var(--sticky-text-color);
+  --bn-colors-hovered-background: var(--sticky-portal-menu-hover-bg);
+  --bn-colors-border: var(--sticky-portal-menu-border-color);
+  border: 1px solid var(--sticky-portal-menu-border-color, var(--bn-colors-border)) !important;
+  border-radius: 8px !important;
+  background: var(--sticky-portal-menu-bg, var(--bn-colors-menu-background)) !important;
+  box-shadow: var(--sticky-portal-menu-shadow, var(--sticky-menu-shadow)) !important;
+  color: var(--sticky-panel-text) !important;
+}
+
+.bn-menu-dropdown :is(.mantine-Menu-label, .mantine-Menu-item, [role="menuitem"]),
+.mantine-Menu-dropdown :is(.mantine-Menu-label, .mantine-Menu-item, [role="menuitem"]),
+.bn-table-handle-menu :is(.mantine-Menu-label, .mantine-Menu-item, [role="menuitem"]) {
+  background: transparent !important;
+  color: var(--sticky-panel-text) !important;
+}
+
+.bn-menu-dropdown
+  :is(
+    .mantine-Menu-item:hover,
+    .mantine-Menu-item[data-hovered],
+    .mantine-Menu-item[aria-selected="true"],
+    [role="menuitem"]:hover,
+    [role="menuitem"][data-hovered],
+    [role="menuitem"][aria-selected="true"]
+  ),
+.mantine-Menu-dropdown
+  :is(
+    .mantine-Menu-item:hover,
+    .mantine-Menu-item[data-hovered],
+    .mantine-Menu-item[aria-selected="true"],
+    [role="menuitem"]:hover,
+    [role="menuitem"][data-hovered],
+    [role="menuitem"][aria-selected="true"]
+  ),
+.bn-table-handle-menu
+  :is(
+    .mantine-Menu-item:hover,
+    .mantine-Menu-item[data-hovered],
+    .mantine-Menu-item[aria-selected="true"],
+    [role="menuitem"]:hover,
+    [role="menuitem"][data-hovered],
+    [role="menuitem"][aria-selected="true"]
+  ) {
+  background: var(--sticky-portal-menu-hover-bg, var(--bn-colors-hovered-background)) !important;
+  color: var(--sticky-text-color) !important;
+}
+
+.bn-menu-dropdown :is(.mantine-Menu-itemSection, .mantine-Menu-itemLabel, [role="menuitem"] *),
+.mantine-Menu-dropdown :is(.mantine-Menu-itemSection, .mantine-Menu-itemLabel, [role="menuitem"] *),
+.bn-table-handle-menu :is(.mantine-Menu-itemSection, .mantine-Menu-itemLabel, [role="menuitem"] *) {
+  color: inherit !important;
+}
+
+.bn-menu-dropdown .notepane-block-menu-icon {
+  color: var(--sticky-panel-muted) !important;
+}
+
+.bn-menu-dropdown .notepane-block-menu-icon.is-turn-into,
+.bn-menu-dropdown .notepane-block-menu-icon.is-block-type {
+  color: #4d79b8 !important;
+}
+
+.bn-menu-dropdown .notepane-block-menu-icon.is-colors {
+  color: #a45bb9 !important;
+}
+
+.bn-menu-dropdown .notepane-block-menu-icon.is-delete {
+  color: var(--icon-tone-delete, #c14a4a) !important;
+}
+
+.bn-menu-dropdown :is(.mantine-Divider-root, .mantine-Menu-divider),
+.mantine-Menu-dropdown :is(.mantine-Divider-root, .mantine-Menu-divider),
+.bn-table-handle-menu :is(.mantine-Divider-root, .mantine-Menu-divider) {
+  border-color: var(--sticky-portal-menu-border-color, var(--bn-colors-border)) !important;
+}
+
+.bn-select {
+  min-width: 182px;
+  padding: 6px !important;
+}
+
+.bn-select .mantine-Menu-item {
+  min-height: 32px;
+  padding: 5px 7px !important;
+  border-radius: 6px;
+  font: 500 12px/1.2 var(--notepane-ui-font);
+}
+
+.bn-select .mantine-Menu-itemSection[data-position="left"] {
+  display: grid;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  margin-inline-end: 9px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--sticky-panel-text) 7%, transparent);
+}
+
+.bn-select .mantine-Menu-itemSection[data-position="left"] svg {
+  width: 16px;
+  height: 16px;
+}
+
+.bn-select .mantine-Menu-itemSection[data-position="right"] {
+  margin-inline-start: auto;
+}
+
+.bn-popover-content.bn-form-popover {
+  --bn-colors-menu-text: var(--sticky-panel-text);
+  --bn-colors-menu-background: var(--sticky-portal-menu-bg);
+  --bn-colors-hovered-background: var(--sticky-portal-menu-hover-bg);
+  --bn-colors-border: var(--sticky-portal-menu-border-color);
+  min-width: 276px;
+  gap: 4px;
+  padding: 6px !important;
+  border: 1px solid var(--sticky-portal-menu-border-color) !important;
+  border-radius: 9px !important;
+  background: var(--sticky-portal-menu-bg) !important;
+  box-shadow: var(--sticky-portal-menu-shadow) !important;
+  color: var(--sticky-panel-text) !important;
+}
+
+.bn-form-popover .mantine-TextInput-root,
+.bn-form-popover .mantine-FileInput-root {
+  width: 100%;
+}
+
+.bn-form-popover
+  :is(.mantine-TextInput-wrapper, .mantine-FileInput-wrapper) {
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--sticky-portal-menu-border-color);
+  border-radius: 6px;
+  background: var(--sticky-panel-bg);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.bn-form-popover
+  :is(.mantine-TextInput-wrapper, .mantine-FileInput-wrapper):focus-within {
+  border-color: #2383e2;
+  box-shadow: 0 0 0 2px rgb(35 131 226 / 0.18);
+}
+
+.bn-form-popover
+  :is(.mantine-TextInput-input, .mantine-FileInput-input) {
+  height: 32px;
+  padding-inline: 30px 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--sticky-panel-text) !important;
+  font: 500 11px/1.2 var(--notepane-ui-font);
+}
+
+.bn-form-popover
+  :is(.mantine-TextInput-input, .mantine-FileInput-input)::placeholder {
+  color: var(--sticky-panel-muted) !important;
+  opacity: 1;
+}
+
+.bn-form-popover
+  :is(.mantine-TextInput-section, .mantine-FileInput-section) {
+  width: 28px;
+  color: var(--sticky-panel-muted) !important;
+}
+
+.bn-color-picker-dropdown :is(.mantine-UnstyledButton-root, .mantine-ActionIcon-root) {
+  border-color: var(--sticky-portal-menu-border-color, var(--bn-colors-border)) !important;
+  color: var(--sticky-panel-text) !important;
+}
+
+.bn-color-picker-dropdown
+  :is(.mantine-UnstyledButton-root:hover, .mantine-ActionIcon-root:hover) {
+  background: var(--sticky-portal-menu-hover-bg, var(--bn-colors-hovered-background)) !important;
+}
+
+.bn-formatting-toolbar.notepane-formatting-toolbar {
+  display: grid;
+  width: 190px;
+  max-width: calc(100vw - 16px);
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  overflow: visible;
+  padding: 7px;
+  border: 1px solid var(--sticky-portal-menu-border-color, var(--bn-colors-border));
+  border-radius: 10px;
+  background: var(--sticky-portal-menu-bg, var(--bn-colors-menu-background));
+  box-shadow: var(--sticky-portal-menu-shadow, var(--sticky-menu-shadow));
+  color: var(--sticky-panel-text, var(--bn-colors-menu-text));
+}
+
+.bn-formatting-toolbar.notepane-formatting-toolbar.is-table-context {
+  translate: 8px 0;
+  pointer-events: auto;
+}
+
+.bn-formatting-toolbar.notepane-formatting-toolbar.is-file-context {
+  width: 150px;
+}
+
+.bn-formatting-toolbar.notepane-formatting-toolbar.is-file-context
+  .notepane-formatting-contextual-actions {
+  grid-template-columns: repeat(4, 30px);
+  padding-top: 0;
+  border-top: 0;
+}
+
+div:has(> .bn-formatting-toolbar.notepane-formatting-toolbar.is-table-context) {
+  cursor: move;
+  pointer-events: auto;
+}
+
+.notepane-formatting-type-row {
+  min-width: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--sticky-portal-menu-border-color, var(--bn-colors-border));
+}
+
+.notepane-formatting-type-row > .mantine-Menu-root,
+.notepane-formatting-type-row > .mantine-Button-root,
+.notepane-formatting-type-row .mantine-Button-root {
+  width: 100%;
+}
+
+.notepane-formatting-type-row .mantine-Button-root {
+  height: 32px;
+  min-height: 32px;
+  justify-content: flex-start;
+  padding-inline: 8px;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--sticky-panel-text, var(--bn-colors-menu-text)) !important;
+  font: 500 12px/1 var(--notepane-ui-font);
+}
+
+.notepane-formatting-type-row .mantine-Button-root:hover {
+  background: var(
+    --sticky-portal-menu-hover-bg,
+    var(--bn-colors-hovered-background)
+  ) !important;
+}
+
+.notepane-formatting-type-row .mantine-Button-label {
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notepane-formatting-type-row .mantine-Button-section[data-position="left"] {
+  display: grid;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  margin-inline: 0 9px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--sticky-panel-text) 7%, transparent);
+}
+
+.notepane-formatting-type-row
+  .mantine-Button-section[data-position="left"]
+  svg {
+  width: 16px;
+  height: 16px;
+}
+
+.notepane-formatting-type-row .mantine-Button-section[data-position="right"] {
+  margin-inline-start: auto;
+}
+
+.notepane-formatting-actions,
+.notepane-formatting-contextual-actions {
+  display: grid;
+  grid-template-columns: repeat(5, 30px);
+  gap: 3px;
+  align-items: center;
+}
+
+.notepane-formatting-contextual-actions:empty {
+  display: none;
+}
+
+.notepane-formatting-contextual-actions:not(:empty) {
+  padding-top: 6px;
+  border-top: 1px solid var(--sticky-portal-menu-border-color, var(--bn-colors-border));
+}
+
+.notepane-formatting-actions .mantine-ActionIcon-root,
+.notepane-formatting-contextual-actions .mantine-ActionIcon-root {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--sticky-panel-text, var(--bn-colors-menu-text)) !important;
+}
+
+.notepane-formatting-actions .mantine-ActionIcon-root:hover,
+.notepane-formatting-contextual-actions .mantine-ActionIcon-root:hover {
+  background: var(
+    --sticky-portal-menu-hover-bg,
+    var(--bn-colors-hovered-background)
+  ) !important;
+}
+
+.notepane-formatting-actions .mantine-ActionIcon-root[data-selected],
+.notepane-formatting-contextual-actions .mantine-ActionIcon-root[data-selected] {
+  background: var(
+    --sticky-portal-menu-hover-bg,
+    var(--bn-colors-selected-background)
+  ) !important;
+  color: var(--sticky-text-color, var(--bn-colors-selected-text)) !important;
+}
+
+.notepane-formatting-actions .mantine-ActionIcon-root svg,
+.notepane-formatting-contextual-actions .mantine-ActionIcon-root svg {
+  width: 17px;
+  height: 17px;
+}
+
+.notepane-formatting-contextual-actions
+  .notepane-table-merge-split-button
+  svg {
+  width: 21px;
+  height: 21px;
+  stroke-width: 2;
+}
+
+.notion-color-picker-dropdown {
+  width: 180px;
+  padding: 9px !important;
+  overflow: hidden !important;
+}
+
+.notion-color-picker-content,
+.notion-color-picker-section {
+  display: grid;
+}
+
+.notion-color-picker-content {
+  gap: 10px;
+}
+
+.notion-color-picker-section {
+  gap: 5px;
+}
+
+.notion-color-picker-label {
+  padding-inline: 2px;
+  color: var(--sticky-panel-muted);
+  font: 600 10px/1.3 var(--notepane-ui-font);
+  letter-spacing: 0.01em;
+}
+
+.notion-color-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 28px);
+  gap: 5px;
+}
+
+.notion-color-swatch.mantine-Menu-item {
+  display: grid;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  place-items: center;
+  padding: 2px !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px;
+  background: transparent !important;
+  color: var(--sticky-panel-text) !important;
+}
+
+.notion-color-swatch.mantine-Menu-item:hover,
+.notion-color-swatch.mantine-Menu-item:focus-visible {
+  outline: none;
+  background: var(
+    --sticky-portal-menu-hover-bg,
+    var(--bn-colors-hovered-background)
+  ) !important;
+}
+
+.notion-color-swatch.mantine-Menu-item[data-active="true"] {
+  border-color: var(--sticky-panel-text) !important;
+}
+
+.notion-color-swatch .mantine-Menu-itemLabel {
+  display: grid;
+  overflow: visible;
+  place-items: center;
+}
+
+.notepane-editor-color-icon {
+  display: grid !important;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid var(--sticky-portal-menu-border-color) !important;
+  border-radius: 5px !important;
+  background-color: var(--sticky-panel-bg) !important;
+  color: var(--sticky-panel-text) !important;
+  font: 600 13px/1 var(--notepane-ui-font);
+}
+
+.notepane-toolbar-color-icon {
+  width: 20px;
+  height: 20px;
+  font-size: 12px;
+}
+
+.notepane-editor-color-icon[data-text-color="gray"] {
+  color: var(--notepane-editor-gray-text) !important;
+}
+
+.notepane-editor-color-icon[data-text-color="brown"] {
+  color: var(--notepane-editor-brown-text) !important;
+}
+
+.notepane-editor-color-icon[data-text-color="red"] {
+  color: var(--notepane-editor-red-text) !important;
+}
+
+.notepane-editor-color-icon[data-text-color="orange"] {
+  color: var(--notepane-editor-orange-text) !important;
+}
+
+.notepane-editor-color-icon[data-text-color="yellow"] {
+  color: var(--notepane-editor-yellow-text) !important;
+}
+
+.notepane-editor-color-icon[data-text-color="green"] {
+  color: var(--notepane-editor-green-text) !important;
+}
+
+.notepane-editor-color-icon[data-text-color="blue"] {
+  color: var(--notepane-editor-blue-text) !important;
+}
+
+.notepane-editor-color-icon[data-text-color="purple"] {
+  color: var(--notepane-editor-purple-text) !important;
+}
+
+.notepane-editor-color-icon[data-text-color="pink"] {
+  color: var(--notepane-editor-pink-text) !important;
+}
+
+.notepane-editor-color-icon[data-background-color="gray"] {
+  background-color: var(--notepane-editor-gray-bg) !important;
+}
+
+.notepane-editor-color-icon[data-background-color="brown"] {
+  background-color: var(--notepane-editor-brown-bg) !important;
+}
+
+.notepane-editor-color-icon[data-background-color="red"] {
+  background-color: var(--notepane-editor-red-bg) !important;
+}
+
+.notepane-editor-color-icon[data-background-color="orange"] {
+  background-color: var(--notepane-editor-orange-bg) !important;
+}
+
+.notepane-editor-color-icon[data-background-color="yellow"] {
+  background-color: var(--notepane-editor-yellow-bg) !important;
+}
+
+.notepane-editor-color-icon[data-background-color="green"] {
+  background-color: var(--notepane-editor-green-bg) !important;
+}
+
+.notepane-editor-color-icon[data-background-color="blue"] {
+  background-color: var(--notepane-editor-blue-bg) !important;
+}
+
+.notepane-editor-color-icon[data-background-color="purple"] {
+  background-color: var(--notepane-editor-purple-bg) !important;
+}
+
+.notepane-editor-color-icon[data-background-color="pink"] {
+  background-color: var(--notepane-editor-pink-bg) !important;
+}
+
+.bn-menu-dropdown,
+.mantine-Popover-dropdown {
+  z-index: 1000 !important;
+  max-width: calc(100vw - 16px) !important;
+  max-height: calc(100vh - 16px) !important;
+  overflow: auto !important;
+  scrollbar-color: var(--sticky-scrollbar-thumb) var(--sticky-scrollbar-track);
+}
+
+/* File panels are portalled to document.body, outside BlockNote's .bn-mantine
+ * scope. Reapply the upstream panel layout at the portal boundary. */
+.bn-panel {
+  width: min(500px, calc(100vw - 16px)) !important;
+  padding: 8px !important;
+  border: 1px solid var(--sticky-portal-menu-border-color, var(--bn-colors-border)) !important;
+  border-radius: var(--bn-border-radius-medium) !important;
+  background: var(--sticky-portal-menu-bg, var(--bn-colors-menu-background)) !important;
+  box-shadow: var(--sticky-portal-menu-shadow, var(--bn-shadow-medium)) !important;
+}
+
+.bn-panel .mantine-Tabs-root {
+  width: 100%;
+}
+
+.bn-panel .bn-tab-panel {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.bn-drag-handle-menu {
+  z-index: 1300 !important;
+  overflow: visible !important;
+}
+
+.notepane-block-menu-subpanel {
+  position: absolute;
+  z-index: 1301;
+  top: 0;
+  left: calc(100% + 5px);
+  width: 190px;
+  max-height: min(360px, calc(100vh - 16px));
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--sticky-portal-menu-border-color);
+  border-radius: 8px;
+  background: var(--sticky-portal-menu-bg);
+  box-shadow: var(--sticky-portal-menu-shadow, var(--sticky-menu-shadow));
+}
+
+.notepane-block-menu-subpanel[data-panel="colors"] {
+  width: 180px;
+  padding: 9px;
+}
+
+.bn-suggestion-menu[role="listbox"] {
+  max-height: inherit;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.bn-block-content[data-content-type="heading"]:has(
+    .ProseMirror-trailingBreak:only-child
+  ) {
+  position: relative;
+}
+
+.bn-block-content[data-content-type="heading"]:has(
+    .ProseMirror-trailingBreak:only-child
+  )::after {
+  position: absolute;
+  top: 18px;
+  left: 0;
+  margin: 0;
+  font-style: normal;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.bn-block-content[data-content-type="heading"][data-is-toggleable="true"]:has(
+    .ProseMirror-trailingBreak:only-child
+  )::after {
+  left: 28px;
+}
+
+.bn-block-content[data-content-type="heading"]:has(h1):has(
+    .ProseMirror-trailingBreak:only-child
+  )::after {
+  content: "Heading 1" !important;
+}
+
+.bn-block-content[data-content-type="heading"]:has(h2):has(
+    .ProseMirror-trailingBreak:only-child
+  )::after {
+  content: "Heading 2" !important;
+}
+
+.bn-block-content[data-content-type="heading"]:has(h3):has(
+    .ProseMirror-trailingBreak:only-child
+  )::after {
+  content: "Heading 3" !important;
+}
+
+.bn-block-content[data-content-type="heading"]:has(h4):has(
+    .ProseMirror-trailingBreak:only-child
+  )::after {
+  content: "Heading 4" !important;
+}
