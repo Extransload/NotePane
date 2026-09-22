@@ -4,3 +4,8 @@ release/
 .DS_Store
 *.log
 test-results/
+
+# Agent instruction files (local only)
+CLAUDE.md
+AGENTS.md
+.claude/
