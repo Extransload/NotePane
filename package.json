@@ -2,6 +2,7 @@
   "name": "notepane",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "A local-first desktop note pane app with tabbed sessions and sticky windows.",
   "main": "electron/main.cjs",
   "type": "module",
