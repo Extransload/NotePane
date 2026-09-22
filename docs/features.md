@@ -35,7 +35,7 @@
 - Show all sticky notes: `Command/Ctrl + Shift + 0`
 - Cycle sticky windows: `Command/Ctrl + Backtick`
 - Toggle always on top: `Command/Ctrl + Shift + P`
-- Toggle Tab/Sticky mode: `Command/Ctrl + Shift + M`
+- Toggle Tab/Sticky mode: `Command/Ctrl + Shift + T`
 - Toggle Light/Dark mode: `Command/Ctrl + Shift + L`
 - Open export menu: `Command/Ctrl + Shift + E`
 - Delayed hover tooltips for clickable controls
