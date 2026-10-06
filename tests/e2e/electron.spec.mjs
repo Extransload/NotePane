@@ -521,6 +521,33 @@ test("Electron keeps the tabs window on its session while a detached note is edi
   }
 });
 
+test("Electron flushes typing still waiting on the save debounce when windows are asked to flush", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const editor = page.getByTestId("sticky-editor-surface");
+    await expect(editor).toContainText("first body");
+
+    await editor.getByText("first body").click();
+    await page.keyboard.press("End");
+    await page.keyboard.insertText(" typed right before teardown");
+    // Ask right away, well inside the renderer's save debounce.
+    const results = await electronApp.evaluate(() => globalThis.notepaneFlushEditorWindows());
+
+    expect(results).toEqual(["done"]);
+    const notes = JSON.parse(fs.readFileSync(path.join(userDataDirectory, "notes.json"), "utf8")).notes;
+    expect(notes.find((note) => note.id === "first-note")?.markdown)
+      .toContain("typed right before teardown");
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron keeps running when saving window bounds fails", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [

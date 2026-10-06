@@ -1,5 +1,14 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+// Main asks before it destroys this window or replaces the workspace. The reply
+// goes out once every registered editor has written its pending edits, or at
+// once when no editor has mounted yet.
+const flushHandlers = new Set();
+ipcRenderer.on("notes:flush-requested", async (_event, requestId) => {
+  await Promise.allSettled([...flushHandlers].map(async (handler) => handler()));
+  ipcRenderer.send("notes:flush-done", requestId);
+});
+
 contextBridge.exposeInMainWorld("blocknoteSticky", {
   platform: process.platform,
   getCurrentNoteId: () => ipcRenderer.invoke("notes:get-current-id"),
@@ -30,6 +39,10 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
   attachNote: (noteId) => ipcRenderer.invoke("notes:attach", noteId),
   revealNote: (payload) => ipcRenderer.invoke("notes:reveal", payload),
   takePendingFind: () => ipcRenderer.invoke("find:take-pending"),
+  onFlushRequested: (callback) => {
+    flushHandlers.add(callback);
+    return () => flushHandlers.delete(callback);
+  },
   onFindOpenRequested: (callback) => {
     const listener = () => callback();
     ipcRenderer.on("find:open", listener);
