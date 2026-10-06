@@ -43,6 +43,49 @@ function fitBoundsToWorkAreas(bounds, workAreas) {
   };
 }
 
+/**
+ * Bounds for a note being detached out of the tabs window. The tabs window
+ * saves its own bounds into the note it shows, and notes created in tabs mode
+ * start with those bounds, so a detached note would otherwise open exactly on
+ * top of the tabs window and look as if nothing happened. When the note has no
+ * position, or its position is within `offset` of the tabs window origin, it
+ * opens at sticky size, `offset` pixels down and right of the tabs window, kept
+ * inside the work area of the display showing the tabs window. A note that
+ * already has its own distinct position keeps it.
+ */
+function getDetachedWindowBounds(noteBounds, tabsBounds, workAreas, options) {
+  const { offset, width, height } = options;
+  if (
+    !Number.isFinite(tabsBounds?.x) ||
+    !Number.isFinite(tabsBounds?.y) ||
+    !Array.isArray(workAreas) ||
+    workAreas.length === 0
+  ) {
+    return noteBounds;
+  }
+
+  const hasPosition = Number.isFinite(noteBounds?.x) && Number.isFinite(noteBounds?.y);
+  if (
+    hasPosition &&
+    (Math.abs(noteBounds.x - tabsBounds.x) >= offset ||
+      Math.abs(noteBounds.y - tabsBounds.y) >= offset)
+  ) {
+    return noteBounds;
+  }
+
+  const area = workAreas.reduce((best, candidate) =>
+    overlapArea(tabsBounds, candidate) > overlapArea(tabsBounds, best) ? candidate : best,
+  workAreas[0]);
+  const fittedWidth = Math.min(width, area.width);
+  const fittedHeight = Math.min(height, area.height);
+  return {
+    x: clamp(tabsBounds.x + offset, area.x, area.x + area.width - fittedWidth),
+    y: clamp(tabsBounds.y + offset, area.y, area.y + area.height - fittedHeight),
+    width: fittedWidth,
+    height: fittedHeight,
+  };
+}
+
 function intersect(a, b) {
   const left = Math.max(a.x, b.x);
   const top = Math.max(a.y, b.y);
@@ -61,4 +104,4 @@ function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
-module.exports = { fitBoundsToWorkAreas };
+module.exports = { fitBoundsToWorkAreas, getDetachedWindowBounds };
