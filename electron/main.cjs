@@ -1761,24 +1761,65 @@ async function listInstalledFonts() {
     installedFontsPromise = resolveInstalledFonts().catch(() => []);
   }
 
-  return await installedFontsPromise;
+  const fontFamilies = await installedFontsPromise;
+  // Only a successful lookup is cached, so a failed or empty one is retried
+  // the next time the font menu asks.
+  if (fontFamilies.length === 0) {
+    installedFontsPromise = null;
+  }
+  return fontFamilies;
 }
 
 async function resolveInstalledFonts() {
-  if (process.platform === "darwin") {
-    const { stdout } = await execFileAsync(
-      "/usr/sbin/system_profiler",
-      ["SPFontsDataType", "-json", "-detailLevel", "mini"],
-      {
-        timeout: 20_000,
-        maxBuffer: 24 * 1024 * 1024,
-      },
-    );
-
-    return extractFontFamiliesFromSystemProfiler(stdout);
+  if (process.platform !== "darwin") {
+    return [];
   }
 
-  return [];
+  try {
+    return await listFontFamiliesFromFontManager();
+  } catch {
+    return await listFontFamiliesFromSystemProfiler();
+  }
+}
+
+// NSFontManager answers in under a second. system_profiler walks every font
+// file and took over 20 seconds with a few hundred user fonts installed, so it
+// is only the fallback.
+async function listFontFamiliesFromFontManager() {
+  const { stdout } = await execFileAsync(
+    "/usr/bin/osascript",
+    [
+      "-l",
+      "JavaScript",
+      "-e",
+      'ObjC.import("AppKit"); JSON.stringify(ObjC.deepUnwrap($.NSFontManager.sharedFontManager.availableFontFamilies))',
+    ],
+    {
+      timeout: 10_000,
+      maxBuffer: 4 * 1024 * 1024,
+    },
+  );
+
+  const fontFamilies = sortFontFamilies(
+    new Set(JSON.parse(stdout).map(normalizeInstalledFontFamily).filter(Boolean)),
+  );
+  if (fontFamilies.length === 0) {
+    throw new Error("NSFontManager returned no font families.");
+  }
+  return fontFamilies;
+}
+
+async function listFontFamiliesFromSystemProfiler() {
+  const { stdout } = await execFileAsync(
+    "/usr/sbin/system_profiler",
+    ["SPFontsDataType", "-json", "-detailLevel", "mini"],
+    {
+      timeout: 60_000,
+      maxBuffer: 24 * 1024 * 1024,
+    },
+  );
+
+  return extractFontFamiliesFromSystemProfiler(stdout);
 }
 
 function extractFontFamiliesFromSystemProfiler(stdout) {
@@ -1814,6 +1855,10 @@ function extractFontFamiliesFromSystemProfiler(stdout) {
     }
   }
 
+  return sortFontFamilies(fontFamilies);
+}
+
+function sortFontFamilies(fontFamilies) {
   return [...fontFamilies].sort((left, right) =>
     left.localeCompare(right, undefined, {
       sensitivity: "base",

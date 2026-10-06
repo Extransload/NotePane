@@ -1169,10 +1169,14 @@ test("Electron creates sticky-mode tabs with a persisted default accent", async 
       });
     }).toBe(1);
 
-    const tabsPage = getOpenPages(electronApp)[0] ?? await electronApp.firstWindow();
-    await expect(tabsPage.getByRole("tab")).toHaveCount(2);
+    // The new tabs window and the closing sticky window of the same note share
+    // a URL, and Playwright can still list the closing one. Read every open page
+    // on each attempt instead of keeping a page picked mid-transition.
+    await expect.poll(() =>
+      readOpenPages(electronApp, (page) => page.getByRole("tab").count()),
+    ).toContain(2);
     await expect.poll(async () => {
-      return await tabsPage.evaluate(() => {
+      const [tabStyle = null] = await readOpenPages(electronApp, (page) => page.evaluate(() => {
         const tab = [...document.querySelectorAll(".session-tab-row")]
           .find((candidate) =>
             candidate.getAttribute("style")?.includes("rgb(255 215 232 / 1)"),
@@ -1184,7 +1188,8 @@ test("Electron creates sticky-mode tabs with a persisted default accent", async 
               boxShadow: getComputedStyle(tab).boxShadow,
             }
           : null;
-      });
+      }));
+      return tabStyle;
     }).toEqual({
       background: "rgb(255, 215, 232)",
       color: "rgba(31, 31, 31, 0.72)",
@@ -1678,6 +1683,19 @@ async function getStickyPageByNoteId(electronApp, noteId) {
   }
 
   throw new Error(`Sticky page not found: ${noteId}`);
+}
+
+// Runs `read` on every open page, skipping pages that close while being read
+// and results that are null.
+async function readOpenPages(electronApp, read) {
+  const results = [];
+  for (const page of getOpenPages(electronApp)) {
+    const result = await read(page).catch(() => null);
+    if (result !== null && result !== undefined) {
+      results.push(result);
+    }
+  }
+  return results;
 }
 
 function getOpenPages(electronApp) {
