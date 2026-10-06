@@ -29,6 +29,8 @@ for Option. Configurable shortcuts can be changed in Preferences.
 | `/` | Open the block palette |
 | `Enter` / `Shift+Enter` | New block / line break inside a block |
 | `⌘A` | Select the block, then the whole document |
+| `⌘P` | Search every note and jump to a match |
+| `⌘F` | Find in the current note (`Enter` / `⇧Enter` to step, `Esc` to close) |
 | `⌘X` | Cut the current block when nothing is selected |
 | `⌘=` / `⌘-` | Editor font size |
 | `⌘⇧W` | Toggle the wide canvas |

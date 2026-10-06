@@ -60,6 +60,8 @@ BlockNote handles editor interaction directly.
 - Table handles
 - `Command/Ctrl + A` selects all editor blocks
 - `Command/Ctrl + X` cuts/removes the current block when no text is selected
+- Search notes: `Command/Ctrl + P` searches titles and bodies of every note outside Trash and opens the chosen note at its first match
+- Find in note: `Command/Ctrl + F` highlights matches, steps with `Enter` / `Shift + Enter`, and expands collapsed toggles that hold the current match
 - Active editor-only typography control with searchable font family dropdown, installed macOS font discovery where supported, and 6-144px size presets/manual input
 
 ## Blocks

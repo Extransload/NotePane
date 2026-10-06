@@ -45,6 +45,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | BlockNote floating menu positioning and clamping | `src/editor/floatingMenus.js` |
 | Image download, crop geometry, upload | `src/editor/images.js` |
 | Code block language detection and prettifying | `src/editor/codeFormatting.js` |
+| Note search matching, snippets and plain-text extraction | `src/model/search.js` |
+| Find in note decorations and navigation | `src/editor/findInNote.js`, `src/hooks/useFindInNote.js` |
 | Note titles, ordering, trash previews | `src/model/notes.js` |
 | Preference and font normalisation and defaults | `src/model/preferences.js` |
 | Shortcut parsing, matching, display labels | `src/model/keyboardShortcuts.js` |
