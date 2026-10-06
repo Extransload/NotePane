@@ -1548,17 +1548,21 @@ test("Electron uses the native Windows title bar and frame", async () => {
 
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
     await expect.poll(() => getOpenPages(electronApp).length).toBe(1);
-    const stickyPage = getOpenPages(electronApp)[0];
-    await expect(stickyPage.getByTestId("sticky-header")).toBeVisible();
     await expect.poll(async () => {
       return await electronApp.evaluate(({ BrowserWindow }) => {
         return BrowserWindow.getAllWindows()[0]?.isMenuBarVisible();
       });
     }).toBe(false);
-    const stickyTitleBarHeight = await stickyPage.evaluate(
-      () => window.outerHeight - window.innerHeight,
-    );
-    expect(stickyTitleBarHeight).toBeLessThan(16);
+    // The closing tabs window can still be listed while the sticky window
+    // opens. Read every open page on each attempt instead of keeping a page
+    // picked mid-transition.
+    await expect.poll(async () => {
+      const stickyTitleBarHeights = await readOpenPages(electronApp, async (page) =>
+        (await page.getByTestId("sticky-header").isVisible())
+          ? page.evaluate(() => window.outerHeight - window.innerHeight)
+          : null);
+      return stickyTitleBarHeights.length === 1 && stickyTitleBarHeights[0] < 16;
+    }).toBe(true);
   } finally {
     await electronApp.close();
   }
