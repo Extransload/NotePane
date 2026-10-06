@@ -1603,7 +1603,7 @@ function installIpcHandlers() {
   });
 
   ipcMain.handle("assets:copy-image", async (_event, payload) => {
-    const asset = await readAssetFromUrl(payload?.url);
+    const asset = await readAssetFromUrl(payload?.url, { assets: store.assets });
     const image = nativeImage.createFromBuffer(asset.buffer);
     if (image.isEmpty()) {
       throw new Error("Image could not be copied.");
