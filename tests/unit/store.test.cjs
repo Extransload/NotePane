@@ -769,6 +769,148 @@ test("fills new search shortcuts into stored keyboard shortcuts", () => {
   assert.equal(shortcuts.findInNote, "Mod+F");
 });
 
+const IMAGE_BYTES = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
+const IMAGE_DATA_URL = `data:image/png;base64,${IMAGE_BYTES.toString("base64")}`;
+const ASSET_URL_PATTERN = /notepane-asset:\/\/local\/[0-9a-f]{64}\.png/;
+
+function imageBlocksJSON(url) {
+  return JSON.stringify([{ id: "image-block", type: "image", props: { url }, children: [] }]);
+}
+
+function writeLegacyWorkspace(directory) {
+  fs.writeFileSync(path.join(directory, "notes.json"), JSON.stringify({
+    version: 11,
+    notes: [
+      { id: "active-note", title: "Active", blocksJSON: imageBlocksJSON(IMAGE_DATA_URL), markdown: `![](${IMAGE_DATA_URL})` },
+      { id: "trashed-note", title: "Trashed", trashedAt: 5, blocksJSON: imageBlocksJSON(IMAGE_DATA_URL), markdown: "" },
+    ],
+  }), "utf8");
+  fs.writeFileSync(path.join(directory, "note-history.json"), JSON.stringify({
+    version: 2,
+    notes: {
+      "active-note": [
+        { id: "v1", createdAt: 1, title: "Active", blocksJSON: imageBlocksJSON(IMAGE_DATA_URL), markdown: "", source: "auto" },
+      ],
+    },
+  }), "utf8");
+}
+
+function readWorkspaceFiles(directory) {
+  return {
+    notes: fs.readFileSync(path.join(directory, "notes.json"), "utf8"),
+    history: fs.readFileSync(path.join(directory, "note-history.json"), "utf8"),
+  };
+}
+
+function listFiles(directory, prefix) {
+  return fs.readdirSync(directory).filter((fileName) => fileName.startsWith(prefix));
+}
+
+test("stores saved images as asset files instead of data URLs", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+  const note = store.createNote({ width: 900, height: 700 });
+
+  const saved = store.updateContent({
+    noteId: note.id,
+    blocksJSON: imageBlocksJSON(IMAGE_DATA_URL),
+    markdown: `![](${IMAGE_DATA_URL})`,
+  });
+
+  assert.match(saved.blocksJSON, ASSET_URL_PATTERN);
+  assert.doesNotMatch(saved.blocksJSON + saved.markdown, /;base64,/);
+  assert.equal(listFiles(path.join(directory, "assets"), "").length, 1);
+  const version = store.createNoteVersion(note.id, {
+    blocksJSON: imageBlocksJSON(IMAGE_DATA_URL),
+    markdown: "",
+    source: "manual",
+  });
+  assert.match(version.blocksJSON, ASSET_URL_PATTERN);
+});
+
+test("migrates inline images in notes, trash and history once, keeping backups", () => {
+  const directory = createTemporaryDirectory();
+  writeLegacyWorkspace(directory);
+
+  new StickyStore(directory);
+
+  const migrated = readWorkspaceFiles(directory);
+  assert.doesNotMatch(migrated.notes + migrated.history, /;base64,/);
+  assert.match(migrated.notes, ASSET_URL_PATTERN);
+  assert.match(migrated.history, ASSET_URL_PATTERN);
+  assert.equal(listFiles(directory, "notes.pre-assets-").length, 1);
+  assert.equal(listFiles(directory, "note-history.pre-assets-").length, 1);
+  assert.match(
+    fs.readFileSync(path.join(directory, listFiles(directory, "notes.pre-assets-")[0]), "utf8"),
+    /;base64,/,
+  );
+
+  new StickyStore(directory);
+
+  assert.deepEqual(readWorkspaceFiles(directory), migrated);
+  assert.equal(listFiles(directory, "notes.pre-assets-").length, 1);
+});
+
+test("leaves the workspace files untouched when migration fails", () => {
+  const directory = createTemporaryDirectory();
+  writeLegacyWorkspace(directory);
+  const before = readWorkspaceFiles(directory);
+  // A file where the assets directory should be makes every asset write fail.
+  fs.writeFileSync(path.join(directory, "assets"), "not a directory", "utf8");
+
+  const store = createStoreQuietly(directory);
+
+  assert.deepEqual(readWorkspaceFiles(directory), before);
+  assert.match(store.getNote("active-note").blocksJSON, /;base64,/);
+  assert.equal(listFiles(directory, "notes.pre-assets-").length, 0);
+});
+
+test("deletes unreferenced assets at startup but keeps ones used by trash and history", () => {
+  const directory = createTemporaryDirectory();
+  writeLegacyWorkspace(directory);
+  new StickyStore(directory);
+  const assetsDirectory = path.join(directory, "assets");
+  const orphan = path.join(assetsDirectory, `${"c".repeat(64)}.png`);
+  fs.writeFileSync(orphan, "orphan");
+  const state = JSON.parse(fs.readFileSync(path.join(directory, "notes.json"), "utf8"));
+  state.notes = state.notes.filter((note) => note.id === "trashed-note");
+  fs.writeFileSync(path.join(directory, "notes.json"), JSON.stringify(state), "utf8");
+
+  new StickyStore(directory);
+
+  assert.equal(fs.existsSync(orphan), false);
+  assert.equal(listFiles(assetsDirectory, "").length, 1);
+});
+
+test("never collects assets when the notes file failed to load", () => {
+  const directory = createTemporaryDirectory();
+  writeLegacyWorkspace(directory);
+  new StickyStore(directory);
+  fs.writeFileSync(path.join(directory, "notes.json"), "{broken", "utf8");
+
+  createStoreQuietly(directory);
+
+  assert.equal(listFiles(path.join(directory, "assets"), "").length, 1);
+});
+
+test("exports backups with inline images and stores restored images as assets", () => {
+  const directory = createTemporaryDirectory();
+  writeLegacyWorkspace(directory);
+  const store = new StickyStore(directory);
+
+  const backup = store.createBackup();
+  const backupText = JSON.stringify(backup);
+  assert.match(backupText, /;base64,/);
+  assert.doesNotMatch(backupText, /notepane-asset:/);
+
+  const restoreDirectory = createTemporaryDirectory();
+  const restoredStore = new StickyStore(restoreDirectory);
+  restoredStore.restoreBackup(backup);
+
+  assert.match(restoredStore.getNote("active-note").blocksJSON, ASSET_URL_PATTERN);
+  assert.doesNotMatch(fs.readFileSync(path.join(restoreDirectory, "notes.json"), "utf8"), /;base64,/);
+});
+
 test("exports and restores a versioned portable workspace backup", () => {
   const sourceDirectory = createTemporaryDirectory();
   const sourceStore = new StickyStore(sourceDirectory);

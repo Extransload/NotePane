@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
+const { AssetStore, hasBase64DataUrl } = require("./assetStore.cjs");
 
 const DEFAULT_NOTE_TITLE = "Untitled";
 const NOTE_PANE_BACKUP_FORMAT = "notepane-backup";
@@ -225,6 +226,7 @@ class StickyStore {
     this.historyFilePath = path.join(userDataPath, "note-history.json");
     this.history = {};
     this.loadIssues = [];
+    this.assets = new AssetStore(path.join(userDataPath, "assets"));
     this.state = {
       appTheme: DEFAULT_APP_THEME,
       layoutMode: DEFAULT_LAYOUT_MODE,
@@ -233,6 +235,91 @@ class StickyStore {
     };
     this.load();
     this.loadHistory();
+    this.migrateInlineAssets();
+  }
+
+  // Moves base64 data URLs out of notes.json and note-history.json into
+  // content-addressed asset files, then deletes assets nothing references.
+  // With no data URL left it changes nothing, so it is safe on every startup.
+  migrateInlineAssets() {
+    // A file that failed to load was replaced by an empty state. Collecting
+    // garbage against that state would delete every asset it referenced.
+    if (this.loadIssues.length > 0) {
+      return;
+    }
+
+    const notesNeedMigration = this.state.notes.some(hasInlineAsset);
+    const historyNeedsMigration = Object.values(this.history)
+      .some((versions) => Array.isArray(versions) && versions.some(hasInlineAsset));
+
+    if (notesNeedMigration || historyNeedsMigration) {
+      let notes;
+      let history;
+      try {
+        // Every asset is written before either workspace file is touched, so a
+        // failure here leaves both files exactly as they were.
+        notes = this.state.notes.map((note) => this.externalizeContent(note));
+        history = Object.fromEntries(
+          Object.entries(this.history).map(([noteId, versions]) => [
+            noteId,
+            Array.isArray(versions)
+              ? versions.map((version) => this.externalizeContent(version))
+              : versions,
+          ]),
+        );
+      } catch (error) {
+        console.error("[NotePane] Failed to move inline images into asset files:", error);
+        return;
+      }
+
+      const timestamp = new Date().toISOString().replaceAll(":", "-");
+      if (notesNeedMigration) {
+        fs.copyFileSync(
+          this.filePath,
+          path.join(this.directoryPath, `notes.pre-assets-${timestamp}.json`),
+        );
+        this.state = { ...this.state, notes };
+        this.save();
+      }
+      if (historyNeedsMigration) {
+        fs.copyFileSync(
+          this.historyFilePath,
+          path.join(this.directoryPath, `note-history.pre-assets-${timestamp}.json`),
+        );
+        this.history = history;
+        this.saveHistory();
+      }
+    }
+
+    try {
+      this.assets.collectGarbage(this.listReferencedAssetUrls());
+    } catch (error) {
+      console.error("[NotePane] Failed to delete unused asset files:", error);
+    }
+  }
+
+  externalizeContent(record) {
+    return {
+      ...record,
+      blocksJSON: this.assets.externalizeDataUrls(record.blocksJSON),
+      markdown: this.assets.externalizeDataUrls(record.markdown),
+    };
+  }
+
+  listReferencedAssetUrls() {
+    const referenced = new Set();
+    const collect = (record) => {
+      for (const url of AssetStore.referencedUrls(`${record?.blocksJSON ?? ""}\n${record?.markdown ?? ""}`)) {
+        referenced.add(url);
+      }
+    };
+    this.state.notes.forEach(collect);
+    for (const versions of Object.values(this.history)) {
+      if (Array.isArray(versions)) {
+        versions.forEach(collect);
+      }
+    }
+    return referenced;
   }
 
   load() {
@@ -375,8 +462,12 @@ class StickyStore {
       createdAt: Date.now(),
       title: typeof snapshot.title === "string" ? snapshot.title : note.title,
       titleManuallyEdited: Boolean(snapshot.titleManuallyEdited ?? note.titleManuallyEdited),
-      blocksJSON: normalizeBlocksJSON(snapshot.blocksJSON ?? note.blocksJSON),
-      markdown: typeof snapshot.markdown === "string" ? snapshot.markdown : note.markdown,
+      blocksJSON: normalizeBlocksJSON(
+        this.assets.externalizeDataUrls(snapshot.blocksJSON ?? note.blocksJSON),
+      ),
+      markdown: this.assets.externalizeDataUrls(
+        typeof snapshot.markdown === "string" ? snapshot.markdown : note.markdown,
+      ),
       source:
         snapshot.source === "manual" || snapshot.source === "restore"
           ? snapshot.source
@@ -634,8 +725,10 @@ class StickyStore {
       return null;
     }
 
-    const nextBlocksJSON = normalizeBlocksJSON(blocksJSON);
-    const nextMarkdown = typeof markdown === "string" ? markdown : "";
+    const nextBlocksJSON = normalizeBlocksJSON(this.assets.externalizeDataUrls(blocksJSON));
+    const nextMarkdown = typeof markdown === "string"
+      ? this.assets.externalizeDataUrls(markdown)
+      : "";
     const contentChanged = note.blocksJSON !== nextBlocksJSON || note.markdown !== nextMarkdown;
     const latestVersion = this.listNoteVersions(noteId)[0];
     if (
@@ -704,7 +797,16 @@ class StickyStore {
         version:
           typeof options.appVersion === "string" ? options.appVersion : null,
       },
-      data: JSON.parse(JSON.stringify(this.state)),
+      // Assets are inlined so the backup stays one self-contained file that
+      // older app versions can import.
+      data: {
+        ...JSON.parse(JSON.stringify(this.state)),
+        notes: this.state.notes.map((note) => ({
+          ...JSON.parse(JSON.stringify(note)),
+          blocksJSON: this.assets.inlineAssetUrls(note.blocksJSON),
+          markdown: this.assets.inlineAssetUrls(note.markdown),
+        })),
+      },
     };
   }
 
@@ -733,7 +835,10 @@ class StickyStore {
     }
 
     const previousState = this.state;
-    this.state = normalizedBackup.data;
+    this.state = {
+      ...normalizedBackup.data,
+      notes: normalizedBackup.data.notes.map((note) => this.externalizeContent(note)),
+    };
     try {
       this.save();
     } catch (error) {
@@ -857,6 +962,10 @@ function normalizeBackupExportedAt(value) {
     throw new Error("The NotePane backup has an invalid export date.");
   }
   return new Date(value).toISOString();
+}
+
+function hasInlineAsset(record) {
+  return hasBase64DataUrl(record?.blocksJSON) || hasBase64DataUrl(record?.markdown);
 }
 
 function writeJsonAtomic(filePath, value) {
