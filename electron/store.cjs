@@ -1343,15 +1343,65 @@ function normalizeEditorPreferences(
       typeof source.showTableOfContents === "boolean"
         ? source.showTableOfContents
         : Boolean(fallbackSource.showTableOfContents),
-    keyboardShortcuts: normalizeKeyboardShortcuts(
+    ...normalizeKeyboardShortcutPreferences(source, fallbackSource),
+  };
+}
+
+function normalizeKeyboardShortcutPreferences(source, fallbackSource) {
+  const keyboardShortcuts = normalizeKeyboardShortcuts(
+    source.keyboardShortcuts,
+    fallbackSource.keyboardShortcuts,
+  );
+  const keyboardShortcutEnabled = normalizeKeyboardShortcutEnabled(
+    source.keyboardShortcutEnabled,
+    fallbackSource.keyboardShortcutEnabled,
+  );
+  return {
+    keyboardShortcuts,
+    keyboardShortcutEnabled: disableShadowingDefaultShortcuts(
       source.keyboardShortcuts,
-      fallbackSource.keyboardShortcuts,
-    ),
-    keyboardShortcutEnabled: normalizeKeyboardShortcutEnabled(
       source.keyboardShortcutEnabled,
-      fallbackSource.keyboardShortcutEnabled,
+      keyboardShortcuts,
+      keyboardShortcutEnabled,
     ),
   };
+}
+
+// A command missing from the stored shortcuts (one added after they were
+// saved) takes its default keys. When the user already bound those keys to
+// another enabled command, the user's binding wins and the new command starts
+// disabled. Mirrors `disableShadowingDefaultShortcuts` in
+// `src/model/keyboardShortcuts.js`.
+function disableShadowingDefaultShortcuts(
+  storedShortcuts,
+  storedEnabled,
+  keyboardShortcuts,
+  keyboardShortcutEnabled,
+) {
+  if (!storedShortcuts || typeof storedShortcuts !== "object") {
+    return keyboardShortcutEnabled;
+  }
+  const explicitEnabled =
+    storedEnabled && typeof storedEnabled === "object" ? storedEnabled : {};
+  const isStored = (commandId) =>
+    Boolean(parseKeyboardShortcut(storedShortcuts[commandId]));
+  const userKeys = new Set(
+    KEYBOARD_SHORTCUT_COMMAND_IDS
+      .filter((commandId) =>
+        isStored(commandId) && keyboardShortcutEnabled[commandId] !== false)
+      .map((commandId) => keyboardShortcuts[commandId]),
+  );
+  const nextEnabled = { ...keyboardShortcutEnabled };
+  for (const commandId of KEYBOARD_SHORTCUT_COMMAND_IDS) {
+    if (
+      !isStored(commandId) &&
+      typeof explicitEnabled[commandId] !== "boolean" &&
+      userKeys.has(keyboardShortcuts[commandId])
+    ) {
+      nextEnabled[commandId] = false;
+    }
+  }
+  return nextEnabled;
 }
 
 function normalizeKeyboardShortcuts(

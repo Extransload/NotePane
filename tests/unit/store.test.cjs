@@ -769,6 +769,46 @@ test("fills new search shortcuts into stored keyboard shortcuts", () => {
   assert.equal(shortcuts.findInNote, "Mod+F");
 });
 
+test("keeps a custom binding when a new default shortcut uses the same keys", () => {
+  const directory = createTemporaryDirectory();
+  fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({
+      version: 11,
+      notes: [],
+      editorPreferences: {
+        keyboardShortcuts: { toggleSidebar: "Mod+P", toggleTableOfContents: "Mod+F" },
+        keyboardShortcutEnabled: { toggleTableOfContents: false },
+      },
+    }),
+    "utf8",
+  );
+
+  const preferences = new StickyStore(directory).getEditorPreferences();
+
+  assert.equal(preferences.keyboardShortcuts.toggleSidebar, "Mod+P");
+  assert.equal(preferences.keyboardShortcutEnabled.toggleSidebar, true);
+  // The new search shortcut would shadow the custom binding, so it starts off.
+  assert.equal(preferences.keyboardShortcutEnabled.searchNotes, false);
+  // A disabled custom binding shadows nothing, so find keeps its default.
+  assert.equal(preferences.keyboardShortcutEnabled.findInNote, true);
+  // A binding the user saved after the new shortcut existed is left alone.
+  const saved = normalizeSavedPreferences(directory, {
+    keyboardShortcuts: { ...DEFAULT_KEYBOARD_SHORTCUTS, toggleSidebar: "Mod+P" },
+    keyboardShortcutEnabled: { ...DEFAULT_KEYBOARD_SHORTCUT_ENABLED, searchNotes: true },
+  });
+  assert.equal(saved.keyboardShortcutEnabled.searchNotes, true);
+});
+
+function normalizeSavedPreferences(directory, editorPreferences) {
+  fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({ version: 11, notes: [], editorPreferences }),
+    "utf8",
+  );
+  return new StickyStore(directory).getEditorPreferences();
+}
+
 const IMAGE_BYTES = Buffer.from("89504e470d0a1a0a0000000d49484452", "hex");
 const IMAGE_DATA_URL = `data:image/png;base64,${IMAGE_BYTES.toString("base64")}`;
 const ASSET_URL_PATTERN = /notepane-asset:\/\/local\/[0-9a-f]{64}\.png/;
