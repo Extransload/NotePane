@@ -471,6 +471,137 @@ test("Electron keeps sticky windows bound to their original sessions during new-
   }
 });
 
+test("Electron keeps the tabs window on its session while a detached note is edited", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    {
+      id: "first-note",
+      title: "First note",
+      markdown: "first docked body",
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: "second-note",
+      // The default title keeps the title derived from the first line.
+      title: "Untitled",
+      markdown: "second detached body",
+      createdAt: 2,
+      updatedAt: 2,
+    },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const tabsPage = await electronApp.firstWindow();
+    const tabsEditor = tabsPage.getByTestId("sticky-editor-surface");
+    await expect(tabsEditor).toContainText("first docked body");
+
+    await tabsPage.evaluate(() => window.blocknoteSticky.detachNote("second-note"));
+    const detachedPage = await getStickyPageByNoteId(electronApp, "second-note");
+    const detachedEditor = detachedPage.getByTestId("sticky-editor-surface");
+    await expect(detachedEditor).toContainText("second detached body");
+
+    // Editing the first line renames the detached note, which broadcasts the
+    // updated note to every window.
+    await detachedPage.bringToFront();
+    await detachedEditor.getByText("second detached body").click();
+    await detachedPage.keyboard.press("End");
+    await detachedPage.keyboard.insertText(" edited");
+    await expect.poll(async () => {
+      const notes = await tabsPage.evaluate(() => window.blocknoteSticky.listNotes());
+      return notes.find((note) => note.id === "second-note")?.title;
+    }).toBe("second detached body edited");
+
+    await expect.poll(() => getCurrentPageNoteId(tabsPage)).toBe("first-note");
+    await expect(tabsEditor).toContainText("first docked body");
+    await expect(tabsEditor).not.toContainText("second detached body");
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Electron saves a session rename committed by switching to another tab", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", markdown: "second body", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
+
+    await page.getByRole("tab", { name: /First note/ }).dblclick();
+    await page.getByLabel("Session name").fill("Renamed first");
+    await page.getByRole("tab", { name: /Second note/ }).click();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("second body");
+
+    await expect.poll(async () => {
+      const notes = await page.evaluate(() => window.blocknoteSticky.listNotes());
+      return notes.find((note) => note.id === "first-note")?.title;
+    }).toBe("Renamed first");
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Electron saves the latest typing when a new session is created right away", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const editor = page.getByTestId("sticky-editor-surface");
+    await expect(editor).toContainText("first body");
+
+    await editor.getByText("first body").click();
+    await page.keyboard.press("End");
+    await page.keyboard.insertText(" typed just before new tab");
+    await page.keyboard.press(modifierShortcut("T"));
+    await expect(page.getByRole("tab")).toHaveCount(2);
+
+    await expect.poll(async () => {
+      const note = await page.evaluate(() => window.blocknoteSticky.getNote("first-note"));
+      return note?.markdown ?? "";
+    }).toContain("typed just before new tab");
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Electron exits a second instance that shares the same user data", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+  ]);
+  const firstApp = await launchApp(userDataDirectory);
+  let secondApp = null;
+
+  try {
+    const page = await firstApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
+
+    // The second process may exit before Playwright attaches to it.
+    secondApp = await launchApp(userDataDirectory).catch(() => null);
+    if (secondApp) {
+      await expect.poll(() => secondApp.process().exitCode, { timeout: 10_000 })
+        .not.toBeNull();
+    }
+
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
+  } finally {
+    if (secondApp && secondApp.process().exitCode === null) {
+      await secondApp.close();
+    }
+    await firstApp.close();
+  }
+});
+
 test("Electron menu actions respect tabs/sticky modes and toggle always-on-top", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);

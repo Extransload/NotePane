@@ -222,6 +222,7 @@ class StickyStore {
     this.filePath = path.join(userDataPath, "notes.json");
     this.historyFilePath = path.join(userDataPath, "note-history.json");
     this.history = {};
+    this.loadIssues = [];
     this.state = {
       appTheme: DEFAULT_APP_THEME,
       layoutMode: DEFAULT_LAYOUT_MODE,
@@ -247,7 +248,10 @@ class StickyStore {
       const parsed = JSON.parse(fs.readFileSync(this.filePath, "utf8"));
       const parsedObject = parsed && typeof parsed === "object" ? parsed : {};
       const notes = Array.isArray(parsed) ? parsed : parsedObject.notes;
-      const rawNotes = Array.isArray(notes) ? notes : [];
+      if (!Array.isArray(notes)) {
+        throw new Error("notes.json does not contain a notes list.");
+      }
+      const rawNotes = notes;
       const version = Number.isFinite(parsedObject.version)
         ? parsedObject.version
         : 1;
@@ -270,7 +274,7 @@ class StickyStore {
         ),
       };
     } catch (error) {
-      this.backupCorruptedFile();
+      this.backupCorruptedFile(this.filePath, "notes-corrupted", error);
       this.state = {
         appTheme: DEFAULT_APP_THEME,
         layoutMode: DEFAULT_LAYOUT_MODE,
@@ -344,6 +348,7 @@ class StickyStore {
       const parsed = JSON.parse(fs.readFileSync(this.historyFilePath, "utf8"));
       this.history = parsed && typeof parsed.notes === "object" ? parsed.notes : {};
     } catch (error) {
+      this.backupCorruptedFile(this.historyFilePath, "note-history-corrupted", error);
       this.history = {};
       console.error("[NotePane] Failed to load note-history.json:", error);
     }
@@ -746,21 +751,38 @@ class StickyStore {
     });
   }
 
-  backupCorruptedFile() {
-    if (!fs.existsSync(this.filePath)) {
+  getLoadIssues() {
+    return this.loadIssues.map((issue) => ({ ...issue }));
+  }
+
+  // Moves an unreadable file aside so the next save cannot overwrite it, and
+  // records it so the app can tell the user. A rename needs no free space,
+  // unlike a copy, so it still works when a full disk caused the damage.
+  backupCorruptedFile(filePath, backupPrefix, error) {
+    if (!fs.existsSync(filePath)) {
       return;
     }
 
     const timestamp = new Date().toISOString().replaceAll(":", "-");
     const backupPath = path.join(
       this.directoryPath,
-      `notes-corrupted-${timestamp}.json`,
+      `${backupPrefix}-${timestamp}.json`,
     );
+    let preservedPath = backupPath;
     try {
-      fs.copyFileSync(this.filePath, backupPath);
+      fs.renameSync(filePath, backupPath);
     } catch {
-      // Best-effort backup only.
+      try {
+        fs.copyFileSync(filePath, backupPath);
+      } catch {
+        preservedPath = null;
+      }
     }
+    this.loadIssues.push({
+      fileName: path.basename(filePath),
+      backupPath: preservedPath,
+      message: error?.message ?? String(error),
+    });
   }
 }
 

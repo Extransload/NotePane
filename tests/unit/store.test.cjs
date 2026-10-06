@@ -704,6 +704,53 @@ test("backs up a corrupted notes file and starts with an empty state", () => {
   assert.equal(backups.length, 1);
 });
 
+test("reports a corrupted notes file with a backup that keeps the original bytes", () => {
+  const directory = createTemporaryDirectory();
+  fs.writeFileSync(path.join(directory, "notes.json"), "{broken", "utf8");
+
+  const store = createStoreQuietly(directory);
+  store.createNote({ width: 900, height: 700 });
+
+  const issues = store.getLoadIssues();
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].fileName, "notes.json");
+  assert.equal(fs.readFileSync(issues[0].backupPath, "utf8"), "{broken");
+});
+
+test("treats a notes file without a notes array as corrupted", () => {
+  const directory = createTemporaryDirectory();
+  const original = JSON.stringify({ version: 11, notes: "not a list" });
+  fs.writeFileSync(path.join(directory, "notes.json"), original, "utf8");
+
+  const store = createStoreQuietly(directory);
+  store.createNote({ width: 900, height: 700 });
+
+  const issues = store.getLoadIssues();
+  assert.equal(issues.length, 1);
+  assert.equal(fs.readFileSync(issues[0].backupPath, "utf8"), original);
+});
+
+test("backs up a corrupted version history file before it is overwritten", () => {
+  const directory = createTemporaryDirectory();
+  fs.writeFileSync(path.join(directory, "note-history.json"), "{broken", "utf8");
+
+  const store = createStoreQuietly(directory);
+  const note = store.createNote({ width: 900, height: 700 });
+  store.createNoteVersion(note.id, { source: "manual" });
+
+  const issues = store.getLoadIssues();
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].fileName, "note-history.json");
+  assert.equal(fs.readFileSync(issues[0].backupPath, "utf8"), "{broken");
+});
+
+test("reports no load issues for a healthy store", () => {
+  const directory = createTemporaryDirectory();
+  new StickyStore(directory).createNote({ width: 900, height: 700 });
+
+  assert.deepEqual(new StickyStore(directory).getLoadIssues(), []);
+});
+
 test("exports and restores a versioned portable workspace backup", () => {
   const sourceDirectory = createTemporaryDirectory();
   const sourceStore = new StickyStore(sourceDirectory);
@@ -817,3 +864,13 @@ test.after(() => {
     fs.rmSync(temporaryDirectories.pop(), { recursive: true, force: true });
   }
 });
+
+function createStoreQuietly(directory) {
+  const originalConsoleError = console.error;
+  try {
+    console.error = () => {};
+    return new StickyStore(directory);
+  } finally {
+    console.error = originalConsoleError;
+  }
+}

@@ -67,6 +67,14 @@ if (userDataDirOverride) {
   app.setPath("userData", userDataDirOverride);
 }
 
+// Every process rewrites the whole notes.json from its own memory, so a second
+// process on the same user data would overwrite the first one's edits. The
+// lock is scoped to the userData path, which is why it follows `setPath`.
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+}
+
 function isWsl() {
   return (
     process.platform === "linux" &&
@@ -420,7 +428,10 @@ function resolveActiveNoteForWindow(entry, activeNote) {
     return null;
   }
 
-  if (entry.primary || entry.noteId === activeNote.id) {
+  // Navigation updates `entry.noteId` before broadcasting, so a window only
+  // adopts the note it is already bound to. Forwarding any other note would
+  // remount the tabs window onto a note open in a detached window.
+  if (entry.noteId === activeNote.id) {
     return activeNote;
   }
 
@@ -1824,7 +1835,41 @@ function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
+function reportStoreLoadIssues() {
+  const issues = store.getLoadIssues();
+  if (issues.length === 0 || quietTestMode) {
+    return;
+  }
+
+  const details = issues
+    .map((issue) =>
+      issue.backupPath
+        ? `${issue.fileName} was moved to:\n${issue.backupPath}`
+        : `${issue.fileName} could not be preserved (${issue.message}).`,
+    )
+    .join("\n\n");
+  void dialog.showMessageBox(getPrimaryEntry()?.window ?? undefined, {
+    type: "warning",
+    title: "NotePane could not read saved data",
+    message: "Some saved data was unreadable, so NotePane started without it.",
+    detail: `${details}\n\nThe original file was kept so it can be recovered. If you have a workspace backup, restore it from Preferences > General > Data.`,
+  });
+}
+
+app.on("second-instance", () => {
+  const window =
+    getPrimaryEntry()?.window ??
+    [...windows.values()].find((entry) => !entry.window.isDestroyed())?.window;
+  if (window?.isMinimized()) {
+    window.restore();
+  }
+  presentWindow(window);
+});
+
 app.whenReady().then(() => {
+  if (!hasSingleInstanceLock) {
+    return;
+  }
   if (quietTestMode) {
     app.dock?.hide();
   }
@@ -1840,6 +1885,7 @@ app.whenReady().then(() => {
   }
 
   syncWindowsForLayoutMode();
+  reportStoreLoadIssues();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

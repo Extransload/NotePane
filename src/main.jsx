@@ -1285,6 +1285,9 @@ function StickyEditor({
   const isEditorDirtyRef = useRef(false);
   const appearanceTimerRef = useRef(null);
   const sessionAppearanceTimerRef = useRef(null);
+  // Payloads waiting on the appearance debounce, sent on unmount instead of dropped.
+  const pendingAppearanceRef = useRef(null);
+  const pendingSessionAppearanceRef = useRef(null);
   const sessionTabRowsRef = useRef(new Map());
   const previousSessionTabRectsRef = useRef(null);
   const lastSavedBlocksRef = useRef("");
@@ -1572,15 +1575,18 @@ function StickyEditor({
         window.clearTimeout(appearanceTimerRef.current);
       }
 
+      const payload = {
+        noteId: note.id,
+        title: normalizeTitle(nextTitle),
+        theme: normalizeTheme(nextTheme),
+      };
+      if (Object.hasOwn(options, "titleManuallyEdited")) {
+        payload.titleManuallyEdited = Boolean(options.titleManuallyEdited);
+      }
+      pendingAppearanceRef.current = payload;
       appearanceTimerRef.current = window.setTimeout(() => {
-        const payload = {
-          noteId: note.id,
-          title: normalizeTitle(nextTitle),
-          theme: normalizeTheme(nextTheme),
-        };
-        if (Object.hasOwn(options, "titleManuallyEdited")) {
-          payload.titleManuallyEdited = Boolean(options.titleManuallyEdited);
-        }
+        appearanceTimerRef.current = null;
+        pendingAppearanceRef.current = null;
         void electronApi.updateAppearance(payload);
       }, 160);
     },
@@ -1596,13 +1602,17 @@ function StickyEditor({
       window.clearTimeout(sessionAppearanceTimerRef.current);
     }
 
+    const payload = {
+      noteId: sessionNote.id,
+      title: getNoteDisplayTitle(sessionNote),
+      titleManuallyEdited: isTitleManuallyEdited(sessionNote),
+      theme: normalizeTheme(nextTheme),
+    };
+    pendingSessionAppearanceRef.current = payload;
     sessionAppearanceTimerRef.current = window.setTimeout(() => {
-      void electronApi.updateAppearance({
-        noteId: sessionNote.id,
-        title: getNoteDisplayTitle(sessionNote),
-        titleManuallyEdited: isTitleManuallyEdited(sessionNote),
-        theme: normalizeTheme(nextTheme),
-      });
+      sessionAppearanceTimerRef.current = null;
+      pendingSessionAppearanceRef.current = null;
+      void electronApi.updateAppearance(payload);
     }, 160);
   }, []);
 
@@ -2885,19 +2895,36 @@ function StickyEditor({
     [editor],
   );
 
+  const saveNowRef = useRef(saveNow);
+  useEffect(() => {
+    saveNowRef.current = saveNow;
+  }, [saveNow]);
+
+  // The editor remounts whenever the window switches notes. Flush whatever is
+  // still waiting on a debounce or retry so the switch never drops edits.
   useEffect(() => {
     return () => {
-      if (saveTimerRef.current) {
-        window.clearTimeout(saveTimerRef.current);
-      }
+      const hasPendingContentSave = Boolean(
+        saveTimerRef.current || saveRetryTimerRef.current || isEditorDirtyRef.current,
+      );
       if (saveRetryTimerRef.current) {
         window.clearTimeout(saveRetryTimerRef.current);
+        saveRetryTimerRef.current = null;
+      }
+      if (hasPendingContentSave) {
+        void saveNowRef.current();
       }
       if (appearanceTimerRef.current) {
         window.clearTimeout(appearanceTimerRef.current);
       }
       if (sessionAppearanceTimerRef.current) {
         window.clearTimeout(sessionAppearanceTimerRef.current);
+      }
+      for (const pendingRef of [pendingAppearanceRef, pendingSessionAppearanceRef]) {
+        if (pendingRef.current) {
+          void electronApi?.updateAppearance(pendingRef.current);
+          pendingRef.current = null;
+        }
       }
     };
   }, []);
