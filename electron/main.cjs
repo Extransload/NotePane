@@ -17,6 +17,7 @@ const {
   StickyStore,
   DEFAULT_KEYBOARD_SHORTCUTS,
 } = require("./store.cjs");
+const { fitBoundsToWorkAreas } = require("./windowBounds.cjs");
 
 const APP_NAME = "NotePane";
 const execFileAsync = promisify(execFile);
@@ -1828,7 +1829,15 @@ function normalizeWindowBounds(bounds, options = {}) {
     normalized.y = bounds.y;
   }
 
-  return normalized;
+  return fitBoundsToWorkAreas(normalized, getDisplayWorkAreas());
+}
+
+function getDisplayWorkAreas() {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  return [
+    primaryDisplay,
+    ...screen.getAllDisplays().filter((display) => display.id !== primaryDisplay.id),
+  ].map((display) => display.workArea);
 }
 
 function clamp(value, minimum, maximum) {
@@ -1897,10 +1906,34 @@ app.whenReady().then(() => {
   });
 });
 
+// Links come from note content, which can be pasted or imported, so only
+// schemes that open a browser or mail client are handed to the OS. Others such
+// as file:, smb: or ms-msdt: could launch local programs with one click.
+const EXTERNAL_URL_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+function openExternalUrl(url) {
+  let protocol;
+  try {
+    protocol = new URL(url).protocol;
+  } catch {
+    return;
+  }
+  if (EXTERNAL_URL_PROTOCOLS.has(protocol)) {
+    void shell.openExternal(url);
+  }
+}
+
 app.on("web-contents-created", (_event, contents) => {
   contents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    openExternalUrl(url);
     return { action: "deny" };
+  });
+  // The renderer never navigates itself. A link without a target or a file
+  // dropped outside the editor would otherwise replace the app page while the
+  // preload bridge stays attached to it.
+  contents.on("will-navigate", (event, url) => {
+    event.preventDefault();
+    openExternalUrl(url);
   });
 });
 

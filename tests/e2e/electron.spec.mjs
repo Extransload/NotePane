@@ -602,6 +602,82 @@ test("Electron exits a second instance that shares the same user data", async ()
   }
 });
 
+test("Electron reopens a window saved on a disconnected display inside the screen", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+  ]);
+  const notesPath = path.join(userDataDirectory, "notes.json");
+  const state = JSON.parse(fs.readFileSync(notesPath, "utf8"));
+  state.notes[0].bounds = { x: -20000, y: -20000, width: 960, height: 720 };
+  fs.writeFileSync(notesPath, JSON.stringify(state), "utf8");
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
+
+    const { bounds, workArea } = await electronApp.evaluate(({ BrowserWindow, screen }) => ({
+      bounds: BrowserWindow.getAllWindows()[0].getBounds(),
+      workArea: screen.getPrimaryDisplay().workArea,
+    }));
+    expect(bounds.x).toBeGreaterThanOrEqual(workArea.x);
+    expect(bounds.y).toBeGreaterThanOrEqual(workArea.y);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(workArea.x + workArea.width);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(workArea.y + workArea.height);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Electron opens only web and mail links externally and never navigates the app window", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    const appUrl = page.url();
+    await electronApp.evaluate(({ shell }) => {
+      globalThis.openedExternalUrls = [];
+      shell.openExternal = async (url) => {
+        globalThis.openedExternalUrls.push(url);
+      };
+    });
+
+    await page.evaluate(() => {
+      window.open("file:///etc/hosts");
+      window.open("smb://example.test/share");
+      window.open("https://example.test/opened");
+      window.open("mailto:someone@example.test");
+    });
+    await page.evaluate(() => {
+      window.location.href = "https://example.test/navigated";
+    }).catch(() => {});
+
+    await expect.poll(() => electronApp.evaluate(() => globalThis.openedExternalUrls))
+      .toEqual([
+        "https://example.test/opened",
+        "mailto:someone@example.test",
+        "https://example.test/navigated",
+      ]);
+    // Playwright keeps waiting on the cancelled navigation, so read the DOM
+    // through the main process instead of a locator.
+    const pageState = await electronApp.evaluate(async ({ BrowserWindow }) => {
+      const contents = BrowserWindow.getAllWindows()[0].webContents;
+      return {
+        url: contents.getURL(),
+        hasEditor: await contents.executeJavaScript(
+          "Boolean(document.querySelector('[data-testid=sticky-editor-surface]'))",
+        ),
+      };
+    });
+    expect(pageState).toEqual({ url: appUrl, hasEditor: true });
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron menu actions respect tabs/sticky modes and toggle always-on-top", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
