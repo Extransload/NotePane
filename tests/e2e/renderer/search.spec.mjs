@@ -100,7 +100,9 @@ test("expands a collapsed toggle that holds the current match", async ({ page })
 
   await editorText(page, "Parent toggle").click();
   await page.keyboard.press(modifierShortcut("F"));
-  await findBar(page).getByRole("textbox", { name: "Find in note" }).fill("needle");
+  const input = findBar(page).getByRole("textbox", { name: "Find in note" });
+  await input.fill("needle");
+  await input.press("Enter");
 
   await expect(wrapper).toHaveAttribute("data-show-children", "true");
   await expect(editorText(page, "hidden needle")).toBeVisible();
@@ -228,4 +230,69 @@ test("closes find with Escape after clicking the step buttons", async ({ page })
   await page.keyboard.press("Escape");
 
   await expect(findBar(page)).toHaveCount(0);
+});
+
+async function typeCollapsedToggle(page, title, child) {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type(">");
+  await page.keyboard.press("Space");
+  await page.keyboard.insertText(title);
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText(child);
+  const wrapper = page.locator(".bn-toggle-wrapper").filter({ hasText: title });
+  await wrapper.locator(".bn-toggle-button").first().click();
+  await expect(wrapper).toHaveAttribute("data-show-children", "false");
+  return wrapper;
+}
+
+test("typing a find query leaves collapsed toggles closed until a step", async ({ page }) => {
+  const wrapper = await typeCollapsedToggle(page, "Quiet toggle", "hidden quokka");
+  await editorText(page, "Quiet toggle").click();
+  await page.keyboard.press(modifierShortcut("F"));
+  const input = findBar(page).getByRole("textbox", { name: "Find in note" });
+
+  await input.pressSequentially("quokka");
+  await expect(findBar(page)).toContainText("1 / 1");
+  await expect(wrapper).toHaveAttribute("data-show-children", "false");
+
+  await input.press("Enter");
+  await expect(wrapper).toHaveAttribute("data-show-children", "true");
+  await expect(editorText(page, "hidden quokka")).toBeVisible();
+});
+
+test("find opened from the palette expands the toggle holding the match", async ({ page }) => {
+  const wrapper = await typeCollapsedToggle(page, "Palette toggle", "hidden wombat");
+  await editorText(page, "Palette toggle").click();
+  await page.keyboard.press(modifierShortcut("P"));
+  const input = palette(page).getByRole("textbox", { name: "Search notes" });
+  await input.fill("wombat");
+  await input.press("Enter");
+
+  await expect(findBar(page)).toContainText("1 / 1");
+  await expect(wrapper).toHaveAttribute("data-show-children", "true");
+});
+
+test("refining the find query stays on the current match", async ({ page }) => {
+  await typeParagraphs(page, ["needle thin", "needle one", "needle two", "needle three"]);
+  await page.keyboard.press(modifierShortcut("F"));
+  const input = findBar(page).getByRole("textbox", { name: "Find in note" });
+  await input.fill("needle");
+  await expect(findBar(page)).toContainText("1 / 4");
+  await input.press("Enter");
+  await input.press("Enter");
+  await expect(page.locator(".bn-editor .notepane-find-match.is-current")).toHaveText("needle");
+  await expect(findBar(page)).toContainText("3 / 4");
+
+  // "needle two" still matches, so it stays current.
+  await input.pressSequentially(" t");
+  await expect(findBar(page)).toContainText("2 / 3");
+  await expect(page.locator(".bn-editor .notepane-find-match.is-current")).toHaveText("needle t");
+  await expect(page.locator(".bn-editor p").filter({ has: page.locator(".is-current") }))
+    .toHaveText("needle two");
+
+  // It no longer matches, so the nearest match after it becomes current.
+  await input.pressSequentially("h");
+  await expect(findBar(page)).toContainText("2 / 2");
+  await expect(page.locator(".bn-editor p").filter({ has: page.locator(".is-current") }))
+    .toHaveText("needle three");
 });
