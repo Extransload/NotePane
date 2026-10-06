@@ -394,6 +394,8 @@ export const PREFERENCE_SHORTCUT_COMMANDS = [
   { id: "selectTabByNumber", label: "Open tab by number", fixedShortcut: true },
   { id: "closeWindow", label: "Close window" },
   { id: "focusEditor", label: "Focus editor" },
+  { id: "searchNotes", label: "Search notes" },
+  { id: "findInNote", label: "Find in note" },
   { id: "previousTab", label: "Previous tab" },
   { id: "nextTab", label: "Next tab" },
   { id: "moveTabLeft", label: "Move tab left" },

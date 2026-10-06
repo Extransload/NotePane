@@ -158,6 +158,8 @@ const DEFAULT_KEYBOARD_SHORTCUTS = Object.freeze({
   newNote: "Mod+N",
   closeWindow: "Mod+W",
   focusEditor: "Mod+Enter",
+  searchNotes: "Mod+P",
+  findInNote: "Mod+F",
   previousTab: "Mod+Alt+ArrowLeft",
   nextTab: "Mod+Alt+ArrowRight",
   moveTabLeft: "Mod+Shift+[",

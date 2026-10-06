@@ -751,6 +751,24 @@ test("reports no load issues for a healthy store", () => {
   assert.deepEqual(new StickyStore(directory).getLoadIssues(), []);
 });
 
+test("fills new search shortcuts into stored keyboard shortcuts", () => {
+  const directory = createTemporaryDirectory();
+  fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({
+      version: 11,
+      notes: [],
+      editorPreferences: { keyboardShortcuts: { newSession: "Mod+T" } },
+    }),
+    "utf8",
+  );
+
+  const shortcuts = new StickyStore(directory).getEditorPreferences().keyboardShortcuts;
+
+  assert.equal(shortcuts.searchNotes, "Mod+P");
+  assert.equal(shortcuts.findInNote, "Mod+F");
+});
+
 test("exports and restores a versioned portable workspace backup", () => {
   const sourceDirectory = createTemporaryDirectory();
   const sourceStore = new StickyStore(sourceDirectory);
