@@ -37,8 +37,9 @@ search and no find inside a note.
 1. `Mod+P` opens the palette in the focused window. An empty query lists notes in sidebar order, so the palette also works as
    a note switcher.
 2. Results come from `searchNotes` over the App's note list, which excludes Trash. The current note's body is read from
-   the live editor, because its latest edits may still be waiting on the save debounce. Other notes use their stored
-   markdown, converted to plain text.
+   the live editor, because its latest edits may still be waiting on the save debounce. Other notes use the text of
+   their stored `blocksJSON`, which is exact and carries no image data URLs. Notes without `blocksJSON` fall back to
+   their stored markdown, converted to plain text.
 3. Ranking: title matches first, then body-only matches. Ties keep sidebar order.
 4. Choosing a result:
    - The current note: close the palette and open the find bar with the query.
