@@ -3,7 +3,6 @@ const os = require("os");
 const path = require("path");
 const { execFile } = require("child_process");
 const { promisify } = require("util");
-const { fileURLToPath } = require("url");
 const {
   app,
   BrowserWindow,
@@ -21,6 +20,7 @@ const {
   DEFAULT_KEYBOARD_SHORTCUTS,
 } = require("./store.cjs");
 const { fitBoundsToWorkAreas } = require("./windowBounds.cjs");
+const { readAssetFromUrl } = require("./assetSources.cjs");
 
 const APP_NAME = "NotePane";
 const execFileAsync = promisify(execFile);
@@ -131,7 +131,9 @@ function createWindow(note, options = {}) {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      // The preload only uses contextBridge, ipcRenderer and process.platform,
+      // all of which a sandboxed preload provides.
+      sandbox: true,
     },
   });
   window.setWindowButtonVisibility?.(true);
@@ -1582,7 +1584,7 @@ function installIpcHandlers() {
 
   ipcMain.handle("assets:save-url", async (event, payload) => {
     const window = BrowserWindow.fromWebContents(event.sender);
-    const asset = await readAssetFromUrl(payload?.url);
+    const asset = await readAssetFromUrl(payload?.url, { assets: store.assets });
     const isImage = payload?.kind !== "file";
     const defaultName = sanitizeFileName(
       payload?.defaultName,
@@ -1777,62 +1779,6 @@ function formatBackupTimestamp(date) {
   return date.toISOString().replace("T", " ").replace(/[:]/g, "-").replace("Z", "");
 }
 
-async function readAssetFromUrl(url) {
-  if (typeof url !== "string" || url.trim() === "") {
-    throw new Error("Missing image URL.");
-  }
-
-  if (url.startsWith("data:")) {
-    return readDataUrl(url);
-  }
-
-  if (url.startsWith("notepane-asset:")) {
-    const asset = store.assets.read(url);
-    if (!asset) {
-      throw new Error("Image file is missing.");
-    }
-    return asset;
-  }
-
-  if (url.startsWith("file:")) {
-    return {
-      buffer: fs.readFileSync(fileURLToPath(url)),
-      mimeType: mimeForExtension(path.extname(fileURLToPath(url))),
-    };
-  }
-
-  if (/^https?:\/\//i.test(url)) {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Image download failed with HTTP ${response.status}.`);
-    }
-
-    return {
-      buffer: Buffer.from(await response.arrayBuffer()),
-      mimeType: response.headers.get("content-type")?.split(";")[0] || "image/png",
-    };
-  }
-
-  throw new Error("Unsupported image URL.");
-}
-
-function readDataUrl(dataUrl) {
-  const match = /^data:([^;,]+)?(;base64)?,(.*)$/s.exec(dataUrl);
-  if (!match) {
-    throw new Error("Invalid data URL.");
-  }
-
-  const mimeType = match[1] || "application/octet-stream";
-  const isBase64 = Boolean(match[2]);
-  const data = match[3] || "";
-  return {
-    buffer: isBase64
-      ? Buffer.from(data, "base64")
-      : Buffer.from(decodeURIComponent(data), "utf8"),
-    mimeType,
-  };
-}
-
 function sanitizeFileName(value, fallback) {
   const source = typeof value === "string" && value.trim() ? value : fallback;
   return source
@@ -1855,21 +1801,6 @@ function extensionForMime(mimeType) {
     case "image/png":
     default:
       return "png";
-  }
-}
-
-function mimeForExtension(extension) {
-  switch (extension.toLowerCase()) {
-    case ".jpg":
-    case ".jpeg":
-      return "image/jpeg";
-    case ".gif":
-      return "image/gif";
-    case ".webp":
-      return "image/webp";
-    case ".png":
-    default:
-      return "image/png";
   }
 }
 

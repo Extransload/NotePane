@@ -700,6 +700,84 @@ test("Electron reopens a window saved on a disconnected display inside the scree
   }
 });
 
+test("Electron runs every renderer sandboxed with the preload bridge intact", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-sandbox-");
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+
+    const sandboxFlags = await electronApp.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().map((window) =>
+        window.webContents.getLastWebPreferences().sandbox),
+    );
+    expect(sandboxFlags.length).toBeGreaterThan(0);
+    expect(sandboxFlags).toEqual(sandboxFlags.map(() => true));
+    expect(await page.evaluate(() => ({
+      platform: window.blocknoteSticky?.platform,
+      listNotes: typeof window.blocknoteSticky?.listNotes,
+      require: typeof window.require,
+    }))).toEqual({ platform: process.platform, listNotes: "function", require: "undefined" });
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Electron loads the packaged renderer under a Content Security Policy", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-csp-");
+  writeInitialNotes(userDataDirectory, [
+    {
+      id: "csp-note",
+      title: "CSP note",
+      blocksJSON: JSON.stringify([
+        { id: "image-block", type: "image", props: { url: `data:image/png;base64,${TINY_PNG_BASE64}` }, children: [] },
+        { id: "text-block", type: "paragraph", content: [{ type: "text", text: "csp probe" }], children: [] },
+      ]),
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("csp probe");
+    const violations = [];
+    page.on("console", (message) => {
+      if (/Content Security Policy/i.test(message.text())) {
+        violations.push(message.text());
+      }
+    });
+    // Reload with the listener attached so violations during startup are seen.
+    await page.reload();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("csp probe");
+    await expect.poll(() => readEditorImage(page)).toEqual({
+      src: expect.stringMatching(/^notepane-asset:\/\/local\/[0-9a-f]{64}\.png$/),
+      loaded: true,
+    });
+    await expect.poll(() => page.evaluate(() => document.fonts.status)).toBe("loaded");
+    expect(violations).toEqual([]);
+
+    const policy = await page.evaluate(() =>
+      document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.getAttribute("content") ?? null);
+    expect(policy).toContain("script-src 'self'");
+    expect(policy).toContain("object-src 'none'");
+    expect(policy).not.toMatch(/script-src[^;]*'unsafe-(inline|eval)'/);
+
+    const inlineScriptRan = await page.evaluate(() => {
+      const script = document.createElement("script");
+      script.textContent = "window.__notepaneInlineScriptRan = true;";
+      document.head.append(script);
+      script.remove();
+      return window.__notepaneInlineScriptRan === true;
+    });
+    expect(inlineScriptRan).toBe(false);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron opens only web and mail links externally and never navigates the app window", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
