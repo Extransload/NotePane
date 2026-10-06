@@ -89,7 +89,12 @@ export function useNoteSearchPalette({
       if (findQuery) {
         onFindRequested({ noteId: targetId, query: findQuery });
       }
-      await selectSidebarNote(targetId);
+      const landedNoteId = await selectSidebarNote(targetId);
+      // A switch that fails, for example because another window trashed the
+      // note, must not leave the request to open find on a later visit.
+      if (findQuery && landedNoteId !== targetId) {
+        onPendingFindHandled();
+      }
       return;
     }
     await electronApi?.revealNote?.({ noteId: targetId, query: findQuery });
@@ -100,6 +105,7 @@ export function useNoteSearchPalette({
     note.detached,
     note.id,
     onFindRequested,
+    onPendingFindHandled,
     openFind,
     query,
     selectSidebarNote,

@@ -164,6 +164,42 @@ export function normalizeKeyboardShortcutEnabled(
   return normalizedEnabled;
 }
 
+// A command missing from the stored shortcuts (one added after they were
+// saved) takes its default keys. When the user already bound those keys to
+// another enabled command, the user's binding wins and the new command starts
+// disabled. Mirrors `disableShadowingDefaultShortcuts` in `electron/store.cjs`.
+export function disableShadowingDefaultShortcuts(
+  storedShortcuts,
+  storedEnabled,
+  keyboardShortcuts,
+  keyboardShortcutEnabled,
+) {
+  if (!storedShortcuts || typeof storedShortcuts !== "object") {
+    return keyboardShortcutEnabled;
+  }
+  const explicitEnabled =
+    storedEnabled && typeof storedEnabled === "object" ? storedEnabled : {};
+  const isStored = (commandId) =>
+    Boolean(parseKeyboardShortcut(storedShortcuts[commandId]));
+  const userKeys = new Set(
+    KEYBOARD_SHORTCUT_COMMAND_IDS
+      .filter((commandId) =>
+        isStored(commandId) && keyboardShortcutEnabled[commandId] !== false)
+      .map((commandId) => keyboardShortcuts[commandId]),
+  );
+  const nextEnabled = { ...keyboardShortcutEnabled };
+  for (const commandId of KEYBOARD_SHORTCUT_COMMAND_IDS) {
+    if (
+      !isStored(commandId) &&
+      typeof explicitEnabled[commandId] !== "boolean" &&
+      userKeys.has(keyboardShortcuts[commandId])
+    ) {
+      nextEnabled[commandId] = false;
+    }
+  }
+  return nextEnabled;
+}
+
 export function normalizeKeyboardShortcut(value, fallback) {
   const parsedShortcut = parseKeyboardShortcut(value);
   if (parsedShortcut) {

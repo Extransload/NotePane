@@ -61,8 +61,11 @@ let store;
 let quitting = false;
 let backupOperationInProgress = false;
 const manuallyClosedStickyNoteIds = new Set();
-// Find queries waiting for a window to pick them up. A window that is still
-// loading cannot receive `find:open` yet, so it pulls its query on startup.
+// Find queries waiting for a window to pick them up, keyed by window id. A
+// window that is still loading cannot receive `find:open` yet, so it pulls its
+// query on startup. A query belongs to the window it was sent to: it is dropped
+// when that window closes or has moved on to another note, so it can never open
+// find later in a different window or visit.
 const pendingFindQueries = new Map();
 let installedFontsPromise = null;
 // Flush requests sent to renderers, keyed by request id, waiting on
@@ -161,6 +164,7 @@ function createWindow(note, options = {}) {
   window.on("closed", () => {
     const closedEntry = windows.get(window.id);
     windows.delete(window.id);
+    pendingFindQueries.delete(window.id);
     if (
       !quitting &&
       store?.getLayoutMode?.() === "sticky" &&
@@ -1352,22 +1356,25 @@ function installIpcHandlers() {
       return null;
     }
 
-    pendingFindQueries.set(note.id, typeof payload?.query === "string" ? payload.query : "");
-    if (!window.webContents.isLoading()) {
-      window.webContents.send("find:open");
-    }
+    pendingFindQueries.set(window.id, {
+      noteId: note.id,
+      query: typeof payload?.query === "string" ? payload.query : "",
+    });
+    // Sent even while loading: a renderer that has not subscribed yet drops
+    // it and pulls the query on startup instead, so neither path misses it.
+    window.webContents.send("find:open");
     presentWindow(window);
     return note;
   });
 
   ipcMain.handle("find:take-pending", (event) => {
-    const noteId = getNoteIdForWebContents(event.sender);
-    if (!noteId || !pendingFindQueries.has(noteId)) {
+    const windowId = BrowserWindow.fromWebContents(event.sender)?.id;
+    const request = pendingFindQueries.get(windowId);
+    if (!request) {
       return null;
     }
-    const query = pendingFindQueries.get(noteId);
-    pendingFindQueries.delete(noteId);
-    return { noteId, query };
+    pendingFindQueries.delete(windowId);
+    return request.noteId === getNoteIdForWebContents(event.sender) ? request : null;
   });
 
   ipcMain.on("notes:flush-done", (event, requestId) => {

@@ -9,12 +9,15 @@ import {
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
 } from "react";
 
 /**
  * Find bar state. The query is applied from an effect, after the editor view
  * exists, so a find opened right after a note switch still finds its matches.
+ * Collapsed toggles open only for a step or for a find opened with a query,
+ * never while the query is typed.
  */
 export function useFindInNote(editor) {
   const [isOpen, setIsOpen] = useState(false);
@@ -22,6 +25,7 @@ export function useFindInNote(editor) {
   const [status, setStatus] = useState({ current: 0, total: 0 });
   const [focusRequest, setFocusRequest] = useState(0);
   const [applyRequest, setApplyRequest] = useState(0);
+  const expandOnApplyRef = useRef(false);
 
   const refreshStatus = useCallback(() => {
     const { matches, index } = getFindState(editor);
@@ -36,12 +40,14 @@ export function useFindInNote(editor) {
     }
     setFindQuery(editor, query);
     refreshStatus();
-    revealCurrentFindMatch(editor);
+    revealCurrentFindMatch(editor, { expandToggles: expandOnApplyRef.current });
+    expandOnApplyRef.current = false;
   }, [applyRequest, editor, isOpen, query, refreshStatus]);
 
   const openFind = useCallback((initialQuery) => {
     if (typeof initialQuery === "string") {
       setQuery(initialQuery);
+      expandOnApplyRef.current = true;
     }
     setIsOpen(true);
     setFocusRequest((value) => value + 1);

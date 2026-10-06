@@ -40,8 +40,10 @@ search and no find inside a note.
    the live editor, because its latest edits may still be waiting on the save debounce. Other notes use the text of
    their stored `blocksJSON`, which is exact and carries no image data URLs. Notes without `blocksJSON` fall back to
    their stored markdown, converted to plain text.
-3. Ranking: title matches first, then body-only matches. Ties keep sidebar order.
-4. Choosing a result:
+3. Body text keeps one block (or table cell) per line, and a match never spans two lines, so the palette and the find
+   bar agree on what matches. Snippets show whitespace as single spaces.
+4. Ranking: title matches first, then body-only matches. Ties keep sidebar order.
+5. Choosing a result:
    - The current note: close the palette and open the find bar with the query.
    - A docked note in Tabs mode: switch through the existing `selectSidebarNote` path, which flushes pending saves.
      After the editor remounts it opens the find bar with the query.
@@ -49,6 +51,8 @@ search and no find inside a note.
      creates that note's window. That includes a sticky window the user closed by hand: main drops it from the
      manually closed set and reopens only that note. Main then focuses the window and sends it `find:open { query }`.
      A note that no longer exists returns `null` and nothing happens.
+   - A find request is dropped when the switch does not land on the chosen note, or when the window it was sent to
+     closes or moves to another note before taking it, so it never opens find on a later visit.
 
 ### Find bar
 
@@ -56,11 +60,13 @@ search and no find inside a note.
    text. Pressing `Mod+F` while the bar is open selects the whole query input.
 2. Each query change recomputes matches across the document's text nodes, grouped by text block so that a match never
    spans two blocks. Document edits remap or recompute the matches. The current index stays on the match nearest to
-   the previous one.
+   the previous one: refining the query keeps the current match while it still matches, or else moves to the nearest
+   match after it. Without a current match, the search starts at the caret.
 3. `Enter` moves to the next match and `Shift+Enter` to the previous one, wrapping at both ends. An `Enter` that commits
    an IME composition (`isComposing` or `keyCode === 229`) is ignored.
 4. Moving to a match scrolls it into view. When the match is inside a collapsed toggle, only the toggles that contain
-   it are expanded.
+   it are expanded. Toggles open only for a step (`Enter`, `Shift+Enter`, the buttons) or for a find opened with a
+   query; while the query is typed, only a visible match is scrolled to, so a partial query never opens toggles.
 5. `Escape` clears the highlights and closes the bar. If there is a current match, it becomes the editor selection so
    the user can keep typing there.
 
@@ -82,7 +88,8 @@ Decorations never change the document, so find does not touch undo history or tr
 
 Add `searchNotes: "Mod+P"` and `findInNote: "Mod+F"` to `DEFAULT_KEYBOARD_SHORTCUTS` in both `electron/store.cjs` and
 `src/constants.js`. Both can be rebound or disabled in Preferences. Stored preferences that lack the new ids are filled
-from the defaults by the existing normalization.
+from the defaults by the existing normalization. When a user already bound a new default's keys to another enabled
+command, the user's binding wins: the new command starts disabled instead of shadowing it.
 
 ## Testing
 

@@ -537,6 +537,7 @@ function App() {
         setNote(nextNote);
         setNotes((currentNotes) => mergeNotes(currentNotes, nextNote));
       }
+      return nextNote ?? null;
     },
     [notes],
   );
@@ -2119,14 +2120,17 @@ function StickyEditor({
     };
   }, [matchesEnabledKeyboardShortcut, openPreferences]);
 
+  // Resolves to the id of the note the window landed on, or null when the
+  // switch failed.
   const selectSidebarNote = useCallback(
     async (noteId) => {
       if (noteId === note.id) {
-        return;
+        return noteId;
       }
 
       await saveNow();
-      await onSelectNote(noteId);
+      const landedNote = await onSelectNote(noteId);
+      return landedNote?.id ?? null;
     },
     [note.id, onSelectNote, saveNow],
   );

@@ -68,9 +68,11 @@ function inlineToPlainText(content) {
   if (!content || typeof content !== "object") {
     return "";
   }
+  // Every table cell is its own text block in the editor, so each one gets
+  // its own line, the unit that note search matches within.
   if (content.type === "tableContent") {
     return (content.rows ?? [])
-      .map((row) => (row.cells ?? []).map(inlineToPlainText).join(" "))
+      .flatMap((row) => (row.cells ?? []).map(inlineToPlainText))
       .join("\n");
   }
   if (typeof content.text === "string") {
@@ -80,7 +82,9 @@ function inlineToPlainText(content) {
 }
 
 // Reads only `content` and `children`, never `props`, so image and file URLs
-// (often multi-megabyte data URLs) are never searched.
+// (often multi-megabyte data URLs) are never searched. Blocks are separated by
+// newlines. A query never holds a newline, so a match stays inside one block,
+// as it does in find in note.
 export function blocksToPlainText(blocks) {
   const lines = [];
   const visit = (block) => {
@@ -106,7 +110,7 @@ export function markdownToPlainText(markdown) {
     .replace(/<[^>]+>/g, "")
     .replace(/^\s{0,3}(?:#{1,6}\s+|>\s?|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+)/gm, "")
     .replace(/(\*\*|__|~~|`|\*)/g, "")
-    .replace(/\|/g, " ")
+    .replace(/\|/g, "\n")
     .replace(/^\s*:?-{3,}:?(?:\s+:?-{3,}:?)*\s*$/gm, "");
 }
 
@@ -138,12 +142,18 @@ function collapseWhitespace(text) {
   return String(text ?? "").replace(/\s+/g, " ").trim();
 }
 
+// Replaces each whitespace character with one space, so a snippet shows on one
+// line while its match ranges keep their offsets.
+function flattenWhitespace(text) {
+  return text.replace(/\s/g, " ");
+}
+
 export function makeSnippet(text, ranges) {
   const first = ranges[0];
   const start = first ? Math.max(0, first.start - SNIPPET_BEFORE) : 0;
   const end = Math.min(text.length, start + SNIPPET_LENGTH);
   return {
-    text: text.slice(start, end),
+    text: flattenWhitespace(text.slice(start, end)),
     clippedStart: start > 0,
     clippedEnd: end < text.length,
     ranges: ranges
@@ -168,7 +178,8 @@ export function searchNotes(entries, query) {
   const bodyHits = [];
   for (const entry of entries) {
     const titleRanges = findMatchRanges(entry.title, trimmedQuery);
-    const body = collapseWhitespace(entry.body);
+    // Matched as stored, without collapsing whitespace across blocks.
+    const body = String(entry.body ?? "");
     const bodyRanges = findMatchRanges(body, trimmedQuery);
     if (titleRanges.length === 0 && bodyRanges.length === 0) {
       continue;

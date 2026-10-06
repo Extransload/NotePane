@@ -66,8 +66,13 @@ const findInNotePlugin = new Plugin({
     apply(tr, value, _oldState, newState) {
       const meta = tr.getMeta(findInNotePluginKey);
       if (meta?.type === "setQuery") {
+        // Refining the query keeps the current match while it still matches,
+        // or else moves to the nearest match after it. Without a current
+        // match the search starts at the caret.
+        const current = value.matches[value.index];
         const matches = findMatchesInDoc(newState.doc, meta.query);
-        return { query: meta.query, matches, index: indexNearest(matches, meta.from) };
+        const anchor = current ? current.from : meta.from;
+        return { query: meta.query, matches, index: indexNearest(matches, anchor) };
       }
       if (meta?.type === "step") {
         const count = value.matches.length;
@@ -188,16 +193,23 @@ function expandTogglesAround(view, pos) {
   }
 }
 
-export function revealCurrentFindMatch(editor) {
+// Scrolls the current match into view. With `expandToggles` off, as while the
+// query is being typed, a match hidden in a collapsed toggle is left hidden:
+// a partial query must not open toggles for good.
+export function revealCurrentFindMatch(editor, { expandToggles = true } = {}) {
   const view = getView(editor);
   const match = getCurrentFindMatch(editor);
   if (!view || !match) {
     return;
   }
-  expandTogglesAround(view, match.from);
+  if (expandToggles) {
+    expandTogglesAround(view, match.from);
+  }
   const { node } = view.domAtPos(match.from);
   const element = node instanceof Element ? node : node?.parentElement;
-  element?.scrollIntoView({ block: "center" });
+  if (element && (expandToggles || element.checkVisibility())) {
+    element.scrollIntoView({ block: "center" });
+  }
 }
 
 export function getFindSeedText(editor) {

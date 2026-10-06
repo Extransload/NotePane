@@ -885,6 +885,147 @@ test("Electron opens only web and mail links externally and never navigates the 
   }
 });
 
+test("Electron note search drops its find request when the tab switch fails", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", markdown: "second has the needle", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const editor = page.getByTestId("sticky-editor-surface");
+    await expect(editor).toContainText("first body");
+    await editor.getByText("first body").click();
+    await page.keyboard.press(modifierShortcut("P"));
+    const palette = page.getByRole("dialog", { name: "Search notes" });
+    const input = palette.getByRole("textbox", { name: "Search notes" });
+    await input.fill("needle");
+    await expect(palette.getByRole("option")).toHaveCount(1);
+
+    // Another window trashes the note while the palette still lists it.
+    await page.evaluate(() => window.blocknoteSticky.deleteNote("second-note"));
+    await expect(page.getByRole("tab", { name: /Second note/ })).toHaveCount(0);
+    await input.press("Enter");
+    await expect(palette).toHaveCount(0);
+    expect(await getCurrentPageNoteId(page)).toBe("first-note");
+
+    await page.evaluate(() => window.blocknoteSticky.restoreNote("second-note"));
+    await page.getByRole("tab", { name: /Second note/ }).click();
+    await expect(editor).toContainText("second has the needle");
+    await expect.poll(() => getCurrentPageNoteId(page)).toBe("second-note");
+    // Open the palette and close it again: a stale find request would have
+    // opened the find bar by the time this round trip finishes.
+    await page.keyboard.press(modifierShortcut("P"));
+    await palette.getByRole("textbox", { name: "Search notes" }).press("Escape");
+    await expect(page.getByRole("search", { name: "Find in note" })).toHaveCount(0);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Electron reveal drops a find query its window never took", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", markdown: "second has the needle", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+  const countWindows = () => electronApp.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().length);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(countWindows).toBe(2);
+    const firstStickyPage = await getStickyPageByNoteId(electronApp, "first-note");
+    const secondStickyPage = await getStickyPageByNoteId(electronApp, "second-note");
+
+    // The second window never hears `find:open`, then closes without taking it.
+    const secondWindowId = await electronApp.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().find((window) =>
+        new URL(window.webContents.getURL()).searchParams.get("noteId") === "second-note").id);
+    await electronApp.evaluate(({ BrowserWindow }, windowId) => {
+      const { webContents } = BrowserWindow.fromId(windowId);
+      const send = webContents.send.bind(webContents);
+      webContents.send = (channel, ...args) => {
+        if (channel !== "find:open") {
+          send(channel, ...args);
+        }
+      };
+    }, secondWindowId);
+    await firstStickyPage.evaluate(() =>
+      window.blocknoteSticky.revealNote({ noteId: "second-note", query: "needle" }));
+    expect(secondStickyPage.isClosed()).toBe(false);
+    // Closed from the main process, which counts as closing it by hand, so the
+    // test does not wait on a reply from the page that is closing.
+    await electronApp.evaluate(({ BrowserWindow }, windowId) => {
+      BrowserWindow.fromId(windowId).close();
+    }, secondWindowId);
+    await expect.poll(countWindows).toBe(1);
+
+    await clickMenuItem(electronApp, "Show All NotePanes");
+    await expect.poll(countWindows).toBe(2);
+    const reopenedPage = await getStickyPageByNoteId(electronApp, "second-note");
+    await expect(reopenedPage.getByTestId("sticky-editor-surface")).toContainText("second has the needle");
+    await reopenedPage.bringToFront();
+    await reopenedPage.getByTestId("sticky-editor-surface").getByText("second has the needle").click();
+    await reopenedPage.keyboard.press(modifierShortcut("P"));
+    await reopenedPage.getByRole("dialog", { name: "Search notes" })
+      .getByRole("textbox", { name: "Search notes" }).press("Escape");
+    await expect(reopenedPage.getByRole("search", { name: "Find in note" })).toHaveCount(0);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Electron note search palette keeps a selection when the stored list is shorter", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", markdown: "second body", createdAt: 2, updatedAt: 2 },
+    { id: "third-note", title: "Third note", markdown: "third body", createdAt: 3, updatedAt: 3 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const editor = page.getByTestId("sticky-editor-surface");
+    await expect(editor).toContainText("first body");
+    const firstNote = await page.evaluate(() => window.blocknoteSticky.getNote("first-note"));
+    // Hold the palette's stored-note request, then answer it with fewer notes
+    // than the window lists, as when another window trashed them meanwhile.
+    await electronApp.evaluate(({ ipcMain }, onlyNote) => {
+      globalThis.releaseNotesList = [];
+      ipcMain.removeHandler("notes:list");
+      ipcMain.handle("notes:list", () => new Promise((resolve) => {
+        globalThis.releaseNotesList.push(() => resolve([onlyNote]));
+      }));
+    }, firstNote);
+
+    await editor.getByText("first body").click();
+    await page.keyboard.press(modifierShortcut("P"));
+    const palette = page.getByRole("dialog", { name: "Search notes" });
+    const input = palette.getByRole("textbox", { name: "Search notes" });
+    await expect(palette.getByRole("option")).toHaveCount(3);
+    await input.press("ArrowUp");
+    await expect(palette.getByRole("option").nth(2)).toHaveAttribute("aria-selected", "true");
+
+    await expect.poll(() => electronApp.evaluate(() => globalThis.releaseNotesList.length))
+      .toBeGreaterThan(0);
+    await electronApp.evaluate(() => globalThis.releaseNotesList.forEach((release) => release()));
+    await expect(palette.getByRole("option")).toHaveCount(1);
+    await expect(palette.getByRole("option")).toHaveAttribute("aria-selected", "true");
+    await input.press("Enter");
+
+    await expect(palette).toHaveCount(0);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron note search switches tabs and opens find on the match", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [
@@ -1650,17 +1791,21 @@ test("Electron uses the native Windows title bar and frame", async () => {
 
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
     await expect.poll(() => getOpenPages(electronApp).length).toBe(1);
-    const stickyPage = getOpenPages(electronApp)[0];
-    await expect(stickyPage.getByTestId("sticky-header")).toBeVisible();
     await expect.poll(async () => {
       return await electronApp.evaluate(({ BrowserWindow }) => {
         return BrowserWindow.getAllWindows()[0]?.isMenuBarVisible();
       });
     }).toBe(false);
-    const stickyTitleBarHeight = await stickyPage.evaluate(
-      () => window.outerHeight - window.innerHeight,
-    );
-    expect(stickyTitleBarHeight).toBeLessThan(16);
+    // The closing tabs window can still be listed while the sticky window
+    // opens. Read every open page on each attempt instead of keeping a page
+    // picked mid-transition.
+    await expect.poll(async () => {
+      const stickyTitleBarHeights = await readOpenPages(electronApp, async (page) =>
+        (await page.getByTestId("sticky-header").isVisible())
+          ? page.evaluate(() => window.outerHeight - window.innerHeight)
+          : null);
+      return stickyTitleBarHeights.length === 1 && stickyTitleBarHeights[0] < 16;
+    }).toBe(true);
   } finally {
     await electronApp.close();
   }

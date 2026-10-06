@@ -14,6 +14,7 @@ import {
   MIN_EDITOR_FONT_SIZE_PX,
 } from "../constants.js";
 import {
+  disableShadowingDefaultShortcuts,
   normalizeKeyboardShortcutEnabled,
   normalizeKeyboardShortcuts,
 } from "./keyboardShortcuts.js";
@@ -62,13 +63,26 @@ export function normalizeEditorPreferences(
       typeof source.showTableOfContents === "boolean"
         ? source.showTableOfContents
         : Boolean(fallbackSource.showTableOfContents),
-    keyboardShortcuts: normalizeKeyboardShortcuts(
+    ...normalizeKeyboardShortcutPreferences(source, fallbackSource),
+  };
+}
+
+function normalizeKeyboardShortcutPreferences(source, fallbackSource) {
+  const keyboardShortcuts = normalizeKeyboardShortcuts(
+    source.keyboardShortcuts,
+    fallbackSource.keyboardShortcuts,
+  );
+  const keyboardShortcutEnabled = normalizeKeyboardShortcutEnabled(
+    source.keyboardShortcutEnabled,
+    fallbackSource.keyboardShortcutEnabled,
+  );
+  return {
+    keyboardShortcuts,
+    keyboardShortcutEnabled: disableShadowingDefaultShortcuts(
       source.keyboardShortcuts,
-      fallbackSource.keyboardShortcuts,
-    ),
-    keyboardShortcutEnabled: normalizeKeyboardShortcutEnabled(
       source.keyboardShortcutEnabled,
-      fallbackSource.keyboardShortcutEnabled,
+      keyboardShortcuts,
+      keyboardShortcutEnabled,
     ),
   };
 }
