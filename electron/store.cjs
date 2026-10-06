@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { randomUUID } = require("crypto");
 const { AssetStore, hasBase64DataUrl } = require("./assetStore.cjs");
+const { writeFileAtomic } = require("./atomicWrite.cjs");
 
 const DEFAULT_NOTE_TITLE = "Untitled";
 const NOTE_PANE_BACKUP_FORMAT = "notepane-backup";
@@ -969,16 +970,7 @@ function hasInlineAsset(record) {
 }
 
 function writeJsonAtomic(filePath, value) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-  try {
-    fs.writeFileSync(temporaryPath, JSON.stringify(value, null, 2), "utf8");
-    fs.renameSync(temporaryPath, filePath);
-  } finally {
-    if (fs.existsSync(temporaryPath)) {
-      fs.unlinkSync(temporaryPath);
-    }
-  }
+  writeFileAtomic(filePath, JSON.stringify(value, null, 2));
 }
 
 function normalizeNote(value, options = {}) {

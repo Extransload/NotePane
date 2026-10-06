@@ -911,6 +911,109 @@ test("exports backups with inline images and stores restored images as assets", 
   assert.doesNotMatch(fs.readFileSync(path.join(restoreDirectory, "notes.json"), "utf8"), /;base64,/);
 });
 
+test("retries a notes save while the file is briefly locked", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+  const note = store.createNote({ width: 900, height: 700 });
+  const notesPath = path.join(directory, "notes.json");
+
+  const attempts = withFailingRenames(notesPath, ["EPERM", "EBUSY"], () =>
+    store.updateContent({
+      noteId: note.id,
+      blocksJSON: JSON.stringify([{ type: "paragraph", content: "Locked once" }]),
+      markdown: "Locked once",
+    }),
+  );
+
+  assert.deepEqual(attempts, ["EPERM", "EBUSY", null]);
+  assert.equal(new StickyStore(directory).getNote(note.id).markdown, "Locked once");
+  assert.deepEqual(fs.readdirSync(directory).filter((name) => name.endsWith(".tmp")), []);
+});
+
+test("rethrows a notes save failure that a retry cannot fix", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+  const note = store.createNote({ width: 900, height: 700 });
+  const notesPath = path.join(directory, "notes.json");
+  const attempts = [];
+
+  assert.throws(
+    () =>
+      withFailingRenames(
+        notesPath,
+        ["ENOSPC", "ENOSPC"],
+        () =>
+          store.updateContent({
+            noteId: note.id,
+            blocksJSON: JSON.stringify([{ type: "paragraph", content: "Disk full" }]),
+            markdown: "Disk full",
+          }),
+        attempts,
+      ),
+    { code: "ENOSPC" },
+  );
+  assert.deepEqual(attempts, ["ENOSPC"]);
+  assert.deepEqual(fs.readdirSync(directory).filter((name) => name.endsWith(".tmp")), []);
+});
+
+test("flushes the temporary notes file to disk before renaming it", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+  const note = store.createNote({ width: 900, height: 700 });
+  const notesPath = path.join(directory, "notes.json");
+  const events = [];
+  const originalFsync = fs.fsyncSync;
+  const originalRename = fs.renameSync;
+  fs.fsyncSync = (fd) => {
+    events.push("fsync");
+    return originalFsync(fd);
+  };
+  fs.renameSync = (from, to) => {
+    if (to === notesPath) events.push("rename");
+    return originalRename(from, to);
+  };
+  try {
+    store.updateContent({
+      noteId: note.id,
+      blocksJSON: JSON.stringify([{ type: "paragraph", content: "Durable" }]),
+      markdown: "Durable",
+    });
+  } finally {
+    fs.fsyncSync = originalFsync;
+    fs.renameSync = originalRename;
+  }
+
+  const renameIndex = events.lastIndexOf("rename");
+  assert.ok(renameIndex > 0, `expected an fsync before the rename, saw [${events.join(", ")}]`);
+  assert.equal(events[renameIndex - 1], "fsync");
+});
+
+// Makes fs.renameSync onto targetPath fail with each listed error code in turn,
+// then behave normally. Records each attempt's code (null for success).
+function withFailingRenames(targetPath, codes, action, attempts = []) {
+  const originalRename = fs.renameSync;
+  const remaining = [...codes];
+  fs.renameSync = (from, to) => {
+    if (to !== targetPath) {
+      return originalRename(from, to);
+    }
+    const code = remaining.shift() ?? null;
+    attempts.push(code);
+    if (code) {
+      const error = new Error(`${code}: simulated rename failure`);
+      error.code = code;
+      throw error;
+    }
+    return originalRename(from, to);
+  };
+  try {
+    action();
+  } finally {
+    fs.renameSync = originalRename;
+  }
+  return attempts;
+}
+
 test("exports and restores a versioned portable workspace backup", () => {
   const sourceDirectory = createTemporaryDirectory();
   const sourceStore = new StickyStore(sourceDirectory);

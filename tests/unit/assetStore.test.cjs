@@ -90,6 +90,56 @@ test("collects garbage but keeps referenced assets", () => {
   assert.equal(store.read(dropped), null);
 });
 
+test("retries storing an asset while its file is briefly locked", () => {
+  const store = new AssetStore(createTemporaryDirectory());
+  const originalRename = fs.renameSync;
+  const failures = ["EACCES", "EPERM"];
+  let attempts = 0;
+  fs.renameSync = (from, to) => {
+    attempts += 1;
+    const code = failures.shift();
+    if (code) {
+      const error = new Error(`${code}: simulated rename failure`);
+      error.code = code;
+      throw error;
+    }
+    return originalRename(from, to);
+  };
+  let url;
+  try {
+    url = store.put(PNG_BYTES, "image/png");
+  } finally {
+    fs.renameSync = originalRename;
+  }
+
+  assert.equal(attempts, 3);
+  assert.deepEqual(store.read(url).buffer, PNG_BYTES);
+  assert.deepEqual(fs.readdirSync(store.directory).filter((name) => name.endsWith(".tmp")), []);
+});
+
+test("flushes an asset to disk before renaming it into place", () => {
+  const store = new AssetStore(createTemporaryDirectory());
+  const events = [];
+  const originalFsync = fs.fsyncSync;
+  const originalRename = fs.renameSync;
+  fs.fsyncSync = (fd) => {
+    events.push("fsync");
+    return originalFsync(fd);
+  };
+  fs.renameSync = (from, to) => {
+    events.push("rename");
+    return originalRename(from, to);
+  };
+  try {
+    store.put(PNG_BYTES, "image/png");
+  } finally {
+    fs.fsyncSync = originalFsync;
+    fs.renameSync = originalRename;
+  }
+
+  assert.deepEqual(events, ["fsync", "rename"]);
+});
+
 const temporaryDirectories = [];
 
 function createTemporaryDirectory() {

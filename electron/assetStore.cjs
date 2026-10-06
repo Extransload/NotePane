@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
-const { createHash, randomUUID } = require("crypto");
+const { createHash } = require("crypto");
+const { writeFileAtomic } = require("./atomicWrite.cjs");
 
 // Uploaded media lives in content-addressed files instead of base64 data URLs
 // inside note JSON. Notes reference a file as
@@ -55,16 +56,7 @@ class AssetStore {
     const extension = EXTENSION_BY_MIME[String(mimeType).toLowerCase()] ?? "bin";
     const filePath = path.join(this.directory, `${hash}.${extension}`);
     if (!fs.existsSync(filePath)) {
-      fs.mkdirSync(this.directory, { recursive: true });
-      const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-      try {
-        fs.writeFileSync(temporaryPath, buffer);
-        fs.renameSync(temporaryPath, filePath);
-      } finally {
-        if (fs.existsSync(temporaryPath)) {
-          fs.unlinkSync(temporaryPath);
-        }
-      }
+      writeFileAtomic(filePath, buffer);
     }
     return `${ASSET_URL_PREFIX}${hash}.${extension}`;
   }
