@@ -54,6 +54,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Sticky shell and session tab computed styles | `src/style/themeStyles.js` |
 | Colour conversion and contrast | `src/style/colorMath.js` |
 | Saving, debouncing, version snapshots | `src/hooks/useNotePersistence.js` |
+| Flushing pending saves on unmount or when main asks | `src/hooks/usePendingSaveFlush.js` |
 | Keys handled on the editor surface | `src/hooks/useEditorSurfaceShortcuts.js` |
 | Window, session and tab-mode keyboard commands | `src/hooks/useKeyboardCommands.js` |
 | Session tab drag and drop | `src/hooks/useSessionTabDrag.js` |
@@ -83,7 +84,12 @@ The renderer owns editor behavior. The desktop shell does not override BlockNote
 2. Renderer serializes `editor.document` to `blocksJSON`.
 3. Renderer also stores a lossy markdown fallback.
 4. IPC sends the payload to Electron main.
-5. `StickyStore` writes `notes.json` atomically.
+5. `StickyStore` writes `notes.json` atomically (`electron/atomicWrite.cjs`): the temporary file is fsynced before
+   the rename, and a rename blocked by a briefly locked file (EPERM/EBUSY/EACCES) is retried with a short backoff.
+
+Before main destroys windows (the Windows layout switch) or reads or replaces the workspace (backup export and
+import), it sends `notes:flush-requested` to every note window and waits, up to 1.5 s per window, for
+`notes:flush-done` after the renderer has written its debounced content and appearance edits.
 
 Uploaded media never stays in note JSON. Upload and crop store bytes through the `assets:store` IPC and insert a
 `notepane-asset://local/<sha256>.<ext>` URL. Any base64 data URL that still reaches the store (pasted HTML, Markdown

@@ -64,6 +64,11 @@ const manuallyClosedStickyNoteIds = new Set();
 // loading cannot receive `find:open` yet, so it pulls its query on startup.
 const pendingFindQueries = new Map();
 let installedFontsPromise = null;
+// Flush requests sent to renderers, keyed by request id, waiting on
+// `notes:flush-done`.
+const pendingEditorFlushes = new Map();
+let nextEditorFlushRequestId = 1;
+const EDITOR_FLUSH_TIMEOUT_MS = 1500;
 
 if (isWsl()) {
   // WSL's X/Wayland bridge can tear down Electron's GPU process between launches.
@@ -622,7 +627,12 @@ function restoreTabsModeAfterLastStickyWindowClosed(activeNoteId) {
   return true;
 }
 
-function recreateWindowsForLayoutMode(activeNoteId, options = {}) {
+async function recreateWindowsForLayoutMode(activeNoteId, options = {}) {
+  // `destroy()` below skips the renderer's unmount flush, and the replacement
+  // windows load notes from the store, so pending edits must land first.
+  if (options.flushEditors !== false) {
+    await flushEditorWindows();
+  }
   const previousEntries = [...windows.values()];
   const notes = store.listNotes();
   const layoutMode = store.getLayoutMode();
@@ -768,7 +778,7 @@ async function updateLayoutMode(layoutMode, options = {}) {
         previousLayoutMode !== "sticky" && nextLayoutMode === "sticky",
     };
     const targetWindows = isChangingMode && process.platform === "win32"
-      ? recreateWindowsForLayoutMode(activeNoteId, windowSyncOptions)
+      ? await recreateWindowsForLayoutMode(activeNoteId, windowSyncOptions)
       : syncWindowsForLayoutMode(activeNoteId, windowSyncOptions);
     broadcastLayoutMode(nextLayoutMode);
     broadcastNotesChanged();
@@ -1038,7 +1048,13 @@ function persistWindowBounds(window) {
     return;
   }
 
-  store.updateBounds(entry.noteId, window.getBounds());
+  // Runs from window and app event handlers, where an exception would surface
+  // as Electron's uncaught-exception dialog. Losing one bounds update is fine.
+  try {
+    store.updateBounds(entry.noteId, window.getBounds());
+  } catch (error) {
+    console.error("[NotePane] Failed to save window bounds:", error);
+  }
 }
 
 function getNoteIdForWebContents(webContents) {
@@ -1342,6 +1358,13 @@ function installIpcHandlers() {
     return { noteId, query };
   });
 
+  ipcMain.on("notes:flush-done", (event, requestId) => {
+    const pending = pendingEditorFlushes.get(requestId);
+    if (pending && pending.webContents === event.sender) {
+      pending.finish("done");
+    }
+  });
+
   ipcMain.handle("notes:save-content", (event, payload) => {
     const resolvedNoteId =
       payload?.noteId || getNoteIdForWebContents(event.sender);
@@ -1459,7 +1482,7 @@ function installIpcHandlers() {
       throw new Error("No active window found for backup export.");
     }
 
-    await waitForPendingEditorSaves();
+    await flushEditorWindows();
     const backup = store.createBackup({ appVersion: app.getVersion() });
     const defaultName = `NotePane Backup ${formatBackupTimestamp(new Date())}.notepane`;
     const result = await saveBuffer({
@@ -1508,7 +1531,7 @@ function installIpcHandlers() {
       return { canceled: true, imported: false, summary };
     }
 
-    await waitForPendingEditorSaves();
+    await flushEditorWindows();
     const automaticBackupPath = path.join(
       app.getPath("userData"),
       "Backups",
@@ -1521,14 +1544,21 @@ function installIpcHandlers() {
     const activeNote = store.listNotes()[0];
     manuallyClosedStickyNoteIds.clear();
 
-    setTimeout(() => {
+    setTimeout(async () => {
       if (!activeNote) {
         return;
       }
-      recreateWindowsForLayoutMode(activeNote.id, {
-        persistExistingBounds: false,
-      });
-      buildMenu();
+      try {
+        // Edits were flushed before the restore. Flushing again now would
+        // write the old windows' content over the restored notes.
+        await recreateWindowsForLayoutMode(activeNote.id, {
+          persistExistingBounds: false,
+          flushEditors: false,
+        });
+        buildMenu();
+      } catch (error) {
+        console.error("[NotePane] Failed to reopen windows after backup import:", error);
+      }
     }, 50);
 
     return {
@@ -1646,9 +1676,48 @@ async function withBackupOperation(callback) {
   }
 }
 
-async function waitForPendingEditorSaves() {
-  await new Promise((resolve) => setTimeout(resolve, 250));
+// Asks every note window to write its debounced content and appearance edits
+// now, and resolves once each has confirmed, closed or timed out. Destroying a
+// window skips the renderer's own unmount and pagehide flush, so callers that
+// destroy windows or replace the workspace call this first.
+function flushEditorWindows(timeoutMs = EDITOR_FLUSH_TIMEOUT_MS) {
+  const targets = [...windows.values()]
+    .map((entry) => entry.window)
+    .filter((window) => !window.isDestroyed() && !window.webContents.isDestroyed());
+  return Promise.all(
+    targets.map((window) => requestEditorFlush(window.webContents, timeoutMs)),
+  );
 }
+
+function requestEditorFlush(webContents, timeoutMs) {
+  return new Promise((resolve) => {
+    const requestId = nextEditorFlushRequestId;
+    nextEditorFlushRequestId += 1;
+    const finish = (outcome) => {
+      clearTimeout(timer);
+      pendingEditorFlushes.delete(requestId);
+      webContents.removeListener("destroyed", onDestroyed);
+      if (outcome === "timeout") {
+        console.error("[NotePane] A window did not confirm its pending saves in time.");
+      }
+      resolve(outcome);
+    };
+    const onDestroyed = () => finish("destroyed");
+    const timer = setTimeout(() => finish("timeout"), timeoutMs);
+    pendingEditorFlushes.set(requestId, { webContents, finish });
+    webContents.once("destroyed", onDestroyed);
+    try {
+      webContents.send("notes:flush-requested", requestId);
+    } catch (error) {
+      console.error("[NotePane] Failed to request pending saves:", error);
+      finish("failed");
+    }
+  });
+}
+
+// Lets Electron tests drive the flush directly. The main-process global is not
+// reachable from renderers.
+globalThis.notepaneFlushEditorWindows = flushEditorWindows;
 
 async function saveBuffer({ window, buffer, defaultName, dialogTitle, filters }) {
   if (exportDirectoryOverride) {

@@ -246,6 +246,7 @@ import {
   useTabModeShortcuts,
 } from "./hooks/useKeyboardCommands.js";
 import { useNotePersistence } from "./hooks/useNotePersistence.js";
+import { usePendingSaveFlush } from "./hooks/usePendingSaveFlush.js";
 import { useSessionTabDrag } from "./hooks/useSessionTabDrag.js";
 import { useStickyToasts } from "./hooks/useStickyToasts.js";
 import {
@@ -2977,39 +2978,16 @@ function StickyEditor({
     [editor],
   );
 
-  const saveNowRef = useRef(saveNow);
-  useEffect(() => {
-    saveNowRef.current = saveNow;
-  }, [saveNow]);
-
-  // The editor remounts whenever the window switches notes. Flush whatever is
-  // still waiting on a debounce or retry so the switch never drops edits.
-  useEffect(() => {
-    return () => {
-      const hasPendingContentSave = Boolean(
-        saveTimerRef.current || saveRetryTimerRef.current || isEditorDirtyRef.current,
-      );
-      if (saveRetryTimerRef.current) {
-        window.clearTimeout(saveRetryTimerRef.current);
-        saveRetryTimerRef.current = null;
-      }
-      if (hasPendingContentSave) {
-        void saveNowRef.current();
-      }
-      if (appearanceTimerRef.current) {
-        window.clearTimeout(appearanceTimerRef.current);
-      }
-      if (sessionAppearanceTimerRef.current) {
-        window.clearTimeout(sessionAppearanceTimerRef.current);
-      }
-      for (const pendingRef of [pendingAppearanceRef, pendingSessionAppearanceRef]) {
-        if (pendingRef.current) {
-          void electronApi?.updateAppearance(pendingRef.current);
-          pendingRef.current = null;
-        }
-      }
-    };
-  }, []);
+  usePendingSaveFlush({
+    appearanceTimerRef,
+    isEditorDirtyRef,
+    pendingAppearanceRef,
+    pendingSessionAppearanceRef,
+    saveNow,
+    saveRetryTimerRef,
+    saveTimerRef,
+    sessionAppearanceTimerRef,
+  });
 
   return (
     <main
