@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import {
+  clickLastEmptyParagraph,
   loadTemplatePreview,
+  pasteClipboardText,
 } from "../support/renderer-helpers.mjs";
 
 test.beforeEach(async ({ page }) => {
@@ -131,4 +133,57 @@ test("shows image download and crop actions in one toolbar", async ({ page }) =>
     "src",
     originalSource,
   );
+});
+
+test("crops the clicked image when two image blocks share one source", async ({ page }) => {
+  const imageSource = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 120;
+    canvas.height = 80;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#d33";
+    context.fillRect(0, 0, 60, 80);
+    context.fillStyle = "#33d";
+    context.fillRect(60, 0, 60, 80);
+    return canvas.toDataURL("image/png");
+  });
+  await clickLastEmptyParagraph(page);
+  await pasteClipboardText(page, {
+    plainText: "",
+    html: `<img src="${imageSource}" alt="first"><p>between</p><img src="${imageSource}" alt="second">`,
+  });
+
+  const images = page.locator(".bn-editor img.bn-visual-media");
+  await expect(images).toHaveCount(2);
+  const blockIds = await images.evaluateAll((elements) => (
+    elements.map((element) => element.closest(".bn-block-outer[data-id]")?.dataset.id)
+  ));
+  expect(new Set(blockIds).size).toBe(2);
+  const imageInBlock = (blockId) => page.locator(
+    `.bn-editor .bn-block-outer[data-id="${blockId}"] img.bn-visual-media`,
+  );
+  await expect(imageInBlock(blockIds[0])).toHaveAttribute("src", imageSource);
+  await expect(imageInBlock(blockIds[1])).toHaveAttribute("src", imageSource);
+
+  await imageInBlock(blockIds[1]).click();
+  const imageTools = page.locator(".notepane-formatting-toolbar:visible");
+  await imageTools.getByRole("button", { name: "Crop image" }).click();
+  const cropDialog = page.getByRole("dialog", { name: "Crop image" });
+  await expect(cropDialog).toBeVisible();
+  const cropImageBox = await cropDialog.locator(".crop-image-canvas img").boundingBox();
+  const handleBox = await cropDialog
+    .getByRole("button", { name: "Resize crop from right", exact: true })
+    .boundingBox();
+  await page.mouse.move(handleBox.x + (handleBox.width / 2), handleBox.y + (handleBox.height / 2));
+  await page.mouse.down();
+  await page.mouse.move(
+    cropImageBox.x + (cropImageBox.width * 0.5),
+    cropImageBox.y + (cropImageBox.height * 0.5),
+  );
+  await page.mouse.up();
+  await cropDialog.getByRole("button", { name: "Apply crop" }).click();
+  await expect(cropDialog).toHaveCount(0);
+
+  await expect(imageInBlock(blockIds[1])).not.toHaveAttribute("src", imageSource);
+  await expect(imageInBlock(blockIds[0])).toHaveAttribute("src", imageSource);
 });

@@ -83,7 +83,7 @@ import {
   cutCurrentBlocks,
   extractTableOfContentsEntries,
   findBlockById,
-  findImageBlockBySource,
+  findImageBlockForElement,
   focusLastEditorBlock,
   getBlocksForClipboard,
   getEditorBlockElement,
@@ -2254,7 +2254,7 @@ function StickyEditor({
         return;
       }
 
-      const block = findImageBlockBySource(editor.document, image.currentSrc || image.src);
+      const block = findImageBlockForElement(editor.document, image);
       if (!block) {
         return;
       }

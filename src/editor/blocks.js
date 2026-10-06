@@ -343,6 +343,23 @@ export function findBlockById(blocks, blockId) {
   return null;
 }
 
+// Identical images share one asset URL, so the rendered block id is the only
+// reliable way to tell which of several matching image blocks was clicked.
+export function findImageBlockForElement(blocks, imageElement) {
+  const blockId = imageElement
+    ?.closest?.(".bn-block-outer[data-id]")
+    ?.getAttribute("data-id");
+  const block = findBlockById(blocks, blockId);
+  if (block?.type === "image") {
+    return block;
+  }
+
+  return findImageBlockBySource(
+    blocks,
+    imageElement?.currentSrc || imageElement?.src,
+  );
+}
+
 export function findImageBlockBySource(blocks, sourceUrl) {
   const imageBlocks = [];
   collectBlocks(blocks, (block) => {
