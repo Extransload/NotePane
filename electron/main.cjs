@@ -19,7 +19,7 @@ const {
   StickyStore,
   DEFAULT_KEYBOARD_SHORTCUTS,
 } = require("./store.cjs");
-const { fitBoundsToWorkAreas } = require("./windowBounds.cjs");
+const { fitBoundsToWorkAreas, getDetachedWindowBounds } = require("./windowBounds.cjs");
 const { readAssetFromUrl } = require("./assetSources.cjs");
 
 const APP_NAME = "NotePane";
@@ -33,6 +33,7 @@ const STICKY_MIN_WIDTH = 320;
 const STICKY_MIN_HEIGHT = 260;
 const STICKY_WINDOW_GAP = 18;
 const STICKY_WINDOW_MARGIN = 28;
+const DETACHED_WINDOW_OFFSET = 40;
 const TRAFFIC_LIGHT_X = 14;
 const TABS_TRAFFIC_LIGHT_Y = 15;
 const STICKY_TRAFFIC_LIGHT_Y = 10;
@@ -1278,9 +1279,18 @@ function installIpcHandlers() {
       };
     }
 
-    createWindow(note);
-
     const currentWindow = BrowserWindow.fromWebContents(event.sender);
+    const tabsWindow = getPrimaryEntry()?.window ?? currentWindow;
+    const detachedBounds = getDetachedWindowBounds(
+      note.bounds,
+      tabsWindow && !tabsWindow.isDestroyed() ? tabsWindow.getBounds() : null,
+      getDisplayWorkAreas(),
+      { offset: DETACHED_WINDOW_OFFSET, width: STICKY_WINDOW_WIDTH, height: STICKY_WINDOW_HEIGHT },
+    );
+    createWindow(
+      detachedBounds === note.bounds ? note : store.updateBounds(note.id, detachedBounds) ?? note,
+    );
+
     const currentEntry = currentWindow ? windows.get(currentWindow.id) : null;
     const nextActiveNote = getMainTabsNote(currentEntry?.noteId);
     if (currentEntry?.primary && nextActiveNote) {

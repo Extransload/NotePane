@@ -454,3 +454,25 @@ test("keeps breathing room above and below the editor document", async ({ page }
   await expect(page.getByTestId("sticky-editor-surface").getByText("bottom empty space focus"))
     .toBeVisible();
 });
+
+test("lets Tab move focus between controls inside the preferences dialog", async ({ page }) => {
+  await page.keyboard.press(modifierShortcut(","));
+  const preferencesPanel = page.getByRole("dialog", { name: "Preferences window" });
+  await expect(preferencesPanel).toBeVisible();
+
+  const closeButton = preferencesPanel.getByRole("button", { name: "Close preferences" });
+  await closeButton.focus();
+  await expect(closeButton).toBeFocused();
+
+  await page.keyboard.press("Tab");
+
+  await expect(closeButton).not.toBeFocused();
+  await expect.poll(async () =>
+    await preferencesPanel.evaluate((panel) =>
+      panel.contains(document.activeElement) && document.activeElement !== panel,
+    ),
+  ).toBe(true);
+
+  await page.keyboard.press("Shift+Tab");
+  await expect(closeButton).toBeFocused();
+});

@@ -67,6 +67,20 @@ export function NotePaneSideMenuController({
     const clearHandleSelectionHint = () => {
       editor.domElement?.removeAttribute("data-notepane-handle-block-id");
     };
+    // The handle's block stands in for an empty selection only until the user
+    // does something else. A plain key (Escape, Tab, arrows, typing) can move the
+    // caret without a mousedown, so it ends the hint; Mod+C / Mod+X right after
+    // the handle click carry a modifier and still act on the handle's block.
+    const clearHandleSelectionHintOnKey = (event) => {
+      if (
+        event.metaKey ||
+        event.ctrlKey ||
+        ["Shift", "Alt", "Meta", "Control"].includes(event.key)
+      ) {
+        return;
+      }
+      clearHandleSelectionHint();
+    };
     const rememberBlockFromDragHandle = (event) => {
       const handle = event.target instanceof Element
         ? event.target.closest(".bn-side-menu button[aria-expanded]")
@@ -82,11 +96,13 @@ export function NotePaneSideMenuController({
     ownerDocument.addEventListener("dragstart", preserveDragPreviewWidth, true);
     ownerDocument.addEventListener("dragend", clearDragPreviewWidth, true);
     ownerDocument.addEventListener("mousedown", clearHandleSelectionHint, true);
+    ownerDocument.addEventListener("keydown", clearHandleSelectionHintOnKey, true);
     ownerDocument.addEventListener("click", rememberBlockFromDragHandle, true);
     return () => {
       ownerDocument.removeEventListener("dragstart", preserveDragPreviewWidth, true);
       ownerDocument.removeEventListener("dragend", clearDragPreviewWidth, true);
       ownerDocument.removeEventListener("mousedown", clearHandleSelectionHint, true);
+      ownerDocument.removeEventListener("keydown", clearHandleSelectionHintOnKey, true);
       ownerDocument.removeEventListener("click", rememberBlockFromDragHandle, true);
       clearDragPreviewWidth();
       clearHandleSelectionHint();

@@ -31,3 +31,7 @@ export function isVisibleElement(element) {
 export function isEditableFormTarget(target) {
   return target instanceof Element && Boolean(target.closest("input, textarea, select"));
 }
+
+export function isInsideDialog(target) {
+  return target instanceof Element && Boolean(target.closest("[role='dialog']"));
+}

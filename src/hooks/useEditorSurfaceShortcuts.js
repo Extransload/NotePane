@@ -34,6 +34,7 @@ import {
 } from "../editor/toggleKeyboard.js";
 import {
   isEditableFormTarget,
+  isInsideDialog,
   isVisibleElement,
 } from "../utils/dom.js";
 import {
@@ -209,7 +210,15 @@ export function useEditorSurfaceShortcuts({
         return;
       }
 
+      // Tab outside the editor is blocked so it cannot wander from the body or the
+      // window chrome (sidebar, header, toolbars) into chrome controls. The
+      // exceptions are form fields and anything inside a dialog (Preferences, crop,
+      // sticky settings, search palette, colour panel): there Tab keeps its normal
+      // meaning and moves between the dialog's own controls.
       if (!isEditorShortcutTarget(event.target)) {
+        if (isInsideDialog(event.target)) {
+          return;
+        }
         if (!isEditableFormTarget(event.target)) {
           event.preventDefault();
           if (isEditorActive) {

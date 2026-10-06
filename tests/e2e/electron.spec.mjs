@@ -471,6 +471,65 @@ test("Electron keeps sticky windows bound to their original sessions during new-
   }
 });
 
+test("Electron opens a detached note beside the tabs window instead of on top of it", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", markdown: "second body", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const tabsPage = await electronApp.firstWindow();
+    const tabsEditor = tabsPage.getByTestId("sticky-editor-surface");
+    await expect(tabsEditor).toContainText("first body");
+
+    // The tabs window saves its bounds into the note it shows, so after moving
+    // the window on the second session that note stores the tabs window bounds.
+    await tabsPage.getByRole("tab", { name: /Second note/ }).click();
+    await expect(tabsEditor).toContainText("second body");
+    await expect.poll(() => getCurrentPageNoteId(tabsPage)).toBe("second-note");
+    const tabsBounds = await electronApp.evaluate(({ BrowserWindow }) => {
+      const [window] = BrowserWindow.getAllWindows();
+      window.setBounds({ x: 160, y: 120, width: 960, height: 720 });
+      // A programmatic move does not end a user drag, so signal it as one.
+      window.emit("moved");
+      return window.getBounds();
+    });
+    await expect.poll(async () => {
+      const notes = await tabsPage.evaluate(() => window.blocknoteSticky.listNotes());
+      const bounds = notes.find((note) => note.id === "second-note")?.bounds;
+      return bounds && { x: bounds.x, y: bounds.y };
+    }).toEqual({ x: tabsBounds.x, y: tabsBounds.y });
+
+    await tabsPage.evaluate(() => window.blocknoteSticky.detachNote("second-note"));
+    const detachedPage = await getStickyPageByNoteId(electronApp, "second-note");
+    await expect(detachedPage.getByTestId("sticky-editor-surface")).toContainText("second body");
+
+    const placement = await electronApp.evaluate(({ BrowserWindow, screen }) => {
+      const detachedWindow = BrowserWindow.getAllWindows().find((window) =>
+        window.webContents.getURL().includes("noteId=second-note"),
+      );
+      const bounds = detachedWindow.getBounds();
+      const workArea = screen.getDisplayMatching(bounds).workArea;
+      return {
+        bounds,
+        insideWorkArea:
+          bounds.x >= workArea.x &&
+          bounds.y >= workArea.y &&
+          bounds.x + bounds.width <= workArea.x + workArea.width &&
+          bounds.y + bounds.height <= workArea.y + workArea.height,
+      };
+    });
+    expect(placement.bounds.x).not.toBe(tabsBounds.x);
+    expect(placement.bounds.y).not.toBe(tabsBounds.y);
+    expect(placement.bounds.width).toBeLessThan(tabsBounds.width);
+    expect(placement.insideWorkArea).toBe(true);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron keeps the tabs window on its session while a detached note is edited", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [

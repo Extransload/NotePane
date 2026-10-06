@@ -971,3 +971,45 @@ test("copies only the highlighted text of a keyboard selection across blocks", a
   expect(copied.plainText).toContain("gamma del");
   expect(copied.plainText).not.toContain("delta");
 });
+
+test("cuts the block under the caret after the six-dot handle menu is dismissed", async ({ page }) => {
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("Alpha handle block");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Bravo middle block");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Charlie caret block");
+
+  const editor = page.locator(".bn-editor");
+  const alpha = editor.getByText("Alpha handle block", { exact: true });
+  await alpha.click();
+  const alphaBox = await alpha.boundingBox();
+  await page.mouse.move(alphaBox.x + 4, alphaBox.y + alphaBox.height / 2);
+  await page.mouse.move(alphaBox.x - 24, alphaBox.y + alphaBox.height / 2);
+  await page.getByRole("button", { name: "Open block menu" }).click();
+  await expect(page.locator(".bn-drag-handle-menu:visible")).toBeVisible();
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-drag-handle-menu:visible")).toHaveCount(0);
+  // Dismissing the menu leaves focus on the page; Tab returns it to the editor
+  // without a click, which would otherwise reset the handle's block.
+  await page.keyboard.press("Tab");
+  await expectEditorFocused(page);
+
+  for (let step = 0; step < 4; step += 1) {
+    await page.keyboard.press("ArrowDown");
+  }
+  await page.keyboard.press("End");
+  await expect.poll(() => page.evaluate(() => {
+    const anchor = window.getSelection()?.anchorNode;
+    const element = anchor instanceof Element ? anchor : anchor?.parentElement;
+    return element?.closest(".bn-block-content")?.textContent ?? null;
+  })).toBe("Charlie caret block");
+
+  await page.keyboard.press(modifierShortcut("X"));
+
+  await expect(editor.getByText("Charlie caret block", { exact: true })).toHaveCount(0);
+  await expect(editor.getByText("Alpha handle block", { exact: true })).toHaveCount(1);
+  await expect(editor.getByText("Bravo middle block", { exact: true })).toHaveCount(1);
+});
