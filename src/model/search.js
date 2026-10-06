@@ -14,6 +14,14 @@ export function normalizeSearchText(text) {
 // character came from, so matches map back onto the original string even when
 // normalization changes its length.
 function buildSearchIndex(text) {
+  // Fast path for the common case. Lowercasing only ever lengthens a string,
+  // so when the text is already NFC and keeps its length, every index maps to
+  // itself and per-grapheme work is unnecessary.
+  const wholeNormalized = normalizeSearchText(text);
+  if (wholeNormalized.length === text.length && text === text.normalize("NFC")) {
+    return { normalized: wholeNormalized, starts: null, ends: null };
+  }
+
   let normalized = "";
   const starts = [];
   const ends = [];
@@ -42,7 +50,9 @@ export function findMatchRanges(text, query) {
     if (at < 0) {
       break;
     }
-    ranges.push({ start: starts[at], end: ends[at + needle.length - 1] });
+    ranges.push(starts
+      ? { start: starts[at], end: ends[at + needle.length - 1] }
+      : { start: at, end: at + needle.length });
     from = at + needle.length;
   }
   return ranges;

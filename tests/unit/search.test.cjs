@@ -120,3 +120,15 @@ test("reuses cached note text until the note content changes", async () => {
   assert.equal(readNoteText(note), "first");
   assert.equal(readNoteText({ ...note, markdown: "second" }), "second");
 });
+
+// A generous budget: 2 MB is roughly 100 notes of 20 KB. Grapheme
+// segmentation of every character took seconds here; plain text must not.
+test("searches about 2 MB of plain text within an interactive budget", async () => {
+  const { findMatchRanges } = await loadSearch();
+  const text = "Lorem ipsum dolor sit amet, 한글 문장도 섞어 둔다. ".repeat(48_000);
+  const started = performance.now();
+  const ranges = findMatchRanges(text, "AMET");
+  const elapsed = performance.now() - started;
+  assert.equal(ranges.length, 48_000);
+  assert.ok(elapsed < 400, `took ${Math.round(elapsed)} ms`);
+});
