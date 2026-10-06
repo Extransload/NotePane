@@ -124,7 +124,9 @@ function createWindow(note, options = {}) {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      // The preload only uses contextBridge, ipcRenderer and process.platform,
+      // all of which a sandboxed preload provides.
+      sandbox: true,
     },
   });
   window.setWindowButtonVisibility?.(true);
