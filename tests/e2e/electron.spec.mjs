@@ -521,6 +521,49 @@ test("Electron keeps the tabs window on its session while a detached note is edi
   }
 });
 
+test("Electron keeps running when saving window bounds fails", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
+
+    // A read-only data folder makes every notes.json write fail.
+    fs.chmodSync(userDataDirectory, 0o555);
+    let failures;
+    try {
+      failures = await electronApp.evaluate(({ app, BrowserWindow }) => {
+        const errors = [];
+        const window = BrowserWindow.getAllWindows()[0];
+        const emitters = [
+          ["moved", () => window.emit("moved")],
+          ["resized", () => window.emit("resized")],
+          ["close", () => window.emit("close", { preventDefault() {} })],
+          ["before-quit", () => app.emit("before-quit", { preventDefault() {} })],
+        ];
+        for (const [eventName, emit] of emitters) {
+          try {
+            emit();
+          } catch (error) {
+            errors.push(`${eventName}: ${error.code ?? error.message}`);
+          }
+        }
+        return errors;
+      });
+    } finally {
+      fs.chmodSync(userDataDirectory, 0o755);
+    }
+
+    expect(failures).toEqual([]);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron saves a session rename committed by switching to another tab", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [

@@ -1036,7 +1036,13 @@ function persistWindowBounds(window) {
     return;
   }
 
-  store.updateBounds(entry.noteId, window.getBounds());
+  // Runs from window and app event handlers, where an exception would surface
+  // as Electron's uncaught-exception dialog. Losing one bounds update is fine.
+  try {
+    store.updateBounds(entry.noteId, window.getBounds());
+  } catch (error) {
+    console.error("[NotePane] Failed to save window bounds:", error);
+  }
 }
 
 function getNoteIdForWebContents(webContents) {
