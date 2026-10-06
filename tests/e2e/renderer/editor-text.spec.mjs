@@ -887,3 +887,87 @@ test("deletes the current block with Command+X when no text is selected", async 
   await expect(page.getByRole("paragraph").filter({ hasText: /^$/ }).last())
     .toBeVisible();
 });
+
+// Fires the editor's copy handlers into a DataTransfer, the way an in-app
+// copy does, and returns it so the same data can be pasted back.
+async function copyFromEditor(page) {
+  return await page.evaluate(() => {
+    const clipboardData = new DataTransfer();
+    document.querySelector(".bn-editor").dispatchEvent(
+      new ClipboardEvent("copy", { bubbles: true, cancelable: true, clipboardData }),
+    );
+    window.__notepaneTestClipboard = clipboardData;
+    return {
+      types: [...clipboardData.types],
+      plainText: clipboardData.getData("text/plain"),
+    };
+  });
+}
+
+async function pasteLastCopy(page) {
+  await page.evaluate(() => {
+    document.querySelector(".bn-editor").dispatchEvent(
+      new ClipboardEvent("paste", {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: window.__notepaneTestClipboard,
+      }),
+    );
+  });
+}
+
+test("keeps a toggle when blocks copied inside the editor are pasted back", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type(">");
+  await page.keyboard.press("Space");
+  await page.keyboard.insertText("toggle A");
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("child A");
+  const toggles = page.locator(".bn-editor [data-content-type='toggleListItem']");
+  await expect(toggles).toHaveCount(1);
+
+  await page.keyboard.press(modifierShortcut("A"));
+  await page.keyboard.press(modifierShortcut("A"));
+  const copied = await copyFromEditor(page);
+  expect(copied.types).toContain("blocknote/html");
+  await pasteLastCopy(page);
+
+  await expect(toggles).toHaveCount(1);
+  await expect(page.locator(".bn-editor [data-content-type='bulletListItem']")).toHaveCount(0);
+  await expect(toggles.filter({ hasText: "toggle A" })).toHaveCount(1);
+});
+
+test("pastes VS Code lines that start with # as code, not headings", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.evaluate(() => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData("text/plain", "# install deps\npip install notepane");
+    clipboardData.setData("vscode-editor-data", JSON.stringify({ mode: "shellscript" }));
+    document.querySelector(".bn-editor").dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData }),
+    );
+  });
+
+  await expect(page.locator(".bn-editor [data-content-type='codeBlock']")).toContainText("# install deps");
+  await expect(page.locator(".bn-editor h1, .bn-editor [data-content-type='heading']")).toHaveCount(0);
+});
+
+test("copies only the highlighted text of a keyboard selection across blocks", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.insertText("alpha beta");
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("gamma delta");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Shift+ArrowDown");
+  await page.keyboard.press("Shift+End");
+  for (let index = 0; index < 2; index += 1) {
+    await page.keyboard.press("Shift+ArrowLeft");
+  }
+  expect(await page.evaluate(() => String(window.getSelection()))).toMatch(/gamma del$/);
+
+  const copied = await copyFromEditor(page);
+
+  expect(copied.plainText).toContain("gamma del");
+  expect(copied.plainText).not.toContain("delta");
+});

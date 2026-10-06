@@ -978,6 +978,20 @@ function StickyEditor({
           return true;
         }
 
+        // NotePane's own copies carry lossless blocknote/html, and VS Code
+        // copies carry their language. BlockNote handles both, so their
+        // Markdown-looking plain text must not be re-parsed here.
+        const clipboardTypes = event.clipboardData?.types ?? [];
+        if (
+          clipboardTypes.includes("blocknote/html") ||
+          clipboardTypes.includes("vscode-editor-data")
+        ) {
+          return defaultPasteHandler({
+            prioritizeMarkdownOverHTML: true,
+            plainTextAsMarkdown: true,
+          });
+        }
+
         const normalizedPaste = normalizePastedMarkdownForBlockNote(plainText);
         if (normalizedPaste.shouldPasteAsMarkdown) {
           editor.pasteMarkdown(normalizedPaste.markdown);

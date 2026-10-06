@@ -46,12 +46,11 @@ export function getBlocksForClipboard(editor) {
     });
     return blocks;
   }
-  if (selection?.$anchorCell || selection?.$headCell) {
-    return [];
-  }
-
-  const selectedBlocks = editor.getSelection()?.blocks;
-  return selectedBlocks?.length > 1 ? selectedBlocks : [];
+  // Cell selections and plain text selections, even across blocks, are
+  // serialised by the editor itself, so the clipboard holds exactly what is
+  // highlighted. Whole-block copies come from the node and block-range
+  // selections above, which a cross-block drag is promoted to.
+  return [];
 }
 
 export function isEmptyEditorSurfacePointer(event) {
