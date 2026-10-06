@@ -1,0 +1,84 @@
+/* Note search palette and find in note. */
+
+.find-bar-dock {
+  position: sticky;
+  z-index: 27;
+  top: 0;
+  display: flex;
+  justify-content: flex-end;
+  height: 0;
+  padding-right: 14px;
+}
+
+.find-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  margin-top: 10px;
+  padding: 0 6px 0 4px;
+  border: 1px solid color-mix(in srgb, var(--sticky-border-color) 48%, transparent);
+  border-radius: 9px;
+  background: var(--sticky-panel-bg);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--sticky-text-color) 10%, transparent);
+  color: var(--sticky-panel-text);
+  font: 500 12px/1 var(--notepane-ui-font);
+}
+
+.find-bar-input {
+  width: min(220px, 38vw);
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+}
+
+.find-bar-input:focus {
+  border-color: color-mix(in srgb, var(--sticky-border-color) 70%, transparent);
+}
+
+.find-bar-input.has-no-match {
+  border-color: #e5484d;
+}
+
+.find-bar-count {
+  min-width: 42px;
+  text-align: center;
+  opacity: 0.72;
+  font-variant-numeric: tabular-nums;
+}
+
+.find-bar-button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.find-bar-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sticky-text-color) 9%, transparent);
+}
+
+.find-bar-button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.bn-editor .notepane-find-match {
+  border-radius: 2px;
+  background: var(--notepane-find-match-bg);
+}
+
+.bn-editor .notepane-find-match.is-current {
+  background: var(--notepane-find-current-bg);
+}

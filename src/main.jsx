@@ -232,6 +232,9 @@ import {
   isVisibleElement,
 } from "./utils/dom.js";
 import { useEditorSurfaceShortcuts } from "./hooks/useEditorSurfaceShortcuts.js";
+import { useFindInNote } from "./hooks/useFindInNote.js";
+import { FindInNote, getFindSeedText } from "./editor/findInNote.js";
+import { FindBar } from "./ui/FindBar.jsx";
 import {
   useChromeShortcuts,
   useSessionNumberShortcuts,
@@ -929,7 +932,7 @@ function StickyEditor({
 
   const editor = useCreateBlockNote({
     schema,
-    extensions: [BlockDragSelection],
+    extensions: [BlockDragSelection, FindInNote],
     initialContent: initialEditorContent,
     tabBehavior: "prefer-indent",
     tables: {
@@ -963,6 +966,12 @@ function StickyEditor({
       });
     },
   });
+  const findInNote = useFindInNote(editor);
+  const { openFind } = findInNote;
+  const openFindInNote = useCallback(
+    () => openFind(getFindSeedText(editor)),
+    [editor, openFind],
+  );
   useBlockNoteFloatingMenuGuard();
   const codeBlockToolTargets = useCodeBlockToolTargets();
 
@@ -2069,6 +2078,7 @@ function StickyEditor({
 
   useChromeShortcuts({
     adjustEditorFontScale,
+    openFindInNote,
     appThemeMode,
     effectiveLayoutMode,
     exportNote,
@@ -3367,6 +3377,20 @@ function StickyEditor({
           }}
           onMouseDown={focusLastBlockFromEmptySurface}
         >
+          {findInNote.isOpen && (
+            <div className="find-bar-dock">
+              <FindBar
+                query={findInNote.query}
+                current={findInNote.current}
+                total={findInNote.total}
+                focusRequest={findInNote.focusRequest}
+                isFindShortcut={(event) => matchesEnabledKeyboardShortcut(event, "findInNote")}
+                onQueryChange={findInNote.updateQuery}
+                onStep={findInNote.step}
+                onClose={findInNote.closeFind}
+              />
+            </div>
+          )}
           {editorFontSizeToast && (
             <div
               className="editor-font-size-toast"

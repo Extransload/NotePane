@@ -24,6 +24,7 @@ export function useChromeShortcuts({
   onAppThemeModeChanged,
   onAttachNote,
   onEditorWidthChange,
+  openFindInNote,
   requestNewSession,
   saveVersionNow,
   setExportFormatMenu,
@@ -57,6 +58,12 @@ export function useChromeShortcuts({
         event.target instanceof Element &&
         event.target.closest("input, textarea, select, .preferences-window")
       ) {
+        return;
+      }
+
+      if (matchesEnabledKeyboardShortcut(event, "findInNote")) {
+        event.preventDefault();
+        openFindInNote();
         return;
       }
 
@@ -162,6 +169,7 @@ export function useChromeShortcuts({
     requestNewSession,
     toggleTableOfContents,
     onEditorWidthChange,
+    openFindInNote,
     toggleLayoutMode,
     saveVersionNow,
     showExportToast,

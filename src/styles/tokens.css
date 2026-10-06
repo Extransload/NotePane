@@ -296,3 +296,13 @@ body.theme-dark,
   --bn-colors-shadow: rgb(0 0 0 / 0.48);
   --bn-colors-side-menu: #9b9b98;
 }
+
+.sticky-shell {
+  --notepane-find-match-bg: rgba(250, 204, 21, 0.32);
+  --notepane-find-current-bg: rgba(249, 115, 22, 0.55);
+}
+
+.sticky-shell.theme-dark {
+  --notepane-find-match-bg: rgba(250, 204, 21, 0.22);
+  --notepane-find-current-bg: rgba(251, 146, 60, 0.5);
+}
