@@ -775,6 +775,44 @@ test("Electron reveal ignores a note that no longer exists", async () => {
   }
 });
 
+test("Electron note search sees text another sticky window just saved", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", markdown: "second body", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    const firstStickyPage = await getStickyPageByNoteId(electronApp, "first-note");
+    const secondStickyPage = await getStickyPageByNoteId(electronApp, "second-note");
+
+    // The title is set by hand, so this edit does not broadcast a title change.
+    await secondStickyPage.bringToFront();
+    const secondEditor = secondStickyPage.getByTestId("sticky-editor-surface");
+    await secondEditor.getByText("second body").click();
+    await secondStickyPage.keyboard.press("End");
+    await secondStickyPage.keyboard.insertText(" freshword");
+    await expect.poll(async () => {
+      const note = await firstStickyPage.evaluate(() => window.blocknoteSticky.getNote("second-note"));
+      return note?.markdown ?? "";
+    }).toContain("freshword");
+
+    await firstStickyPage.bringToFront();
+    await firstStickyPage.getByTestId("sticky-editor-surface").getByText("first body").click();
+    await firstStickyPage.keyboard.press(modifierShortcut("P"));
+    const palette = firstStickyPage.getByRole("dialog", { name: "Search notes" });
+    await palette.getByRole("textbox", { name: "Search notes" }).fill("freshword");
+
+    await expect(palette.getByRole("option")).toHaveCount(1);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron menu actions respect tabs/sticky modes and toggle always-on-top", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);

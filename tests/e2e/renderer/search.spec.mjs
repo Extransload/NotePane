@@ -196,3 +196,36 @@ test("closes the note search palette with Escape and returns to the editor", asy
   await expect(palette(page)).toHaveCount(0);
   await expectEditorToBeFocused(page);
 });
+
+test("uses a blank palette query as a plain note switch without opening find", async ({ page }) => {
+  await typeParagraphs(page, ["switch only"]);
+  await page.keyboard.press(modifierShortcut("P"));
+  await palette(page).getByRole("textbox", { name: "Search notes" }).press("Enter");
+
+  await expect(palette(page)).toHaveCount(0);
+  await expect(findBar(page)).toHaveCount(0);
+  await expectEditorToBeFocused(page);
+});
+
+test("hands the trimmed palette query to find", async ({ page }) => {
+  await typeParagraphs(page, ["trim target"]);
+  await page.keyboard.press(modifierShortcut("P"));
+  const input = palette(page).getByRole("textbox", { name: "Search notes" });
+  await input.fill("target ");
+  await input.press("Enter");
+
+  await expect(findBar(page).getByRole("textbox", { name: "Find in note" })).toHaveValue("target");
+  await expect(findBar(page)).toContainText("1 / 1");
+});
+
+test("closes find with Escape after clicking the step buttons", async ({ page }) => {
+  await typeParagraphs(page, ["needle needle"]);
+  await page.keyboard.press(modifierShortcut("F"));
+  await findBar(page).getByRole("textbox", { name: "Find in note" }).fill("needle");
+  await findBar(page).getByRole("button", { name: "Next match" }).click();
+  await expect(findBar(page)).toContainText("2 / 2");
+
+  await page.keyboard.press("Escape");
+
+  await expect(findBar(page)).toHaveCount(0);
+});
