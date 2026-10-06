@@ -102,6 +102,8 @@ import {
   useBlockNoteFloatingMenuGuard,
 } from "./editor/floatingMenus.js";
 import {
+  canCopyImageToClipboard,
+  copyImageToClipboard,
   downloadInBrowser,
   ensurePngName,
   getStoredImageCrop,
@@ -2295,6 +2297,21 @@ function StickyEditor({
     downloadInBrowser(url, defaultName);
   }, [activeImageBlockId, editor]);
 
+  const copyActiveImage = useCallback(async (selectedBlock) => {
+    const url = findBlockById(editor.document, selectedBlock?.id ?? activeImageBlockId)
+      ?.props?.url;
+    if (!url) {
+      return;
+    }
+
+    try {
+      await copyImageToClipboard(url);
+      showExportToast("Image copied", "success");
+    } catch (error) {
+      showExportToast(error.message || "Image copy failed.", "error");
+    }
+  }, [activeImageBlockId, editor, showExportToast]);
+
   const openCropDialog = useCallback(() => {
     const block = findBlockById(editor.document, activeImageBlockId);
     const url = block?.props?.originalUrl || block?.props?.url;
@@ -3511,6 +3528,7 @@ function StickyEditor({
               onColorUsed={onEditorColorUsed}
               onCropImage={openCropDialog}
               onDownloadImage={downloadActiveImage}
+              onCopyImage={canCopyImageToClipboard() ? copyActiveImage : undefined}
               activeImageBlockId={activeImageBlockId}
               portalElement={document.body}
               hidden={isTableCellSelectionDismissed}

@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { formatKeyboardShortcut } from "@blocknote/core";
 import { TableHandlesExtension } from "@blocknote/core/extensions";
-import { Combine, Crop, Download, SplitSquareHorizontal } from "lucide-react";
+import { Combine, Copy, Crop, Download, SplitSquareHorizontal } from "lucide-react";
 import {
   BasicTextStyleButton,
   blockTypeSelectItems as getBlockTypeSelectItems,
@@ -79,6 +79,7 @@ export function RecentColorFormattingToolbarController({
   onColorUsed,
   onCropImage,
   onDownloadImage,
+  onCopyImage,
   activeImageBlockId,
   portalElement,
   hidden = false,
@@ -91,10 +92,18 @@ export function RecentColorFormattingToolbarController({
         onColorUsed={onColorUsed}
         onCropImage={onCropImage}
         onDownloadImage={onDownloadImage}
+        onCopyImage={onCopyImage}
         activeImageBlockId={activeImageBlockId}
       />
     ),
-    [activeImageBlockId, onColorUsed, onCropImage, onDownloadImage, recentColors],
+    [
+      activeImageBlockId,
+      onColorUsed,
+      onCopyImage,
+      onCropImage,
+      onDownloadImage,
+      recentColors,
+    ],
   );
 
   if (hidden) {
@@ -116,6 +125,7 @@ function RecentColorFormattingToolbar({
   onColorUsed,
   onCropImage,
   onDownloadImage,
+  onCopyImage,
   activeImageBlockId,
 }) {
   const Components = useComponentsContext();
@@ -212,6 +222,15 @@ function RecentColorFormattingToolbar({
             mainTooltip={`Download ${downloadableBlock.type}`}
             icon={<Download />}
             onClick={() => onDownloadImage(downloadableBlock)}
+          />
+        )}
+        {imageBlock?.type === "image" && onCopyImage && (
+          <Components.FormattingToolbar.Button
+            className="bn-button notepane-image-copy-button"
+            label="Copy image"
+            mainTooltip="Copy image"
+            icon={<Copy />}
+            onClick={() => onCopyImage(imageBlock)}
           />
         )}
         {imageBlock?.type === "image" && onCropImage && (

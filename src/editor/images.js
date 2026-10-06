@@ -228,6 +228,49 @@ export async function storeDataUrlAsAsset(dataUrl) {
   }
 }
 
+export function canCopyImageToClipboard() {
+  return Boolean(
+    electronApi?.copyImage ||
+      (typeof navigator !== "undefined" &&
+        typeof navigator.clipboard?.write === "function" &&
+        typeof ClipboardItem !== "undefined"),
+  );
+}
+
+// Asset URLs only resolve inside NotePane, so copying an image hands other apps
+// the pixels instead of the URL. Electron writes a native image; the browser
+// preview uses the async clipboard, which only accepts PNG.
+export async function copyImageToClipboard(url) {
+  if (electronApi?.copyImage) {
+    await electronApi.copyImage({ url });
+    return;
+  }
+
+  if (!canCopyImageToClipboard()) {
+    throw new Error("Image copy is not available here.");
+  }
+
+  const response = await fetch(url);
+  const blob = await response.blob();
+  const pngBlob = blob.type === "image/png" ? blob : await convertImageBlobToPng(blob);
+  await navigator.clipboard.write([new ClipboardItem({ "image/png": pngBlob })]);
+}
+
+async function convertImageBlobToPng(blob) {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d").drawImage(bitmap, 0, 0);
+  bitmap.close?.();
+  return await new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (pngBlob) => (pngBlob ? resolve(pngBlob) : reject(new Error("Image could not be copied."))),
+      "image/png",
+    );
+  });
+}
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

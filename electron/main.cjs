@@ -8,7 +8,9 @@ const {
   app,
   BrowserWindow,
   Menu,
+  clipboard,
   ipcMain,
+  nativeImage,
   shell,
   dialog,
   protocol,
@@ -1566,6 +1568,16 @@ function installIpcHandlers() {
         ? [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }]
         : [{ name: "All files", extensions: ["*"] }],
     });
+  });
+
+  ipcMain.handle("assets:copy-image", async (_event, payload) => {
+    const asset = await readAssetFromUrl(payload?.url);
+    const image = nativeImage.createFromBuffer(asset.buffer);
+    if (image.isEmpty()) {
+      throw new Error("Image could not be copied.");
+    }
+    clipboard.writeImage(image);
+    return true;
   });
 
   ipcMain.handle("fonts:list", async () => {

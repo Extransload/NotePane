@@ -187,3 +187,24 @@ test("crops the clicked image when two image blocks share one source", async ({ 
   await expect(imageInBlock(blockIds[1])).not.toHaveAttribute("src", imageSource);
   await expect(imageInBlock(blockIds[0])).toHaveAttribute("src", imageSource);
 });
+
+test("copies the selected image to the clipboard as PNG data", async ({ context, page }) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await loadTemplatePreview(page);
+  await page.locator("img.bn-visual-media").first().click();
+
+  await page.locator(".notepane-formatting-toolbar:visible")
+    .getByRole("button", { name: "Copy image", exact: true })
+    .click();
+
+  await expect(page.getByRole("status").filter({ hasText: "Image copied" })).toBeVisible();
+  const copiedImage = await page.evaluate(async () => {
+    const [item] = await navigator.clipboard.read();
+    const blob = await item.getType("image/png");
+    const bitmap = await createImageBitmap(blob);
+    return { types: item.types, width: bitmap.width, height: bitmap.height };
+  });
+  expect(copiedImage.types).toContain("image/png");
+  expect(copiedImage.width).toBeGreaterThan(0);
+  expect(copiedImage.height).toBeGreaterThan(0);
+});

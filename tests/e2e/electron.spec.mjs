@@ -887,6 +887,42 @@ test("Electron stores pasted images as asset files and keeps exports self-contai
   }
 });
 
+test("Electron copies an asset image to the system clipboard as image data", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    await clickLastEmptyParagraph(page);
+    await page.evaluate((base64) => {
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      const clipboardData = new DataTransfer();
+      clipboardData.items.add(new File([bytes], "dot.png", { type: "image/png" }));
+      document.querySelector(".bn-editor").dispatchEvent(
+        new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData }),
+      );
+    }, TINY_PNG_BASE64);
+    await expect.poll(() => readEditorImage(page)).toEqual({
+      src: expect.stringMatching(/^notepane-asset:\/\/local\/[0-9a-f]{64}\.png$/),
+      loaded: true,
+    });
+
+    await electronApp.evaluate(({ clipboard }) => clipboard.clear());
+    await page.locator(".bn-editor img.bn-visual-media").first().click();
+    await page.locator(".notepane-formatting-toolbar:visible")
+      .getByRole("button", { name: "Copy image", exact: true })
+      .click();
+
+    await expect(page.getByRole("status").filter({ hasText: "Image copied" })).toBeVisible();
+    await expect.poll(() => electronApp.evaluate(
+      ({ clipboard }) => clipboard.readImage().getSize(),
+    )).toEqual({ width: 1, height: 1 });
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron moves an inline image from an older notes file into an asset", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [
