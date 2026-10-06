@@ -28,6 +28,13 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
     ipcRenderer.invoke("notes:update-appearance", payload),
   detachNote: (noteId) => ipcRenderer.invoke("notes:detach", noteId),
   attachNote: (noteId) => ipcRenderer.invoke("notes:attach", noteId),
+  revealNote: (payload) => ipcRenderer.invoke("notes:reveal", payload),
+  takePendingFind: () => ipcRenderer.invoke("find:take-pending"),
+  onFindOpenRequested: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on("find:open", listener);
+    return () => ipcRenderer.removeListener("find:open", listener);
+  },
   exportNote: (payload) => ipcRenderer.invoke("export:note", payload),
   exportBackup: () => ipcRenderer.invoke("backup:export"),
   importBackup: () => ipcRenderer.invoke("backup:import"),

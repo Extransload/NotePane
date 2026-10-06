@@ -485,6 +485,22 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!electronApi?.takePendingFind) {
+      return undefined;
+    }
+    // Pull on startup for a window created by a reveal, and on `find:open` for a
+    // window that was already loaded. Whichever comes first takes the query.
+    const takePendingFind = async () => {
+      const request = await electronApi.takePendingFind();
+      if (request) {
+        setPendingFind(request);
+      }
+    };
+    void takePendingFind();
+    return electronApi.onFindOpenRequested?.(() => void takePendingFind());
+  }, []);
+
+  useEffect(() => {
     return electronApi?.onEditorPreferencesChanged?.((nextEditorPreferences) => {
       setEditorPreferences(normalizeEditorPreferences(nextEditorPreferences));
     });

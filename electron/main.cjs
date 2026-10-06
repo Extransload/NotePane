@@ -57,6 +57,9 @@ let store;
 let quitting = false;
 let backupOperationInProgress = false;
 const manuallyClosedStickyNoteIds = new Set();
+// Find queries waiting for a window to pick them up. A window that is still
+// loading cannot receive `find:open` yet, so it pulls its query on startup.
+const pendingFindQueries = new Map();
 let installedFontsPromise = null;
 
 if (isWsl()) {
@@ -1284,6 +1287,41 @@ function installIpcHandlers() {
       notes: store.listNotes(),
       activeNote: note,
     };
+  });
+
+  ipcMain.handle("notes:reveal", (_event, payload) => {
+    const note = typeof payload?.noteId === "string" ? store.getNote(payload.noteId) : null;
+    if (!note) {
+      return null;
+    }
+
+    let window;
+    if (store.getLayoutMode() === "sticky" || note.detached) {
+      manuallyClosedStickyNoteIds.delete(note.id);
+      window = ensureWindowForNote(note);
+    } else {
+      window = ensureTabsWindow(note.id);
+    }
+    if (!window || window.isDestroyed()) {
+      return null;
+    }
+
+    pendingFindQueries.set(note.id, typeof payload?.query === "string" ? payload.query : "");
+    if (!window.webContents.isLoading()) {
+      window.webContents.send("find:open");
+    }
+    presentWindow(window);
+    return note;
+  });
+
+  ipcMain.handle("find:take-pending", (event) => {
+    const noteId = getNoteIdForWebContents(event.sender);
+    if (!noteId || !pendingFindQueries.has(noteId)) {
+      return null;
+    }
+    const query = pendingFindQueries.get(noteId);
+    pendingFindQueries.delete(noteId);
+    return { noteId, query };
   });
 
   ipcMain.handle("notes:save-content", (event, payload) => {

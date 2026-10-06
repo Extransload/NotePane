@@ -708,6 +708,73 @@ test("Electron note search switches tabs and opens find on the match", async () 
   }
 });
 
+test("Electron note search reveals a sticky window, even one closed by hand", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", markdown: "second has the needle", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+  const countWindows = () => electronApp.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().length);
+  const searchFrom = async (page, query) => {
+    await page.bringToFront();
+    await page.getByTestId("sticky-editor-surface").getByText("first body").click();
+    await page.keyboard.press(modifierShortcut("P"));
+    const input = page.getByRole("dialog", { name: "Search notes" })
+      .getByRole("textbox", { name: "Search notes" });
+    await input.fill(query);
+    await input.press("Enter");
+  };
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(countWindows).toBe(2);
+    const firstStickyPage = await getStickyPageByNoteId(electronApp, "first-note");
+
+    await searchFrom(firstStickyPage, "needle");
+    let secondStickyPage = await getStickyPageByNoteId(electronApp, "second-note");
+    let findBar = secondStickyPage.getByRole("search", { name: "Find in note" });
+    await expect(findBar.getByRole("textbox", { name: "Find in note" })).toHaveValue("needle");
+    await expect(findBar).toContainText("1 / 1");
+
+    await secondStickyPage.evaluate(() => window.blocknoteSticky.closeCurrentWindow());
+    await expect.poll(countWindows).toBe(1);
+
+    await searchFrom(firstStickyPage, "needle");
+    await expect.poll(countWindows).toBe(2);
+    secondStickyPage = await getStickyPageByNoteId(electronApp, "second-note");
+    findBar = secondStickyPage.getByRole("search", { name: "Find in note" });
+    await expect(findBar.getByRole("textbox", { name: "Find in note" })).toHaveValue("needle");
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Electron reveal ignores a note that no longer exists", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
+
+    const revealed = await page.evaluate(() =>
+      window.blocknoteSticky.revealNote({ noteId: "missing-note", query: "x" }));
+
+    expect(revealed).toBeNull();
+    expect(await electronApp.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().length)).toBe(1);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron menu actions respect tabs/sticky modes and toggle always-on-top", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
