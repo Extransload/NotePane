@@ -49,7 +49,14 @@ export function FindBar({
       className="find-bar"
       role="search"
       aria-label="Find in note"
-      onMouseDown={(event) => event.stopPropagation()}
+      onMouseDown={(event) => {
+        event.stopPropagation();
+        // Keep focus in the input when a button is clicked, so Enter, Shift+Enter
+        // and Escape keep working afterwards.
+        if (event.target instanceof Element && event.target.closest("button")) {
+          event.preventDefault();
+        }
+      }}
     >
       <input
         ref={inputRef}
