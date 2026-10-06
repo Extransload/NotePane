@@ -104,7 +104,11 @@ export function handleToggleEnter(editor, event) {
 
 export function handleToggleBackspace(editor, event) {
   const selection = editor?.prosemirrorView?.state.selection;
+  // Backspace during an IME composition edits the uncommitted syllable; the
+  // editor state can still look empty then, so it must not strip the toggle.
   if (
+    event.isComposing ||
+    event.keyCode === 229 ||
     event.key !== "Backspace" ||
     event.shiftKey ||
     event.metaKey ||

@@ -659,3 +659,34 @@ test("toggles checklist and toggle heading without shell interference", async ({
   await expect(page.getByText("Use this template when the workspace is clear"))
     .toBeVisible();
 });
+
+test("ignores Backspace during a Korean IME composition in an empty heading toggle", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("#");
+  await page.keyboard.press("Space");
+  await page.keyboard.type(">");
+  await page.keyboard.press("Space");
+
+  const headingToggle = page.locator(
+    "[data-content-type='heading'][data-is-toggleable='true']:has(h1)",
+  );
+  await expect(headingToggle).toHaveCount(1);
+
+  await page.locator(".bn-editor").evaluate((editor) => {
+    editor.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    editor.dispatchEvent(new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      isComposing: true,
+      key: "Backspace",
+    }));
+    editor.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
+  });
+  await expect(headingToggle).toHaveCount(1);
+
+  await page.keyboard.press("Backspace");
+  await expect(headingToggle).toHaveCount(0);
+  await expect(page.locator(
+    "[data-content-type='heading']:has(h1):not([data-is-toggleable='true'])",
+  )).toHaveCount(1);
+});
