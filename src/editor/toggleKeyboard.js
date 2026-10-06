@@ -41,7 +41,11 @@ export function handleToggleSpace(editor, event) {
 
 export function handleToggleEnter(editor, event) {
   const selection = editor?.prosemirrorView?.state.selection;
+  // Enter that commits an IME composition (Korean, Japanese, ...) belongs to
+  // the IME; acting on it would add a child before the syllable is committed.
   if (
+    event.isComposing ||
+    event.keyCode === 229 ||
     event.key !== "Enter" ||
     event.shiftKey ||
     event.metaKey ||

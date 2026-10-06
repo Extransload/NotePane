@@ -150,6 +150,35 @@ test("uses identical Enter behavior for ordinary and heading toggles", async ({ 
   }
 });
 
+test("ignores Enter that commits a Korean IME composition in a toggle title", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type(">");
+  await page.keyboard.press("Space");
+  await page.keyboard.insertText("한글 토글");
+  const blocks = page.locator(".bn-editor .bn-block-outer");
+  const blockCount = await blocks.count();
+
+  await page.locator(".bn-editor").evaluate((editor) => {
+    editor.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    editor.dispatchEvent(new KeyboardEvent("keydown", {
+      bubbles: true,
+      cancelable: true,
+      isComposing: true,
+      key: "Enter",
+    }));
+    editor.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
+  });
+  await expect(blocks).toHaveCount(blockCount);
+
+  await page.keyboard.press("Enter");
+  await expect(blocks).toHaveCount(blockCount + 1);
+  await page.keyboard.type("child after composition");
+  const toggle = page.locator("[data-content-type='toggleListItem']")
+    .filter({ hasText: "한글 토글" });
+  await expect(toggle.locator("xpath=ancestor::*[contains(@class,'bn-block-outer')][1]"))
+    .toContainText("child after composition");
+});
+
 test("removes empty ordinary and heading toggles without losing heading format", async ({ page }) => {
   for (const { shortcut, selector, typedText, resultSelector } of [
     {
