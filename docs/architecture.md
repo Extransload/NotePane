@@ -152,6 +152,8 @@ The renderer uses:
 - PDF export uses Electron `printToPDF` with print CSS that hides app chrome.
 - Both export paths temporarily remove app chrome/background styling so the exported content has no NotePane shell background.
 - Image download is handled in Electron main so `data:`, `notepane-asset:`, `file:`, and `http(s):` image URLs can be saved through the native save dialog.
+- Copy image puts the image pixels, not its URL, on the clipboard: Electron reads the URL through the same reader as download (`assets:copy-image`) and writes a native image; the browser preview writes a PNG `ClipboardItem` and hides the action when the async clipboard is unavailable.
+- Image toolbar actions resolve the clicked image's block from its rendered `.bn-block-outer[data-id]`, because identical images share one asset URL.
 - Image crop is renderer-side canvas processing; the cropped PNG is stored as an asset and replaces the block URL.
 
 ## Theme mode and Preferences panel
