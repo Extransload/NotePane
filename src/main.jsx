@@ -235,6 +235,8 @@ import { useEditorSurfaceShortcuts } from "./hooks/useEditorSurfaceShortcuts.js"
 import { useFindInNote } from "./hooks/useFindInNote.js";
 import { FindInNote, getFindSeedText } from "./editor/findInNote.js";
 import { FindBar } from "./ui/FindBar.jsx";
+import { blocksToPlainText, createNoteTextReader, searchNotes } from "./model/search.js";
+import { SearchPalette } from "./ui/SearchPalette.jsx";
 import {
   useChromeShortcuts,
   useSessionNumberShortcuts,
@@ -262,6 +264,7 @@ function App() {
   const [note, setNote] = useState(null);
   const [notes, setNotes] = useState([]);
   const [trashedNotes, setTrashedNotes] = useState([]);
+  const [pendingFind, setPendingFind] = useState(null);
   const [appTheme, setAppTheme] = useState(DEFAULT_APP_THEME);
   const [layoutMode, setLayoutMode] = useState(DEFAULT_LAYOUT_MODE);
   const [installedFontFamilies, setInstalledFontFamilies] = useState([]);
@@ -864,6 +867,9 @@ function App() {
         recentEditorColors={recentEditorColors}
         onEditorColorUsed={rememberRecentEditorColor}
         layoutTransition={layoutTransition}
+        pendingFind={pendingFind}
+        onFindRequested={setPendingFind}
+        onPendingFindHandled={() => setPendingFind(null)}
       />
       {sessionUndoToast && (
         <StickyToast
@@ -914,6 +920,9 @@ function StickyEditor({
   recentEditorColors,
   onEditorColorUsed,
   layoutTransition,
+  pendingFind,
+  onFindRequested,
+  onPendingFindHandled,
 }) {
   const parsedStoredBlocks = useMemo(
     () => parseBlocksJSON(note.blocksJSON),
@@ -972,6 +981,29 @@ function StickyEditor({
     () => openFind(getFindSeedText(editor)),
     [editor, openFind],
   );
+  const [searchPaletteQuery, setSearchPaletteQuery] = useState(null);
+  const readNoteText = useMemo(() => createNoteTextReader(), []);
+  const searchResults = useMemo(() => {
+    if (searchPaletteQuery === null) {
+      return [];
+    }
+    // The current note may have edits still waiting on the save debounce, so
+    // it is read from the live editor instead of the stored copy.
+    const entries = notes.map((candidate) => ({
+      note: candidate,
+      title: getNoteDisplayTitle(candidate),
+      body: candidate.id === note.id
+        ? blocksToPlainText(editor.document)
+        : readNoteText(candidate),
+    }));
+    return searchNotes(entries, searchPaletteQuery);
+  }, [editor, note.id, notes, readNoteText, searchPaletteQuery]);
+
+  const openSearchPalette = useCallback(() => setSearchPaletteQuery(""), []);
+  const closeSearchPalette = useCallback(() => {
+    setSearchPaletteQuery(null);
+    editor.focus();
+  }, [editor]);
   useBlockNoteFloatingMenuGuard();
   const codeBlockToolTargets = useCodeBlockToolTargets();
 
@@ -2079,6 +2111,7 @@ function StickyEditor({
   useChromeShortcuts({
     adjustEditorFontScale,
     openFindInNote,
+    openSearchPalette,
     appThemeMode,
     effectiveLayoutMode,
     exportNote,
@@ -2330,6 +2363,39 @@ function StickyEditor({
     },
     [note.id, onSelectNote, saveNow],
   );
+
+  const chooseSearchResult = useCallback(async (result) => {
+    const query = searchPaletteQuery ?? "";
+    setSearchPaletteQuery(null);
+    const targetId = result.note.id;
+    if (targetId === note.id) {
+      openFind(query);
+      return;
+    }
+    const isTabsWindow = effectiveLayoutMode === "tabs" && !note.detached;
+    if (isTabsWindow && !result.note.detached) {
+      onFindRequested({ noteId: targetId, query });
+      await selectSidebarNote(targetId);
+      return;
+    }
+    await electronApi?.revealNote?.({ noteId: targetId, query });
+  }, [
+    effectiveLayoutMode,
+    note.detached,
+    note.id,
+    onFindRequested,
+    openFind,
+    searchPaletteQuery,
+    selectSidebarNote,
+  ]);
+
+  useEffect(() => {
+    if (pendingFind?.noteId !== note.id) {
+      return;
+    }
+    onPendingFindHandled();
+    openFind(pendingFind.query);
+  }, [note.id, onPendingFindHandled, openFind, pendingFind]);
 
   const sessionColorPanelNote = useMemo(
     () =>
@@ -3586,6 +3652,15 @@ function StickyEditor({
         />
       )}
       {exportToast && <StickyToast toast={exportToast} />}
+      {searchPaletteQuery !== null && (
+        <SearchPalette
+          query={searchPaletteQuery}
+          results={searchResults}
+          onQueryChange={setSearchPaletteQuery}
+          onChoose={(result) => void chooseSearchResult(result)}
+          onClose={closeSearchPalette}
+        />
+      )}
       <AdaptiveTooltipPortal />
       {cropState && (
         <CropDialog

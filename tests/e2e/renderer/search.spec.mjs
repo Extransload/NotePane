@@ -162,3 +162,37 @@ test("leaves undo history to the last real edit", async ({ page }) => {
 
   await expect(editorText(page, "undo me later")).toHaveCount(0);
 });
+
+function palette(page) {
+  return page.getByRole("dialog", { name: "Search notes" });
+}
+
+test("opens the note search palette and lands on a match in the current note", async ({ page }) => {
+  await typeParagraphs(page, ["palette target text", "second palette line"]);
+
+  await page.keyboard.press(modifierShortcut("P"));
+  const input = palette(page).getByRole("textbox", { name: "Search notes" });
+  await expect(input).toBeFocused();
+  await expect(palette(page).getByRole("option")).toHaveCount(1);
+
+  await input.fill("zzz-not-there");
+  await expect(palette(page)).toContainText("No matching notes");
+
+  await input.fill("palette");
+  await expect(palette(page).getByRole("option")).toHaveCount(1);
+  await input.press("Enter");
+
+  await expect(palette(page)).toHaveCount(0);
+  await expect(findBar(page).getByRole("textbox", { name: "Find in note" }))
+    .toHaveValue("palette");
+  await expect(findBar(page)).toContainText("/ 2");
+});
+
+test("closes the note search palette with Escape and returns to the editor", async ({ page }) => {
+  await typeParagraphs(page, ["escape check"]);
+  await page.keyboard.press(modifierShortcut("P"));
+  await palette(page).getByRole("textbox", { name: "Search notes" }).press("Escape");
+
+  await expect(palette(page)).toHaveCount(0);
+  await expectEditorToBeFocused(page);
+});

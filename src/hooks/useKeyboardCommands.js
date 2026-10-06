@@ -25,6 +25,7 @@ export function useChromeShortcuts({
   onAttachNote,
   onEditorWidthChange,
   openFindInNote,
+  openSearchPalette,
   requestNewSession,
   saveVersionNow,
   setExportFormatMenu,
@@ -64,6 +65,12 @@ export function useChromeShortcuts({
       if (matchesEnabledKeyboardShortcut(event, "findInNote")) {
         event.preventDefault();
         openFindInNote();
+        return;
+      }
+
+      if (matchesEnabledKeyboardShortcut(event, "searchNotes")) {
+        event.preventDefault();
+        openSearchPalette();
         return;
       }
 
@@ -170,6 +177,7 @@ export function useChromeShortcuts({
     toggleTableOfContents,
     onEditorWidthChange,
     openFindInNote,
+    openSearchPalette,
     toggleLayoutMode,
     saveVersionNow,
     showExportToast,

@@ -82,3 +82,99 @@
 .bn-editor .notepane-find-match.is-current {
   background: var(--notepane-find-current-bg);
 }
+
+.search-palette-backdrop {
+  position: fixed;
+  z-index: 60;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  padding-top: min(14vh, 120px);
+  background: color-mix(in srgb, var(--sticky-text-color) 8%, transparent);
+}
+
+.search-palette {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(70vh, 520px);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--sticky-border-color) 48%, transparent);
+  border-radius: 12px;
+  background: var(--sticky-panel-bg);
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--sticky-text-color) 18%, transparent);
+  color: var(--sticky-panel-text);
+  font: 500 13px/1.35 var(--notepane-ui-font);
+}
+
+.search-palette-input {
+  height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--sticky-border-color) 36%, transparent);
+  background: transparent;
+  color: inherit;
+  font: 500 15px/1 var(--notepane-ui-font);
+  outline: none;
+}
+
+.search-palette-results {
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.search-result {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 3px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.search-result.is-selected {
+  background: color-mix(in srgb, var(--sticky-text-color) 8%, transparent);
+}
+
+.search-result-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.search-result-title {
+  overflow: hidden;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result-count {
+  opacity: 0.6;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.search-result-snippet {
+  grid-column: 2 / 4;
+  overflow: hidden;
+  opacity: 0.72;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-result mark {
+  border-radius: 2px;
+  background: var(--notepane-find-match-bg);
+  color: inherit;
+}
+
+.search-palette-empty {
+  padding: 18px 16px;
+  opacity: 0.65;
+}

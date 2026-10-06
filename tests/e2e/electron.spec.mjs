@@ -678,6 +678,36 @@ test("Electron opens only web and mail links externally and never navigates the 
   }
 });
 
+test("Electron note search switches tabs and opens find on the match", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", markdown: "second has the needle", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const editor = page.getByTestId("sticky-editor-surface");
+    await expect(editor).toContainText("first body");
+
+    await editor.getByText("first body").click();
+    await page.keyboard.press(modifierShortcut("P"));
+    const palette = page.getByRole("dialog", { name: "Search notes" });
+    await palette.getByRole("textbox", { name: "Search notes" }).fill("needle");
+    await expect(palette.getByRole("option")).toHaveCount(1);
+    await palette.getByRole("textbox", { name: "Search notes" }).press("Enter");
+
+    await expect(editor).toContainText("second has the needle");
+    await expect.poll(() => getCurrentPageNoteId(page)).toBe("second-note");
+    const findBar = page.getByRole("search", { name: "Find in note" });
+    await expect(findBar.getByRole("textbox", { name: "Find in note" })).toHaveValue("needle");
+    await expect(findBar).toContainText("1 / 1");
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron menu actions respect tabs/sticky modes and toggle always-on-top", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
