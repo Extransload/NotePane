@@ -122,13 +122,18 @@ test("reuses cached note text until the note content changes", async () => {
 });
 
 // A generous budget: 2 MB is roughly 100 notes of 20 KB. Grapheme
-// segmentation of every character took seconds here; plain text must not.
+// segmentation of every character took about 750 ms here; the fast path takes
+// about 10 ms. The fastest of three runs is compared, so a garbage collection
+// pause or a busy test runner cannot fail the test on its own.
 test("searches about 2 MB of plain text within an interactive budget", async () => {
   const { findMatchRanges } = await loadSearch();
   const text = "Lorem ipsum dolor sit amet, 한글 문장도 섞어 둔다. ".repeat(48_000);
-  const started = performance.now();
-  const ranges = findMatchRanges(text, "AMET");
-  const elapsed = performance.now() - started;
-  assert.equal(ranges.length, 48_000);
-  assert.ok(elapsed < 400, `took ${Math.round(elapsed)} ms`);
+  let fastest = Infinity;
+  for (let run = 0; run < 3; run += 1) {
+    const started = performance.now();
+    const ranges = findMatchRanges(text, "AMET");
+    fastest = Math.min(fastest, performance.now() - started);
+    assert.equal(ranges.length, 48_000);
+  }
+  assert.ok(fastest < 400, `fastest run took ${Math.round(fastest)} ms`);
 });
