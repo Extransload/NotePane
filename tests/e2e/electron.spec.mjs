@@ -678,6 +678,51 @@ test("Electron opens only web and mail links externally and never navigates the 
   }
 });
 
+test("Electron note search palette keeps a selection when the stored list is shorter", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", markdown: "second body", createdAt: 2, updatedAt: 2 },
+    { id: "third-note", title: "Third note", markdown: "third body", createdAt: 3, updatedAt: 3 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const editor = page.getByTestId("sticky-editor-surface");
+    await expect(editor).toContainText("first body");
+    const firstNote = await page.evaluate(() => window.blocknoteSticky.getNote("first-note"));
+    // Hold the palette's stored-note request, then answer it with fewer notes
+    // than the window lists, as when another window trashed them meanwhile.
+    await electronApp.evaluate(({ ipcMain }, onlyNote) => {
+      globalThis.releaseNotesList = [];
+      ipcMain.removeHandler("notes:list");
+      ipcMain.handle("notes:list", () => new Promise((resolve) => {
+        globalThis.releaseNotesList.push(() => resolve([onlyNote]));
+      }));
+    }, firstNote);
+
+    await editor.getByText("first body").click();
+    await page.keyboard.press(modifierShortcut("P"));
+    const palette = page.getByRole("dialog", { name: "Search notes" });
+    const input = palette.getByRole("textbox", { name: "Search notes" });
+    await expect(palette.getByRole("option")).toHaveCount(3);
+    await input.press("ArrowUp");
+    await expect(palette.getByRole("option").nth(2)).toHaveAttribute("aria-selected", "true");
+
+    await expect.poll(() => electronApp.evaluate(() => globalThis.releaseNotesList.length))
+      .toBeGreaterThan(0);
+    await electronApp.evaluate(() => globalThis.releaseNotesList.forEach((release) => release()));
+    await expect(palette.getByRole("option")).toHaveCount(1);
+    await expect(palette.getByRole("option")).toHaveAttribute("aria-selected", "true");
+    await input.press("Enter");
+
+    await expect(palette).toHaveCount(0);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron note search switches tabs and opens find on the match", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [

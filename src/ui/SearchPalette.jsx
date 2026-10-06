@@ -32,11 +32,15 @@ export function SearchPalette({ query, results, onQueryChange, onChoose, onClose
     setSelectedIndex(0);
   }, [query]);
 
+  // Results can shrink while the palette is open, for example when the stored
+  // notes arrive, so the selection is clamped to the current list.
+  const activeIndex = Math.max(0, Math.min(selectedIndex, results.length - 1));
+
   const moveSelection = (delta) => {
     if (results.length === 0) {
       return;
     }
-    setSelectedIndex((index) => (index + delta + results.length) % results.length);
+    setSelectedIndex((activeIndex + delta + results.length) % results.length);
   };
 
   const handleKeyDown = (event) => {
@@ -50,7 +54,7 @@ export function SearchPalette({ query, results, onQueryChange, onChoose, onClose
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      const result = results[selectedIndex];
+      const result = results[activeIndex];
       if (result) {
         onChoose(result);
       }
@@ -63,7 +67,7 @@ export function SearchPalette({ query, results, onQueryChange, onChoose, onClose
     }
   };
 
-  const activeResult = results[selectedIndex];
+  const activeResult = results[activeIndex];
 
   return (
     <div
@@ -101,8 +105,8 @@ export function SearchPalette({ query, results, onQueryChange, onChoose, onClose
                 key={result.note.id}
                 id={`search-result-${result.note.id}`}
                 role="option"
-                aria-selected={index === selectedIndex}
-                className={index === selectedIndex ? "search-result is-selected" : "search-result"}
+                aria-selected={index === activeIndex}
+                className={index === activeIndex ? "search-result is-selected" : "search-result"}
                 onMouseEnter={() => setSelectedIndex(index)}
                 onMouseDown={(event) => {
                   event.preventDefault();
