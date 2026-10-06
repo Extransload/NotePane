@@ -11,6 +11,7 @@ const {
   ipcMain,
   shell,
   dialog,
+  protocol,
   screen,
 } = require("electron");
 const {
@@ -70,6 +71,21 @@ if (isWsl()) {
 if (userDataDirOverride) {
   app.setPath("userData", userDataDirOverride);
 }
+
+// Note media is served from content-addressed files. The scheme is standard
+// and CORS-enabled so <img>, <video> and a crop canvas can all use it.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "notepane-asset",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
 
 // Every process rewrites the whole notes.json from its own memory, so a second
 // process on the same user data would overwrite the first one's edits. The
@@ -1409,7 +1425,8 @@ function installIpcHandlers() {
       }
       return saveBuffer({
         window,
-        buffer: Buffer.from(payload.markdown, "utf8"),
+        // Assets are inlined so the exported file stays self-contained.
+        buffer: Buffer.from(store.assets.inlineAssetUrls(payload.markdown), "utf8"),
         defaultName: `${title}.md`,
         dialogTitle: "Export note as Markdown",
         filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
@@ -1519,6 +1536,17 @@ function installIpcHandlers() {
       automaticBackupPath,
     };
   }));
+
+  ipcMain.handle("assets:store", (_event, payload) => {
+    const bytes = payload?.bytes;
+    if (!(bytes instanceof Uint8Array)) {
+      throw new Error("Missing asset bytes.");
+    }
+    const mimeType = typeof payload?.mimeType === "string" && payload.mimeType
+      ? payload.mimeType
+      : "application/octet-stream";
+    return store.assets.put(Buffer.from(bytes), mimeType);
+  });
 
   ipcMain.handle("assets:save-url", async (event, payload) => {
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -1675,6 +1703,14 @@ async function readAssetFromUrl(url) {
 
   if (url.startsWith("data:")) {
     return readDataUrl(url);
+  }
+
+  if (url.startsWith("notepane-asset:")) {
+    const asset = store.assets.read(url);
+    if (!asset) {
+      throw new Error("Image file is missing.");
+    }
+    return asset;
   }
 
   if (url.startsWith("file:")) {
@@ -1969,6 +2005,21 @@ app.whenReady().then(() => {
   app.setName(APP_NAME);
 
   store = new StickyStore(app.getPath("userData"));
+  protocol.handle("notepane-asset", (request) => {
+    // AssetStore.read only accepts content-address names, so a request can
+    // never reach a file outside the assets directory.
+    const asset = store.assets.read(request.url);
+    if (!asset) {
+      return new Response(null, { status: 404 });
+    }
+    return new Response(asset.buffer, {
+      headers: {
+        "content-type": asset.mimeType,
+        "access-control-allow-origin": "*",
+        "cache-control": "max-age=31536000, immutable",
+      },
+    });
+  });
   installIpcHandlers();
   buildMenu();
 

@@ -14,6 +14,7 @@
 | --- | --- |
 | `electron/main.cjs` | app lifecycle, tab/sticky window orchestration, native menu, note/session create/activate/delete/detach/attach IPC, export/download IPC |
 | `electron/store.cjs` | local JSON persistence |
+| `electron/assetStore.cjs` | content-addressed media files under `userData/assets`, served as `notepane-asset://local/<sha256>.<ext>` |
 | `electron/preload.cjs` | safe renderer bridge |
 | `src/main.jsx` | composition only: the `App` shell and the `StickyEditor` component that wires everything below together |
 | `src/styles.css` | ordered `@import` list for `src/styles/` |
@@ -84,6 +85,14 @@ The renderer owns editor behavior. The desktop shell does not override BlockNote
 4. IPC sends the payload to Electron main.
 5. `StickyStore` writes `notes.json` atomically.
 
+Uploaded media never stays in note JSON. Upload and crop store bytes through the `assets:store` IPC and insert a
+`notepane-asset://local/<sha256>.<ext>` URL. Any base64 data URL that still reaches the store (pasted HTML, Markdown
+import, backup restore) is moved into an asset file on save. On startup the store migrates inline images left in
+`notes.json` and `note-history.json` (keeping `*.pre-assets-<timestamp>.json` copies), then deletes asset files that
+no note, trashed note or history version references. It skips both steps when a store file failed to load. Workspace
+backups and Markdown export inline the assets again, so those files stay self-contained. The browser preview has no
+asset store and keeps data URLs.
+
 Appearance changes use a separate IPC path and persist the note title, optional sidebar tab accent color/opacity, and
 per-note editor typography in the matching local JSON note record. Light/Dark mode is app-wide state and is persisted
 separately at the root of `notes.json` as `appTheme.mode`. Layout mode is also app-wide and is stored as root
@@ -142,8 +151,8 @@ The renderer uses:
 - PNG export captures the visible editor surface with Electron `capturePage`.
 - PDF export uses Electron `printToPDF` with print CSS that hides app chrome.
 - Both export paths temporarily remove app chrome/background styling so the exported content has no NotePane shell background.
-- Image download is handled in Electron main so `data:`, `file:`, and `http(s):` image URLs can be saved through the native save dialog.
-- Image crop is renderer-side canvas processing and updates the selected image block to a cropped PNG data URL.
+- Image download is handled in Electron main so `data:`, `notepane-asset:`, `file:`, and `http(s):` image URLs can be saved through the native save dialog.
+- Image crop is renderer-side canvas processing; the cropped PNG is stored as an asset and replaces the block URL.
 
 ## Theme mode and Preferences panel
 

@@ -108,6 +108,7 @@ import {
   imageFileName,
   preventFocusLoss,
   uploadFile,
+  storeDataUrlAsAsset,
 } from "./editor/images.js";
 import {
   EMPTY_BLOCKS,
@@ -2358,7 +2359,8 @@ function StickyEditor({
   );
 
   const applyCrop = useCallback(
-    (croppedDataUrl, crop) => {
+    async (croppedDataUrl, crop) => {
+      const croppedUrl = await storeDataUrlAsAsset(croppedDataUrl);
       const block = findBlockById(editor.document, cropState?.blockId);
       if (!block) {
         return;
@@ -2366,7 +2368,7 @@ function StickyEditor({
 
       editor.updateBlock(block, {
         props: {
-          url: croppedDataUrl,
+          url: croppedUrl,
           originalUrl: block.props.originalUrl || block.props.url,
           cropX: crop.x,
           cropY: crop.y,

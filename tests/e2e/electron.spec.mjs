@@ -813,6 +813,111 @@ test("Electron note search sees text another sticky window just saved", async ()
   }
 });
 
+// A valid 1x1 PNG, small enough to inline in a test.
+const TINY_PNG_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+
+async function readEditorImage(page) {
+  return await page.locator(".bn-editor img.bn-visual-media").first().evaluate((image) => ({
+    src: image.getAttribute("src"),
+    loaded: image.complete && image.naturalWidth > 0,
+  }));
+}
+
+test("Electron stores pasted images as asset files and keeps exports self-contained", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  const exportDirectory = createTemporaryDirectory("notepane-export-");
+  const electronApp = await launchApp(userDataDirectory, exportDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    await clickLastEmptyParagraph(page);
+    await page.evaluate((base64) => {
+      const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+      const clipboardData = new DataTransfer();
+      clipboardData.items.add(new File([bytes], "dot.png", { type: "image/png" }));
+      document.querySelector(".bn-editor").dispatchEvent(
+        new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData }),
+      );
+    }, TINY_PNG_BASE64);
+
+    await expect.poll(() => readEditorImage(page)).toEqual({
+      src: expect.stringMatching(/^notepane-asset:\/\/local\/[0-9a-f]{64}\.png$/),
+      loaded: true,
+    });
+    await expect.poll(() => {
+      const state = JSON.parse(fs.readFileSync(path.join(userDataDirectory, "notes.json"), "utf8"));
+      return state.notes.some((note) => /notepane-asset:/.test(note.blocksJSON ?? ""));
+    }).toBe(true);
+    expect(fs.readFileSync(path.join(userDataDirectory, "notes.json"), "utf8")).not.toContain(";base64,");
+
+    const image = page.locator(".bn-editor img.bn-visual-media").first();
+    const imageTools = page.locator(".notepane-formatting-toolbar:visible");
+    await image.click();
+    await imageTools.locator(".notepane-file-download-button").click();
+    await expect.poll(() => fs.readdirSync(exportDirectory).filter((name) => name.endsWith(".png")))
+      .toHaveLength(1);
+    const downloadedName = fs.readdirSync(exportDirectory).find((name) => name.endsWith(".png"));
+    expect(fs.readFileSync(path.join(exportDirectory, downloadedName)))
+      .toEqual(Buffer.from(TINY_PNG_BASE64, "base64"));
+
+    await page.getByRole("button", { name: "Export" }).click();
+    await page.getByRole("menu", { name: "Export format" })
+      .getByRole("menuitem", { name: /Markdown/ })
+      .click();
+    await expect.poll(() => fs.readdirSync(exportDirectory).filter((name) => name.endsWith(".md")))
+      .toHaveLength(1);
+    const markdownName = fs.readdirSync(exportDirectory).find((name) => name.endsWith(".md"));
+    const markdown = fs.readFileSync(path.join(exportDirectory, markdownName), "utf8");
+    expect(markdown).toContain(`data:image/png;base64,${TINY_PNG_BASE64}`);
+    expect(markdown).not.toContain("notepane-asset:");
+
+    await image.click();
+    await imageTools.getByRole("button", { name: "Crop image" }).click();
+    await page.getByRole("dialog", { name: "Crop image" })
+      .getByRole("button", { name: "Apply crop" })
+      .click();
+    await expect.poll(() => readEditorImage(page)).toEqual({
+      src: expect.stringMatching(/^notepane-asset:\/\/local\/[0-9a-f]{64}\.png$/),
+      loaded: true,
+    });
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Electron moves an inline image from an older notes file into an asset", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    {
+      id: "image-note",
+      title: "Image note",
+      blocksJSON: JSON.stringify([
+        { id: "image-block", type: "image", props: { url: `data:image/png;base64,${TINY_PNG_BASE64}` }, children: [] },
+        { id: "text-block", type: "paragraph", content: [{ type: "text", text: "after image" }], children: [] },
+      ]),
+      createdAt: 1,
+      updatedAt: 1,
+    },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("after image");
+
+    await expect.poll(() => readEditorImage(page)).toEqual({
+      src: expect.stringMatching(/^notepane-asset:\/\/local\/[0-9a-f]{64}\.png$/),
+      loaded: true,
+    });
+    expect(fs.readFileSync(path.join(userDataDirectory, "notes.json"), "utf8")).not.toContain(";base64,");
+    expect(fs.readdirSync(userDataDirectory).some((name) => name.startsWith("notes.pre-assets-"))).toBe(true);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron menu actions respect tabs/sticky modes and toggle always-on-top", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);

@@ -1,6 +1,7 @@
 import {
   DEFAULT_CROP,
   MIN_CROP_SIZE,
+  electronApi,
 } from "../constants.js";
 import {
   clamp,
@@ -198,7 +199,36 @@ export function waitForImage(image) {
   });
 }
 
-export function uploadFile(file) {
+// In the desktop app uploads become content-addressed asset files. The browser
+// preview has no file store, so it keeps data URLs.
+export async function uploadFile(file) {
+  if (electronApi?.storeAsset) {
+    return await electronApi.storeAsset({
+      bytes: new Uint8Array(await file.arrayBuffer()),
+      mimeType: file.type,
+    });
+  }
+  return await readFileAsDataUrl(file);
+}
+
+// Falls back to the data URL on failure; the main process externalizes any
+// data URL left in a note when it is saved.
+export async function storeDataUrlAsAsset(dataUrl) {
+  if (!electronApi?.storeAsset) {
+    return dataUrl;
+  }
+  try {
+    const response = await fetch(dataUrl);
+    return await electronApi.storeAsset({
+      bytes: new Uint8Array(await response.arrayBuffer()),
+      mimeType: response.headers.get("content-type") ?? "application/octet-stream",
+    });
+  } catch {
+    return dataUrl;
+  }
+}
+
+function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.addEventListener("load", () => resolve(reader.result));

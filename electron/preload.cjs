@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
   exportBackup: () => ipcRenderer.invoke("backup:export"),
   importBackup: () => ipcRenderer.invoke("backup:import"),
   saveAsset: (payload) => ipcRenderer.invoke("assets:save-url", payload),
+  storeAsset: (payload) => ipcRenderer.invoke("assets:store", payload),
   listFonts: () => ipcRenderer.invoke("fonts:list"),
   moveWindowBy: (payload) => ipcRenderer.invoke("window:move-by", payload),
   closeCurrentWindow: () => ipcRenderer.invoke("window:close-current"),
