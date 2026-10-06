@@ -59,7 +59,7 @@ test("extracts text from nested, linked and table blocks but not image data", as
   const text = blocksToPlainText(blocks);
   assert.match(text, /Read the docs/);
   assert.match(text, /nested child/);
-  assert.match(text, /cell one cell two/);
+  assert.match(text, /cell one\ncell two/);
   assert.doesNotMatch(text, /base64|png/);
 });
 
@@ -136,4 +136,30 @@ test("searches about 2 MB of plain text within an interactive budget", async () 
     assert.equal(ranges.length, 48_000);
   }
   assert.ok(fastest < 400, `fastest run took ${Math.round(fastest)} ms`);
+});
+
+// Find in note never matches across blocks, so the palette must not either:
+// otherwise it lists a note whose find bar then shows 0 / 0.
+test("matches the note body one block at a time, like find in note", async () => {
+  const { blocksToPlainText, searchNotes } = await loadSearch();
+  const paragraphs = "first line ends\nstarts the second";
+  assert.deepEqual(searchNotes([{ note: { id: "a" }, title: "A", body: paragraphs }], "ends starts"), []);
+
+  const table = blocksToPlainText([{
+    type: "table",
+    content: {
+      type: "tableContent",
+      rows: [{ cells: [[{ type: "text", text: "cell one" }], [{ type: "text", text: "cell two" }]] }],
+    },
+    children: [],
+  }]);
+  assert.deepEqual(searchNotes([{ note: { id: "a" }, title: "A", body: table }], "one cell"), []);
+  assert.equal(searchNotes([{ note: { id: "a" }, title: "A", body: table }], "cell").length, 1);
+});
+
+test("shows a snippet that spans blocks on one line", async () => {
+  const { searchNotes } = await loadSearch();
+  const [result] = searchNotes([{ note: { id: "a" }, title: "A", body: "alpha\nneedle\tbeta" }], "needle");
+  assert.equal(result.snippet.text, "alpha needle beta");
+  assert.deepEqual(result.snippet.ranges, [{ start: 6, end: 12 }]);
 });
