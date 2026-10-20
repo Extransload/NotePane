@@ -77,7 +77,7 @@ A theme is data: `{ id, label, scheme, palette, overrides }`.
 | Text | text, muted text, faint/disabled text |
 | Roles | accent (selection, focus, table focus), danger, success, warning |
 | Named colours | gray, brown, red, orange, yellow, green, blue, purple, pink |
-| Code | code background, code text, code muted, and the syntax highlighting theme (see Code blocks) |
+| Code | code background `codeBg` (the Shiki theme's background, except in NotePane Light and Dark), code text, code muted, and the syntax highlighting theme `codeTheme` (see Code blocks) |
 
 - Catppuccin, Nord, Dracula and Tokyo Night take their values from the official palettes. Table Peek's
   `palette.ts` shows one way of assigning them to surfaces.
@@ -220,20 +220,45 @@ Today `codeBlockOptions` loads Shiki with `themes: ["github-dark", "github-light
   - **Selecting the colours:** the parser (`prosemirror-highlight` 0.15.3) evaluates `getLoadedThemes()[0]` on
     every call, so each highlight uses the code theme active at that moment. The output stays single-theme, as
     today: an inline `color` on each token, and `--prosemirror-highlight`/`--prosemirror-highlight-bg` on the block.
-  - **Switching without a reload:** load the new code theme first (Shiki throws on a theme that is not loaded), set
-    `activeCodeTheme`, then in every BlockNote editor of the window run one `editor.transact((tr) => …)` that calls
-    `tr.setNodeMarkup(pos, undefined, node.attrs)` on each `codeBlock` and sets `tr.setMeta("addToHistory", false)`.
-    Replacing a node with an equal node drops its entry from `prosemirror-highlight`'s position cache, so the block
-    is re-parsed. The document stays equal, so TipTap emits no `update`: BlockNote's `onChange` does not fire, the
-    note is not saved, and undo is untouched. A `prosemirror-highlight-refresh` meta alone does not recolour,
-    because the cache keeps the decorations of unchanged nodes. The highlighter is never recreated: BlockNote caches
-    its promise and the parser on `globalThis` (`Symbol.for("blocknote.shikiHighlighterPromise")`,
-    `Symbol.for("blocknote.shikiParser")`).
-  - **Limitation:** the switch must reach every editor in the window; each sticky window is its own renderer and
-    re-highlights its own editors. Export, which renders with NotePane Light, switches the code theme to
-    `github-dark` and back around the capture the same way. The rejected route, measured: typing one character in a
-    200-line TypeScript block costs about 36 ms with one theme, 142 ms with four and 325 ms with all nine code
-    themes.
+  - **Font styles stay dropped, as today.** Shiki's single-theme tokens carry `fontStyle` but no `htmlStyle`, so the
+    parser writes only `color`. Observed: `github-dark` marks `# Title` bold and `*italic*` italic in Markdown, and
+    every character rendered `font-style: normal`, `font-weight: 400`, `text-decoration-line: none`, both today and
+    after the switch round trip. Catppuccin Mocha marks `// note` italic and goes through the same path, so it is
+    dropped too. That case was confirmed in Shiki's tokens, not snapshotted in the DOM.
+  - **Startup:** before its first editor renders, the window sets the module-level `activeCodeTheme` from the
+    theme it starts with (the persisted one). `createHighlighter` loads that code theme before it resolves. The
+    first highlight therefore never asks for a theme that is not loaded, which matters because Shiki throws on one
+    (``Theme `x` not found``).
+  - **Switching without a reload:** `createHighlighter` stores its promise in a module variable as it starts. The
+    switch awaits that promise, loads the new code theme with `loadTheme`, and only then sets `activeCodeTheme` and
+    re-highlights. If no code block has been highlighted yet, so the promise does not exist, setting
+    `activeCodeTheme` is enough, because `createHighlighter` will load it. To re-highlight, each BlockNote editor of
+    the window runs one `editor.transact((tr) => …)` that calls `tr.setNodeMarkup(pos, undefined, node.attrs)` on
+    each `codeBlock` and sets `tr.setMeta("addToHistory", false)`. The editors are the window's `StickyEditor`
+    editor (`useCreateBlockNote` in `src/main.jsx`) and, while it is open, the read-only version-history preview
+    (`previewEditor` in `VersionHistoryPanel`, `src/ui/overlays.jsx`). Both use `schema`, so both share the
+    highlighter. Both should run the same hook from `src/hooks/` when the active code theme changes; the spike
+    exercised only the main editor. Editors mounted later highlight with the active theme on their own.
+    - Verified empirically: replacing each code block with an equal node this way makes `prosemirror-highlight`
+      re-parse it with the new theme. A `prosemirror-highlight-refresh` meta alone does not recolour. The source
+      suggests the reason: the plugin's position cache keeps the decorations of unchanged nodes.
+    - The document stays equal, so TipTap emits no `update` (0 events counted, against 1 for a real edit).
+      BlockNote's `onChange` does not fire, the note is not saved, and undo is untouched.
+    - The highlighter is never recreated: BlockNote caches its promise and the parser on `globalThis`
+      (`Symbol.for("blocknote.shikiHighlighterPromise")`, `Symbol.for("blocknote.shikiParser")`).
+  - **Code background:** for every theme except NotePane Light and Dark, `palette.codeBg` equals the background of
+    that theme's Shiki theme. That keeps highlighted blocks (`--prosemirror-highlight-bg`) and plain text blocks
+    (`--sticky-code-bg`) the same colour. The values are `catppuccin-latte` `#eff1f5`, `catppuccin-frappe`
+    `#303446`, `catppuccin-macchiato` `#24273a`, `catppuccin-mocha` `#1e1e2e`, `nord` `#2e3440`, `dracula`
+    `#282a36` and `tokyo-night` `#1a1b26`, plus `github-light` `#fff` for test themes. NotePane Light and Dark keep
+    today's split exactly: highlighted blocks paint Shiki's `github-dark` `#24292e` through
+    `--prosemirror-highlight-bg`, and plain text blocks paint `#0d1117` through `--sticky-code-bg`.
+    *(Controller's ruling after the spike.)*
+  - **Limitation:** the switch must reach every editor in the window, and each sticky window is its own renderer and
+    re-highlights its own editors. Export renders with NotePane Light, so it switches the code theme to
+    `github-dark` before the capture and back after it, the same way (see Export). The rejected route was measured:
+    typing one character in a 200-line TypeScript block costs about 36 ms with one theme, 142 ms with four and
+    325 ms with all nine code themes.
   - **NotePane colours unchanged:** checked in the rendered DOM of a JavaScript, Python, Markdown, CSS and plain
     text block: the computed `color`, `font-style`, `font-weight` and `text-decoration-line` of all 385 characters,
     and the background and colour of each block and its `pre`. Today's build and the new highlighter after switching
@@ -249,6 +274,8 @@ Today `codeBlockOptions` loads Shiki with `themes: ["github-dark", "github-light
 PNG and PDF export forces light colours today (`body.is-exporting`, `overlays.css` 180–306), whatever the mode.
 Keep that behaviour: export renders with the NotePane Light theme's tokens, applied for the duration of the export,
 instead of the literal block. *(Writer's call: exports stay printable and look the same whatever theme is selected.)*
+Code blocks follow NotePane Light's `codeTheme`: the export switches the active code theme to `github-dark` and
+re-highlights before the capture, then switches back after it (see Code blocks).
 
 Applying the whole theme also sets the highlight colours. Today the export block never sets them, so a dark-mode
 export probably keeps dark highlight colours (inferred by the audit, not reproduced).
@@ -524,9 +551,9 @@ pass.
 
 ## Work order
 
-0. Spike: confirm which code block route works with `@blocknote/code-block` 0.52.1 (multi-theme variables, or
-   recreate and re-highlight). Confirm that setting `--bn-colors-*` on `.bn-root` reaches the slash menu and the
-   side menu.
+0. Spike: done (Task 1). Code blocks highlight with the active code theme only and are re-highlighted when the
+   theme changes (see Code blocks). Setting `--bn-colors-*` on `.bn-root` reaches the slash menu and the side menu
+   (see BlockNote and Mantine).
 1. Capture the NotePane Light and Dark snapshots (tokens, sticky and tab styles), then add `check:colors` in
    report-only mode.
 2. Add the theme definition model and `buildThemeTokens`, reproducing NotePane Light and Dark exactly. Apply the
