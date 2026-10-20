@@ -10,7 +10,7 @@ export const WHITE = "#ffffff";
 export const BLACK = "#000000";
 
 // The contrast WCAG asks of body text.
-const READABLE_CONTRAST = 4.5;
+export const READABLE_CONTRAST = 4.5;
 
 export function isHexColor(value) {
   return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
@@ -84,6 +84,19 @@ export function pickReadableText(backgroundHexColor, [darkTextColor, lightTextCo
   return getContrastRatio(backgroundHexColor, candidate) >= READABLE_CONTRAST
     ? candidate
     : getContrastingTextColor(backgroundHexColor, BLACK, WHITE);
+}
+
+// The opacity at which `textHexColor`, drawn over `backgroundHexColor`, reads at 4.5:1: the
+// smallest of `minimumOpacity`, then up in 0.01 steps, that does. `minimumOpacity` itself when
+// it already reads; full opacity at most.
+export function readableOpacity(textHexColor, backgroundHexColor, minimumOpacity) {
+  for (let step = Math.round(minimumOpacity * 100); step < 100; step += 1) {
+    const composite = blendHexOverHex(textHexColor, backgroundHexColor, step / 100);
+    if (getContrastRatio(composite, backgroundHexColor) >= READABLE_CONTRAST) {
+      return step / 100;
+    }
+  }
+  return 1;
 }
 
 export function getReadableBoundaryColor(

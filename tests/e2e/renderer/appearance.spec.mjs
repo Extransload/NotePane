@@ -586,15 +586,17 @@ test("supports light/dark mode and readable sidebar tab background customization
   await expect.poll(() => getTabCssValue(page, 0, "backgroundColor"))
     .toBe("rgb(255, 0, 0)");
   // Neither tab ink reads at 4.5:1 on pure red (#1f1f1f 4.1:1, #fbfbfa 3.8:1), so the
-  // contrast fallback takes black (5.3:1); the inactive tab shows it at 72%.
+  // contrast fallback takes black (5.3:1). The inactive tab dims it from 72% only as far as
+  // it still reads at 4.5:1, which on red is 79%.
   await expect.poll(() => getTabCssValue(page, 0, "color"))
-    .toBe("rgba(0, 0, 0, 0.72)");
+    .toBe("rgba(0, 0, 0, 0.79)");
 
   await page.getByLabel("RGB session tab color value").fill("rgb(0 0 255)");
   await expect.poll(() => getTabCssValue(page, 0, "backgroundColor"))
     .toBe("rgb(0, 0, 255)");
+  // #fbfbfa at 72% reads 4.48:1 on pure blue, so the inactive tab shows it at 73%.
   await expect.poll(() => getTabCssValue(page, 0, "color"))
-    .toBe("rgba(251, 251, 250, 0.72)");
+    .toBe("rgba(251, 251, 250, 0.73)");
 
   await page.getByLabel("LCH session tab color value").fill("lch(100% 0 0deg)");
   await expect.poll(() => getTabCssValue(page, 0, "backgroundColor"))

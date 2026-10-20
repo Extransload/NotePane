@@ -5,10 +5,17 @@ const fixture = require("./fixtures/theme-baseline.json");
 // The sticky and tab style output captured before the theme system existed (Task 2), for the
 // six pastels, pure red and mid grey at three opacities in both modes. NotePane Light and Dark
 // must reproduce it, except where the spec's contrast fallback applies: an entry whose text
-// colour read below 4.5:1 on its own background (ruling R6).
+// colour, or whose inactive tab text, read below 4.5:1 on its own background (rulings R6, R24,
+// R25).
 const READABLE = 4.5;
 // Task 8 deleted the glass variables: no stylesheet reads them.
 const DELETED_STICKY_KEYS = new Set(["--sticky-glass-highlight", "--sticky-glass-lowlight", "--sticky-glass-stroke"]);
+// Inactive tabs show the tab text at this opacity, raised only where it would not read.
+const INACTIVE_TEXT_OPACITY = 0.72;
+// Today's link colours, the browser's own, which NotePane Light and Dark pin (ruling R26).
+const TODAYS_LINK = { light: "#0000ee", dark: "#9e9eff" };
+const STICKY_INKS = ["#37352f", "#f7f7f4"];
+const TAB_INKS = ["#1f1f1f", "#fbfbfa"];
 
 async function load() {
   // src/constants.js reads window.blocknoteSticky at import time.
@@ -57,6 +64,30 @@ const readableText = (cm) => (background, pair) => {
     : higherContrast(cm, background, ["#000000", "#ffffff"]);
 };
 
+// Inactive tab text opacity rules. Today's is fixed; the readable rule takes the smallest of
+// 0.72, 0.73, … 1 at which the text drawn over the tab reads at 4.5:1.
+const todaysInactiveOpacity = () => () => INACTIVE_TEXT_OPACITY;
+const readableInactiveOpacity = (cm) => (text, background) => {
+  for (let step = Math.round(INACTIVE_TEXT_OPACITY * 100); step < 100; step += 1) {
+    const composite = cm.blendHexOverHex(text, background, step / 100);
+    if (cm.getContrastRatio(composite, background) >= READABLE) return step / 100;
+  }
+  return 1;
+};
+const TODAYS_TAB_RULES = (cm) => ({ text: todaysTabText(cm), inactiveOpacity: todaysInactiveOpacity() });
+const READABLE_TAB_RULES = (cm) => ({ text: readableText(cm), inactiveOpacity: readableInactiveOpacity(cm) });
+
+// "rgb(r g b / a)" drawn over an opaque hex colour.
+function compositeOver(cm, cssRgb, backgroundHex) {
+  const [red, green, blue, alpha] = cssRgb.match(/[\d.]+/g).map(Number);
+  const [backgroundRed, backgroundGreen, backgroundBlue] = cm.hexToRgb(backgroundHex);
+  return cm.rgbToHex(
+    red * alpha + backgroundRed * (1 - alpha),
+    green * alpha + backgroundGreen * (1 - alpha),
+    blue * alpha + backgroundBlue * (1 - alpha),
+  );
+}
+
 // Today's sticky derivation (src/style/themeStyles.js before Task 8, glass variables left out)
 // with the text rule passed in. With today's rule it reproduces the fixture; with the readable
 // rule it gives what an exempt entry must be now: every field derived from the new text colour,
@@ -64,7 +95,7 @@ const readableText = (cm) => (background, pair) => {
 function stickyModel(cm, { accentColor, noteTheme, mode }, pickText) {
   const opacity = noteTheme.tabTextOpacity;
   const base = mode === "dark" ? "#191919" : "#ffffff";
-  const inks = ["#37352f", "#f7f7f4"];
+  const inks = STICKY_INKS;
   const rgb = cm.hexToCssRgb;
   const background = cm.blendHexOverHex(accentColor, base, opacity);
   const text = pickText(background, inks);
@@ -136,12 +167,13 @@ function stickyModel(cm, { accentColor, noteTheme, mode }, pickText) {
   };
 }
 
-// Today's tab derivation, likewise. `background` is the colour the tab paints over the tab base.
-function tabModel(cm, pastels, { noteTheme, mode, noteIndex }, pickText) {
+// Today's tab derivation, likewise, with the text and inactive opacity rules passed in.
+// `background` is the colour the tab paints over the tab base.
+function tabModel(cm, pastels, { noteTheme, mode, noteIndex }, rules) {
   const accentColor = noteTheme.tabTextColor ?? pastels[noteIndex % pastels.length];
   const displayColor = mode === "dark" ? cm.mixHexColors(accentColor, "#000000", 0.12) : accentColor;
   const background = cm.blendHexOverHex(displayColor, mode === "dark" ? "#2a2a2a" : "#f1f1ef", noteTheme.tabTextOpacity);
-  const text = pickText(background, ["#1f1f1f", "#fbfbfa"]);
+  const text = rules.text(background, TAB_INKS);
   const rgb = cm.hexToCssRgb;
   const border = rgb(text, 0.34);
   const fill = rgb(displayColor, noteTheme.tabTextOpacity);
@@ -152,7 +184,7 @@ function tabModel(cm, pastels, { noteTheme, mode, noteIndex }, pickText) {
       "--session-tab-hover-bg": fill,
       "--session-tab-inactive-bg": fill,
       "--session-tab-text-color": text,
-      "--session-tab-inactive-text-color": rgb(text, 0.72),
+      "--session-tab-inactive-text-color": rgb(text, rules.inactiveOpacity(text, background)),
       "--session-tab-border-color": border,
       "--session-tab-active-shadow": `inset 0 0 0 1px ${border}, 0 7px 16px ${rgb(text, 0.12)}`,
       "--session-tab-inactive-shadow": `inset 0 0 0 1px ${rgb(text, 0.04)}`,
@@ -172,7 +204,11 @@ test("the baseline model reproduces the fixture with today's text rules", async 
     assert.deepEqual(normalise(stickyModel(cm, entry, todaysStickyText(cm))), normalise(entry.style), describeSticky(entry));
   }
   for (const entry of fixture.tabs) {
-    assert.deepEqual(normalise(tabModel(cm, pastels, entry, todaysTabText(cm)).style), normalise(entry.style), describeTab(entry));
+    assert.deepEqual(
+      normalise(tabModel(cm, pastels, entry, TODAYS_TAB_RULES(cm)).style),
+      normalise(entry.style),
+      describeTab(entry),
+    );
   }
 });
 
@@ -182,18 +218,31 @@ test("NotePane sticky and tab output equals the baseline", async () => {
 
   for (const entry of fixture.sticky) {
     const label = describeSticky(entry);
-    const actual = normalise(
-      themeStyles.getStickyShellStyle(entry.noteTheme, entry.accentColor, notePaneTheme(getTheme, entry.mode)),
+    const theme = notePaneTheme(getTheme, entry.mode);
+    const { "--notepane-link": link, ...style } = themeStyles.getStickyShellStyle(
+      entry.noteTheme,
+      entry.accentColor,
+      theme,
     );
+    const actual = normalise(style);
     const background = entry.style["--sticky-effective-bg"];
+
+    // Links keep today's colour where it reads on the note, and are fitted to it elsewhere: the
+    // theme's blue toward the note's text colour until it reads at 4.5:1 (ruling R26).
+    if (cm.getContrastRatio(TODAYS_LINK[entry.mode], background) >= READABLE) {
+      assert.equal(link, undefined, `${label} link`);
+    } else {
+      assert.equal(link, cm.readableOn(theme.palette.blue, [background], style["--sticky-text-color"]), `${label} link`);
+      assert.ok(cm.getContrastRatio(link, background) >= READABLE, `${label} link`);
+    }
+
     if (cm.getContrastRatio(entry.style["--sticky-text-color"], background) >= READABLE) {
       assert.deepEqual(actual, normalise(entry.style), label);
       continue;
     }
     exempt.sticky.push(label);
-    // Neither colour of the pair reaches 4.5:1, so black or white, whichever reads better.
     const text = actual["--sticky-text-color"];
-    assert.equal(text, higherContrast(cm, background, ["#000000", "#ffffff"]), label);
+    assert.equal(text, cm.pickReadableText(background, STICKY_INKS), label);
     assert.ok(cm.getContrastRatio(text, background) >= READABLE, label);
     assert.deepEqual(actual, normalise(stickyModel(cm, entry, readableText(cm))), label);
   }
@@ -203,18 +252,22 @@ test("NotePane sticky and tab output equals the baseline", async () => {
     const actual = normalise(
       themeStyles.getSessionTabStyle(entry.noteTheme, notePaneTheme(getTheme, entry.mode), entry.noteIndex),
     );
-    const { background } = tabModel(cm, pastels, entry, todaysTabText(cm));
-    if (cm.getContrastRatio(entry.style["--session-tab-text-color"], background) >= READABLE) {
+    const { background } = tabModel(cm, pastels, entry, TODAYS_TAB_RULES(cm));
+    const reads = (style) => [
+      cm.getContrastRatio(style["--session-tab-text-color"], background),
+      cm.getContrastRatio(compositeOver(cm, style["--session-tab-inactive-text-color"], background), background),
+    ];
+    if (reads(entry.style).every((ratio) => ratio >= READABLE)) {
       assert.deepEqual(actual, normalise(entry.style), label);
       continue;
     }
     exempt.tabs.push(label);
-    // Today's luminance switch picked the weaker colour of the pair; the readable rule keeps the
-    // other one when it reaches 4.5:1.
-    const text = actual["--session-tab-text-color"];
-    assert.equal(text, readableText(cm)(background, ["#1f1f1f", "#fbfbfa"]), label);
-    assert.ok(cm.getContrastRatio(text, background) >= READABLE, label);
-    assert.deepEqual(actual, normalise(tabModel(cm, pastels, entry, readableText(cm)).style), label);
+    // Today's luminance switch could pick the weaker colour of the pair, and inactive tabs dim it
+    // to 72%: the readable rules keep the stronger ink and raise the inactive opacity until both
+    // read at 4.5:1.
+    assert.equal(actual["--session-tab-text-color"], cm.pickReadableText(background, TAB_INKS), label);
+    for (const ratio of reads(actual)) assert.ok(ratio >= READABLE, `${label}: ${ratio.toFixed(2)}`);
+    assert.deepEqual(actual, normalise(tabModel(cm, pastels, entry, READABLE_TAB_RULES(cm)).style), label);
   }
 
   // The spec's own example of an unreadable colour is among the exemptions.

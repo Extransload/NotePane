@@ -217,22 +217,49 @@ test("text on fill and surface results is readable", async () => {
   }
 });
 
-// --notepane-link is fitted to the window colour; a tone-matched sticky window is painted with
-// the note's colour instead, so it fits the link to that surface. NotePane Light and Dark keep
-// the link colours their theme pins.
-test("links read at 4.5:1 on tone-matched sticky surfaces", async () => {
-  const { listThemes, toneMatchedThemes, pastels, getStickyShellStyle, getContrastRatio } = await load();
-  for (const theme of toneMatchedThemes) {
-    for (const hex of pastels) {
+// Active tabs show the tab text as it is, inactive ones dimmed; both must read on the fill.
+test("session tab text on the tab fill, active and inactive, meets the same bar", async () => {
+  const { listThemes, inputs, getSessionTabStyle, getContrastRatio, getNoteChrome, ...colorMath } = await load();
+  for (const theme of listThemes()) {
+    const chrome = getNoteChrome(theme);
+    for (const hex of inputs) {
       for (const tabTextOpacity of OPACITIES) {
-        const style = getStickyShellStyle({ tabTextColor: hex, tabTextOpacity }, hex, theme);
-        const ratio = getContrastRatio(style["--notepane-link"], style["--sticky-effective-bg"]);
-        assert.ok(ratio >= 4.5, `${theme.id} ${hex} @${tabTextOpacity}: ${style["--notepane-link"]} reads ${ratio.toFixed(2)}`);
+        const tab = getSessionTabStyle({ tabTextColor: hex, tabTextOpacity }, theme, 0);
+        const fill = compositeOver(colorMath, tab["--session-tab-active-bg"], chrome.tabBase);
+        const texts = {
+          active: tab["--session-tab-text-color"],
+          inactive: compositeOver(colorMath, tab["--session-tab-inactive-text-color"], fill),
+        };
+        for (const [state, text] of Object.entries(texts)) {
+          const ratio = getContrastRatio(text, fill);
+          assert.ok(ratio >= 4.5, `${theme.id} ${hex} @${tabTextOpacity} ${state}: ${text} on ${fill} is ${ratio.toFixed(2)}`);
+        }
       }
     }
   }
-  for (const theme of listThemes().filter((candidate) => !candidate.toneMatching)) {
-    assert.ok(!("--notepane-link" in getStickyShellStyle({ tabTextColor: "#fff2b8" }, "#fff2b8", theme)), theme.id);
+});
+
+// --notepane-link is fitted to the window colour, but a sticky window is painted with the
+// note's colour. Where the theme's link does not read on that surface, the sticky window fits
+// one to it (ruling R26); elsewhere the theme's link, NotePane's pinned ones included, is kept.
+test("sticky links read at 4.5:1 on every surface result", async () => {
+  const { listThemes, inputs, getStickyShellStyle, getContrastRatio } = await load();
+  const { buildThemeTokens } = await import("../../src/style/themeTokens.js");
+  for (const theme of listThemes()) {
+    const themeLink = buildThemeTokens(theme)["--notepane-link"];
+    for (const hex of inputs) {
+      for (const tabTextOpacity of OPACITIES) {
+        const style = getStickyShellStyle({ tabTextColor: hex, tabTextOpacity }, hex, theme);
+        const surface = style["--sticky-effective-bg"];
+        const label = `${theme.id} ${hex} @${tabTextOpacity}`;
+        if (getContrastRatio(themeLink, surface) >= 4.5) {
+          assert.equal(style["--notepane-link"], undefined, `${label} keeps ${themeLink}`);
+          continue;
+        }
+        const ratio = getContrastRatio(style["--notepane-link"], surface);
+        assert.ok(ratio >= 4.5, `${label}: ${style["--notepane-link"]} on ${surface} reads ${ratio.toFixed(2)}`);
+      }
+    }
   }
 });
 

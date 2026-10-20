@@ -8,7 +8,9 @@ import {
   normalizeTheme,
 } from "../model/preferences.js";
 import {
+  READABLE_CONTRAST,
   blendHexOverHex,
+  getContrastRatio,
   getReadableBoundaryColor,
   getRelativeLuminance,
   hexToCssRgb,
@@ -16,10 +18,17 @@ import {
   mixHexColors,
   pickReadableText,
   readableOn,
+  readableOpacity,
 } from "./colorMath.js";
+import {
+  buildThemeTokens,
+} from "./themeTokens.js";
 import {
   toneMatch,
 } from "./toneMatch.js";
+
+// Inactive session tabs show the tab text at this opacity, or more where it would not read.
+const INACTIVE_TAB_TEXT_OPACITY = 0.72;
 
 export function resolveTabTextColor(noteTheme, theme) {
   const normalizedTheme = normalizeTheme(noteTheme);
@@ -144,7 +153,10 @@ export function getSessionTabStyle(noteTheme, theme, noteIndex = 0) {
     chrome.tabInkDark,
     chrome.tabInkLight,
   ]);
-  const inactiveTextColor = hexToCssRgb(activeTextColor, 0.72);
+  const inactiveTextColor = hexToCssRgb(
+    activeTextColor,
+    readableOpacity(activeTextColor, activeEffectiveBackground, INACTIVE_TAB_TEXT_OPACITY),
+  );
   const activeBorderColor = hexToCssRgb(activeTextColor, 0.34);
   const activeShadowColor = hexToCssRgb(activeTextColor, 0.12);
   const inactiveShadowColor = hexToCssRgb(activeTextColor, 0.04);
@@ -242,12 +254,12 @@ export function getStickyShellStyle(noteTheme, accentColor, theme) {
     isLightBackground ? 0.16 : 0.22,
   );
   const iconMutedFill = hexToCssRgb(textColor, isLightBackground ? 0.10 : 0.14);
-  // Links: the theme's blue toward the note's text colour until it reads at 4.5:1 on the note,
-  // as --notepane-link is fitted to the window. NotePane Light and Dark show note colours as
-  // they are and keep the link colours their theme pins.
-  const linkStyle = theme.toneMatching === false
-    ? {}
-    : { "--notepane-link": readableOn(palette.blue, [effectiveBackground], textColor) };
+  // Links: the theme's link where it reads on the note at 4.5:1. Elsewhere the theme's blue,
+  // mixed toward the note's text colour until it does, as --notepane-link is fitted to the window.
+  const linkStyle =
+    getContrastRatio(buildThemeTokens(theme)["--notepane-link"], effectiveBackground) >= READABLE_CONTRAST
+      ? {}
+      : { "--notepane-link": readableOn(palette.blue, [effectiveBackground], textColor) };
 
   return {
     ...linkStyle,

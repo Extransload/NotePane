@@ -91,5 +91,7 @@ export function toneMatch(hex, theme, role) {
   if (input.c < NEUTRAL_CHROMA) {
     return matchNeutral(input, theme, target);
   }
+  // The role's chroma is a ceiling, not a value to reach (ruling R23): a colour more vivid than
+  // the theme's tone is quietened to it, and a quieter one, such as a pastel, keeps its own.
   return oklchToHex({ l: target.l, c: Math.min(input.c, target.c), h: input.h });
 }
