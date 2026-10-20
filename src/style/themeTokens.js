@@ -1,9 +1,6 @@
 import { getContrastingTextColor, hexToCssRgb, hexToRgb, mixHexColors } from "./colorMath.js";
 import { DEFAULT_THEME_ID, getTheme } from "./themes.js";
 
-// Glass highlights and chrome fills are white in every theme; name the endpoint once.
-const WHITE = "#ffffff";
-
 const NAMED_COLOURS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
 
 // Strength of derived values per scheme: [light, dark].
@@ -67,15 +64,17 @@ export function buildThemeTokens(theme) {
   const { palette, scheme } = theme;
   const s = (name) => pick(STRENGTH[name], scheme);
   const g = (name) => pick(GEOMETRY[name], scheme);
-  // The colour that low-alpha borders and fills are drawn with: text on light, white on dark.
-  const ink = scheme === "dark" ? WHITE : palette.text;
-  // Hover fills sit on the surface: the hover colour on light, a white veil on dark.
-  const hoverBase = scheme === "dark" ? WHITE : palette.hover;
+  // Low-alpha borders and pressed fills are drawn with palette.text in both schemes.
+  // Hover fills sit on the surface: the hover colour on light, a veil of the text colour on dark.
+  const hoverBase = scheme === "dark" ? palette.text : palette.hover;
+  // Glass highlights and the translucent chrome fills: the panel colour on light themes, where
+  // they brighten a surface, and the text colour on dark themes, where they lift it.
+  const glass = scheme === "dark" ? palette.text : palette.panel;
   // Drop shadows under controls and menus are tinted with the text colour on light themes.
   const tint = scheme === "dark" ? palette.shadow : palette.text;
   const shadow = (name, strength, base = palette.shadow) =>
     `${g(name)} ${hexToCssRgb(base, s(strength))}`;
-  const highlight = (strength) => `inset 0 1px 0 ${hexToCssRgb(WHITE, s(strength))}`;
+  const highlight = (strength) => `inset 0 1px 0 ${hexToCssRgb(glass, s(strength))}`;
 
   const tokens = {
     "--sticky-effective-bg": palette.window,
@@ -88,7 +87,7 @@ export function buildThemeTokens(theme) {
     "--sticky-panel-muted": palette.muted,
     "--sticky-text-color": palette.text,
     "--sticky-muted-color": palette.muted,
-    "--sticky-border-color": hexToCssRgb(ink, s("border")),
+    "--sticky-border-color": hexToCssRgb(palette.text, s("border")),
     "--sticky-table-border-color": palette.lineStrong,
     "--sticky-table-active-bg": hexToCssRgb(palette.accent, s("tableActive")),
     "--sticky-table-focused-border-color": hexToCssRgb(palette.accent, s("tableFocused")),
@@ -101,14 +100,14 @@ export function buildThemeTokens(theme) {
     "--sticky-portal-menu-hover-bg": palette.hover,
     "--sticky-portal-menu-border-color": palette.line,
     "--sticky-portal-menu-shadow": `${shadow("portal", "portalShadow", tint)}, ${highlight("glass")}`,
-    "--sticky-control-bg": hexToCssRgb(WHITE, s("controlBg")),
+    "--sticky-control-bg": hexToCssRgb(glass, s("controlBg")),
     "--sticky-control-hover-bg": hexToCssRgb(hoverBase, s("controlHover")),
     "--sticky-danger-color": palette.danger,
     "--sticky-code-bg": palette.codeBg,
     "--sticky-code-text": palette.codeText,
     "--sticky-code-border": hexToCssRgb(palette.codeMuted, s("codeBorder")),
     "--sticky-code-muted": palette.codeMuted,
-    "--sticky-inline-code-bg": hexToCssRgb(ink, s("inlineCode")),
+    "--sticky-inline-code-bg": hexToCssRgb(palette.text, s("inlineCode")),
     "--sticky-inline-code-text": palette.danger,
     "--sticky-menu-shadow": shadow("menu", "menuShadow"),
     "--sticky-panel-shadow": shadow("panel", "panelShadow"),
@@ -133,17 +132,17 @@ export function buildThemeTokens(theme) {
     "--icon-tone-tabs": palette.blue,
     "--icon-tone-trash": palette.red,
     "--default-tab-text-color": palette.text,
-    "--icon-surface-fill": hexToCssRgb(WHITE, s("iconSurface")),
-    "--icon-muted-fill": hexToCssRgb(ink, s("iconMuted")),
+    "--icon-surface-fill": hexToCssRgb(glass, s("iconSurface")),
+    "--icon-muted-fill": hexToCssRgb(palette.text, s("iconMuted")),
     "--icon-chrome-color": palette.muted,
     "--icon-chrome-active-color": palette.text,
-    "--chrome-icon-button-bg": hexToCssRgb(WHITE, s("buttonBg")),
+    "--chrome-icon-button-bg": hexToCssRgb(glass, s("buttonBg")),
     "--chrome-icon-button-hover-bg": hexToCssRgb(hoverBase, s("buttonHover")),
-    "--chrome-icon-button-active-bg": hexToCssRgb(ink, s("buttonActive")),
-    "--chrome-icon-button-active-hover-bg": hexToCssRgb(ink, s("buttonActiveHover")),
-    "--chrome-icon-button-border": hexToCssRgb(ink, s("buttonBorder")),
-    "--chrome-icon-button-hover-border": hexToCssRgb(ink, s("buttonHoverBorder")),
-    "--chrome-icon-button-active-border": hexToCssRgb(ink, s("buttonActiveBorder")),
+    "--chrome-icon-button-active-bg": hexToCssRgb(palette.text, s("buttonActive")),
+    "--chrome-icon-button-active-hover-bg": hexToCssRgb(palette.text, s("buttonActiveHover")),
+    "--chrome-icon-button-border": hexToCssRgb(palette.text, s("buttonBorder")),
+    "--chrome-icon-button-hover-border": hexToCssRgb(palette.text, s("buttonHoverBorder")),
+    "--chrome-icon-button-active-border": hexToCssRgb(palette.text, s("buttonActiveBorder")),
     "--chrome-icon-button-shadow": `${shadow("button", "buttonShadow")}, ${highlight("glassButton")}`,
     "--session-tab-active-bg": palette.header,
     "--session-tab-inactive-bg": palette.header,
@@ -160,7 +159,7 @@ export function buildThemeTokens(theme) {
     "--bn-colors-selected-background": palette.accent,
     "--bn-colors-disabled-text": palette.faint,
     "--bn-colors-disabled-background": palette.header,
-    "--bn-colors-border": hexToCssRgb(ink, s("border")),
+    "--bn-colors-border": hexToCssRgb(palette.text, s("border")),
     "--bn-colors-shadow": hexToCssRgb(palette.shadow, s("bnShadow")),
     "--bn-colors-side-menu": palette.faint,
     "--notepane-find-match-bg": commaRgba(palette.warning, s("findMatch")),

@@ -78,7 +78,13 @@
       "--bn-colors-selected-background": "#2f3437",
       "--bn-colors-disabled-background": "#f1f1ef",
       "--bn-colors-side-menu": "#8a8a86",
-      "--notepane-find-current-bg": "rgba(249, 115, 22, 0.55)"
+      "--notepane-find-current-bg": "rgba(249, 115, 22, 0.55)",
+      "--sticky-control-bg": "rgb(255 255 255 / 0.76)",
+      "--icon-surface-fill": "rgb(255 255 255 / 0.78)",
+      "--chrome-icon-button-bg": "rgb(255 255 255 / 0.74)",
+      "--sticky-table-control-shadow": "0 5px 12px rgb(55 53 47 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.28)",
+      "--sticky-portal-menu-shadow": "0 12px 26px rgb(55 53 47 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.38)",
+      "--chrome-icon-button-shadow": "0 4px 10px rgb(0 0 0 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.42)"
     },
     "overrideReasons": [
       {
@@ -169,6 +175,22 @@
           "--notepane-find-current-bg"
         ],
         "reason": "Today's hand-tuned find highlight colour and alpha."
+      },
+      {
+        "tokens": [
+          "--sticky-control-bg",
+          "--icon-surface-fill",
+          "--chrome-icon-button-bg"
+        ],
+        "reason": "NotePane Light's translucent chrome fills are pure white, brighter than its #f5f5f2 panel, which the derivation uses as the glass colour."
+      },
+      {
+        "tokens": [
+          "--sticky-table-control-shadow",
+          "--sticky-portal-menu-shadow",
+          "--chrome-icon-button-shadow"
+        ],
+        "reason": "NotePane Light's inset glass highlight on table controls, menus and icon buttons is pure white, brighter than its #f5f5f2 panel, which the derivation uses."
       }
     ]
   },
@@ -245,7 +267,24 @@
       "--bn-colors-selected-background": "#3f3f3f",
       "--bn-colors-disabled-background": "#202020",
       "--bn-colors-side-menu": "#9b9b98",
-      "--notepane-find-current-bg": "rgba(251, 146, 60, 0.5)"
+      "--notepane-find-current-bg": "rgba(251, 146, 60, 0.5)",
+      "--sticky-border-color": "rgb(255 255 255 / 0.12)",
+      "--bn-colors-border": "rgb(255 255 255 / 0.12)",
+      "--sticky-inline-code-bg": "rgb(255 255 255 / 0.1)",
+      "--sticky-control-bg": "rgb(255 255 255 / 0.06)",
+      "--sticky-control-hover-bg": "rgb(255 255 255 / 0.1)",
+      "--icon-surface-fill": "rgb(255 255 255 / 0.08)",
+      "--icon-muted-fill": "rgb(255 255 255 / 0.12)",
+      "--chrome-icon-button-bg": "rgb(255 255 255 / 0.07)",
+      "--chrome-icon-button-hover-bg": "rgb(255 255 255 / 0.11)",
+      "--chrome-icon-button-active-bg": "rgb(255 255 255 / 0.12)",
+      "--chrome-icon-button-active-hover-bg": "rgb(255 255 255 / 0.15)",
+      "--chrome-icon-button-border": "rgb(255 255 255 / 0.14)",
+      "--chrome-icon-button-hover-border": "rgb(255 255 255 / 0.24)",
+      "--chrome-icon-button-active-border": "rgb(255 255 255 / 0.30)",
+      "--sticky-table-control-shadow": "0 7px 16px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.08)",
+      "--sticky-portal-menu-shadow": "0 14px 34px rgb(0 0 0 / 0.46), inset 0 1px 0 rgb(255 255 255 / 0.08)",
+      "--chrome-icon-button-shadow": "0 4px 12px rgb(0 0 0 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.08)"
     },
     "overrideReasons": [
       {
@@ -330,6 +369,33 @@
           "--notepane-find-current-bg"
         ],
         "reason": "Today's hand-tuned find highlight colour and alpha."
+      },
+      {
+        "tokens": [
+          "--sticky-border-color",
+          "--bn-colors-border",
+          "--sticky-inline-code-bg",
+          "--sticky-control-bg",
+          "--sticky-control-hover-bg",
+          "--icon-surface-fill",
+          "--icon-muted-fill",
+          "--chrome-icon-button-bg",
+          "--chrome-icon-button-hover-bg",
+          "--chrome-icon-button-active-bg",
+          "--chrome-icon-button-active-hover-bg",
+          "--chrome-icon-button-border",
+          "--chrome-icon-button-hover-border",
+          "--chrome-icon-button-active-border"
+        ],
+        "reason": "NotePane Dark draws hairline borders, inline code, pressed, hover and translucent chrome fills as a pure white veil; the derivation draws them with its text colour #f1f1ef."
+      },
+      {
+        "tokens": [
+          "--sticky-table-control-shadow",
+          "--sticky-portal-menu-shadow",
+          "--chrome-icon-button-shadow"
+        ],
+        "reason": "NotePane Dark's inset glass highlight on table controls, menus and icon buttons is pure white; the derivation uses its text colour #f1f1ef."
       }
     ]
   }
