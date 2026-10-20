@@ -1,4 +1,4 @@
-import { hexToCssRgb, hexToRgb, mixHexColors } from "./colorMath.js";
+import { getContrastingTextColor, hexToCssRgb, hexToRgb, mixHexColors } from "./colorMath.js";
 import { DEFAULT_THEME_ID, getTheme } from "./themes.js";
 
 // Glass highlights and chrome fills are white in every theme; name the endpoint once.
@@ -156,7 +156,7 @@ export function buildThemeTokens(theme) {
     "--bn-colors-tooltip-background": "var(--sticky-portal-menu-hover-bg)",
     "--bn-colors-hovered-text": "var(--sticky-text-color)",
     "--bn-colors-hovered-background": "var(--sticky-portal-menu-hover-bg)",
-    "--bn-colors-selected-text": palette.text,
+    "--bn-colors-selected-text": getContrastingTextColor(palette.accent, palette.text, palette.window),
     "--bn-colors-selected-background": palette.accent,
     "--bn-colors-disabled-text": palette.faint,
     "--bn-colors-disabled-background": palette.header,

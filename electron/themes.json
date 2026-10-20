@@ -79,7 +79,98 @@
       "--bn-colors-disabled-background": "#f1f1ef",
       "--bn-colors-side-menu": "#8a8a86",
       "--notepane-find-current-bg": "rgba(249, 115, 22, 0.55)"
-    }
+    },
+    "overrideReasons": [
+      {
+        "tokens": [
+          "--brand-pane-cream",
+          "--brand-pastel-sage",
+          "--brand-pastel-sky",
+          "--brand-graphite-ink"
+        ],
+        "reason": "Today's hand-tuned brand constant, not a palette value."
+      },
+      {
+        "tokens": [
+          "--sticky-table-control-bg",
+          "--sticky-portal-menu-bg",
+          "--sticky-control-hover-bg",
+          "--chrome-icon-button-hover-bg"
+        ],
+        "reason": "Today's hand-tuned surface or shadow tint; the derived default differs."
+      },
+      {
+        "tokens": [
+          "--sticky-inline-code-bg",
+          "--sticky-inline-code-text"
+        ],
+        "reason": "Today's hand-tuned inline code tint."
+      },
+      {
+        "tokens": [
+          "--notepane-editor-gray-bg",
+          "--notepane-editor-brown-bg",
+          "--notepane-editor-red-bg",
+          "--notepane-editor-orange-bg",
+          "--notepane-editor-yellow-bg",
+          "--notepane-editor-green-bg",
+          "--notepane-editor-blue-bg",
+          "--notepane-editor-purple-bg",
+          "--notepane-editor-pink-bg"
+        ],
+        "reason": "Notion-style editor highlight background, not a mix of the window and the named colour."
+      },
+      {
+        "tokens": [
+          "--icon-chrome-color",
+          "--icon-chrome-active-color"
+        ],
+        "reason": "Today's hand-tuned chrome icon colour."
+      },
+      {
+        "tokens": [
+          "--icon-tone-copy",
+          "--icon-tone-delete",
+          "--icon-tone-dock",
+          "--icon-tone-palette",
+          "--icon-tone-pin",
+          "--icon-tone-pin-active",
+          "--icon-tone-restore",
+          "--icon-tone-settings",
+          "--icon-tone-sidebar",
+          "--icon-tone-sticky",
+          "--icon-tone-tabs",
+          "--icon-tone-trash"
+        ],
+        "reason": "Hand-tuned per-icon tone, not a palette named colour."
+      },
+      {
+        "tokens": [
+          "--session-tab-active-bg",
+          "--session-tab-inactive-bg",
+          "--session-tab-hover-bg"
+        ],
+        "reason": "Today's session tab surface, a fixed step from the header colour."
+      },
+      {
+        "tokens": [
+          "--bn-colors-menu-background",
+          "--bn-colors-tooltip-background",
+          "--bn-colors-hovered-background",
+          "--bn-colors-selected-text",
+          "--bn-colors-selected-background",
+          "--bn-colors-disabled-background",
+          "--bn-colors-side-menu"
+        ],
+        "reason": "BlockNote value kept from today's tokens.css; the derived default differs."
+      },
+      {
+        "tokens": [
+          "--notepane-find-current-bg"
+        ],
+        "reason": "Today's hand-tuned find highlight colour and alpha."
+      }
+    ]
   },
   {
     "id": "notepane-dark",
@@ -147,15 +238,99 @@
       "--icon-tone-sticky": "#ffd36e",
       "--icon-tone-tabs": "#91d0ff",
       "--icon-tone-trash": "#ff8a8a",
-      "--chrome-icon-button-active-border": "rgb(255 255 255 / 0.30)",
       "--session-tab-active-bg": "#2a2a2a",
       "--session-tab-inactive-bg": "#2a2a2a",
       "--session-tab-hover-bg": "#2a2a2a",
+      "--bn-colors-selected-text": "#f1f1ef",
       "--bn-colors-selected-background": "#3f3f3f",
-      "--bn-colors-disabled-text": "#666",
       "--bn-colors-disabled-background": "#202020",
       "--bn-colors-side-menu": "#9b9b98",
       "--notepane-find-current-bg": "rgba(251, 146, 60, 0.5)"
-    }
+    },
+    "overrideReasons": [
+      {
+        "tokens": [
+          "--brand-pane-cream",
+          "--brand-pastel-sage",
+          "--brand-pastel-sky",
+          "--brand-graphite-ink"
+        ],
+        "reason": "Today's hand-tuned brand constant, not a palette value."
+      },
+      {
+        "tokens": [
+          "--sticky-table-control-bg",
+          "--sticky-table-control-hover-bg",
+          "--sticky-portal-menu-bg"
+        ],
+        "reason": "Today's hand-tuned surface or shadow tint; the derived default differs."
+      },
+      {
+        "tokens": [
+          "--sticky-inline-code-text"
+        ],
+        "reason": "Today's hand-tuned inline code tint."
+      },
+      {
+        "tokens": [
+          "--notepane-editor-gray-bg",
+          "--notepane-editor-brown-bg",
+          "--notepane-editor-red-bg",
+          "--notepane-editor-orange-bg",
+          "--notepane-editor-yellow-bg",
+          "--notepane-editor-green-bg",
+          "--notepane-editor-blue-bg",
+          "--notepane-editor-purple-bg",
+          "--notepane-editor-pink-bg"
+        ],
+        "reason": "Notion-style editor highlight background, not a mix of the window and the named colour."
+      },
+      {
+        "tokens": [
+          "--icon-chrome-color"
+        ],
+        "reason": "Today's hand-tuned chrome icon colour."
+      },
+      {
+        "tokens": [
+          "--icon-tone-copy",
+          "--icon-tone-delete",
+          "--icon-tone-dock",
+          "--icon-tone-palette",
+          "--icon-tone-pin",
+          "--icon-tone-pin-active",
+          "--icon-tone-restore",
+          "--icon-tone-settings",
+          "--icon-tone-sidebar",
+          "--icon-tone-sticky",
+          "--icon-tone-tabs",
+          "--icon-tone-trash"
+        ],
+        "reason": "Hand-tuned per-icon tone, not a palette named colour."
+      },
+      {
+        "tokens": [
+          "--session-tab-active-bg",
+          "--session-tab-inactive-bg",
+          "--session-tab-hover-bg"
+        ],
+        "reason": "Today's session tab surface, a fixed step from the header colour."
+      },
+      {
+        "tokens": [
+          "--bn-colors-selected-text",
+          "--bn-colors-selected-background",
+          "--bn-colors-disabled-background",
+          "--bn-colors-side-menu"
+        ],
+        "reason": "BlockNote value kept from today's tokens.css; the derived default differs."
+      },
+      {
+        "tokens": [
+          "--notepane-find-current-bg"
+        ],
+        "reason": "Today's hand-tuned find highlight colour and alpha."
+      }
+    ]
   }
 ]

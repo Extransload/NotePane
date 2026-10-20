@@ -22,6 +22,23 @@ const NON_COLOUR_TOKENS = new Set([
 const pickColourTokens = (tokens) =>
   Object.fromEntries(Object.entries(tokens).filter(([name]) => !NON_COLOUR_TOKENS.has(name)));
 
+// Compares colours, not spellings: #rgb -> #rrggbb, rgb()/rgba() -> "rgb(r g b / a)", 0.30 -> 0.3.
+// Everything that is not a colour (geometry, var(), color-mix()) is compared exactly.
+function normaliseColours(value) {
+  return value
+    .replace(/#([0-9a-f])([0-9a-f])([0-9a-f])\b/gi, "#$1$1$2$2$3$3")
+    .replace(/#[0-9a-f]{6}\b/gi, (hex) => hex.toLowerCase())
+    .replace(/rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:\s*[,/]\s*([\d.]+))?\s*\)/gi, (_, r, g, b, a) =>
+      a === undefined ? `rgb(${r} ${g} ${b})` : `rgb(${r} ${g} ${b} / ${Number(a)})`,
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+const normaliseTokens = (tokens) =>
+  Object.fromEntries(
+    Object.entries(pickColourTokens(tokens)).map(([name, value]) => [name, normaliseColours(value)]),
+  );
+
 test("every theme defines every palette key as six-digit hex", async () => {
   const { listThemes, PALETTE_KEYS } = await loadThemes();
   assert.equal(PALETTE_KEYS.length, 27);
@@ -47,8 +64,8 @@ test("NotePane Light tokens equal the captured tokens.css values", async () => {
   const { buildThemeTokens } = await loadTokens();
   const { getTheme } = await loadThemes();
   assert.deepEqual(
-    pickColourTokens(buildThemeTokens(getTheme("notepane-light"))),
-    pickColourTokens(baseline.tokens.light),
+    normaliseTokens(buildThemeTokens(getTheme("notepane-light"))),
+    normaliseTokens(baseline.tokens.light),
   );
 });
 
@@ -57,8 +74,8 @@ test("NotePane Dark tokens equal the captured tokens.css values", async () => {
   const { buildThemeTokens } = await loadTokens();
   const { getTheme } = await loadThemes();
   assert.deepEqual(
-    pickColourTokens(buildThemeTokens(getTheme("notepane-dark"))),
-    pickColourTokens(baseline.tokens.dark),
+    normaliseTokens(buildThemeTokens(getTheme("notepane-dark"))),
+    normaliseTokens(baseline.tokens.dark),
   );
 });
 
@@ -101,11 +118,42 @@ test("themeIdForMode maps dark to NotePane Dark and everything else to Light", a
 test("registered test themes follow the JSON themes", async () => {
   const { registerTestThemes, listThemes, getTheme, isKnownThemeId } = await loadThemes();
   const base = getTheme("notepane-dark");
-  registerTestThemes([{ ...base, id: "test-extra", label: "Test Extra" }]);
-  const ids = listThemes().map((theme) => theme.id);
-  assert.deepEqual(ids.slice(0, 2), ["notepane-light", "notepane-dark"]);
-  assert.equal(ids.at(-1), "test-extra");
-  assert.ok(isKnownThemeId("test-extra"));
-  registerTestThemes([]);
+  try {
+    registerTestThemes([{ ...base, id: "test-extra", label: "Test Extra" }]);
+    const ids = listThemes().map((theme) => theme.id);
+    assert.deepEqual(ids.slice(0, 2), ["notepane-light", "notepane-dark"]);
+    assert.equal(ids.at(-1), "test-extra");
+    assert.ok(isKnownThemeId("test-extra"));
+  } finally {
+    registerTestThemes([]);
+  }
   assert.ok(!isKnownThemeId("test-extra"));
 });
+
+test("derivation is total for a theme without overrides", async () => {
+  const { buildThemeTokens, THEME_TOKEN_NAMES } = await loadTokens();
+  const { listThemes } = await loadThemes();
+  for (const theme of listThemes()) {
+    const tokens = buildThemeTokens({ ...theme, overrides: {} });
+    for (const name of THEME_TOKEN_NAMES) {
+      const value = tokens[name];
+      assert.equal(typeof value, "string", `${theme.id} ${name}`);
+      assert.notEqual(value.trim(), "", `${theme.id} ${name}`);
+      assert.doesNotMatch(value, /undefined|NaN|null/, `${theme.id} ${name}`);
+    }
+  }
+});
+
+test("every override has a recorded reason", async () => {
+  const { listThemes } = await loadThemes();
+  for (const theme of listThemes()) {
+    const overrideKeys = Object.keys(theme.overrides).sort();
+    const grouped = (theme.overrideReasons ?? []).flatMap((group) => {
+      assert.ok(group.reason && group.reason.trim(), `${theme.id} reason text`);
+      return group.tokens;
+    });
+    assert.deepEqual([...grouped].sort(), overrideKeys, theme.id);
+    assert.equal(new Set(grouped).size, grouped.length, `${theme.id} token listed twice`);
+  }
+});
+
