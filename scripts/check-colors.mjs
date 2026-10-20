@@ -76,11 +76,11 @@ function readJson(file, fallback) {
   return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : fallback;
 }
 
-// An allowlist entry covers a finding in the same file (any file for "*") whose line contains
+// An allowlist entry covers a finding in the same file whose line contains
 // `text`, or, when it carries `lines: [first, last]`, any finding inside that line range.
 function isAllowed(finding, allowlist) {
   return allowlist.some((entry) => {
-    if (entry.file !== "*" && entry.file !== finding.file) return false;
+    if (entry.file !== finding.file) return false;
     if (Array.isArray(entry.lines)) {
       return finding.line >= entry.lines[0] && finding.line <= entry.lines[1];
     }

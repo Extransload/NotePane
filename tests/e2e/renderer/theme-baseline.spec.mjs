@@ -31,8 +31,6 @@ const NAMED_COLORS = [
   "red",
 ];
 
-test.use({ actionTimeout: 15_000 });
-
 const editorSurface =(page) => page.getByTestId("sticky-editor-surface");
 const formattingToolbar = (page) => page.locator(".bn-formatting-toolbar");
 const preferencesDialog = (page) => page.getByRole("dialog", { name: "Preferences window" });
@@ -57,18 +55,15 @@ async function selectWord(page, word) {
   await expect(formattingToolbar(page)).toBeVisible();
 }
 
-// The colour menu animates in, so a click can land before the word is styled; the whole
-// select-and-apply step is retried until the word carries the colour.
 async function applyColor(page, word, kind, color) {
   const styleType = kind === "text" ? "textColor" : "backgroundColor";
-  await expect(async () => {
-    await selectWord(page, word);
-    await formattingToolbar(page).getByRole("button", { name: "Colors" }).click();
-    await page.locator(`.bn-color-picker-dropdown:visible [data-test='${kind}-color-${color}']`)
-      .click({ timeout: 3_000 });
-    await expect(styledWord(page, styleType, color, word)).toHaveCount(1, { timeout: 2_000 });
-  }).toPass({ timeout: 20_000 });
+  await selectWord(page, word);
+  await formattingToolbar(page).getByRole("button", { name: "Colors" }).click();
+  await page.locator(`.bn-color-picker-dropdown:visible [data-test='${kind}-color-${color}']`)
+    .click();
+  await expect(styledWord(page, styleType, color, word)).toHaveCount(1);
   await page.keyboard.press("Escape");
+  await expect(formattingToolbar(page)).toBeHidden();
 }
 
 // Builds the document once, in NotePane Light; the same content is read back in Dark.
@@ -87,7 +82,9 @@ async function buildBaselineDocument(page) {
     await page.keyboard.press("Enter");
   }
   await page.keyboard.type("/table");
-  await page.getByText("Table with editable cells").click();
+  // Enter only once the filtered menu shows the single matching item.
+  await expect(page.getByText("Table with editable cells")).toBeVisible();
+  await page.keyboard.press("Enter");
   await expect(page.getByRole("table").first()).toBeVisible();
   await page.keyboard.press("Escape");
 
@@ -187,61 +184,68 @@ const BASELINE_TARGETS = [
   },
 ];
 
-async function readColors(locator) {
-  const read = () =>
-    locator.first().evaluate((element, properties) => {
-      const style = getComputedStyle(element);
-      return Object.fromEntries(properties.map((property) => [property, style[property]]));
-    }, PROPERTIES);
-  // Wait out entrance animations (toast, dialog) before trusting the value.
-  let previous = await read();
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    await locator.page().waitForTimeout(60);
-    const current = await read();
-    if (JSON.stringify(current) === JSON.stringify(previous)) {
-      return current;
-    }
-    previous = current;
-  }
-  throw new Error("computed colours never settled");
+// Entrance animations and the theme transition must have finished before a value is read.
+async function settleAnimations(page) {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+        .map((animation) => animation.finished.catch(() => {})),
+    ),
+  );
 }
 
-test("keeps NotePane Light and Dark computed colours unchanged", async ({ page }) => {
-  test.setTimeout(240_000);
-  await page.goto("/");
-  await expect(editorSurface(page)).toBeVisible();
-  await selectAppTheme(page, "notepane-light");
-  await buildBaselineDocument(page);
+async function readColors(locator) {
+  await settleAnimations(locator.page());
+  return await locator.first().evaluate((element, properties) => {
+    const style = getComputedStyle(element);
+    return Object.fromEntries(properties.map((property) => [property, style[property]]));
+  }, PROPERTIES);
+}
 
-  const captured = {};
-  for (const themeId of THEMES) {
+// One test per theme, so a failure names the theme. Capture mode merges the theme's entries
+// into the fixture and keeps the THEMES order.
+for (const themeId of THEMES) {
+  test(`keeps ${themeId} computed colours unchanged`, async ({ page }) => {
+    await page.goto("/");
+    await expect(editorSurface(page)).toBeVisible();
+    await selectAppTheme(page, "notepane-light");
+    await buildBaselineDocument(page);
     await clickLastEmptyParagraph(page);
     await selectAppTheme(page, themeId);
-    captured[themeId] = {};
+
+    const captured = {};
     for (const target of BASELINE_TARGETS) {
       await target.setup?.(page);
       await expect(target.locator(page).first(), `${themeId} / ${target.name} is visible`)
         .toBeVisible();
-      captured[themeId][target.name] = await readColors(target.locator(page));
+      captured[target.name] = await readColors(target.locator(page));
       await target.teardown?.(page);
     }
-  }
 
-  if (CAPTURE) {
-    fs.mkdirSync(path.dirname(BASELINE_FILE), { recursive: true });
-    fs.writeFileSync(BASELINE_FILE, `${JSON.stringify(captured, null, 2)}\n`);
-    return;
-  }
+    const existing = fs.existsSync(BASELINE_FILE)
+      ? JSON.parse(fs.readFileSync(BASELINE_FILE, "utf8"))
+      : {};
 
-  const baseline = JSON.parse(fs.readFileSync(BASELINE_FILE, "utf8"));
-  for (const themeId of THEMES) {
+    if (CAPTURE) {
+      const merged = {};
+      for (const id of THEMES) {
+        const entries = id === themeId ? captured : existing[id];
+        if (entries) merged[id] = entries;
+      }
+      fs.mkdirSync(path.dirname(BASELINE_FILE), { recursive: true });
+      fs.writeFileSync(BASELINE_FILE, `${JSON.stringify(merged, null, 2)}\n`);
+      return;
+    }
+
     for (const target of BASELINE_TARGETS) {
+      const expected = existing[themeId]?.[target.name];
+      expect(expected, `${themeId} / ${target.name} is missing from the baseline`).toBeDefined();
       for (const property of PROPERTIES) {
-        expect(
-          captured[themeId][target.name][property],
-          `${themeId} / ${target.name} / ${property}`,
-        ).toBe(baseline[themeId][target.name][property]);
+        expect(captured[target.name][property], `${themeId} / ${target.name} / ${property}`)
+          .toBe(expected[property]);
       }
     }
-  }
-});
+  });
+}

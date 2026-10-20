@@ -1,15 +1,5 @@
 [
   {
-    "file": "*",
-    "text": "transparent",
-    "reason": "Keyword, not a themed colour. Never matched by the patterns; listed for documentation."
-  },
-  {
-    "file": "*",
-    "text": "currentColor",
-    "reason": "Keyword that inherits a themed colour. Never matched by the patterns; listed for documentation."
-  },
-  {
     "file": "electron/main.cjs",
     "text": "\"#00000000\"",
     "reason": "Fully transparent window background, not a visible colour."
