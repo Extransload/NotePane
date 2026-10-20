@@ -18,6 +18,7 @@ import {
   loadTemplatePreview,
   modifierShortcut,
   openStickyActionBar,
+  selectAppTheme,
 } from "../support/renderer-helpers.mjs";
 
 test.beforeEach(async ({ page }) => {
@@ -1093,6 +1094,51 @@ test("keeps sticky dark-mode icon tooltips readable", async ({ page }) => {
   });
 
   expect(tooltipContrast).toBeGreaterThanOrEqual(4.5);
+});
+
+test("portalled menu scrollbars follow the sticky note colour", async ({ page }) => {
+  await page.getByRole("button", { name: "Switch to Sticky windows mode" }).click();
+  await expect(page.getByTestId("sticky-shell")).toHaveAttribute(
+    "data-layout-mode",
+    "sticky",
+  );
+  await selectAppTheme(page, "notepane-dark");
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/");
+  const slashMenu = page.locator(".bn-suggestion-menu");
+  await expect(slashMenu).toBeVisible();
+
+  const scrollbar = await slashMenu.evaluate((menu) => {
+    const read = (element, name) => getComputedStyle(element).getPropertyValue(name).trim();
+    return {
+      noteText: read(document.body, "--sticky-text-color"),
+      themeText: read(document.documentElement, "--sticky-text-color"),
+      menuThumb: read(menu, "--sticky-scrollbar-thumb"),
+      menuThumbHover: read(menu, "--sticky-scrollbar-thumb-hover"),
+      rootThumb: read(document.documentElement, "--sticky-scrollbar-thumb"),
+      // The note's BlockNote colours, copied inline onto body, must win over the theme's.
+      noteBlockNoteColors: [...document.body.style]
+        .filter((name) => name.startsWith("--bn-colors-"))
+        .map((name) => ({
+          name,
+          inline: document.body.style.getPropertyValue(name).trim(),
+          computed: read(document.body, name),
+        })),
+    };
+  });
+
+  // The slash menu is portalled into body, where the sticky shell style puts the note's
+  // text colour. NotePane Dark draws the thumb with 28% of it, and 42% on hover.
+  expect(scrollbar.noteText).not.toBe(scrollbar.themeText);
+  expect(scrollbar.menuThumb).toBe(`color-mix(in srgb, ${scrollbar.noteText} 28%, transparent)`);
+  expect(scrollbar.menuThumbHover).toBe(
+    `color-mix(in srgb, ${scrollbar.noteText} 42%, transparent)`,
+  );
+  expect(scrollbar.menuThumb).not.toBe(scrollbar.rootThumb);
+  expect(scrollbar.noteBlockNoteColors.length).toBeGreaterThan(0);
+  for (const { name, inline, computed } of scrollbar.noteBlockNoteColors) {
+    expect(computed, name).toBe(inline);
+  }
 });
 
 test("keeps adaptive tooltips visible from every viewport edge", async ({ page }) => {
