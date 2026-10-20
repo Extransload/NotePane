@@ -171,6 +171,36 @@ function colourScan({ phase, scope, indices, allowlist }) {
     return allowlist.some((entry) => element.closest(entry.selector));
   }
 
+  // A theme change re-highlights code blocks with the new code theme, which replaces their token
+  // spans, split where that theme's tokens split. A target inside a code block's text is
+  // therefore followed by its code element and the offset of its first character there, and read
+  // again on the element that holds that character after the change.
+  const CODE_TEXT = ".bn-editor [data-content-type='codeBlock'] code";
+  function codeTextNodes(code) {
+    const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node);
+    return nodes;
+  }
+  function codeAnchor(element) {
+    const code = element.closest(CODE_TEXT);
+    if (!code || code === element) return null;
+    let offset = 0;
+    for (const node of codeTextNodes(code)) {
+      if (element.contains(node)) return { code, offset };
+      offset += node.textContent.length;
+    }
+    return null;
+  }
+  function elementAtCodeOffset({ code, offset }) {
+    let start = 0;
+    for (const node of codeTextNodes(code)) {
+      start += node.textContent.length;
+      if (offset < start) return node.parentElement;
+    }
+    return null;
+  }
+
   function readTarget(target) {
     const style = getComputedStyle(target.element, target.pseudo);
     const values = {};
@@ -258,7 +288,12 @@ function colourScan({ phase, scope, indices, allowlist }) {
     for (const element of ordered) {
       if (NON_PAINTING.has(element.tagName.toLowerCase()) || isAllowlisted(element) || excluded(element)) continue;
       if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true }) || !hasBox(element)) continue;
-      targets.push({ element, pseudo: null, properties: elementProperties(element, getComputedStyle(element)) });
+      targets.push({
+        element,
+        pseudo: null,
+        properties: elementProperties(element, getComputedStyle(element)),
+        codeAnchor: codeAnchor(element),
+      });
       for (const pseudo of ["::before", "::after"]) {
         const properties = pseudoProperties(getComputedStyle(element, pseudo));
         if (properties.length) targets.push({ element, pseudo, properties });
@@ -280,7 +315,14 @@ function colourScan({ phase, scope, indices, allowlist }) {
     };
   }
   if (phase === "read") {
-    return { readings: window[STORE].map((target) => (target.element.isConnected ? readTarget(target) : null)) };
+    return {
+      readings: window[STORE].map((target) => {
+        if (!target.element.isConnected && target.codeAnchor?.code.isConnected) {
+          target.element = elementAtCodeOffset(target.codeAnchor) ?? target.element;
+        }
+        return target.element.isConnected ? readTarget(target) : null;
+      }),
+    };
   }
   return indices.map((index) => {
     const target = window[STORE][index];

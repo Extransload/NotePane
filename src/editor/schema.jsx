@@ -1,7 +1,4 @@
 import {
-  codeBlockOptions,
-} from "@blocknote/code-block";
-import {
   BlockNoteSchema,
   createBlockConfig,
   createBlockSpec,
@@ -16,6 +13,10 @@ import {
   imageRender,
   imageToExternalHTML,
 } from "@blocknote/core";
+import {
+  codeBlockOptions,
+  followCodeTheme,
+} from "./codeHighlighter.js";
 
 export const NOTE_PANE_TEMPLATE_BLOCKS = [
   {
@@ -190,6 +191,20 @@ export const createNonDestructiveImageBlockSpec = createBlockSpec(
   }),
 );
 
+// Code blocks highlighted with the active theme's code theme. Every editor built from this schema
+// (the note editor and the version history preview) follows theme changes while it is mounted.
+function createNotePaneCodeBlockSpec() {
+  const codeBlockSpec = createCodeBlockSpec(codeBlockOptions);
+  const followTheme = createExtension(({ editor }) => ({
+    key: "notepane-code-theme",
+    mount: () => followCodeTheme(editor),
+  }))();
+  return {
+    ...codeBlockSpec,
+    extensions: [...(codeBlockSpec.extensions ?? []), followTheme],
+  };
+}
+
 export const schema = BlockNoteSchema.create({
   blockSpecs: {
     ...defaultBlockSpecs,
@@ -238,7 +253,7 @@ export const schema = BlockNoteSchema.create({
   },
 }).extend({
   blockSpecs: {
-    codeBlock: createCodeBlockSpec(codeBlockOptions),
+    codeBlock: createNotePaneCodeBlockSpec(),
   },
   styleSpecs: {
     code: notionInlineCodeStyle,

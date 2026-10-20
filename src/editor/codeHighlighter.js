@@ -1,0 +1,139 @@
+import {
+  codeBlockOptions as blockNoteCodeBlockOptions,
+} from "@blocknote/code-block";
+
+// Code blocks are highlighted with the active theme's Shiki theme (`theme.codeTheme`). BlockNote
+// creates the highlighter once per window and caches it, and its parser highlights each block
+// with `getLoadedThemes()[0]`. So the highlighter keeps every code theme loaded and lists the
+// active one first, and a theme change re-highlights the code blocks already on screen. See
+// "Code blocks" in the theme system spec.
+
+// NotePane Light and Dark's code theme, and the fallback for a code theme that is not loaded.
+export const DEFAULT_CODE_THEME = "github-dark";
+
+// The code themes BlockNote's bundle does not load. Each is its own chunk in the build.
+const CODE_THEME_LOADERS = {
+  "catppuccin-latte": () => import("@shikijs/themes/catppuccin-latte"),
+  "catppuccin-frappe": () => import("@shikijs/themes/catppuccin-frappe"),
+  "catppuccin-macchiato": () => import("@shikijs/themes/catppuccin-macchiato"),
+  "catppuccin-mocha": () => import("@shikijs/themes/catppuccin-mocha"),
+  nord: () => import("@shikijs/themes/nord"),
+  dracula: () => import("@shikijs/themes/dracula"),
+  "tokyo-night": () => import("@shikijs/themes/tokyo-night"),
+};
+
+// Every code theme the highlighter holds: BlockNote's own two, then the loaded ones.
+export const CODE_THEME_IDS = ["github-dark", "github-light", ...Object.keys(CODE_THEME_LOADERS)];
+
+// The window theme's code theme, and the code themes that temporarily replace it while
+// withCodeTheme runs (the PDF export); the latest one wins.
+let windowCodeTheme = DEFAULT_CODE_THEME;
+const temporaryCodeThemes = [];
+
+// The mounted editors, and the code theme each one's code blocks were last highlighted with.
+const followingEditors = new Set();
+const highlightedWith = new WeakMap();
+
+function knownCodeTheme(codeTheme) {
+  return CODE_THEME_IDS.includes(codeTheme) ? codeTheme : DEFAULT_CODE_THEME;
+}
+
+export function getActiveCodeTheme() {
+  return temporaryCodeThemes.at(-1) ?? windowCodeTheme;
+}
+
+/**
+ * BlockNote's `createHighlighter`: its language bundle with github-dark and github-light, plus
+ * every other code theme, all loaded before it resolves, so switching never waits and never
+ * asks Shiki for a theme it lacks. Only `getLoadedThemes` is wrapped.
+ */
+export async function createNotePaneHighlighter() {
+  const highlighter = await blockNoteCodeBlockOptions.createHighlighter();
+  await highlighter.loadTheme(...Object.values(CODE_THEME_LOADERS));
+  return {
+    ...highlighter,
+    getLoadedThemes: () => {
+      const active = getActiveCodeTheme();
+      return [active, ...highlighter.getLoadedThemes().filter((id) => id !== active)];
+    },
+  };
+}
+
+// BlockNote's code block options (languages, default language) with NotePane's highlighter.
+export const codeBlockOptions = {
+  ...blockNoteCodeBlockOptions,
+  createHighlighter: createNotePaneHighlighter,
+};
+
+/**
+ * Re-highlights `editor`'s code blocks with the active code theme. prosemirror-highlight keeps
+ * the decorations of an unchanged block, so each code block is set again with its own attributes.
+ * The document stays equal, so nothing is saved, and the step stays out of the undo history.
+ */
+export function rehighlightCodeBlocks(editor) {
+  highlightedWith.set(editor, getActiveCodeTheme());
+  editor.transact((tr) => {
+    let codeBlockCount = 0;
+    tr.doc.descendants((node, position) => {
+      if (node.type.name !== "codeBlock") {
+        return true;
+      }
+      tr.setNodeMarkup(position, undefined, node.attrs);
+      codeBlockCount += 1;
+      return false;
+    });
+    // Without steps or metadata BlockNote does not dispatch the transaction.
+    if (codeBlockCount > 0) {
+      tr.setMeta("addToHistory", false);
+    }
+  });
+}
+
+function rehighlightFollowingEditors() {
+  const active = getActiveCodeTheme();
+  for (const editor of followingEditors) {
+    if (highlightedWith.get(editor) !== active) {
+      rehighlightCodeBlocks(editor);
+    }
+  }
+}
+
+/**
+ * Keeps a mounted editor's code blocks in the active code theme; returns the function that stops.
+ * A newly mounted editor highlights with the active theme on its own; one mounted again after a
+ * theme change is re-highlighted.
+ */
+export function followCodeTheme(editor) {
+  followingEditors.add(editor);
+  if (!highlightedWith.has(editor)) {
+    highlightedWith.set(editor, getActiveCodeTheme());
+  } else if (highlightedWith.get(editor) !== getActiveCodeTheme()) {
+    rehighlightCodeBlocks(editor);
+  }
+  return () => {
+    followingEditors.delete(editor);
+  };
+}
+
+// Sets the window theme's code theme and re-highlights the code blocks on screen. A code theme
+// the highlighter does not hold falls back to github-dark.
+export function setActiveCodeTheme(codeTheme) {
+  windowCodeTheme = knownCodeTheme(codeTheme);
+  rehighlightFollowingEditors();
+}
+
+/**
+ * Highlights code with `codeTheme` while `run` (the PDF export render) runs, then returns to the
+ * window's code theme, also when `run` throws. A theme chosen meanwhile applies afterwards.
+ */
+export async function withCodeTheme(codeTheme, run) {
+  const temporary = knownCodeTheme(codeTheme);
+  temporaryCodeThemes.push(temporary);
+  rehighlightFollowingEditors();
+  try {
+    return await run();
+  } finally {
+    temporaryCodeThemes.splice(temporaryCodeThemes.lastIndexOf(temporary), 1);
+    rehighlightFollowingEditors();
+  }
+}

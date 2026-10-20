@@ -4,6 +4,11 @@ import { getTheme } from "./themes.js";
 // Exports stay printable and look the same whatever theme is selected.
 const EXPORT_THEME_ID = "notepane-light";
 
+// The theme exports render with, its code theme included.
+export function getExportTheme() {
+  return getTheme(EXPORT_THEME_ID);
+}
+
 // The token names each root received last, so a theme that lacks one clears the old value
 // instead of leaving the previous theme's colour behind.
 const appliedTokenNames = new WeakMap();
@@ -71,7 +76,7 @@ function declareReferencingTokensOnBody(ownerDocument, tokens) {
  * without priority) no longer carries `important` and is newer, so it is kept.
  */
 export async function withExportTheme(run, ownerDocument = document) {
-  const theme = getTheme(EXPORT_THEME_ID);
+  const theme = getExportTheme();
   const scheme = { "color-scheme": theme.scheme };
   const tokens = { ...buildThemeTokens(theme), ...scheme };
   const targets = [

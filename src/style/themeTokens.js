@@ -1,4 +1,11 @@
-import { getContrastingTextColor, hexToCssRgb, hexToRgb, mixHexColors, readableOn } from "./colorMath.js";
+import {
+  getContrastingTextColor,
+  getRelativeLuminance,
+  hexToCssRgb,
+  hexToRgb,
+  mixHexColors,
+  readableOn,
+} from "./colorMath.js";
 import { DEFAULT_THEME_ID, getTheme } from "./themes.js";
 
 // The palette's named colours: the editor's text and background colours, and the tone that
@@ -217,6 +224,11 @@ export function buildThemeTokens(theme) {
     "--sticky-code-text": palette.codeText,
     "--sticky-code-border": hexToCssRgb(palette.codeMuted, s("codeBorder")),
     "--sticky-code-muted": palette.codeMuted,
+    // A code block's own colour scheme (its scrollbars and language menu): dark where the code
+    // background is darker than the code text, as NotePane's GitHub dark blocks are in both
+    // NotePane themes.
+    "--sticky-code-color-scheme":
+      getRelativeLuminance(palette.codeBg) < getRelativeLuminance(palette.codeText) ? "dark" : "light",
     "--sticky-inline-code-bg": hexToCssRgb(palette.text, s("inlineCode")),
     "--sticky-inline-code-text": palette.danger,
     "--sticky-menu-shadow": shadow("menu", "menuShadow"),

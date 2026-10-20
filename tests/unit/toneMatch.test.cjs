@@ -1,56 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-// Catppuccin Mocha, the official v1 colours, on NotePane's 27 palette keys. Task 9 moves this
-// exact palette into electron/themes.json and replaces this constant with
-// getTheme("catppuccin-mocha").
-//   Surfaces follow tablepeek (web/src/palette.ts): window = base (its bg), panel = mantle,
-//   header = surface0 (its head), line = surface1, hover = surface1 (its btnHover), text = text
-//   (its ink), muted = subtext0, faint = overlay1, accent = mauve, danger = red (its error),
-//   success = green (its ok), warning = yellow (its warn).
-//   Keys tablepeek has no slot for: sidebar = mantle, lineStrong = overlay0, shadow = crust,
-//   codeBg = base (the catppuccin-mocha Shiki background), codeText = text, codeMuted = overlay2.
-//   Named colours are Mocha's accents: gray = overlay2, brown = flamingo, red = red,
-//   orange = peach, yellow = yellow, green = green, blue = blue, purple = mauve, pink = pink.
-const CATPPUCCIN_MOCHA = {
-  id: "catppuccin-mocha",
-  label: "Catppuccin Mocha",
-  scheme: "dark",
-  codeTheme: "catppuccin-mocha",
-  toneMatching: true,
-  palette: {
-    window: "#1e1e2e",
-    sidebar: "#181825",
-    header: "#313244",
-    panel: "#181825",
-    hover: "#45475a",
-    line: "#45475a",
-    lineStrong: "#6c7086",
-    text: "#cdd6f4",
-    muted: "#a6adc8",
-    faint: "#7f849c",
-    accent: "#cba6f7",
-    danger: "#f38ba8",
-    success: "#a6e3a1",
-    warning: "#f9e2af",
-    shadow: "#11111b",
-    codeBg: "#1e1e2e",
-    codeText: "#cdd6f4",
-    codeMuted: "#9399b2",
-    gray: "#9399b2",
-    brown: "#f2cdcd",
-    red: "#f38ba8",
-    orange: "#fab387",
-    yellow: "#f9e2af",
-    green: "#a6e3a1",
-    blue: "#89b4fa",
-    purple: "#cba6f7",
-    pink: "#f5c2e7",
-  },
-  overrides: {},
-  overrideReasons: [],
-};
-
 const EXTREMES = ["#ff0000", "#00ff00", "#0000ff", "#ffffff", "#000000", "#808080", "#404040", "#c0c0c0"];
 const ROLES = ["fill", "surface", "mark"];
 const OPACITIES = [1, 0.6, 0.35];
@@ -65,10 +15,11 @@ async function load() {
   const { toneMatch } = await import("../../src/style/toneMatch.js");
   const themeStyles = await import("../../src/style/themeStyles.js");
   const { STICKY_PASTEL_PALETTE } = await import("../../src/constants.js");
-  themes.registerTestThemes([...SENTINEL_THEMES, CATPPUCCIN_MOCHA]);
+  themes.registerTestThemes(SENTINEL_THEMES);
   const toneMatchedThemes = themes.listThemes().filter((theme) => theme.toneMatching);
-  // The four sentinels and Mocha, so no test below passes over an empty list.
-  assert.ok(toneMatchedThemes.length >= 5, toneMatchedThemes.map((theme) => theme.id).join());
+  // The seven shipped Catppuccin, Nord, Dracula and Tokyo Night themes and the four sentinels,
+  // so no test below passes over an empty list.
+  assert.ok(toneMatchedThemes.length >= 11, toneMatchedThemes.map((theme) => theme.id).join());
   return {
     ...themes,
     ...colorMath,
@@ -315,8 +266,9 @@ test("distinct pastels stay distinct", async () => {
 
 test("Mocha matches the spec's worked values", async () => {
   const { toneMatch, getTheme, hexToOklch } = await load();
+  // The shipped theme from electron/themes.json, not a fallback.
   const mocha = getTheme("catppuccin-mocha");
-  assert.equal(mocha, CATPPUCCIN_MOCHA);
+  assert.equal(mocha.id, "catppuccin-mocha");
   assert.ok(deltaE(hexToOklch, toneMatch("#fff2b8", mocha, "fill"), "#dacd95") < 0.03);
   assert.ok(deltaE(hexToOklch, toneMatch("#fff2b8", mocha, "surface"), "#3a3417") < 0.03);
 });

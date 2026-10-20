@@ -195,6 +195,9 @@
   opacity: 0.72;
 }
 
+/* Highlighted blocks take the active theme's code theme (src/editor/codeHighlighter.js), which
+   sets the --prosemirror-highlight variables on the block; plain text blocks take the theme's
+   code tokens. Outside NotePane Light and Dark the two backgrounds are the same colour. */
 .bn-editor [data-content-type="codeBlock"],
 .bn-editor [data-content-type="codeBlock"] > pre,
 .bn-editor pre {
@@ -206,7 +209,7 @@
 }
 
 .bn-editor [data-content-type="codeBlock"] {
-  color-scheme: dark;
+  color-scheme: var(--sticky-code-color-scheme);
   overflow: hidden;
   background-clip: padding-box;
   box-shadow: inset 0 0 0 1px var(--sticky-code-border);

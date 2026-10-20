@@ -292,7 +292,18 @@ test("normalizes a known theme id and keeps mode in step", () => {
   const directory = createTemporaryDirectory();
   const store = new StickyStore(directory);
 
-  // Task 9 adds the catppuccin-mocha case here.
+  assert.deepEqual(store.updateAppTheme({ themeId: "catppuccin-mocha" }), {
+    themeId: "catppuccin-mocha",
+    mode: "dark",
+  });
+  assert.deepEqual(store.updateAppTheme({ themeId: "catppuccin-latte", mode: "dark" }), {
+    themeId: "catppuccin-latte",
+    mode: "light",
+  });
+  assert.deepEqual(new StickyStore(directory).getAppTheme(), {
+    themeId: "catppuccin-latte",
+    mode: "light",
+  });
   assert.deepEqual(store.updateAppTheme({ themeId: "notepane-dark" }), {
     themeId: "notepane-dark",
     mode: "dark",
@@ -368,6 +379,7 @@ test("an unknown theme id falls back by mode", () => {
 test("resolves the window background from the current theme", () => {
   const { resolveWindowBackgroundColor } = require("../../electron/windowTheme.cjs");
   assert.equal(resolveWindowBackgroundColor({ themeId: "notepane-dark" }), "#191919");
+  assert.equal(resolveWindowBackgroundColor({ themeId: "catppuccin-mocha", mode: "dark" }), "#1e1e2e");
   assert.equal(
     resolveWindowBackgroundColor({ themeId: "notepane-light", mode: "light" }),
     "#f5f5f2",

@@ -93,6 +93,122 @@ test("theme ids are unique", async () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
+// The picker lists the themes in the order electron/themes.json gives them.
+const SHIPPED_THEMES = [
+  ["notepane-light", "NotePane Light"],
+  ["notepane-dark", "NotePane Dark"],
+  ["catppuccin-latte", "Catppuccin Latte"],
+  ["catppuccin-frappe", "Catppuccin Frappé"],
+  ["catppuccin-macchiato", "Catppuccin Macchiato"],
+  ["catppuccin-mocha", "Catppuccin Mocha"],
+  ["nord", "Nord"],
+  ["dracula", "Dracula"],
+  ["tokyo-night", "Tokyo Night"],
+];
+const NOTEPANE_THEME_IDS = new Set(["notepane-light", "notepane-dark"]);
+const OFFICIAL_PALETTES = require("./fixtures/official-palettes.json");
+const NAMED_COLOUR_KEYS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
+
+test("ships the nine themes in picker order", async () => {
+  const { listThemes } = await loadThemes();
+  assert.deepEqual(
+    listThemes().map((theme) => [theme.id, theme.label]),
+    SHIPPED_THEMES,
+  );
+});
+
+// The spec's bar: text on the window, sidebar and panel at 4.5:1, muted text on the window at
+// 3:1, in every shipped theme and every sentinel.
+test("text contrast meets the spec bar in every theme", async () => {
+  const { listThemes } = await loadThemes();
+  const { SENTINEL_THEMES } = await import("../../src/style/sentinelThemes.js");
+  const { getContrastRatio } = await import("../../src/style/colorMath.js");
+  for (const theme of [...listThemes(), ...SENTINEL_THEMES]) {
+    const { palette } = theme;
+    for (const surface of ["window", "sidebar", "panel"]) {
+      const ratio = getContrastRatio(palette.text, palette[surface]);
+      assert.ok(ratio >= 4.5, `${theme.id} text ${palette.text} on ${surface} ${palette[surface]}: ${ratio.toFixed(2)}`);
+    }
+    const muted = getContrastRatio(palette.muted, palette.window);
+    assert.ok(muted >= 3, `${theme.id} muted ${palette.muted} on window ${palette.window}: ${muted.toFixed(2)}`);
+  }
+});
+
+// Every new theme takes each palette value from its official palette
+// (tests/unit/fixtures/official-palettes.json names the source of each).
+test("the new themes use only their official palette colours", async () => {
+  const { listThemes, PALETTE_KEYS } = await loadThemes();
+  const newThemes = listThemes().filter((theme) => !NOTEPANE_THEME_IDS.has(theme.id));
+  assert.deepEqual(newThemes.map((theme) => theme.id).sort(), Object.keys(OFFICIAL_PALETTES).sort());
+  for (const theme of newThemes) {
+    const official = new Set(Object.values(OFFICIAL_PALETTES[theme.id].colours));
+    for (const key of PALETTE_KEYS) {
+      assert.ok(official.has(theme.palette[key]), `${theme.id}.${key} ${theme.palette[key]} is not in its official palette`);
+    }
+    assert.equal(theme.toneMatching, true, theme.id);
+  }
+});
+
+// The nine named colours (the editor's text and background colours) must stay apart.
+test("named colours are pairwise distinct in every theme", async () => {
+  const { listThemes } = await loadThemes();
+  const { hexToOklab } = await import("../../src/style/colorMath.js");
+  const distance = (first, second) => {
+    const [a, b] = [hexToOklab(first), hexToOklab(second)];
+    return Math.hypot(a.l - b.l, a.a - b.a, a.b - b.b);
+  };
+  for (const theme of listThemes()) {
+    for (let first = 0; first < NAMED_COLOUR_KEYS.length; first += 1) {
+      for (let second = first + 1; second < NAMED_COLOUR_KEYS.length; second += 1) {
+        const [firstKey, secondKey] = [NAMED_COLOUR_KEYS[first], NAMED_COLOUR_KEYS[second]];
+        const delta = distance(theme.palette[firstKey], theme.palette[secondKey]);
+        assert.ok(delta >= 0.05, `${theme.id} ${firstKey} and ${secondKey}: OKLab ΔE ${delta.toFixed(4)}`);
+      }
+    }
+  }
+});
+
+// The spec's code themes. Outside NotePane, the code background and text are the Shiki theme's
+// own, so plain text blocks match highlighted ones; NotePane keeps today's #0d1117 plain block
+// beside github-dark's #24292e highlighted one.
+const CODE_THEMES = {
+  "notepane-light": "github-dark",
+  "notepane-dark": "github-dark",
+  "catppuccin-latte": "catppuccin-latte",
+  "catppuccin-frappe": "catppuccin-frappe",
+  "catppuccin-macchiato": "catppuccin-macchiato",
+  "catppuccin-mocha": "catppuccin-mocha",
+  nord: "nord",
+  dracula: "dracula",
+  "tokyo-night": "tokyo-night",
+};
+
+test("each theme names its spec code theme, and new themes paint code in its colours", async () => {
+  const { listThemes } = await loadThemes();
+  for (const theme of listThemes()) {
+    assert.equal(theme.codeTheme, CODE_THEMES[theme.id], theme.id);
+    if (NOTEPANE_THEME_IDS.has(theme.id)) {
+      assert.equal(theme.palette.codeBg, "#0d1117", theme.id);
+      continue;
+    }
+    const { default: shikiTheme } = await import(`@shikijs/themes/${theme.codeTheme}`);
+    assert.equal(theme.palette.codeBg, shikiTheme.colors["editor.background"].toLowerCase(), `${theme.id} codeBg`);
+    assert.equal(theme.palette.codeText, shikiTheme.colors["editor.foreground"].toLowerCase(), `${theme.id} codeText`);
+  }
+});
+
+// A code block's colour scheme (its scrollbars and language menu) follows its own background:
+// dark for NotePane's GitHub dark blocks in both NotePane themes, the theme's scheme elsewhere.
+test("the code block colour scheme follows the code background", async () => {
+  const { buildThemeTokens } = await loadTokens();
+  const { listThemes } = await loadThemes();
+  const { SENTINEL_THEMES } = await import("../../src/style/sentinelThemes.js");
+  for (const theme of [...listThemes(), ...SENTINEL_THEMES]) {
+    const expected = NOTEPANE_THEME_IDS.has(theme.id) ? "dark" : theme.scheme;
+    assert.equal(buildThemeTokens(theme)["--sticky-code-color-scheme"], expected, theme.id);
+  }
+});
+
 // Tokens that replaced colours the stylesheets wrote as literals, which the tokens.css capture
 // predates. Each pins today's value in [NotePane Light, NotePane Dark]: the literal, or the
 // token the rule read. The dark tooltip frame was #2b2b2b, the dark chip colour.
@@ -145,6 +261,8 @@ const STYLESHEET_LITERAL_TOKENS = {
   "--notepane-code-tool-success": ["#9ee6ad", "#9ee6ad"],
   "--notepane-code-tool-error": ["#ffaaa3", "#ffaaa3"],
   "--notepane-shadow-code-tool": ["0 5px 14px rgb(0 0 0 / 0.22)", "0 5px 14px rgb(0 0 0 / 0.22)"],
+  // blocknote.css gave every code block `color-scheme: dark`.
+  "--sticky-code-color-scheme": ["dark", "dark"],
 };
 
 // Tokens for colours that BlockNote, Mantine and the browser painted before themes existed.

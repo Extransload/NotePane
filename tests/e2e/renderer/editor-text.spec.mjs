@@ -10,6 +10,7 @@ import {
   modifierShortcut,
   pasteClipboardText,
   pastePlainText,
+  selectAppTheme,
 } from "../support/renderer-helpers.mjs";
 
 test.beforeEach(async ({ page }) => {
@@ -84,6 +85,132 @@ test("prettifies supported code blocks and copies code from upper-right actions"
     .toBe(formattedCode);
   await expect(toolbar.getByRole("button", { name: "JavaScript code copied" }))
     .toBeVisible();
+});
+
+// The highlighted JavaScript block, its `const` keyword and a plain text block, as rendered.
+async function readCodeColours(page) {
+  return await page.evaluate(() => {
+    const blocks = [...document.querySelectorAll(".bn-editor [data-content-type='codeBlock']")];
+    const javascript = blocks.find((block) => block.textContent.includes("const answer"));
+    const plain = blocks.find((block) => block.textContent.includes("plain words"));
+    const keyword = [...javascript.querySelectorAll("code span")].find((span) => span.textContent === "const");
+    return {
+      javascriptBackground: getComputedStyle(javascript).backgroundColor,
+      javascriptColorScheme: getComputedStyle(javascript).colorScheme,
+      keyword: keyword ? getComputedStyle(keyword).color : null,
+      plainBackground: getComputedStyle(plain).backgroundColor,
+    };
+  });
+}
+
+test("code blocks follow the theme", async ({ page }) => {
+  // `?sentinelThemes` exposes the dev-only theme setter selectAppTheme uses.
+  await page.goto("/?sentinelThemes=1");
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, [
+    "```javascript",
+    "const answer = 42;",
+    "```",
+    "",
+    "```text",
+    "plain words",
+    "```",
+  ].join("\n"));
+  await page.evaluate(() => {
+    window.__codeThemeNoReload = true;
+  });
+
+  // NotePane: github-dark on a highlighted block, #0d1117 on a plain one.
+  const notePaneColours = {
+    javascriptBackground: "rgb(36, 41, 46)",
+    javascriptColorScheme: "dark",
+    keyword: "rgb(249, 117, 131)",
+    plainBackground: "rgb(13, 17, 23)",
+  };
+  await expect.poll(() => readCodeColours(page)).toEqual(notePaneColours);
+
+  // Catppuccin Mocha: the catppuccin-mocha code theme, whose background #1e1e2e is the plain one too.
+  await selectAppTheme(page, "catppuccin-mocha");
+  await expect.poll(() => readCodeColours(page)).toEqual({
+    javascriptBackground: "rgb(30, 30, 46)",
+    javascriptColorScheme: "dark",
+    keyword: "rgb(203, 166, 247)",
+    plainBackground: "rgb(30, 30, 46)",
+  });
+
+  // Catppuccin Latte: a light code block, so its colour scheme is light.
+  await selectAppTheme(page, "catppuccin-latte");
+  await expect.poll(() => readCodeColours(page)).toEqual({
+    javascriptBackground: "rgb(239, 241, 245)",
+    javascriptColorScheme: "light",
+    keyword: "rgb(136, 57, 239)",
+    plainBackground: "rgb(239, 241, 245)",
+  });
+
+  await selectAppTheme(page, "notepane-light");
+  await expect.poll(() => readCodeColours(page)).toEqual(notePaneColours);
+  expect(await page.evaluate(() => window.__codeThemeNoReload)).toBe(true);
+});
+
+// Runs in the page before the app loads. A minimal preload bridge: one note whose saved version
+// holds a JavaScript code block.
+function stubVersionHistoryBridge() {
+  const now = Date.UTC(2026, 9, 20, 9, 0, 0);
+  const blocksJSON = JSON.stringify([
+    { type: "paragraph", content: "History note" },
+    { type: "codeBlock", props: { language: "javascript" }, content: "const saved = 1;" },
+  ]);
+  const note = {
+    id: "history-note",
+    title: "History note",
+    titleManuallyEdited: false,
+    blocksJSON,
+    markdown: "",
+    theme: {},
+    seedDemoContent: false,
+    editorFontScale: 1,
+    editorFontFamily: "Inter",
+    detached: false,
+    trashedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  window.blocknoteSticky = {
+    getCurrentNoteId: async () => note.id,
+    getNote: async () => note,
+    listNotes: async () => [note],
+    listTrash: async () => [],
+    getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
+    getLayoutMode: async () => "tabs",
+    getEditorPreferences: async () => ({}),
+    listFonts: async () => [],
+    saveContent: async () => note,
+    updateAppearance: async () => undefined,
+    listNoteVersions: async () => [
+      { id: "version-1", noteId: note.id, title: note.title, blocksJSON, source: "manual", createdAt: now - 60_000 },
+    ],
+  };
+}
+
+test("the version history preview recolours its code blocks with the theme", async ({ page }) => {
+  await page.addInitScript(stubVersionHistoryBridge);
+  // `?sentinelThemes` exposes the dev-only theme setter selectAppTheme uses.
+  await page.goto("/?sentinelThemes=1");
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  await page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Version history" }).click();
+  const preview = page.getByRole("dialog", { name: "Version history" }).getByLabel("Version preview");
+  const keyword = preview.locator("[data-content-type='codeBlock'] code span", { hasText: /^const$/ });
+  const block = preview.locator("[data-content-type='codeBlock']");
+
+  await expect(keyword).toHaveCSS("color", "rgb(249, 117, 131)");
+  await expect(block).toHaveCSS("background-color", "rgb(36, 41, 46)");
+  await selectAppTheme(page, "catppuccin-mocha");
+  await expect(keyword).toHaveCSS("color", "rgb(203, 166, 247)");
+  await expect(block).toHaveCSS("background-color", "rgb(30, 30, 46)");
+  await selectAppTheme(page, "notepane-light");
+  await expect(keyword).toHaveCSS("color", "rgb(249, 117, 131)");
+  await expect(block).toHaveCSS("background-color", "rgb(36, 41, 46)");
 });
 
 test("keeps copy available when a code language has no browser formatter", async ({ page }) => {

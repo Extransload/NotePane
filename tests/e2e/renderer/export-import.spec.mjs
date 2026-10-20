@@ -117,6 +117,8 @@ function stubExportBridge() {
     const muted = getComputedStyle(probe).color;
     probe.remove();
     const shell = styleOf("[data-testid='sticky-shell']");
+    const keyword = [...document.querySelectorAll(".bn-editor [data-content-type='codeBlock'] code span")]
+      .find((span) => span.textContent === "const");
     return {
       exporting: document.body.classList.contains("is-exporting"),
       shellText: shell.color,
@@ -124,6 +126,8 @@ function stubExportBridge() {
       // printToPDF paints the page canvas in the root's colour scheme.
       rootColorScheme: getComputedStyle(document.documentElement).colorScheme,
       codeBackground: styleOf(".bn-editor [data-content-type='codeBlock']").backgroundColor,
+      // The highlighted `const`, coloured by the active code theme.
+      codeKeyword: keyword ? getComputedStyle(keyword).color : null,
       redHighlight: styleOf(".bn-editor [data-background-color='red']").backgroundColor,
       tableBorder: styleOf(".bn-editor td").borderTopColor,
       muted,
@@ -147,14 +151,20 @@ function stubExportBridge() {
   };
 }
 
-// Export renders with NotePane Light whatever theme is selected. Add a theme id here once
-// selectAppTheme can select it.
-for (const { themeId, label } of [{ themeId: "notepane-dark", label: "a dark theme" }]) {
+// Export renders with NotePane Light whatever theme is selected, code included: NotePane Light's
+// github-dark code theme, even where the selected theme highlights code in its own colours.
+for (const { themeId, label, ownCodeTheme } of [
+  { themeId: "notepane-dark", label: "a dark theme", ownCodeTheme: false },
+  { themeId: "catppuccin-mocha", label: "Catppuccin Mocha", ownCodeTheme: true },
+]) {
   test(`export renders with NotePane Light under ${label}`, async ({ page }) => {
     await page.addInitScript(stubExportBridge);
-    await page.goto("/");
+    // `?sentinelThemes` exposes the dev-only theme setter selectAppTheme uses.
+    await page.goto("/?sentinelThemes=1");
     await expect(page.locator(".bn-editor [data-background-color='red']")).toBeVisible();
     await expect(page.locator(".bn-editor td").first()).toBeVisible();
+    await expect(page.locator(".bn-editor [data-content-type='codeBlock'] code span", { hasText: /^const$/ }))
+      .toHaveCSS("color", "rgb(249, 117, 131)");
     // The shell eases its colours over a theme change; read them once that has finished.
     const readSettledColours = async () => {
       await page.waitForFunction(() =>
@@ -172,6 +182,9 @@ for (const { themeId, label } of [{ themeId: "notepane-dark", label: "a dark the
     expect(themedColours.redHighlight).not.toBe(lightColours.redHighlight);
     expect(themedColours.tableBorder).not.toBe(lightColours.tableBorder);
     expect(themedColours.muted).not.toBe(lightColours.muted);
+    if (ownCodeTheme) {
+      expect(themedColours.codeKeyword).not.toBe(lightColours.codeKeyword);
+    }
 
     await page.getByRole("button", { name: "Export" }).click();
     await page.getByRole("menu", { name: "Export format" }).getByRole("menuitem", { name: /PDF/ }).click();
@@ -184,6 +197,7 @@ for (const { themeId, label } of [{ themeId: "notepane-dark", label: "a dark the
       colorScheme: "light",
       rootColorScheme: "light",
       codeBackground: "rgb(13, 17, 23)",
+      codeKeyword: "rgb(249, 117, 131)",
       redHighlight: lightColours.redHighlight,
       tableBorder: lightColours.tableBorder,
       muted: lightColours.muted,

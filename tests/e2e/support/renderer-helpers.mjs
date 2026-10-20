@@ -948,9 +948,15 @@ async function readThemeScheme(page) {
   return await page.evaluate(() => document.documentElement.dataset.themeScheme);
 }
 
-// Until the theme picker exists this supports only the two NotePane themes, switched
-// with the Mod+Shift+L shortcut.
+// Until the theme picker exists, a page opened with `?sentinelThemes` selects any theme through
+// the dev-only `window.__notepaneTest.setThemeId`, which calls the picker's theme setter.
+// Otherwise this supports only the two NotePane themes, switched with the Mod+Shift+L shortcut.
 export async function selectAppTheme(page, themeId) {
+  if (await page.evaluate(() => Boolean(window.__notepaneTest))) {
+    await page.evaluate((id) => window.__notepaneTest.setThemeId(id), themeId);
+    await expect(page.locator("html")).toHaveAttribute("data-theme-id", themeId);
+    return;
+  }
   const targetScheme = { "notepane-light": "light", "notepane-dark": "dark" }[themeId];
   if (!targetScheme) {
     throw new Error(`selectAppTheme does not support "${themeId}" yet`);

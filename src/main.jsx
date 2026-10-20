@@ -98,6 +98,10 @@ import {
   normalizePastedMarkdownForBlockNote,
 } from "./editor/clipboard.js";
 import {
+  setActiveCodeTheme,
+  withCodeTheme,
+} from "./editor/codeHighlighter.js";
+import {
   useBlockNoteFloatingMenuGuard,
 } from "./editor/floatingMenus.js";
 import {
@@ -181,6 +185,7 @@ import {
 } from "./style/themeStyles.js";
 import {
   applyThemeToDocument,
+  getExportTheme,
   readInitialThemeId,
   withExportTheme,
 } from "./style/applyTheme.js";
@@ -1992,7 +1997,9 @@ function StickyEditor({
           markdown,
         });
       };
-      const result = isPdf ? await withExportTheme(render) : await render();
+      const result = isPdf
+        ? await withExportTheme(() => withCodeTheme(getExportTheme().codeTheme, render))
+        : await render();
 
       if (result?.canceled) {
         hideExportToast();
@@ -3676,8 +3683,11 @@ function StickyEditor({
 }
 
 function renderApp(bindTestThemeSetter = null) {
-  // Before React mounts, so the first frame already has the window's theme.
-  applyThemeToDocument(getTheme(readInitialThemeId()));
+  // Before React mounts, so the first frame already has the window's theme and the first code
+  // block is highlighted with its code theme.
+  const initialTheme = getTheme(readInitialThemeId());
+  applyThemeToDocument(initialTheme);
+  setActiveCodeTheme(initialTheme.codeTheme);
   createRoot(document.getElementById("root")).render(
     <App bindTestThemeSetter={bindTestThemeSetter} />,
   );
