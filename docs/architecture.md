@@ -89,14 +89,15 @@ before the browser suites would. It is the first step of both `verify:quick` and
 Every colour must come from the theme. `npm run check:colors` scans `src/**/*.{css,js,jsx}`, `electron/**/*.cjs` and
 `index.html` for colour literals: hex, `rgb()`, `hsl()`, `oklch()`, `lch()`, and the 148 CSS named colours in any case
 wherever they are colours: in the value of a colour property (any `*-color`, shorthands, shadows, gradients, filters
-and masks), read whole even when it spans several lines, inside a colour function or a shadow, and in JS style values
-such as `{ borderLeftColor: "red" }`, `{ "--x": "white" }` or `"border-color: red"`. A deliberate literal goes in
-`scripts/check-colors-allowlist.json` with its reason, one entry per literal line. It runs right after `check:refs` in
-`verify:quick` and `verify`. The theme leak detector (`tests/e2e/renderer/theme-leaks.spec.mjs`) renders each screen
-under two test-only themes that share no colour and fails on any visible colour that stays the same; its themes and
-test hook load only in a dev build, and `scripts/verify-dist.mjs` fails if they reach the built bundle. The colour
-migration is finished, so neither check keeps a known-debt list: a committed `scripts/check-colors-known.json` or
-`tests/e2e/fixtures/theme-leaks-known.json` fails it.
+and masks), read whole even when it spans several lines, inside a colour function or a shadow, in comments, and in JS
+style values such as `{ borderLeftColor: "red" }`, `{ "--x": "white" }`, `"border-color: " + (on ? "red" : x)` or
+`setAttribute("fill", "white")`. A deliberate literal goes in `scripts/check-colors-allowlist.json` with its reason,
+one entry per literal line; an entry that no longer covers a literal fails the check. It runs right after
+`check:refs` in `verify:quick` and `verify`. The theme leak detector (`tests/e2e/renderer/theme-leaks.spec.mjs`)
+renders each screen under two test-only themes that share no colour and fails on any visible colour that stays the
+same; its themes and test hook load only in a dev build, and `scripts/verify-dist.mjs` fails if they reach the built
+bundle. The colour migration is finished, so neither check keeps a known-debt list: a committed
+`scripts/check-colors-known.json` or `tests/e2e/fixtures/theme-leaks-known.json` fails it.
 
 The renderer owns editor behavior. The desktop shell does not override BlockNote keyboard or mouse behavior.
 

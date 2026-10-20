@@ -7,12 +7,14 @@
   {
     "file": "electron/store.cjs",
     "text": "placehold.co/960x360/1f2937/f8fafc.png",
-    "reason": "Template image URL: note content, not UI colour. Not matched by the patterns; listed for documentation."
+    "reason": "Template image URL: note content, not UI colour. Not matched by the patterns; listed for documentation.",
+    "documentation": true
   },
   {
     "file": "src/editor/schema.jsx",
     "text": "placehold.co/960x360/1f2937/f8fafc.png",
-    "reason": "Template image URL: note content, not UI colour. Not matched by the patterns; listed for documentation."
+    "reason": "Template image URL: note content, not UI colour. Not matched by the patterns; listed for documentation.",
+    "documentation": true
   },
   {
     "file": "electron/store.cjs",
@@ -107,12 +109,12 @@
   {
     "file": "src/styles/controls.css",
     "text": "border: 1px solid rgb(0 0 0 / 0.28);",
-    "reason": "Colour-picking tool: the brightness slider thumb outline. ::-webkit-slider-thumb has no computed-style API, so neither a token read nor the leak detector can follow it, and the thumbs are colour-picking controls that must stay visible over any picked colour."
+    "reason": "Colour-picking tool: the brightness slider thumb outline. The leak detector cannot read ::-webkit-slider-thumb, which has no computed-style API, and the thumb is a colour-picking control that must stay visible over any picked colour."
   },
   {
     "file": "src/styles/controls.css",
     "text": "box-shadow: 0 1px 2px rgb(0 0 0 / 0.34);",
-    "reason": "Colour-picking tool: the brightness slider thumb shadow. ::-webkit-slider-thumb has no computed-style API, so neither a token read nor the leak detector can follow it, and the thumbs are colour-picking controls that must stay visible over any picked colour."
+    "reason": "Colour-picking tool: the brightness slider thumb shadow. The leak detector cannot read ::-webkit-slider-thumb, which has no computed-style API, and the thumb is a colour-picking control that must stay visible over any picked colour."
   },
   {
     "file": "src/styles/controls.css",
@@ -127,12 +129,12 @@
   {
     "file": "src/styles/controls.css",
     "text": "border: 1px solid rgb(0 0 0 / 0.28);",
-    "reason": "Colour-picking tool: the opacity slider thumb outline. ::-webkit-slider-thumb has no computed-style API, so neither a token read nor the leak detector can follow it, and the thumbs are colour-picking controls that must stay visible over any picked colour."
+    "reason": "Colour-picking tool: the opacity slider thumb outline. The leak detector cannot read ::-webkit-slider-thumb, which has no computed-style API, and the thumb is a colour-picking control that must stay visible over any picked colour."
   },
   {
     "file": "src/styles/controls.css",
     "text": "box-shadow: 0 1px 2px rgb(0 0 0 / 0.34);",
-    "reason": "Colour-picking tool: the opacity slider thumb shadow. ::-webkit-slider-thumb has no computed-style API, so neither a token read nor the leak detector can follow it, and the thumbs are colour-picking controls that must stay visible over any picked colour."
+    "reason": "Colour-picking tool: the opacity slider thumb shadow. The leak detector cannot read ::-webkit-slider-thumb, which has no computed-style API, and the thumb is a colour-picking control that must stay visible over any picked colour."
   },
   {
     "file": "src/styles/overlays.css",

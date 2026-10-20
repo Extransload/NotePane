@@ -7,12 +7,16 @@
 //   - hex, rgb()/rgba(), hsl()/hsla(), oklch() and lch() anywhere in a line, comments included;
 //   - one of the 148 CSS named colours, in any case, where it is a colour: in the value of a
 //     colour property (color, any *-color, background, border, outline, fill, stroke, shadows,
-//     filter, mask, list-style-image, scrollbar-color, ...) or of a custom property, and
-//     inside a colour function (color-mix(), rgb(), hsl(), *-gradient(), drop-shadow(),
-//     light-dark()). In .js/.jsx/.cjs the same applies to string and template literals: a
-//     colour-function argument, a shadow ("inset ... white", "0 1px 0 white"), a CSS text
-//     ("border-color: red"), and the value of a colour-property object key, JSX attribute,
-//     style assignment or setProperty() call ({ borderLeftColor: "red" }, { "--x": "white" }).
+//     filter, mask, list-style-image, scrollbar-color, ...; property names in any case) or of a
+//     custom property, inside a colour function (color-mix(), rgb(), hsl(), *-gradient(),
+//     drop-shadow(), light-dark()), and in a shadow ("inset ... white", "0 1px 0 white").
+//     Comments are read the same way. In .js/.jsx/.cjs this applies to string literals,
+//     templates and `+` concatenations, where a `${…}` or concatenated expression standing in
+//     a colour position has its string branches read as colours ("0 0 0 1px ${on ? "red" : x}",
+//     "border-color: " + (on ? "red" : x)). The value of a colour-property object key, JSX
+//     attribute, style assignment, setProperty() or setAttribute() call ({ borderLeftColor:
+//     "red" }, { "--x": "white" }, setAttribute("fill", "white")) is read for named colours
+//     through templates, calls, ?:, ||, ?? and +; setAttribute("style", …) is read as CSS text.
 //     Elsewhere a colour name is a word: a palette key, a list of BlockNote colour names, a class
 //     name. `transparent` and `currentColor` are not colours to this check.
 //
@@ -72,9 +76,9 @@ const NAMED_COLOUR = new RegExp(`(?<![\\w-])(?:${NAMED})(?![\\w(-])`, "gi");
 // Hex and colour functions, matched anywhere in a line.
 const LITERAL_PATTERNS = [/#[0-9a-fA-F]{3,8}\b/, /\brgba?\(/, /\bhsla?\(/, /\boklch\(/, /\blch\(/];
 
-// A property whose value can hold a colour, without its vendor prefix: color or any *-color
-// (border-inline-start-color, -webkit-text-fill-color, scrollbar-color, ...), and the
-// shorthands and image, shadow and filter properties that take a colour.
+// A property whose value can hold a colour, lower-cased and without its vendor prefix: color or
+// any *-color (border-inline-start-color, -webkit-text-fill-color, scrollbar-color, ...), and
+// the shorthands and image, shadow and filter properties that take a colour.
 const COLOUR_PROPERTY = new RegExp(
   "^(?:color|[a-z-]+-color|background(?:-image)?|border(?:-(?:top|right|bottom|left|block|inline)(?:-(?:start|end))?)?" +
     "|border-image(?:-source)?|outline|column-rule|text-decoration|text-emphasis|text-stroke|fill|stroke" +
@@ -88,12 +92,13 @@ function isColourProperty(property) {
   return property.startsWith("--") || COLOUR_PROPERTY.test(property.toLowerCase().replace(VENDOR_PREFIX, ""));
 }
 
-// A JS name (borderLeftColor, WebkitTextFillColor, stopColor, "--pastel-color",
-// "stop-color") read as the CSS property it sets.
+// A JS name (borderLeftColor, WebkitTextFillColor, stopColor, "--pastel-color", "stop-color",
+// "Background-Color") read as the CSS property it sets.
 function isColourKey(name) {
   if (name.startsWith("--")) return true;
+  if (name.includes("-")) return isColourProperty(name);
   const kebab = name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
-  return isColourProperty(kebab) || JS_COLOUR_PROPERTIES.has(kebab);
+  return isColourProperty(kebab) || isColourProperty(name) || JS_COLOUR_PROPERTIES.has(kebab);
 }
 
 // A colour function, whose arguments are colours wherever they are not numbers or keywords.
@@ -106,16 +111,13 @@ const SHADOW = new RegExp(
     `|(?<![\\w-])(?:${NAMED})(?:\\s+${LENGTH}){2,4}(?![\\w(-])`,
   "gi",
 );
-// A CSS declaration, from its property to the `;` or the end of the block that ends it, so a
-// value spanning several lines (a multi-line gradient, say) is read whole.
-const CSS_DECLARATION = /(?:^|[\s;{"'`])(--[\w-]+|-?[a-z][\w-]*)\s*:([^;{}]*)/g;
-
-// A url() names a file, not a colour: blanked before a value is read.
-const blankUrls = (text) => text.replace(/\burl\([^)]*\)/gi, (url) => " ".repeat(url.length));
+// A CSS declaration, from its property (in any case) to the `;` or the end of the block that
+// ends it, so a value spanning several lines (a multi-line gradient, say) is read whole.
+const CSS_DECLARATION = /(?:^|[\s;{"'`])(--[\w-]+|-?[a-z][\w-]*)\s*:([^;{}]*)/gi;
 
 // Offsets, within `text`, of every named colour in it.
 function namedColourOffsets(text) {
-  return [...blankUrls(text).matchAll(NAMED_COLOUR)].map((match) => match.index);
+  return [...text.matchAll(NAMED_COLOUR)].map((match) => match.index);
 }
 
 // The text between the parentheses of the call whose `(` is at `open`.
@@ -128,19 +130,18 @@ function argumentsAt(text, open) {
   return text.slice(open + 1);
 }
 
-// Offsets of the named colours that are colours inside `text`, a stylesheet or a JS string:
-// colour-function arguments, shadows, and the values of colour and custom properties.
+// Offsets of the named colours that are colours inside `text`, a stylesheet, a comment or a JS
+// string: colour-function arguments, shadows, and the values of colour and custom properties.
 function colourOffsetsInText(text) {
   const offsets = [];
-  const clean = blankUrls(text);
-  for (const call of clean.matchAll(COLOUR_FUNCTION)) {
+  for (const call of text.matchAll(COLOUR_FUNCTION)) {
     const open = call.index + call[0].length - 1;
-    for (const offset of namedColourOffsets(argumentsAt(clean, open))) offsets.push(open + 1 + offset);
+    for (const offset of namedColourOffsets(argumentsAt(text, open))) offsets.push(open + 1 + offset);
   }
-  for (const shadow of clean.matchAll(SHADOW)) {
+  for (const shadow of text.matchAll(SHADOW)) {
     for (const offset of namedColourOffsets(shadow[0])) offsets.push(shadow.index + offset);
   }
-  for (const declaration of clean.matchAll(CSS_DECLARATION)) {
+  for (const declaration of text.matchAll(CSS_DECLARATION)) {
     const [whole, property, value] = declaration;
     if (!isColourProperty(property)) continue;
     const valueStart = declaration.index + whole.length - value.length;
@@ -157,15 +158,20 @@ function lineIndex(source) {
   return (offset) => lineStarts.findLastIndex((start) => start <= offset) + 1;
 }
 
-// Lines of a stylesheet (or index.html) that hold a named colour as a colour. Comments are
-// blanked first, keeping every line where it is.
+// Lines of a stylesheet (or index.html) that hold a named colour as a colour. The code is read
+// with its comments blanked, keeping every line where it is, and each comment on its own.
 function cssNamedColourLines(source) {
-  const css = source.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
-  const lineOf = lineIndex(css);
-  return new Set(colourOffsetsInText(css).map(lineOf));
+  const lineOf = lineIndex(source);
+  const comments = [...source.matchAll(/\/\*[\s\S]*?\*\//g)];
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
+  const offsets = colourOffsetsInText(code);
+  for (const comment of comments) {
+    for (const offset of colourOffsetsInText(comment[0])) offsets.push(comment.index + offset);
+  }
+  return new Set(offsets.map(lineOf));
 }
 
-/* ---------- JS: string literals and colour-property values ---------- */
+/* ---------- JS: strings, templates, concatenations and colour-property values ---------- */
 
 function* childNodes(node) {
   for (const key of Object.keys(node)) {
@@ -177,35 +183,71 @@ function* childNodes(node) {
   }
 }
 
-// A string or template literal as { text, start }: its source between the quotes, with each
-// `${…}` blanked to zeros (a number, so `0 1px ${blur} white` still reads as a shadow). Its
-// offsets are source offsets.
-function literalText(node, source) {
-  if (node.type === "StringLiteral") return { text: source.slice(node.start + 1, node.end - 1), start: node.start + 1 };
-  if (node.type !== "TemplateLiteral") return null;
-  const start = node.start + 1;
-  let text = source.slice(start, node.end - 1);
-  // Between two quasis lies one `${…}`.
-  node.quasis.slice(1).forEach((quasi, index) => {
-    const from = node.quasis[index].end - start;
-    const to = quasi.start - start;
-    text = `${text.slice(0, from)}${"0".repeat(to - from)}${text.slice(to)}`;
-  });
-  return { text, start };
+const isConcatenation = (node) => node?.type === "BinaryExpression" && node.operator === "+";
+
+// A string, a template or a `+` concatenation as segments: literal text with its source offset,
+// or an expression.
+function segmentsOf(node, source) {
+  if (node.type === "StringLiteral") return [{ text: source.slice(node.start + 1, node.end - 1), start: node.start + 1 }];
+  if (node.type === "TemplateLiteral") {
+    return node.quasis.flatMap((quasi, index) => [
+      { text: source.slice(quasi.start, quasi.end), start: quasi.start },
+      ...(index < node.expressions.length ? [{ expression: node.expressions[index] }] : []),
+    ]);
+  }
+  if (isConcatenation(node)) return [...segmentsOf(node.left, source), ...segmentsOf(node.right, source)];
+  return [{ expression: node }];
 }
 
-// The string and template literals a value can evaluate to, through ?:, ||, ?? and +.
+// The segments as one text, each expression replaced by `standIn(index)`, and where each
+// segment sits in it.
+function joinSegments(segments, standIn) {
+  let text = "";
+  const placed = segments.map((segment, index) => {
+    const piece = segment.expression ? standIn(index) : segment.text;
+    const at = text.length;
+    text += piece;
+    return { at, end: text.length, segment };
+  });
+  return { text, placed };
+}
+
+// The string and template literals a colour value can evaluate to: through templates' `${…}`,
+// call and `new` arguments, ?:, ||, ?? and +.
 function* valueLiterals(node) {
   if (!node) return;
-  if (node.type === "StringLiteral" || node.type === "TemplateLiteral") yield node;
-  else if (node.type === "ConditionalExpression") {
-    yield* valueLiterals(node.consequent);
-    yield* valueLiterals(node.alternate);
-  } else if (node.type === "LogicalExpression" || node.type === "BinaryExpression") {
-    yield* valueLiterals(node.left);
-    yield* valueLiterals(node.right);
-  } else if (node.type === "JSXExpressionContainer" || node.type === "ParenthesizedExpression") {
-    yield* valueLiterals(node.expression);
+  switch (node.type) {
+    case "StringLiteral":
+      yield node;
+      break;
+    case "TemplateLiteral":
+      yield node;
+      for (const expression of node.expressions) yield* valueLiterals(expression);
+      break;
+    case "CallExpression":
+    case "OptionalCallExpression":
+    case "NewExpression":
+      for (const argument of node.arguments) yield* valueLiterals(argument);
+      break;
+    case "ConditionalExpression":
+      yield* valueLiterals(node.consequent);
+      yield* valueLiterals(node.alternate);
+      break;
+    case "LogicalExpression":
+      yield* valueLiterals(node.left);
+      yield* valueLiterals(node.right);
+      break;
+    case "BinaryExpression":
+      if (node.operator === "+") {
+        yield* valueLiterals(node.left);
+        yield* valueLiterals(node.right);
+      }
+      break;
+    case "JSXExpressionContainer":
+    case "ParenthesizedExpression":
+      yield* valueLiterals(node.expression);
+      break;
+    default:
   }
 }
 
@@ -218,8 +260,9 @@ function keyName(key, computed) {
   return null;
 }
 
-// [name, value] when `node` gives a CSS-like property a value: an object key, a JSX attribute,
-// an assignment to a member (element.style.color = …) or element.style.setProperty(name, …).
+// [name, value] when `node` gives a CSS-like property or a presentation attribute a value: an
+// object key, a JSX attribute, an assignment to a member (element.style.color = …), or a
+// setProperty(name, …) or setAttribute(name, …) call.
 function propertyValue(node) {
   switch (node.type) {
     case "ObjectProperty":
@@ -233,10 +276,11 @@ function propertyValue(node) {
     case "CallExpression":
     case "OptionalCallExpression": {
       const { callee } = node;
-      const isSetProperty =
-        (callee.type === "MemberExpression" || callee.type === "OptionalMemberExpression") &&
-        keyName(callee.property, callee.computed) === "setProperty";
-      return isSetProperty && node.arguments[0]?.type === "StringLiteral"
+      const method =
+        callee.type === "MemberExpression" || callee.type === "OptionalMemberExpression"
+          ? keyName(callee.property, callee.computed)
+          : null;
+      return (method === "setProperty" || method === "setAttribute") && node.arguments[0]?.type === "StringLiteral"
         ? [node.arguments[0].value, node.arguments[1]]
         : [null, null];
     }
@@ -254,21 +298,55 @@ async function jsNamedColourLines(source, file) {
   }
   const lineOf = lineIndex(source);
   const lines = new Set();
-  const visit = (node) => {
-    const literal = literalText(node, source);
-    if (literal) {
-      for (const offset of colourOffsetsInText(literal.text)) lines.add(lineOf(literal.start + offset));
-    }
-    const [name, value] = propertyValue(node);
-    if (name && isColourKey(name)) {
-      for (const valueNode of valueLiterals(value)) {
-        const { text, start } = literalText(valueNode, source);
-        for (const offset of namedColourOffsets(text)) lines.add(lineOf(start + offset));
+  // Every named colour in each literal `node` can evaluate to.
+  const addNamedColours = (node) => {
+    for (const literal of valueLiterals(node)) {
+      const { text, placed } = joinSegments(segmentsOf(literal, source), () => "0");
+      for (const offset of namedColourOffsets(text)) {
+        const { at, segment } = placed.find((place) => offset >= place.at && offset < place.end);
+        if (!segment.expression) lines.add(lineOf(segment.start + offset - at));
       }
     }
-    for (const child of childNodes(node)) visit(child);
   };
-  visit(ast.program);
+  // Colours in a string, template or concatenation read as CSS text. Its own text is read with
+  // each expression as a number; then each expression in turn stands in as a colour, and if
+  // that lands in a colour position, the expression's literals are read as colours.
+  const addTextColours = (node) => {
+    const segments = segmentsOf(node, source);
+    if (!segments.some((segment) => !segment.expression)) return;
+    const plain = joinSegments(segments, () => "0");
+    for (const offset of colourOffsetsInText(plain.text)) {
+      const { at, segment } = plain.placed.find((place) => offset >= place.at && offset < place.end);
+      if (!segment.expression) lines.add(lineOf(segment.start + offset - at));
+    }
+    segments.forEach((segment, index) => {
+      if (!segment.expression) return;
+      const probe = joinSegments(segments, (other) => (other === index ? "red" : "0"));
+      const { at, end } = probe.placed[index];
+      if (colourOffsetsInText(probe.text).some((offset) => offset >= at && offset < end)) {
+        addNamedColours(segment.expression);
+      }
+    });
+  };
+  const visit = (node, parent) => {
+    const isText =
+      node.type === "StringLiteral" ||
+      node.type === "TemplateLiteral" ||
+      (isConcatenation(node) && !isConcatenation(parent));
+    if (isText) addTextColours(node);
+    const [name, value] = propertyValue(node);
+    if (name && name.toLowerCase() === "style" && node.type !== "ObjectProperty" && node.type !== "JSXAttribute") {
+      // setAttribute("style", …) and element.style = …: CSS text.
+      for (const literal of valueLiterals(value)) addTextColours(literal);
+    } else if (name && isColourKey(name)) {
+      addNamedColours(value);
+    }
+    for (const child of childNodes(node)) visit(child, node);
+  };
+  visit(ast.program, null);
+  for (const comment of ast.comments ?? []) {
+    for (const offset of colourOffsetsInText(comment.value)) lines.add(lineOf(comment.start + 2 + offset));
+  }
   return lines;
 }
 
@@ -312,7 +390,9 @@ async function findLiterals() {
 // Every entry names a file, the text of one literal line, and its reason. An entry covers one
 // finding in its file whose line contains its text, so two identical literal lines need two
 // entries and a third copy fails the check. There are no line ranges: they would hide any
-// literal later added inside them.
+// literal later added inside them. An entry that covers nothing fails the check too, since it
+// would silently admit the next matching line; one kept only to document a non-literal carries
+// `"documentation": true` and covers nothing.
 function readAllowlist() {
   const allowlist = JSON.parse(fs.readFileSync(ALLOWLIST_FILE, "utf8"));
   const invalid = allowlist.filter(
@@ -320,25 +400,44 @@ function readAllowlist() {
       typeof entry.file !== "string" ||
       typeof entry.text !== "string" || !entry.text ||
       typeof entry.reason !== "string" || !entry.reason.trim() ||
+      ("documentation" in entry && entry.documentation !== true) ||
       "lines" in entry,
   );
   for (const entry of invalid) {
-    console.error(`check-colors: allowlist entry needs a file, the text of one line and a reason, and no lines: ${JSON.stringify(entry)}`);
+    console.error(
+      `check-colors: allowlist entry needs a file, the text of one line and a reason, no lines, and documentation only as true: ${JSON.stringify(entry)}`,
+    );
   }
   if (invalid.length) process.exit(1);
   return allowlist;
 }
 
-function unallowed(findings, allowlist) {
-  const unused = new Set(allowlist);
-  return findings.filter((finding) => {
-    const entry = [...unused]
-      .filter((candidate) => candidate.file === finding.file && finding.text.includes(candidate.text))
-      .sort((first, second) => second.text.length - first.text.length)[0];
-    if (!entry) return true;
-    unused.delete(entry);
+// A maximum one-to-one matching of findings to the allowlist entries that cover them, by
+// augmenting paths, file by file. Findings are tried in line order and entries in allowlist
+// order, so the result is deterministic. Returns the findings and the entries left unmatched.
+function matchAllowlist(findings, allowlist) {
+  const entries = allowlist.filter((entry) => entry.documentation !== true);
+  const entryOf = new Map(); // finding -> entry
+  const findingOf = new Map(); // entry -> finding
+  const covers = (entry, finding) => entry.file === finding.file && finding.text.includes(entry.text);
+  const augment = (finding, visited) => {
+    for (const entry of entries) {
+      if (visited.has(entry) || !covers(entry, finding)) continue;
+      visited.add(entry);
+      const holder = findingOf.get(entry);
+      if (holder === undefined || augment(holder, visited)) {
+        findingOf.set(entry, finding);
+        entryOf.set(finding, entry);
+        return true;
+      }
+    }
     return false;
-  });
+  };
+  for (const finding of findings) augment(finding, new Set());
+  return {
+    unallowed: findings.filter((finding) => !entryOf.has(finding)),
+    unused: entries.filter((entry) => !findingOf.has(entry)),
+  };
 }
 
 if (fs.existsSync(KNOWN_FILE)) {
@@ -347,19 +446,22 @@ if (fs.existsSync(KNOWN_FILE)) {
 }
 
 const findings = await findLiterals();
-const candidates = unallowed(findings, readAllowlist());
+const { unallowed, unused } = matchAllowlist(findings, readAllowlist());
 
 if (process.argv.includes("--write-known")) {
-  console.log(JSON.stringify(candidates.map(({ file, text }) => ({ file, text })), null, 2));
+  console.log(JSON.stringify(unallowed.map(({ file, text }) => ({ file, text })), null, 2));
   process.exit(0);
 }
 
-for (const finding of candidates) {
+for (const finding of unallowed) {
   console.error(`${finding.file}:${finding.line}: new colour literal: ${finding.text}`);
 }
-if (candidates.length) {
+for (const entry of unused) {
+  console.error(`${entry.file}: allowlist entry covers no colour literal, remove it: ${entry.text}`);
+}
+if (unallowed.length || unused.length) {
   console.error(
-    `check-colors: ${candidates.length} new. Take colours from the theme tokens, or, for a deliberate literal, add it to scripts/check-colors-allowlist.json with a reason.`,
+    `check-colors: ${unallowed.length} new, ${unused.length} unused. Take colours from the theme tokens, or, for a deliberate literal, add it to scripts/check-colors-allowlist.json with a reason; remove an entry whose literal is gone.`,
   );
   process.exit(1);
 }
