@@ -38,6 +38,70 @@ const expectAppliedTheme = (page, themeId) =>
 const rootToken = (page, name) =>
   page.evaluate((token) => getComputedStyle(document.documentElement).getPropertyValue(token).trim(), name);
 
+// A checked card's border and ring colours, and the accent token they read, resolved as a
+// colour where the card sits.
+const readCheckedMarks = (card) => card.evaluate((element) => {
+  const probe = document.createElement("span");
+  probe.style.color = "var(--notepane-control-accent)";
+  element.parentElement.append(probe);
+  const accent = getComputedStyle(probe).color;
+  probe.remove();
+  const style = getComputedStyle(element);
+  return {
+    accent,
+    border: style.borderTopColor,
+    ring: style.boxShadow.match(/rgba?\([^)]*\)/)?.[0] ?? null,
+  };
+});
+
+// Waits until the card's border and ring both show the accent (they ease over a theme change)
+// and returns that accent.
+async function expectMarkedInAccent(card) {
+  await expect.poll(async () => {
+    const { accent, border, ring } = await readCheckedMarks(card);
+    return { border: border === accent, ring: ring === accent };
+  }).toEqual({ border: true, ring: true });
+  return (await readCheckedMarks(card)).accent;
+}
+
+// Runs in the page before the app loads: a preload bridge for one blank note that records each
+// theme the page asks the main process to store.
+function stubThemeRecordingBridge() {
+  const note = {
+    id: "theme-note",
+    title: "Theme note",
+    titleManuallyEdited: false,
+    blocksJSON: null,
+    markdown: "",
+    theme: {},
+    seedDemoContent: false,
+    editorFontScale: 1,
+    editorFontFamily: "Inter",
+    detached: false,
+    trashedAt: null,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  window.__storedThemeIds = [];
+  window.blocknoteSticky = {
+    getCurrentNoteId: async () => note.id,
+    getNote: async () => note,
+    listNotes: async () => [note],
+    listTrash: async () => [],
+    getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
+    getLayoutMode: async () => "tabs",
+    getEditorPreferences: async () => ({}),
+    listFonts: async () => [],
+    saveContent: async () => note,
+    updateAppearance: async () => undefined,
+    listNoteVersions: async () => [],
+    updateAppTheme: async (appTheme) => {
+      window.__storedThemeIds.push(appTheme.themeId);
+      return appTheme;
+    },
+  };
+}
+
 test("picker lists the nine themes and marks the active one", async ({ page }) => {
   // With the leak detector's sentinel themes registered, which the picker must never offer.
   await page.goto("/?sentinelThemes=1");
@@ -65,6 +129,8 @@ test("choosing a card applies the theme immediately", async ({ page }) => {
   const preferences = await openPreferences(page);
   const picker = preferences.getByRole("radiogroup", { name: "App theme" });
   const mocha = themeById("catppuccin-mocha");
+  // The checked card's border and ring read the active theme's control accent.
+  const lightAccent = await expectMarkedInAccent(picker.getByTestId("theme-card-notepane-light"));
 
   await picker.getByTestId("theme-card-catppuccin-mocha").click();
 
@@ -73,9 +139,42 @@ test("choosing a card applies the theme immediately", async ({ page }) => {
   await expect(preferences, "Preferences stays open").toBeVisible();
   await expect(picker.getByTestId("theme-card-catppuccin-mocha")).toHaveAttribute("aria-checked", "true");
   await expect(picker.getByTestId("theme-card-notepane-light")).toHaveAttribute("aria-checked", "false");
-  // The checked card is marked in the theme's accent: now Mocha's.
-  await expect(picker.getByTestId("theme-card-catppuccin-mocha"))
-    .toHaveCSS("border-top-color", hexToRgb(mocha.palette.accent));
+  const mochaAccent = await expectMarkedInAccent(picker.getByTestId("theme-card-catppuccin-mocha"));
+  expect(mochaAccent, "the two themes' accents differ, so the marks followed the theme").not.toBe(lightAccent);
+});
+
+test("each card previews its own theme", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  const preferences = await openPreferences(page);
+
+  // NotePane Light is active; every preview still paints its own theme's palette.
+  for (const theme of THEMES) {
+    const preview = preferences.getByTestId(`theme-card-${theme.id}`).locator(".theme-card-preview");
+    await expect(preview, theme.id).toHaveCSS("background-color", hexToRgb(theme.palette.window));
+    await expect(preview.locator(".theme-card-preview-sidebar"), theme.id)
+      .toHaveCSS("background-color", hexToRgb(theme.palette.sidebar));
+    await expect(preview.locator(".theme-card-preview-header"), theme.id)
+      .toHaveCSS("background-color", hexToRgb(theme.palette.header));
+  }
+});
+
+test("choosing the checked card again changes nothing", async ({ page }) => {
+  await page.addInitScript(stubThemeRecordingBridge);
+  await page.goto("/");
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  const preferences = await openPreferences(page);
+  const checkedCard = preferences.getByTestId("theme-card-notepane-light");
+  await expect(checkedCard).toHaveAttribute("aria-checked", "true");
+
+  await checkedCard.click();
+  await checkedCard.focus();
+  await page.keyboard.press("Space");
+  // A real choice afterwards: it shows the recorder works and comes after the two above.
+  await preferences.getByTestId("theme-card-nord").click();
+
+  await expectAppliedTheme(page, "nord");
+  await expect.poll(() => page.evaluate(() => window.__storedThemeIds)).toEqual(["nord"]);
 });
 
 test("arrow keys move the selection", async ({ page }) => {

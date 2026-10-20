@@ -101,11 +101,6 @@
     "reason": "Image crop frame and handles: they draw over arbitrary image content."
   },
   {
-    "file": "src/ui/ThemePicker.jsx",
-    "text": "style={{ background: palette.",
-    "reason": "previews other themes: each theme card draws a small window in that theme's own palette, whatever theme is active. The colours come from the palette, so no line matches the patterns today; listed for documentation."
-  },
-  {
     "file": "src/style/themeTokens.js",
     "text": "return `rgba(${red}",
     "reason": "Template that formats a palette colour as comma-separated rgba for the find highlights; it holds no literal colour."

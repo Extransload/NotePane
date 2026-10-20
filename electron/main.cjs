@@ -21,7 +21,8 @@ const {
 } = require("./store.cjs");
 const { fitBoundsToWorkAreas, getDetachedWindowBounds } = require("./windowBounds.cjs");
 const {
-  resolveOpaqueWindowBackgroundColor,
+  hasOpaqueWindows,
+  repaintWindowBackgrounds,
   resolveWindowBackgroundColor,
 } = require("./windowTheme.cjs");
 const { readAssetFromUrl } = require("./assetSources.cjs");
@@ -204,7 +205,7 @@ function createWindow(note, options = {}) {
 }
 
 function getWindowChromeOptions(isPrimary, trafficLightPosition) {
-  if (process.platform === "win32") {
+  if (hasOpaqueWindows(process.platform)) {
     // Opaque windows paint this before the renderer does, so it follows the theme.
     const backgroundColor = resolveWindowBackgroundColor(store?.getAppTheme());
     if (!isPrimary) {
@@ -421,14 +422,13 @@ function getCommandTargetWindow() {
 }
 
 function broadcastAppTheme(appTheme) {
-  // Opaque windows keep the background they were created with unless told otherwise, and
-  // paint it while a window resizes or reloads.
-  const backgroundColor = resolveOpaqueWindowBackgroundColor(appTheme, process.platform);
+  repaintWindowBackgrounds(
+    [...windows.values()].map(({ window }) => window),
+    appTheme,
+    process.platform,
+  );
   for (const { window } of windows.values()) {
     if (!window.isDestroyed()) {
-      if (backgroundColor) {
-        window.setBackgroundColor(backgroundColor);
-      }
       window.webContents.send("app-theme:changed", appTheme);
     }
   }

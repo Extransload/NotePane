@@ -31,7 +31,6 @@ test("keeps sticky chrome outside the editable BlockNote surface", async ({ page
   await expect(page.getByRole("tablist", { name: "Note sessions" })).toBeVisible();
   await expect(page.getByLabel("Session name")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Theme" })).toHaveCount(0);
-  await expect(page.getByRole("switch", { name: "Theme mode" })).toHaveCount(0);
   await expect(page.getByTestId("session-sidebar-footer")).toBeVisible();
   await expect(page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Export" }))
     .toBeVisible();
@@ -154,7 +153,6 @@ test("keeps light/dark mode global across sidebar sessions", async ({ page }) =>
   const lightIconColors = await getActionIconColors(page);
   expectDistinctIconColors(lightIconColors);
   await expectSystemSymbolIcons(page);
-  await expect(page.getByRole("switch", { name: "Theme mode" })).toHaveCount(0);
 
   await selectAppTheme(page, "notepane-dark");
   await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-theme-mode", "dark");
@@ -400,8 +398,6 @@ test("supports light/dark mode and readable sidebar tab background customization
       }
     };
   });
-
-  await expect(page.getByRole("switch", { name: "Theme mode" })).toHaveCount(0);
 
   await selectAppTheme(page, "notepane-dark");
   await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-theme-mode", "dark");
@@ -944,7 +940,6 @@ test("uses sticky pastel color and carries it back to the session tab", async ({
     .toHaveCount(0);
   await expect(settingsPanel.getByRole("button", { name: "Pin window" }))
     .toHaveCount(0);
-  await expect(page.getByRole("switch", { name: "Theme mode" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Hide sidebar" })).toHaveCount(0);
   await expect(page.locator("[aria-label='NotePane wordmark']")).toHaveCount(0);
   await expect.poll(() => getHeaderHeight(page)).toBeLessThan(tabModeHeaderHeight);
@@ -983,7 +978,6 @@ test("uses sticky pastel color and carries it back to the session tab", async ({
     "tabs",
   );
   await expect(page.getByRole("button", { name: "Pin window" })).toHaveCount(0);
-  await expect(page.getByRole("switch", { name: "Theme mode" })).toHaveCount(0);
   await expect(page.getByRole("tab")).toHaveCount(1);
   await expectActiveTabColor(page, "backgroundColor", "rgba(255, 215, 232, 0.5)");
   await expectActiveTabColor(page, "color", "rgb(31, 31, 31)");

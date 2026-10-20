@@ -406,6 +406,35 @@ test("repaints window backgrounds on a theme change only where windows are opaqu
   assert.equal(resolveOpaqueWindowBackgroundColor({ themeId: "dracula", mode: "dark" }, "linux"), null);
 });
 
+test("only Windows has opaque windows", () => {
+  const { hasOpaqueWindows } = require("../../electron/windowTheme.cjs");
+  assert.equal(hasOpaqueWindows("win32"), true);
+  assert.equal(hasOpaqueWindows("darwin"), false);
+  assert.equal(hasOpaqueWindows("linux"), false);
+});
+
+test("a theme change repaints every open window where windows are opaque, and none elsewhere", () => {
+  const { repaintWindowBackgrounds } = require("../../electron/windowTheme.cjs");
+  const fakeWindow = (destroyed = false) => ({
+    painted: [],
+    isDestroyed: () => destroyed,
+    setBackgroundColor(colour) {
+      this.painted.push(colour);
+    },
+  });
+  const dracula = { themeId: "dracula", mode: "dark" };
+
+  const windowsOnWindows = [fakeWindow(), fakeWindow(), fakeWindow(true)];
+  repaintWindowBackgrounds(windowsOnWindows, dracula, "win32");
+  assert.deepEqual(windowsOnWindows.map((window) => window.painted), [["#282a36"], ["#282a36"], []]);
+
+  for (const platform of ["darwin", "linux"]) {
+    const windows = [fakeWindow(), fakeWindow()];
+    repaintWindowBackgrounds(windows, dracula, platform);
+    assert.deepEqual(windows.map((window) => window.painted), [[], []], platform);
+  }
+});
+
 test("updates and persists the global layout mode", () => {
   const directory = createTemporaryDirectory();
   const store = new StickyStore(directory);

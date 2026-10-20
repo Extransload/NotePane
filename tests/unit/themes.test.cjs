@@ -138,6 +138,58 @@ test("the picker offers the nine shipped themes, never registered test themes", 
   }
 });
 
+const loadApplyTheme = () => {
+  globalThis.window ??= {};
+  return import("../../src/style/applyTheme.js");
+};
+
+// A window's view for readInitialThemeId: the URL the main process gave it, and session storage
+// holding `stored`, or failing on access or on read.
+function fakeView({ search = "", stored = null, storageFails = null }) {
+  const storage = {
+    getItem(key) {
+      if (storageFails === "read") throw new Error("SecurityError");
+      return key === "notepane.appliedThemeId" ? stored : null;
+    },
+  };
+  return {
+    location: { search },
+    get sessionStorage() {
+      if (storageFails === "access") throw new Error("SecurityError");
+      return storage;
+    },
+  };
+}
+
+test("a reload starts with the theme the window applied last, a new window with the URL's", async () => {
+  const { readInitialThemeId } = await loadApplyTheme();
+  assert.equal(
+    readInitialThemeId(fakeView({ search: "?noteId=n&themeId=notepane-light", stored: "dracula" })),
+    "dracula",
+  );
+  assert.equal(readInitialThemeId(fakeView({ search: "?noteId=n&themeId=notepane-dark" })), "notepane-dark");
+  assert.equal(readInitialThemeId(fakeView({})), null);
+});
+
+test("an unknown stored theme id gives way to the URL's", async () => {
+  const { readInitialThemeId } = await loadApplyTheme();
+  // From a newer build, or a test theme this page did not register.
+  for (const stored of ["solarized", "sentinel-light-a", ""]) {
+    assert.equal(readInitialThemeId(fakeView({ search: "?themeId=nord", stored })), "nord", stored);
+  }
+});
+
+test("session storage that fails gives way to the URL's theme", async () => {
+  const { readInitialThemeId } = await loadApplyTheme();
+  for (const storageFails of ["access", "read"]) {
+    assert.equal(
+      readInitialThemeId(fakeView({ search: "?themeId=tokyo-night", storageFails })),
+      "tokyo-night",
+      storageFails,
+    );
+  }
+});
+
 // The spec's bar: text on the window, sidebar and panel at 4.5:1, muted text on the window at
 // 3:1, in every shipped theme and every sentinel.
 test("text contrast meets the spec bar in every theme", async () => {

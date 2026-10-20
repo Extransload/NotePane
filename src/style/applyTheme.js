@@ -1,5 +1,5 @@
 import { buildThemeTokens } from "./themeTokens.js";
-import { getTheme } from "./themes.js";
+import { getTheme, isKnownThemeId } from "./themes.js";
 
 // Exports stay printable and look the same whatever theme is selected.
 const EXPORT_THEME_ID = "notepane-light";
@@ -139,7 +139,11 @@ function readAppliedThemeId(view) {
 
 // The theme to apply before React mounts, so the first frame already has the theme's colours:
 // the one this window applied last when it reloads, otherwise the one the main process put in
-// the window's URL when it created the window.
+// the window's URL when it created the window. A stored id this build does not know (a newer
+// build's, or a test theme this page did not register) gives way to the URL's.
 export function readInitialThemeId(view = window) {
-  return readAppliedThemeId(view) ?? new URLSearchParams(view.location.search).get("themeId");
+  const appliedThemeId = readAppliedThemeId(view);
+  return isKnownThemeId(appliedThemeId)
+    ? appliedThemeId
+    : new URLSearchParams(view.location.search).get("themeId");
 }

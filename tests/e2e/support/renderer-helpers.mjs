@@ -943,8 +943,12 @@ export function modifierOptionShortcut(key) {
 }
 
 // Selects a theme as a user does: Preferences from the sidebar footer (or its shortcut in the
-// sticky layout, which has no sidebar), the theme's card, then Close. None of these clicks takes
-// focus, so the editor keeps its focus and selection. Does nothing when the theme is applied.
+// sticky layout, which has no sidebar), the theme's card, then Close. Does nothing when the theme
+// is applied. None of these clicks takes focus, so the editor keeps its focus and selection.
+// Side effects a caller may need to undo:
+//   - opening Preferences closes the colour panel, sticky settings, the trash confirmation and
+//     the session tab menus (openPreferencesPage in src/main.jsx);
+//   - the pointer ends over where the Close button was, so whatever lies under it is hovered.
 export async function selectAppTheme(page, themeId) {
   const root = page.locator("html");
   if ((await root.getAttribute("data-theme-id")) === themeId) {

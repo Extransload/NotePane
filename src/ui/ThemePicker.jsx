@@ -59,7 +59,12 @@ export function ThemePicker({ themeId, themes, onChange }) {
           tabIndex={index === tabStopIndex ? 0 : -1}
           data-testid={`theme-card-${theme.id}`}
           onMouseDown={preventFocusLoss}
-          onClick={() => onChange(theme.id)}
+          onClick={() => {
+            // The checked card is already the theme: choosing it again stores nothing.
+            if (theme.id !== themeId) {
+              onChange(theme.id);
+            }
+          }}
           onKeyDown={(event) => {
             const offset = arrowKeyOffset(event);
             if (offset !== 0 && !event.defaultPrevented) {

@@ -131,9 +131,13 @@ test("a new window starts with the current theme applied", async () => {
   try {
     const page = await electronApp.firstWindow();
     await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
-    // The first load starts before a script can be attached, so read it on a reload.
+    // The first load starts before a script can be attached, so read it on a reload. A new
+    // window has no theme of its own in session storage; forgetting the one this window applied
+    // makes the reload start like a new window, from the theme the main process put in the URL.
+    await page.addInitScript(() => sessionStorage.removeItem("notepane.appliedThemeId"));
     expect(await reloadAndReadFirstPaintTheme(page))
       .toEqual({ themeId: "notepane-dark", shellBackground: "#191919" });
+    expect(new URL(page.url()).searchParams.get("themeId")).toBe("notepane-dark");
   } finally {
     await electronApp.close();
   }
@@ -216,6 +220,7 @@ test("changing the theme updates an already-open window", async () => {
     const firstPage = await getStickyPageByNoteId(electronApp, "first-note");
     const secondPage = await getStickyPageByNoteId(electronApp, "second-note");
     await expect(secondPage.getByTestId("sticky-editor-surface")).toBeVisible();
+    await expectStartupCaretPlaced(secondPage);
 
     // Shown once before the change, so its portal root already exists when the theme changes.
     const lightToolbar = await readFormattingToolbar(secondPage, "Second window words");
@@ -231,6 +236,7 @@ test("changing the theme updates an already-open window", async () => {
     // not from the palette directly, so the reference is the same window loaded under Dracula.
     await secondPage.reload();
     await expect(secondPage.getByTestId("sticky-editor-surface")).toBeVisible();
+    await expectStartupCaretPlaced(secondPage);
     expect(await readFormattingToolbar(secondPage, "Second window words")).toEqual(liveToolbar);
   } finally {
     await electronApp.close();
@@ -2462,12 +2468,31 @@ async function reloadAndReadFirstPaintTheme(page) {
   return await page.evaluate(() => window.__notepaneThemeAtDomContentLoaded);
 }
 
-// Selects a word of `paragraphText` so BlockNote shows the formatting toolbar, which NotePane
-// portals into body (the portal root a sticky window copies its note colours onto), and reads
-// the toolbar's background and colour scheme once colour transitions have finished.
+// One frame after its editor mounts, a window puts the caret in the last block (StickyEditor's
+// focusLastEditorBlock effect), which replaces any selection made before it. In these notes the
+// last block is empty, so its placeholder marks that the caret has landed.
+async function expectStartupCaretPlaced(page) {
+  await expect(page.locator(".bn-editor [data-is-empty-and-focused]")).toHaveCount(1);
+}
+
+// Selects the first word of `paragraphText` so BlockNote shows the formatting toolbar, which
+// NotePane portals into body (the portal root a sticky window copies its note colours onto), and
+// reads the toolbar's background and colour scheme once colour transitions have finished.
+//
+// The word is selected through the editor (Tiptap keeps itself on its DOM node as `editor`), so
+// ProseMirror's selection and the DOM's agree at once. A mouse selection is not: 20 ms after the
+// editor gains focus, which bringing a window to the front or a reload causes, ProseMirror writes
+// its own selection back to the DOM if it has not read the DOM's yet, undoing a double-click.
 async function readFormattingToolbar(page, paragraphText) {
   await page.bringToFront();
-  await page.locator(".bn-editor").getByText(paragraphText, { exact: true }).dblclick();
+  await page.locator(".bn-editor").evaluate((editorElement, text) => {
+    const paragraph = [...editorElement.querySelectorAll(".bn-inline-content")]
+      .find((element) => element.textContent === text);
+    const { editor } = editorElement;
+    const from = editor.view.posAtDOM(paragraph, 0);
+    editor.view.focus();
+    editor.commands.setTextSelection({ from, to: from + text.split(" ")[0].length });
+  }, paragraphText);
   const toolbar = page.locator(".bn-formatting-toolbar.notepane-formatting-toolbar:visible");
   await expect(toolbar).toBeVisible();
   await page.waitForFunction(() =>
