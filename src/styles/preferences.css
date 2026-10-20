@@ -255,6 +255,107 @@
   font: 720 12px/1.15 var(--notepane-ui-font);
 }
 
+/* App theme: the setting's text above the theme picker's grid of cards. */
+.app-theme-setting {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.theme-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+/* The card takes the active theme's tokens; only its preview paints the card's own theme. */
+.theme-card {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  padding: 7px 7px 8px;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--sticky-control-bg) 52%, transparent);
+  color: var(--sticky-panel-text);
+  font: 680 11px/1.2 var(--notepane-ui-font);
+  text-align: left;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition:
+    background 130ms ease,
+    border-color 130ms ease,
+    box-shadow 130ms ease,
+    transform 130ms ease;
+}
+
+.theme-card:hover {
+  background: var(--sticky-control-hover-bg);
+  transform: translateY(-1px);
+}
+
+.theme-card[aria-checked="true"] {
+  border-color: var(--notepane-control-accent);
+  box-shadow: 0 0 0 1px var(--notepane-control-accent);
+}
+
+.theme-card:focus-visible {
+  outline: 2px solid var(--notepane-focus-outline);
+  outline-offset: 2px;
+}
+
+/* The preview's colours are set inline from the card's theme. */
+.theme-card-preview {
+  display: grid;
+  height: 54px;
+  grid-template-columns: 26% minmax(0, 1fr);
+  overflow: hidden;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 7px;
+}
+
+.theme-card-preview-main {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  gap: 5px;
+}
+
+.theme-card-preview-header {
+  height: 11px;
+}
+
+.theme-card-preview-text {
+  width: 72%;
+  height: 4px;
+  margin-left: 8px;
+  border-radius: 2px;
+}
+
+.theme-card-preview-text.is-short {
+  width: 46%;
+}
+
+.theme-card-preview-dots {
+  display: flex;
+  gap: 3px;
+  margin-left: 8px;
+}
+
+.theme-card-preview-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.theme-card-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .preferences-data-section {
   display: grid;
   gap: 8px;
@@ -967,31 +1068,6 @@
   border: 0;
   cursor: pointer;
   -webkit-app-region: no-drag;
-}
-
-.header-mode-switch {
-  display: grid;
-  width: 60px;
-  height: 30px;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--sticky-panel-text);
-  box-shadow: none;
-  font: 800 12px/1 var(--notepane-ui-font);
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-  transition:
-    transform 140ms ease,
-    background 140ms ease,
-    border-color 140ms ease;
-}
-
-.header-mode-switch:hover {
-  background: transparent;
-  transform: translateY(-1px);
 }
 
 .sticky-color-button,

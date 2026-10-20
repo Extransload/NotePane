@@ -942,27 +942,35 @@ export function modifierOptionShortcut(key) {
   return `${process.platform === "darwin" ? "Meta" : "Control"}+Alt+${key}`;
 }
 
-// The applied theme's scheme, as the document root exposes it. This is the only place
-// that reads it.
-async function readThemeScheme(page) {
-  return await page.evaluate(() => document.documentElement.dataset.themeScheme);
-}
-
-// Until the theme picker exists, a page opened with `?sentinelThemes` selects any theme through
-// the dev-only `window.__notepaneTest.setThemeId`, which calls the picker's theme setter.
-// Otherwise this supports only the two NotePane themes, switched with the Mod+Shift+L shortcut.
+// Selects a theme as a user does: Preferences from the sidebar footer (or its shortcut in the
+// sticky layout, which has no sidebar), the theme's card, then Close. None of these clicks takes
+// focus, so the editor keeps its focus and selection. Does nothing when the theme is applied.
 export async function selectAppTheme(page, themeId) {
-  if (await page.evaluate(() => Boolean(window.__notepaneTest))) {
-    await page.evaluate((id) => window.__notepaneTest.setThemeId(id), themeId);
-    await expect(page.locator("html")).toHaveAttribute("data-theme-id", themeId);
+  const root = page.locator("html");
+  if ((await root.getAttribute("data-theme-id")) === themeId) {
     return;
   }
-  const targetScheme = { "notepane-light": "light", "notepane-dark": "dark" }[themeId];
-  if (!targetScheme) {
-    throw new Error(`selectAppTheme does not support "${themeId}" yet`);
+  const preferencesButton = page.getByTestId("session-sidebar-footer")
+    .getByRole("button", { name: "Preferences" });
+  if (await preferencesButton.isVisible()) {
+    await preferencesButton.click();
+  } else {
+    await page.keyboard.press(modifierShortcut(","));
   }
-  if ((await readThemeScheme(page)) !== targetScheme) {
-    await page.keyboard.press(modifierShortcut("Shift+L"));
-  }
-  await expect.poll(() => readThemeScheme(page)).toBe(targetScheme);
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await expect(preferences).toBeVisible();
+  const card = preferences.getByTestId(`theme-card-${themeId}`);
+  await card.click();
+  await expect(card).toHaveAttribute("aria-checked", "true");
+  await expect(root).toHaveAttribute("data-theme-id", themeId);
+  await preferences.getByRole("button", { name: "Close preferences" }).click();
+  await expect(preferences).toHaveCount(0);
+}
+
+// For a switch Preferences cannot make, because another dialog covers it: the dev-only
+// `window.__notepaneTest.setThemeId` of a page opened with `?sentinelThemes`, which calls the
+// same `updateAppTheme` as the picker.
+export async function selectAppThemeThroughTestHook(page, themeId) {
+  await page.evaluate((id) => window.__notepaneTest.setThemeId(id), themeId);
+  await expect(page.locator("html")).toHaveAttribute("data-theme-id", themeId);
 }

@@ -2164,13 +2164,11 @@ function StickyEditor({
     adjustEditorFontScale,
     openFindInNote,
     openSearchPalette: notePalette.openPalette,
-    activeThemeId: activeTheme.id,
     effectiveLayoutMode,
     exportNote,
     focusEditor,
     matchesEnabledKeyboardShortcut,
     note,
-    onAppThemeChanged,
     onAttachNote,
     onEditorWidthChange,
     requestNewSession,
@@ -3642,7 +3640,7 @@ function StickyEditor({
       {isPreferencesWindowOpen && (
         <PreferencesWindow
           initialPage={preferencesInitialPage}
-          appThemeMode={activeTheme.scheme}
+          appThemeId={activeTheme.id}
           editorPreferences={editorPreferences}
           keyboardShortcuts={keyboardShortcuts}
           appFontOptions={appFontOptions}

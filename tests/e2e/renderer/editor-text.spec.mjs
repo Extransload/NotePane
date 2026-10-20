@@ -11,6 +11,7 @@ import {
   pasteClipboardText,
   pastePlainText,
   selectAppTheme,
+  selectAppThemeThroughTestHook,
 } from "../support/renderer-helpers.mjs";
 
 // Tests tagged OPENS_OWN_PAGE open the page themselves (with the dev-only theme hook, or a stub
@@ -108,10 +109,7 @@ async function readCodeColours(page) {
   });
 }
 
-test("code blocks follow the theme", { tag: OPENS_OWN_PAGE }, async ({ page }) => {
-  // `?sentinelThemes` exposes the dev-only theme setter selectAppTheme uses.
-  await page.goto("/?sentinelThemes=1");
-  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+test("code blocks follow the theme", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   await pastePlainText(page, [
     "```javascript",
@@ -200,7 +198,8 @@ function stubVersionHistoryBridge() {
 
 test("the version history preview recolours its code blocks with the theme", { tag: OPENS_OWN_PAGE }, async ({ page }) => {
   await page.addInitScript(stubVersionHistoryBridge);
-  // `?sentinelThemes` exposes the dev-only theme setter selectAppTheme uses.
+  // Version history covers Preferences, so the theme changes through the dev-only hook that
+  // `?sentinelThemes` installs.
   await page.goto("/?sentinelThemes=1");
   await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
   await page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Version history" }).click();
@@ -210,10 +209,10 @@ test("the version history preview recolours its code blocks with the theme", { t
 
   await expect(keyword).toHaveCSS("color", "rgb(249, 117, 131)");
   await expect(block).toHaveCSS("background-color", "rgb(36, 41, 46)");
-  await selectAppTheme(page, "catppuccin-mocha");
+  await selectAppThemeThroughTestHook(page, "catppuccin-mocha");
   await expect(keyword).toHaveCSS("color", "rgb(203, 166, 247)");
   await expect(block).toHaveCSS("background-color", "rgb(30, 30, 46)");
-  await selectAppTheme(page, "notepane-light");
+  await selectAppThemeThroughTestHook(page, "notepane-light");
   await expect(keyword).toHaveCSS("color", "rgb(249, 117, 131)");
   await expect(block).toHaveCSS("background-color", "rgb(36, 41, 46)");
 });
@@ -629,7 +628,7 @@ test("renders Command+E inline code with Notion-like styling and composable colo
   ).toBe("rgb(251, 243, 219)");
   await expect(inlineCode).toBeVisible();
 
-  await page.keyboard.press(modifierShortcut("Shift+L"));
+  await selectAppTheme(page, "notepane-dark");
   await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-theme-mode", "dark");
   await expect.poll(async () => await inlineCode.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -968,7 +967,7 @@ test("highlights the active block while its six-dot menu is open", async ({ page
   await paragraph.click();
   await expect(page.locator(".bn-drag-handle-menu:visible")).toHaveCount(0);
   await expect(page.locator("style[data-block-menu-highlight]")).toHaveCount(0);
-  await page.keyboard.press(modifierShortcut("Shift+L"));
+  await selectAppTheme(page, "notepane-dark");
   await expect(page.getByTestId("sticky-shell"))
     .toHaveAttribute("data-theme-mode", "dark");
 

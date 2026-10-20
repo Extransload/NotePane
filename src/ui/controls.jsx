@@ -17,31 +17,6 @@ import {
   TrashSidebarIcon,
 } from "./icons.jsx";
 
-export function HeaderModeSwitch({ mode, shortcut, onChange }) {
-  const isDark = mode === "dark";
-  return (
-    <button
-      type="button"
-      className="header-mode-switch has-tooltip"
-      role="switch"
-      aria-label="Theme mode"
-      aria-checked={isDark}
-      data-tooltip={formatShortcutTooltip(
-        isDark ? "Light mode" : "Dark mode",
-        shortcut,
-      )}
-      onMouseDown={preventFocusLoss}
-      onClick={() => onChange(isDark ? "light" : "dark")}
-    >
-      <span className="theme-mode-switch-track" aria-hidden="true">
-        <span className="theme-mode-switch-icon sun">☀</span>
-        <span className="theme-mode-switch-icon moon">☾</span>
-        <span className="theme-mode-switch-thumb" />
-      </span>
-    </button>
-  );
-}
-
 export function PreferenceToggleSwitch({ checked, ariaLabel, onChange }) {
   return (
     <button

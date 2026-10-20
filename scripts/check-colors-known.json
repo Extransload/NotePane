@@ -14,25 +14,5 @@
   {
     "file": "src/style/colorMath.js",
     "text": "value: `lch(${Math.round(lch.l)}% ${Math.round(lch.c)} ${Math.round(lch.h)}deg${alphaSuffix})`,"
-  },
-  {
-    "file": "src/styles/controls.css",
-    "text": "color-mix(in srgb, #fff2b8 76%, transparent),"
-  },
-  {
-    "file": "src/styles/controls.css",
-    "text": "color-mix(in srgb, #d5c6ff 66%, transparent)"
-  },
-  {
-    "file": "src/styles/controls.css",
-    "text": "color: #d99a00;"
-  },
-  {
-    "file": "src/styles/controls.css",
-    "text": "color: #8ea2ff;"
-  },
-  {
-    "file": "src/styles/controls.css",
-    "text": "box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);"
   }
 ]

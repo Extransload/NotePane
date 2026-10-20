@@ -411,7 +411,6 @@ export const PREFERENCE_SHORTCUT_COMMANDS = [
   { id: "toggleLayoutMode", label: "Toggle tabs / sticky" },
   { id: "toggleEditorWidth", label: "Toggle editor width" },
   { id: "toggleTableOfContents", label: "Toggle table of contents" },
-  { id: "toggleThemeMode", label: "Toggle light / dark" },
   { id: "exportPdf", label: "Export PDF" },
   { id: "preferences", label: "Preferences" },
   { id: "increaseEditorFontSize", label: "Editor font up" },

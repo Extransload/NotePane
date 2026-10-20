@@ -87,56 +87,6 @@
   }
 }
 
-.theme-mode-switch-track {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  width: 60px;
-  height: 26px;
-  align-items: center;
-  padding: 0;
-  border-radius: 999px;
-  background:
-    linear-gradient(
-      90deg,
-      color-mix(in srgb, #fff2b8 76%, transparent),
-      color-mix(in srgb, #d5c6ff 66%, transparent)
-    );
-}
-
-.theme-mode-switch-icon {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  color: var(--sticky-panel-muted);
-  font-size: 14px;
-}
-
-.theme-mode-switch-icon.sun {
-  color: #d99a00;
-}
-
-.theme-mode-switch-icon.moon {
-  color: #8ea2ff;
-}
-
-.theme-mode-switch-thumb {
-  position: absolute;
-  left: 4px;
-  top: 2px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--sticky-panel-bg);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.18);
-  transition: transform 160ms ease;
-}
-
-.header-mode-switch[aria-checked="true"] .theme-mode-switch-thumb {
-  transform: translateX(30px);
-}
-
 .color-wheel {
   position: relative;
   justify-self: center;

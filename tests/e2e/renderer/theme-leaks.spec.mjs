@@ -43,6 +43,10 @@ const ALLOWLIST = [
     reason: "The dot over the disc at the picked point, filled with the picked colour.",
   },
   { selector: ".crop-image-frame", reason: "The crop frame, selection and handles draw over the image." },
+  {
+    selector: ".theme-card-preview",
+    reason: "previews other themes: each picker card's small window is painted in that card's theme. The card around it is still scanned.",
+  },
 ];
 
 const NAMED_COLOURS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
@@ -734,10 +738,20 @@ const SCREEN_GROUPS = [
         await preferences.getByRole("tab", { name: section }).click();
         await expect(preferences.getByRole("tab", { name: section })).toHaveAttribute("aria-selected", "true");
         await parkPointer(page);
+        // A sentinel is never a picker card, so no card is checked; one has focus, so the focus
+        // ring is part of the scan.
+        const themeCard = preferences.getByTestId("theme-card-notepane-light");
+        if (section === "General") {
+          await themeCard.focus();
+          await expect.poll(() => themeCard.evaluate((element) => element.matches(":focus-visible"))).toBe(true);
+        }
         await scan(`preferences: ${section}`, {
           include: [".preferences-backdrop"],
           scrollbars: section === "Shortcuts",
         });
+        if (section === "General") {
+          await expect(themeCard, "the theme card kept focus through both readings").toBeFocused();
+        }
       }
     },
   },

@@ -38,6 +38,7 @@ export function applyThemeToDocument(theme, root = document.documentElement) {
   root.style.colorScheme = theme.scheme;
   if (root === root.ownerDocument.documentElement) {
     declareReferencingTokensOnBody(root.ownerDocument, tokens);
+    rememberAppliedThemeId(root.ownerDocument.defaultView, theme.id);
   }
 }
 
@@ -115,8 +116,30 @@ export async function withExportTheme(run, ownerDocument = document) {
   }
 }
 
-// The main process puts the current theme id in each window's URL, so the entry script can
-// apply it before React mounts and the first frame already has the theme's colours.
-export function readInitialThemeId(search = window.location.search) {
-  return new URLSearchParams(search).get("themeId");
+// The theme this window applied last. The URL's theme id is fixed when the main process creates
+// the window, so after a theme change it names the old theme; session storage survives a reload
+// of the same window and starts empty in a new one.
+const APPLIED_THEME_ID_KEY = "notepane.appliedThemeId";
+
+function rememberAppliedThemeId(view, themeId) {
+  try {
+    view.sessionStorage.setItem(APPLIED_THEME_ID_KEY, themeId);
+  } catch {
+    // Without storage a reload falls back to the URL's theme until the stored one arrives.
+  }
+}
+
+function readAppliedThemeId(view) {
+  try {
+    return view.sessionStorage.getItem(APPLIED_THEME_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+// The theme to apply before React mounts, so the first frame already has the theme's colours:
+// the one this window applied last when it reloads, otherwise the one the main process put in
+// the window's URL when it created the window.
+export function readInitialThemeId(view = window) {
+  return readAppliedThemeId(view) ?? new URLSearchParams(view.location.search).get("themeId");
 }

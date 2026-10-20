@@ -3,6 +3,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+// Theme palettes, from the file the app reads them from.
+const THEMES = JSON.parse(fs.readFileSync(path.join(process.cwd(), "electron", "themes.json"), "utf8"));
+const themePalette = (themeId) => THEMES.find((theme) => theme.id === themeId).palette;
+
 // Each test writes to its own temporary user-data and export directories.
 // They are removed afterwards so runs do not leave hundreds behind in $TMPDIR.
 const temporaryDirectories = [];
@@ -33,7 +37,7 @@ test("Electron app opens a sticky window and persists editor content", async () 
     await page.getByRole("tab").first().dblclick();
     await page.getByLabel("Session name").fill("Project note");
     await page.keyboard.press("Enter");
-    await page.keyboard.press(modifierShortcut("Shift+L"));
+    await chooseAppTheme(page, "notepane-dark");
     await clickMenuItem(electronApp, "Preferences");
     await expect(page.getByRole("dialog", { name: "Preferences window" }))
       .toBeVisible();
@@ -86,7 +90,7 @@ test("Electron app opens a sticky window and persists editor content", async () 
     const persistedState = JSON.parse(fs.readFileSync(notesPath, "utf8"));
     const notes = persistedState.notes;
     expect(notes).toHaveLength(1);
-    expect(persistedState.appTheme.mode).toBe("dark");
+    expect(persistedState.appTheme).toEqual({ themeId: "notepane-dark", mode: "dark" });
     expect(persistedState.layoutMode).toBe("tabs");
     expect(notes[0].title).toBe("Project note");
     expect(notes[0].theme.mode).toBeUndefined();
@@ -127,22 +131,107 @@ test("a new window starts with the current theme applied", async () => {
   try {
     const page = await electronApp.firstWindow();
     await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
-    // The first load starts before a script can be attached, so reload the window with one
-    // that records the root at DOMContentLoaded: after the entry script has run, before React
-    // has asked the main process for the stored theme.
-    await page.addInitScript(() => {
-      document.addEventListener("DOMContentLoaded", () => {
-        const root = document.documentElement;
-        window.__notepaneThemeAtDomContentLoaded = {
-          themeId: root.dataset.themeId ?? null,
-          shellBackground: getComputedStyle(root).getPropertyValue("--sticky-shell-bg").trim(),
-        };
-      });
-    });
-    await page.reload();
+    // The first load starts before a script can be attached, so read it on a reload.
+    expect(await reloadAndReadFirstPaintTheme(page))
+      .toEqual({ themeId: "notepane-dark", shellBackground: "#191919" });
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("a reloaded window starts with the theme chosen after it opened", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-theme-");
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    // The window opened under NotePane Light, and its URL still says so.
+    expect(new URL(page.url()).searchParams.get("themeId")).toBe("notepane-light");
+    await chooseAppTheme(page, "dracula");
+
+    expect(await reloadAndReadFirstPaintTheme(page))
+      .toEqual({ themeId: "dracula", shellBackground: themePalette("dracula").window });
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("the chosen theme persists across a restart", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-theme-");
+  const firstRun = await launchApp(userDataDirectory);
+  try {
+    const page = await firstRun.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    await chooseAppTheme(page, "dracula");
+    await expect.poll(() => readStoredAppTheme(userDataDirectory))
+      .toEqual({ themeId: "dracula", mode: "dark" });
+  } finally {
+    await firstRun.close();
+  }
+
+  const secondRun = await launchApp(userDataDirectory);
+  try {
+    const page = await secondRun.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    expect(readStoredAppTheme(userDataDirectory)).toEqual({ themeId: "dracula", mode: "dark" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme-id", "dracula");
+    expect(await readRootToken(page, "--sticky-shell-bg")).toBe(themePalette("dracula").window);
+  } finally {
+    await secondRun.close();
+  }
+});
+
+// Review Focus 5: the other window follows without a reload, the formatting toolbar that
+// BlockNote portals into its body included.
+test("changing the theme updates an already-open window", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-theme-");
+  writeInitialNotes(userDataDirectory, [
+    {
+      id: "first-note",
+      title: "First note",
+      markdown: "First window words",
+      theme: { tabTextColor: "#d9efff", tabTextOpacity: 1 },
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    {
+      id: "second-note",
+      title: "Second note",
+      markdown: "Second window words",
+      theme: { tabTextColor: "#d9efff", tabTextOpacity: 1 },
+      createdAt: 2,
+      updatedAt: 2,
+    },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
     await expect.poll(() =>
-      page.evaluate(() => window.__notepaneThemeAtDomContentLoaded ?? null),
-    ).toEqual({ themeId: "notepane-dark", shellBackground: "#191919" });
+      electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length),
+    ).toBe(2);
+    const firstPage = await getStickyPageByNoteId(electronApp, "first-note");
+    const secondPage = await getStickyPageByNoteId(electronApp, "second-note");
+    await expect(secondPage.getByTestId("sticky-editor-surface")).toBeVisible();
+
+    // Shown once before the change, so its portal root already exists when the theme changes.
+    const lightToolbar = await readFormattingToolbar(secondPage, "Second window words");
+    expect(lightToolbar).toMatchObject({ portalled: true, colorScheme: "light" });
+
+    await chooseAppTheme(firstPage, "dracula");
+
+    await expect(secondPage.locator("html")).toHaveAttribute("data-theme-id", "dracula");
+    const liveToolbar = await readFormattingToolbar(secondPage, "Second window words");
+    expect(liveToolbar).toMatchObject({ portalled: true, colorScheme: "dark" });
+    expect(liveToolbar.background).not.toBe(lightToolbar.background);
+    // In the sticky layout the toolbar takes its colour from the note tone-matched to the theme,
+    // not from the palette directly, so the reference is the same window loaded under Dracula.
+    await secondPage.reload();
+    await expect(secondPage.getByTestId("sticky-editor-surface")).toBeVisible();
+    expect(await readFormattingToolbar(secondPage, "Second window words")).toEqual(liveToolbar);
   } finally {
     await electronApp.close();
   }
@@ -321,7 +410,8 @@ test("Electron exports and imports a complete portable workspace backup", async 
     const restoredState = JSON.parse(
       fs.readFileSync(path.join(userDataDirectory, "notes.json"), "utf8"),
     );
-    expect(restoredState.appTheme.mode).toBe("dark");
+    // The backup holds an older build's { mode } only; it restores the matching NotePane theme.
+    expect(restoredState.appTheme).toEqual({ themeId: "notepane-dark", mode: "dark" });
     expect(restoredState.notes.map((note) => note.id))
       .toEqual(["imported-note", "imported-trash"]);
     expect(restoredState.notes.find((note) => note.id === "imported-trash").trashedAt)
@@ -2156,7 +2246,7 @@ function writeInitialNotes(userDataDirectory, notes) {
     JSON.stringify(
       {
         version: 3,
-        appTheme: { mode: "light" },
+        appTheme: { themeId: "notepane-light", mode: "light" },
         layoutMode: "tabs",
         notes: notes.map((note, index) => ({
           id: note.id,
@@ -2323,4 +2413,70 @@ async function chooseBlankSessionTemplate(page) {
 
 function modifierShortcut(key) {
   return `${process.platform === "darwin" ? "Meta" : "Control"}+${key}`;
+}
+
+// Chooses a theme as a user does: Preferences through its shortcut (every layout has it), the
+// theme's card in General, then Close.
+async function chooseAppTheme(page, themeId) {
+  await page.bringToFront();
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await expect(preferences).toBeVisible();
+  await preferences.getByTestId(`theme-card-${themeId}`).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme-id", themeId);
+  await preferences.getByRole("button", { name: "Close preferences" }).click();
+  await expect(preferences).toHaveCount(0);
+}
+
+function readStoredAppTheme(userDataDirectory) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(userDataDirectory, "notes.json"), "utf8")).appTheme;
+  } catch {
+    return null;
+  }
+}
+
+async function readRootToken(page, name) {
+  return await page.evaluate(
+    (token) => getComputedStyle(document.documentElement).getPropertyValue(token).trim(),
+    name,
+  );
+}
+
+// Reloads the window with a script that records the root at DOMContentLoaded: after the entry
+// script has applied the first theme, before React has asked the main process for the stored one.
+async function reloadAndReadFirstPaintTheme(page) {
+  await page.addInitScript(() => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const root = document.documentElement;
+      window.__notepaneThemeAtDomContentLoaded = {
+        themeId: root.dataset.themeId ?? null,
+        shellBackground: getComputedStyle(root).getPropertyValue("--sticky-shell-bg").trim(),
+      };
+    });
+  });
+  await page.reload();
+  await expect.poll(() =>
+    page.evaluate(() => window.__notepaneThemeAtDomContentLoaded ?? null),
+  ).not.toBeNull();
+  return await page.evaluate(() => window.__notepaneThemeAtDomContentLoaded);
+}
+
+// Selects a word of `paragraphText` so BlockNote shows the formatting toolbar, which NotePane
+// portals into body (the portal root a sticky window copies its note colours onto), and reads
+// the toolbar's background and colour scheme once colour transitions have finished.
+async function readFormattingToolbar(page, paragraphText) {
+  await page.bringToFront();
+  await page.locator(".bn-editor").getByText(paragraphText, { exact: true }).dblclick();
+  const toolbar = page.locator(".bn-formatting-toolbar.notepane-formatting-toolbar:visible");
+  await expect(toolbar).toBeVisible();
+  await page.waitForFunction(() =>
+    document.getAnimations().every((animation) => !(animation instanceof CSSTransition)),
+  );
+  return await toolbar.evaluate((element) => ({
+    // Outside the React root, so it is the portalled copy that is being read.
+    portalled: element.closest("#root") === null,
+    background: getComputedStyle(element).backgroundColor,
+    colorScheme: getComputedStyle(element).colorScheme,
+  }));
 }

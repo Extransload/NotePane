@@ -172,7 +172,6 @@ const DEFAULT_KEYBOARD_SHORTCUTS = Object.freeze({
   toggleSidebar: "Mod+Shift+B",
   toggleLayoutMode: "Mod+Shift+T",
   toggleTableOfContents: "Mod+Shift+O",
-  toggleThemeMode: "Mod+Shift+L",
   exportPdf: "Mod+Shift+E",
   preferences: "Mod+,",
   increaseEditorFontSize: "Mod+=",

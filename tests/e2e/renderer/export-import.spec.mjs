@@ -159,8 +159,7 @@ for (const { themeId, label, ownCodeTheme } of [
 ]) {
   test(`export renders with NotePane Light under ${label}`, async ({ page }) => {
     await page.addInitScript(stubExportBridge);
-    // `?sentinelThemes` exposes the dev-only theme setter selectAppTheme uses.
-    await page.goto("/?sentinelThemes=1");
+    await page.goto("/");
     await expect(page.locator(".bn-editor [data-background-color='red']")).toBeVisible();
     await expect(page.locator(".bn-editor td").first()).toBeVisible();
     await expect(page.locator(".bn-editor [data-content-type='codeBlock'] code span", { hasText: /^const$/ }))

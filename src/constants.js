@@ -80,7 +80,6 @@ export const DEFAULT_KEYBOARD_SHORTCUTS = {
   toggleLayoutMode: "Mod+Shift+T",
   toggleEditorWidth: "Mod+Shift+W",
   toggleTableOfContents: "Mod+Shift+O",
-  toggleThemeMode: "Mod+Shift+L",
   exportPdf: "Mod+Shift+E",
   preferences: "Mod+,",
   increaseEditorFontSize: "Mod+=",

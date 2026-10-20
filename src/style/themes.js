@@ -39,6 +39,11 @@ export function listThemes() {
   return [...themeData, ...testThemes];
 }
 
+// The themes the app ships, in picker order: never the test themes registered after them.
+export function listBuiltInThemes() {
+  return [...themeData];
+}
+
 export function isKnownThemeId(themeId) {
   return listThemes().some((theme) => theme.id === themeId);
 }

@@ -20,7 +20,10 @@ const {
   DEFAULT_KEYBOARD_SHORTCUTS,
 } = require("./store.cjs");
 const { fitBoundsToWorkAreas, getDetachedWindowBounds } = require("./windowBounds.cjs");
-const { resolveWindowBackgroundColor } = require("./windowTheme.cjs");
+const {
+  resolveOpaqueWindowBackgroundColor,
+  resolveWindowBackgroundColor,
+} = require("./windowTheme.cjs");
 const { readAssetFromUrl } = require("./assetSources.cjs");
 
 const APP_NAME = "NotePane";
@@ -418,8 +421,14 @@ function getCommandTargetWindow() {
 }
 
 function broadcastAppTheme(appTheme) {
+  // Opaque windows keep the background they were created with unless told otherwise, and
+  // paint it while a window resizes or reloads.
+  const backgroundColor = resolveOpaqueWindowBackgroundColor(appTheme, process.platform);
   for (const { window } of windows.values()) {
     if (!window.isDestroyed()) {
+      if (backgroundColor) {
+        window.setBackgroundColor(backgroundColor);
+      }
       window.webContents.send("app-theme:changed", appTheme);
     }
   }

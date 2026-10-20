@@ -11,17 +11,15 @@ import {
 
 /**
  * Window chrome commands: save, export, preferences, colour panel, sidebar,
- * layout mode, theme, font size and table of contents.
+ * layout mode, font size and table of contents.
  */
 export function useChromeShortcuts({
-  activeThemeId,
   adjustEditorFontScale,
   effectiveLayoutMode,
   exportNote,
   focusEditor,
   matchesEnabledKeyboardShortcut,
   note,
-  onAppThemeChanged,
   onAttachNote,
   onEditorWidthChange,
   openFindInNote,
@@ -92,14 +90,6 @@ export function useChromeShortcuts({
         return;
       }
 
-      if (matchesEnabledKeyboardShortcut(event, "toggleThemeMode")) {
-        event.preventDefault();
-        void onAppThemeChanged(
-          activeThemeId === "notepane-dark" ? "notepane-light" : "notepane-dark",
-        );
-        return;
-      }
-
       if (matchesEnabledKeyboardShortcut(event, "exportPdf")) {
         event.preventDefault();
         setIsColorPanelOpen(false);
@@ -165,12 +155,10 @@ export function useChromeShortcuts({
       document.removeEventListener("keydown", handleChromeShortcut, true);
     };
   }, [
-    activeThemeId,
     effectiveLayoutMode,
     matchesEnabledKeyboardShortcut,
     note.detached,
     note.id,
-    onAppThemeChanged,
     onAttachNote,
     adjustEditorFontScale,
     exportNote,

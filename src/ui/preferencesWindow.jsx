@@ -12,7 +12,6 @@ import {
   preventFocusLoss,
 } from "../editor/images.js";
 import {
-  isKeyboardShortcutEnabled,
   normalizeKeyboardShortcutEnabled,
   normalizeKeyboardShortcuts,
 } from "../model/keyboardShortcuts.js";
@@ -21,13 +20,8 @@ import {
   normalizeEditorPreferences,
 } from "../model/preferences.js";
 import {
-  // The light/dark switch below maps its mode to a NotePane theme until the theme picker
-  // replaces it.
-  themeIdForMode,
+  listBuiltInThemes,
 } from "../style/themes.js";
-import {
-  HeaderModeSwitch,
-} from "./controls.jsx";
 import {
   EditorFontFamilyControl,
 } from "./EditorFontControls.jsx";
@@ -36,8 +30,13 @@ import {
   KeyboardShortcutsSection,
 } from "./preferencesSections.jsx";
 import {
+  ThemePicker,
+} from "./ThemePicker.jsx";
+import {
   TrashPreferencesSection,
 } from "./trashPreferences.jsx";
+
+const PICKER_THEMES = listBuiltInThemes();
 
 export const PREFERENCE_PAGES = [
   { id: "general", label: "General" },
@@ -54,7 +53,7 @@ export function normalizePreferencePageId(pageId) {
 
 export function PreferencesWindow({
   initialPage = "general",
-  appThemeMode,
+  appThemeId,
   editorPreferences,
   keyboardShortcuts,
   appFontOptions,
@@ -189,24 +188,17 @@ export function PreferencesWindow({
         aria-labelledby="preferences-tab-general"
       >
         <div className="preferences-section-title">General</div>
-        <div className="preference-setting-row">
+        <div className="preference-setting-row app-theme-setting">
           <div>
             <div className="preference-setting-title">App theme</div>
             <div className="preferences-section-description">
-              Light and dark mode are global for the whole app.
+              The theme applies to every window.
             </div>
           </div>
-          <HeaderModeSwitch
-            mode={appThemeMode}
-            shortcut={
-              isKeyboardShortcutEnabled(
-                normalizedEditorPreferences.keyboardShortcutEnabled,
-                "toggleThemeMode",
-              )
-                ? keyboardShortcuts.toggleThemeMode
-                : ""
-            }
-            onChange={(mode) => onAppThemeChange(themeIdForMode(mode))}
+          <ThemePicker
+            themeId={appThemeId}
+            themes={PICKER_THEMES}
+            onChange={onAppThemeChange}
           />
         </div>
         <div className="preference-setting-row app-font-family-setting">

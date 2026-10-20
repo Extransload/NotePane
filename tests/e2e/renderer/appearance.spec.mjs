@@ -156,7 +156,7 @@ test("keeps light/dark mode global across sidebar sessions", async ({ page }) =>
   await expectSystemSymbolIcons(page);
   await expect(page.getByRole("switch", { name: "Theme mode" })).toHaveCount(0);
 
-  await page.keyboard.press(modifierShortcut("Shift+L"));
+  await selectAppTheme(page, "notepane-dark");
   await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-theme-mode", "dark");
   await expect(page.locator(".brand-wordmark-image-light")).toBeHidden();
   await expect(page.locator(".brand-wordmark-image-dark")).toBeVisible();
@@ -205,7 +205,7 @@ test("keeps light/dark mode global across sidebar sessions", async ({ page }) =>
   await expect(page.getByRole("tab").first()).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-theme-mode", "dark");
 
-  await page.keyboard.press(modifierShortcut("Shift+L"));
+  await selectAppTheme(page, "notepane-light");
   await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-theme-mode", "light");
   await expect(page.locator(".brand-wordmark-image-light")).toBeVisible();
   await expect(page.locator(".brand-wordmark-image-dark")).toBeHidden();
@@ -403,7 +403,7 @@ test("supports light/dark mode and readable sidebar tab background customization
 
   await expect(page.getByRole("switch", { name: "Theme mode" })).toHaveCount(0);
 
-  await page.keyboard.press(modifierShortcut("Shift+L"));
+  await selectAppTheme(page, "notepane-dark");
   await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-theme-mode", "dark");
   await expect.poll(async () => {
     return await page.evaluate(() => {
@@ -422,7 +422,7 @@ test("supports light/dark mode and readable sidebar tab background customization
     activeTabBackground: "rgb(224, 213, 162)",
   });
 
-  await page.keyboard.press(modifierShortcut("Shift+L"));
+  await selectAppTheme(page, "notepane-light");
   await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-theme-mode", "light");
 
   await page.keyboard.press(modifierShortcut(","));
@@ -432,12 +432,12 @@ test("supports light/dark mode and readable sidebar tab background customization
     .toBeVisible();
   await expect(preferencesPanel.getByRole("tab", { name: "General" }))
     .toHaveAttribute("aria-selected", "true");
-  await expect(preferencesPanel.getByRole("switch", { name: "Theme mode" })).toBeVisible();
+  await expect(preferencesPanel.getByRole("radiogroup", { name: "App theme" })).toBeVisible();
   await expect(preferencesPanel.getByText("Keyboard shortcuts")).toHaveCount(0);
   await expect(preferencesPanel.getByLabel("Editor font size")).toHaveCount(0);
   await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
   await expect(preferencesPanel.getByLabel("Editor font size")).toBeVisible();
-  await expect(preferencesPanel.getByRole("switch", { name: "Theme mode" })).toHaveCount(0);
+  await expect(preferencesPanel.getByRole("radiogroup", { name: "App theme" })).toHaveCount(0);
   await preferencesPanel.getByRole("tab", { name: "Shortcuts" }).click();
   await expect(preferencesPanel.getByText("Keyboard shortcuts")).toBeVisible();
   await preferencesPanel.getByRole("tab", { name: "Trash" }).click();
@@ -1037,7 +1037,7 @@ test("keeps sticky editor chrome readable against dark custom backgrounds", asyn
   await expectStickyTableChromeReadable(page);
   await expectStickyPlaceholderReadable(page);
 
-  await page.keyboard.press(modifierShortcut("Shift+L"));
+  await selectAppTheme(page, "notepane-dark");
   await openStickyActionBar(page);
   await page.getByRole("button", { name: "Sticky settings" }).click();
   await page.getByLabel("HEX sticky color value").fill("ffffff");
@@ -1067,7 +1067,7 @@ test("keeps sticky dark-mode icon tooltips readable", async ({ page }) => {
     "data-layout-mode",
     "sticky",
   );
-  await page.keyboard.press(modifierShortcut("Shift+L"));
+  await selectAppTheme(page, "notepane-dark");
 
   await openStickyActionBar(page);
   await page.getByRole("button", { name: "Sticky settings" }).hover();

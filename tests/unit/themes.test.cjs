@@ -123,6 +123,21 @@ test("ships the nine themes in picker order", async () => {
   );
 });
 
+test("the picker offers the nine shipped themes, never registered test themes", async () => {
+  const { listBuiltInThemes, listThemes, registerTestThemes } = await loadThemes();
+  const { SENTINEL_THEMES } = await import("../../src/style/sentinelThemes.js");
+  registerTestThemes(SENTINEL_THEMES);
+  try {
+    assert.ok(listThemes().some((theme) => theme.id === "sentinel-light-a"), "the sentinels are registered");
+    assert.deepEqual(
+      listBuiltInThemes().map((theme) => [theme.id, theme.label]),
+      SHIPPED_THEMES,
+    );
+  } finally {
+    registerTestThemes([]);
+  }
+});
+
 // The spec's bar: text on the window, sidebar and panel at 4.5:1, muted text on the window at
 // 3:1, in every shipped theme and every sentinel.
 test("text contrast meets the spec bar in every theme", async () => {

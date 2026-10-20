@@ -391,6 +391,21 @@ test("resolves the window background from the current theme", () => {
   assert.equal(resolveWindowBackgroundColor(null), "#f5f5f2");
 });
 
+test("repaints window backgrounds on a theme change only where windows are opaque", () => {
+  const { resolveOpaqueWindowBackgroundColor } = require("../../electron/windowTheme.cjs");
+  // Windows: opaque windows take the new theme's window colour.
+  assert.equal(resolveOpaqueWindowBackgroundColor({ themeId: "dracula", mode: "dark" }, "win32"), "#282a36");
+  assert.equal(
+    resolveOpaqueWindowBackgroundColor({ themeId: "notepane-light", mode: "light" }, "win32"),
+    "#f5f5f2",
+  );
+  // An unknown theme falls back by mode, as everywhere else.
+  assert.equal(resolveOpaqueWindowBackgroundColor({ themeId: "solarized", mode: "dark" }, "win32"), "#191919");
+  // macOS and Linux windows are transparent and keep no background colour.
+  assert.equal(resolveOpaqueWindowBackgroundColor({ themeId: "dracula", mode: "dark" }, "darwin"), null);
+  assert.equal(resolveOpaqueWindowBackgroundColor({ themeId: "dracula", mode: "dark" }, "linux"), null);
+});
+
 test("updates and persists the global layout mode", () => {
   const directory = createTemporaryDirectory();
   const store = new StickyStore(directory);
@@ -901,6 +916,38 @@ test("keeps a custom binding when a new default shortcut uses the same keys", ()
     keyboardShortcutEnabled: { ...DEFAULT_KEYBOARD_SHORTCUT_ENABLED, searchNotes: true },
   });
   assert.equal(saved.keyboardShortcutEnabled.searchNotes, true);
+});
+
+test("drops a stored binding for the removed light/dark toggle and leaves Mod+Shift+L unbound", () => {
+  // Builds before the theme picker stored a toggleThemeMode binding and its enabled flag.
+  const directory = createTemporaryDirectory();
+  fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({
+      version: 11,
+      notes: [],
+      editorPreferences: {
+        keyboardShortcuts: { ...DEFAULT_KEYBOARD_SHORTCUTS, toggleThemeMode: "Mod+Shift+L" },
+        keyboardShortcutEnabled: { ...DEFAULT_KEYBOARD_SHORTCUT_ENABLED, toggleThemeMode: true },
+      },
+    }),
+    "utf8",
+  );
+
+  const store = new StickyStore(directory);
+  const preferences = store.getEditorPreferences();
+
+  assert.equal(Object.hasOwn(DEFAULT_KEYBOARD_SHORTCUTS, "toggleThemeMode"), false);
+  assert.equal(Object.hasOwn(preferences.keyboardShortcuts, "toggleThemeMode"), false);
+  assert.equal(Object.hasOwn(preferences.keyboardShortcutEnabled, "toggleThemeMode"), false);
+  assert.deepEqual(
+    Object.entries(preferences.keyboardShortcuts).filter(([, shortcut]) => shortcut === "Mod+Shift+L"),
+    [],
+  );
+  // Saving the loaded preferences does not write the binding back.
+  store.updateEditorPreferences(preferences);
+  const saved = JSON.parse(fs.readFileSync(path.join(directory, "notes.json"), "utf8"));
+  assert.equal(Object.hasOwn(saved.editorPreferences.keyboardShortcuts, "toggleThemeMode"), false);
 });
 
 function normalizeSavedPreferences(directory, editorPreferences) {
