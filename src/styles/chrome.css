@@ -383,8 +383,7 @@
   max-width: min(32vw, 180px);
 }
 
-.sticky-shell.layout-sticky .sticky-title-drag-label,
-.sticky-shell.layout-sticky .sticky-title-input {
+.sticky-shell.layout-sticky .sticky-title-drag-label {
   height: 20px;
   padding: 0 7px;
   border-color: transparent;
@@ -398,8 +397,7 @@
     opacity 140ms ease;
 }
 
-.sticky-shell.layout-sticky .sticky-title-drag-label:hover,
-.sticky-shell.layout-sticky .sticky-title-input:focus {
+.sticky-shell.layout-sticky .sticky-title-drag-label:hover {
   border-color: color-mix(in srgb, var(--sticky-border-color) 64%, transparent);
   background: color-mix(in srgb, var(--sticky-control-bg) 72%, transparent);
   opacity: 1;

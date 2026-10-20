@@ -35,10 +35,6 @@
       "pink": "#ad1a72"
     },
     "overrides": {
-      "--brand-pane-cream": "#fbf7ef",
-      "--brand-pastel-sage": "#ddefd4",
-      "--brand-pastel-sky": "#d9ecf8",
-      "--brand-graphite-ink": "#2f3437",
       "--sticky-table-control-bg": "#f2f2f0",
       "--sticky-portal-menu-bg": "#f7f7f5",
       "--sticky-control-hover-bg": "rgb(242 242 240 / 0.95)",
@@ -71,16 +67,12 @@
       "--session-tab-active-bg": "#f1f1ef",
       "--session-tab-inactive-bg": "#f1f1ef",
       "--session-tab-hover-bg": "#f1f1ef",
-      "--bn-colors-menu-background": "var(--sticky-panel-bg)",
-      "--bn-colors-tooltip-background": "var(--sticky-control-hover-bg)",
-      "--bn-colors-hovered-background": "var(--sticky-control-hover-bg)",
       "--bn-colors-selected-text": "#ffffff",
       "--bn-colors-selected-background": "#2f3437",
       "--bn-colors-disabled-background": "#f1f1ef",
       "--bn-colors-side-menu": "#8a8a86",
       "--notepane-find-current-bg": "rgba(249, 115, 22, 0.55)",
       "--sticky-control-bg": "rgb(255 255 255 / 0.76)",
-      "--icon-surface-fill": "rgb(255 255 255 / 0.78)",
       "--chrome-icon-button-bg": "rgb(255 255 255 / 0.74)",
       "--sticky-table-control-shadow": "0 5px 12px rgb(55 53 47 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.28)",
       "--sticky-portal-menu-shadow": "0 12px 26px rgb(55 53 47 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.38)",
@@ -123,15 +115,6 @@
       "--notepane-control-accent-hover": "#2677c7"
     },
     "overrideReasons": [
-      {
-        "tokens": [
-          "--brand-pane-cream",
-          "--brand-pastel-sage",
-          "--brand-pastel-sky",
-          "--brand-graphite-ink"
-        ],
-        "reason": "Today's hand-tuned brand constant, not a palette value."
-      },
       {
         "tokens": [
           "--sticky-table-control-bg",
@@ -196,9 +179,6 @@
       },
       {
         "tokens": [
-          "--bn-colors-menu-background",
-          "--bn-colors-tooltip-background",
-          "--bn-colors-hovered-background",
           "--bn-colors-selected-text",
           "--bn-colors-selected-background",
           "--bn-colors-disabled-background",
@@ -215,7 +195,6 @@
       {
         "tokens": [
           "--sticky-control-bg",
-          "--icon-surface-fill",
           "--chrome-icon-button-bg"
         ],
         "reason": "NotePane Light's translucent chrome fills are pure white, brighter than its #f5f5f2 panel, which the derivation uses as the glass colour."
@@ -440,10 +419,6 @@
       "pink": "#da208f"
     },
     "overrides": {
-      "--brand-pane-cream": "#fbf7ef",
-      "--brand-pastel-sage": "#ddefd4",
-      "--brand-pastel-sky": "#d9ecf8",
-      "--brand-graphite-ink": "#2f3437",
       "--sticky-table-control-bg": "#161616",
       "--sticky-table-control-hover-bg": "#151515",
       "--sticky-portal-menu-bg": "#202020",
@@ -479,12 +454,9 @@
       "--bn-colors-side-menu": "#9b9b98",
       "--notepane-find-current-bg": "rgba(251, 146, 60, 0.5)",
       "--sticky-border-color": "rgb(255 255 255 / 0.12)",
-      "--bn-colors-border": "rgb(255 255 255 / 0.12)",
       "--sticky-inline-code-bg": "rgb(255 255 255 / 0.1)",
       "--sticky-control-bg": "rgb(255 255 255 / 0.06)",
       "--sticky-control-hover-bg": "rgb(255 255 255 / 0.1)",
-      "--icon-surface-fill": "rgb(255 255 255 / 0.08)",
-      "--icon-muted-fill": "rgb(255 255 255 / 0.12)",
       "--chrome-icon-button-bg": "rgb(255 255 255 / 0.07)",
       "--chrome-icon-button-hover-bg": "rgb(255 255 255 / 0.11)",
       "--chrome-icon-button-active-bg": "rgb(255 255 255 / 0.12)",
@@ -538,15 +510,6 @@
       "--notepane-control-accent-hover": "#4294e4"
     },
     "overrideReasons": [
-      {
-        "tokens": [
-          "--brand-pane-cream",
-          "--brand-pastel-sage",
-          "--brand-pastel-sky",
-          "--brand-graphite-ink"
-        ],
-        "reason": "Today's hand-tuned brand constant, not a palette value."
-      },
       {
         "tokens": [
           "--sticky-table-control-bg",
@@ -624,12 +587,9 @@
       {
         "tokens": [
           "--sticky-border-color",
-          "--bn-colors-border",
           "--sticky-inline-code-bg",
           "--sticky-control-bg",
           "--sticky-control-hover-bg",
-          "--icon-surface-fill",
-          "--icon-muted-fill",
           "--chrome-icon-button-bg",
           "--chrome-icon-button-hover-bg",
           "--chrome-icon-button-active-bg",

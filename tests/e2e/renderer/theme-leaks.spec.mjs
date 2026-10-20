@@ -15,9 +15,11 @@ import {
 //
 // The ratchet: tests/e2e/fixtures/theme-leaks-known.json lists the leaks still expected. The
 // test fails on a leak missing from it (a listed place whose value changed counts) and on a
-// listed leak that no longer occurs. A missing file is an empty list.
+// listed leak that no longer occurs. The list is empty, so the file is gone: a missing file is
+// an empty list, and every leak fails the test.
 //
 // Rewrite the list:  NOTEPANE_WRITE_KNOWN_LEAKS=1 npx playwright test tests/e2e/renderer/theme-leaks.spec.mjs
+//                    (an empty list leaves no file)
 // Compare:           npx playwright test tests/e2e/renderer/theme-leaks.spec.mjs
 const KNOWN_LEAKS_FILE = path.resolve("tests/e2e/fixtures/theme-leaks-known.json");
 const WRITE_KNOWN_LEAKS = process.env.NOTEPANE_WRITE_KNOWN_LEAKS === "1";
@@ -476,8 +478,12 @@ function settleRatchet(pair, group, state) {
 
   if (WRITE_KNOWN_LEAKS) {
     const merged = [...known.filter((leak) => !screenSet.has(leak.screen)), ...leaks].sort(compareLeakKeys);
-    fs.mkdirSync(path.dirname(KNOWN_LEAKS_FILE), { recursive: true });
-    fs.writeFileSync(KNOWN_LEAKS_FILE, `${JSON.stringify(merged, null, 2)}\n`);
+    if (merged.length) {
+      fs.mkdirSync(path.dirname(KNOWN_LEAKS_FILE), { recursive: true });
+      fs.writeFileSync(KNOWN_LEAKS_FILE, `${JSON.stringify(merged, null, 2)}\n`);
+    } else {
+      fs.rmSync(KNOWN_LEAKS_FILE, { force: true });
+    }
     return;
   }
 
@@ -787,6 +793,32 @@ const SCREEN_GROUPS = [
       await expect(errorToast).toHaveCount(0);
       await parkPointer(page);
       await scan("success toast", { include: [".sticky-toast"] });
+    },
+  },
+  {
+    name: "markdown import dialog",
+    screens: ["markdown import dialog", "markdown import error"],
+    async run(page, scan) {
+      await clickLastEmptyParagraph(page);
+      await page.keyboard.type("/import");
+      await page.locator(".bn-suggestion-menu").getByText("Import Markdown", { exact: true }).click();
+      const importDialog = page.getByRole("dialog", { name: "Import Markdown" });
+      await expect(importDialog).toBeVisible();
+      await parkPointer(page);
+      await scan("markdown import dialog", { include: [".markdown-import-backdrop"] });
+
+      // A drop without a file shows the error; a drag entering the drop zone highlights it, as
+      // a file dragged over it would.
+      const dropzone = importDialog.locator(".markdown-import-dropzone");
+      await dropzone.evaluate((element) => {
+        element.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer: new DataTransfer() }));
+      });
+      await expect(importDialog.getByRole("alert")).toHaveText("Drop or choose a Markdown file.");
+      await dropzone.evaluate((element) => {
+        element.dispatchEvent(new DragEvent("dragenter", { bubbles: true, dataTransfer: new DataTransfer() }));
+      });
+      await expect(dropzone).toHaveClass(/\bis-dragging\b/);
+      await scan("markdown import error", { include: [".markdown-import-backdrop"] });
     },
   },
   {

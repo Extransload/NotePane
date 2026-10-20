@@ -978,3 +978,26 @@ export async function selectAppThemeThroughTestHook(page, themeId) {
   await page.evaluate((id) => window.__notepaneTest.setThemeId(id), themeId);
   await expect(page.locator("html")).toHaveAttribute("data-theme-id", themeId);
 }
+
+// The renderer module that applies the export theme, by the path the dev server serves it at.
+// The page imports it, where check:refs cannot follow the path, so this is the one place that
+// names it.
+const APPLY_THEME_MODULE = "/src/style/applyTheme.js";
+
+// Reads the computed style properties `names` (camelCase) of the element `locator` matches as a
+// PDF export renders it: with `is-exporting` on body and the export theme applied through
+// withExportTheme, as exportNote in src/main.jsx does.
+export async function readComputedStyleWhileExporting(locator, names) {
+  return locator.evaluate(async (element, { modulePath, properties }) => {
+    const { withExportTheme } = await import(modulePath);
+    document.body.classList.add("is-exporting");
+    try {
+      return await withExportTheme(async () => {
+        const style = getComputedStyle(element);
+        return Object.fromEntries(properties.map((name) => [name, style[name]]));
+      });
+    } finally {
+      document.body.classList.remove("is-exporting");
+    }
+  }, { modulePath: APPLY_THEME_MODULE, properties: names });
+}

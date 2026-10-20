@@ -10,6 +10,7 @@ import {
   modifierShortcut,
   pasteClipboardText,
   pastePlainText,
+  readComputedStyleWhileExporting,
   selectAppTheme,
   selectAppThemeThroughTestHook,
 } from "../support/renderer-helpers.mjs";
@@ -642,21 +643,7 @@ test("renders Command+E inline code with Notion-like styling and composable colo
   });
 
   // A PDF export sets is-exporting and applies NotePane Light through withExportTheme.
-  const exportStyle = await inlineCode.evaluate(async (element) => {
-    const { withExportTheme } = await import("/src/style/applyTheme.js");
-    document.body.classList.add("is-exporting");
-    try {
-      return await withExportTheme(async () => {
-        const style = getComputedStyle(element);
-        return {
-          backgroundColor: style.backgroundColor,
-          color: style.color,
-        };
-      });
-    } finally {
-      document.body.classList.remove("is-exporting");
-    }
-  });
+  const exportStyle = await readComputedStyleWhileExporting(inlineCode, ["backgroundColor", "color"]);
   expect(exportStyle).toEqual({
     backgroundColor: "rgba(135, 131, 120, 0.16)",
     color: "rgb(189, 63, 63)",

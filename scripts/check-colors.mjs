@@ -1,10 +1,12 @@
 #!/usr/bin/env node
-// Colour-literal ratchet. Every hard-coded colour in the renderer, Electron main process and
-// index.html is either allowlisted on purpose (scripts/check-colors-allowlist.json) or listed
-// as known debt (scripts/check-colors-known.json). The known list may only shrink:
+// Colour-literal check. Every hard-coded colour in the renderer, Electron main process and
+// index.html is allowlisted on purpose (scripts/check-colors-allowlist.json), each entry with
+// its reason. The known-debt list (scripts/check-colors-known.json) is empty, so its file is
+// gone; a missing file is an empty list:
 //   - a literal that is in neither list fails the check;
-//   - a known entry that no longer occurs fails the check, so the list is trimmed as literals go.
-// `--write-known` regenerates the known list from the current tree.
+//   - a known entry that no longer occurs fails the check.
+// `--write-known` regenerates the known list from the current tree, and leaves no file when
+// the list is empty.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,6 +41,35 @@ const PATTERNS = [
   ),
 ];
 
+// A CSS declaration, from its property to the `;` or the end of the block that ends it, so a
+// value spanning several lines (a multi-line gradient's color-mix(), say) is read whole. Its
+// value is checked for named colours when the property is a colour property or a custom
+// property, or when the value mixes colours with color-mix().
+const CSS_DECLARATION = /(?:^|[\s;{])(--[\w-]+|-?[a-z][\w-]*)\s*:([^;{}]*)/g;
+const CSS_COLOUR_PROPERTY = new RegExp(`^(?:${COLOR_PROPERTIES}|--[\\w-]+)$`);
+const CSS_NAMED_COLOUR = new RegExp(`(?<![\\w-])(?:${NAMED})(?![\\w-])`, "g");
+
+// The lines of a stylesheet that hold a named colour inside a colour declaration. Comments
+// are blanked first, keeping every line where it is.
+function namedColourLines(source) {
+  const css = source.replace(/\/\*[\s\S]*?\*\//g, (comment) => comment.replace(/[^\n]/g, " "));
+  const lineStarts = [0];
+  for (let index = css.indexOf("\n"); index !== -1; index = css.indexOf("\n", index + 1)) {
+    lineStarts.push(index + 1);
+  }
+  const lineOf = (offset) => lineStarts.findLastIndex((start) => start <= offset) + 1;
+  const found = new Set();
+  for (const declaration of css.matchAll(CSS_DECLARATION)) {
+    const [whole, property, value] = declaration;
+    if (!CSS_COLOUR_PROPERTY.test(property) && !value.includes("color-mix(")) continue;
+    const valueStart = declaration.index + whole.length - value.length;
+    for (const colour of value.matchAll(CSS_NAMED_COLOUR)) {
+      found.add(lineOf(valueStart + colour.index));
+    }
+  }
+  return found;
+}
+
 function listFiles(dir, extensions) {
   const found = [];
   for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
@@ -61,9 +92,10 @@ function findLiterals() {
     .sort();
   const findings = [];
   for (const file of files) {
-    const lines = fs.readFileSync(path.join(ROOT, file), "utf8").split("\n");
-    lines.forEach((line, index) => {
-      if (PATTERNS.some((pattern) => pattern.test(line))) {
+    const source = fs.readFileSync(path.join(ROOT, file), "utf8");
+    const declarationLines = file.endsWith(".css") ? namedColourLines(source) : new Set();
+    source.split("\n").forEach((line, index) => {
+      if (declarationLines.has(index + 1) || PATTERNS.some((pattern) => pattern.test(line))) {
         findings.push({ file, line: index + 1, text: line.trim() });
       }
     });
@@ -98,8 +130,13 @@ const candidates = findings.filter((finding) => !isAllowed(finding, allowlist));
 
 if (process.argv.includes("--write-known")) {
   const known = candidates.map(({ file, text }) => ({ file, text }));
-  fs.writeFileSync(KNOWN_FILE, `${JSON.stringify(known, null, 2)}\n`);
-  console.log(`check-colors: wrote ${known.length} known literals to scripts/${KNOWN_NAME}`);
+  if (known.length) {
+    fs.writeFileSync(KNOWN_FILE, `${JSON.stringify(known, null, 2)}\n`);
+    console.log(`check-colors: wrote ${known.length} known literals to scripts/${KNOWN_NAME}`);
+  } else {
+    fs.rmSync(KNOWN_FILE, { force: true });
+    console.log(`check-colors: no known literals; scripts/${KNOWN_NAME} is not written`);
+  }
   process.exit(0);
 }
 

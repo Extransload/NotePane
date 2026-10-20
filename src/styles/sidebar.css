@@ -33,7 +33,7 @@
   background:
     linear-gradient(
       180deg,
-      color-mix(in srgb, var(--sticky-sidebar-bg) 96%, white),
+      color-mix(in srgb, var(--sticky-sidebar-bg) 96%, var(--notepane-glass)),
       var(--sticky-sidebar-bg)
     );
   -webkit-app-region: no-drag;
@@ -71,7 +71,7 @@
     linear-gradient(
       180deg,
       var(--sticky-sidebar-bg),
-      color-mix(in srgb, var(--sticky-sidebar-bg) 94%, black)
+      color-mix(in srgb, var(--sticky-sidebar-bg) 94%, var(--notepane-shadow-color))
     );
   -webkit-app-region: no-drag;
 }
@@ -631,32 +631,6 @@
 
 .sticky-title-drag-label:active {
   cursor: default;
-}
-
-.sticky-title-input {
-  width: 100%;
-  height: 30px;
-  min-width: 0;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  outline: none;
-  background: transparent;
-  color: var(--sticky-text-color);
-  font: 760 13px/1 var(--notepane-ui-font);
-  letter-spacing: 0;
-  -webkit-app-region: no-drag;
-  transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    box-shadow 140ms ease;
-}
-
-.sticky-title-input:hover,
-.sticky-title-input:focus {
-  border-color: var(--sticky-border-color);
-  background: var(--sticky-control-bg);
-  box-shadow: var(--notepane-shadow-header-glass);
 }
 
 .sr-only {

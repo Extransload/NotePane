@@ -3,6 +3,7 @@ import {
   clickLastEmptyParagraph,
   loadTemplatePreview,
   modifierShortcut,
+  openStickyActionBar,
   selectAppTheme,
 } from "../support/renderer-helpers.mjs";
 
@@ -98,7 +99,9 @@ function stubExportBridge() {
       { type: "paragraph" },
     ]),
     markdown: "",
-    theme: {},
+    // A pastel at low opacity: in sticky layout under a dark theme the window is dark, with
+    // light text. The tabs layout does not paint the shell with it.
+    theme: { tabTextColor: "#d9efff", tabTextOpacity: 0.35 },
     seedDemoContent: false,
     editorFontScale: 1,
     editorFontFamily: "Inter",
@@ -152,10 +155,12 @@ function stubExportBridge() {
 }
 
 // Export renders with NotePane Light whatever theme is selected, code included: NotePane Light's
-// github-dark code theme, even where the selected theme highlights code in its own colours.
-for (const { themeId, label, ownCodeTheme } of [
-  { themeId: "notepane-dark", label: "a dark theme", ownCodeTheme: false },
-  { themeId: "catppuccin-mocha", label: "Catppuccin Mocha", ownCodeTheme: true },
+// github-dark code theme, even where the selected theme highlights code in its own colours. In
+// sticky layout the shell carries its note's colours inline, and the export replaces those too.
+for (const { themeId, label, ownCodeTheme, layoutMode } of [
+  { themeId: "notepane-dark", label: "a dark theme", ownCodeTheme: false, layoutMode: "tabs" },
+  { themeId: "catppuccin-mocha", label: "Catppuccin Mocha", ownCodeTheme: true, layoutMode: "tabs" },
+  { themeId: "notepane-dark", label: "a dark theme in sticky layout", ownCodeTheme: false, layoutMode: "sticky" },
 ]) {
   test(`export renders with NotePane Light under ${label}`, async ({ page }) => {
     await page.addInitScript(stubExportBridge);
@@ -173,11 +178,20 @@ for (const { themeId, label, ownCodeTheme } of [
       );
       return page.evaluate(() => window.__readExportColours());
     };
+    // NotePane Light's own colours, read in the tabs layout before a sticky window paints the
+    // shell with its note's colour.
     const lightColours = await readSettledColours();
 
+    if (layoutMode === "sticky") {
+      await page.getByTestId("session-sidebar-footer")
+        .getByRole("button", { name: "Switch to Sticky windows mode" })
+        .click();
+      await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
+    }
     await selectAppTheme(page, themeId);
     const themedColours = await readSettledColours();
     // The selected theme paints these differently, so the export check below means something.
+    expect(themedColours.shellText).not.toBe(lightColours.shellText);
     expect(themedColours.redHighlight).not.toBe(lightColours.redHighlight);
     expect(themedColours.tableBorder).not.toBe(lightColours.tableBorder);
     expect(themedColours.muted).not.toBe(lightColours.muted);
@@ -185,6 +199,10 @@ for (const { themeId, label, ownCodeTheme } of [
       expect(themedColours.codeKeyword).not.toBe(lightColours.codeKeyword);
     }
 
+    // In sticky layout the Export button sits in the sticky header's action bar.
+    if (layoutMode === "sticky") {
+      await openStickyActionBar(page);
+    }
     await page.getByRole("button", { name: "Export" }).click();
     await page.getByRole("menu", { name: "Export format" }).getByRole("menuitem", { name: /PDF/ }).click();
     await expect(page.locator(".sticky-toast-success")).toHaveText("PDF exported");

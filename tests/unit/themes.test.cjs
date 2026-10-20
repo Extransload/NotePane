@@ -573,22 +573,51 @@ const LIBRARY_COLOUR_TOKENS = {
   "--notepane-link": ["#0000ee", "#9e9eff"],
 };
 
+// Tokens of the tokens.css capture that nothing read, deleted with their overrides: the brand
+// constants and the icon fills.
+const DELETED_TOKENS = new Set([
+  "--brand-pane-cream",
+  "--brand-pastel-sage",
+  "--brand-pastel-sky",
+  "--brand-graphite-ink",
+  "--icon-surface-fill",
+  "--icon-muted-fill",
+]);
+
+// BlockNote variables whose tokens.css value never painted: BlockNote reads them only inside
+// .bn-root, where the bridge in blocknote.css points each at a NotePane token, so the root's
+// value is never read. Their overrides are gone, and each now holds the derived value, the
+// token the bridge reads: [NotePane Light, NotePane Dark].
+const BRIDGE_SHADOWED_TOKENS = {
+  "--bn-colors-menu-background": ["var(--sticky-portal-menu-bg)", "var(--sticky-portal-menu-bg)"],
+  "--bn-colors-tooltip-background": ["var(--sticky-portal-menu-hover-bg)", "var(--sticky-portal-menu-hover-bg)"],
+  "--bn-colors-hovered-background": ["var(--sticky-portal-menu-hover-bg)", "var(--sticky-portal-menu-hover-bg)"],
+  "--bn-colors-border": ["rgb(55 53 47 / 0.12)", "rgb(241 241 239 / 0.12)"],
+};
+
 async function assertNotePaneTokens(themeId, scheme) {
   const baseline = require("./fixtures/theme-baseline.json");
   const { buildThemeTokens } = await loadTokens();
   const { getTheme } = await loadThemes();
   const literalIndex = scheme === "dark" ? 1 : 0;
   const expected = {
-    ...baseline.tokens[scheme],
+    ...Object.fromEntries(Object.entries(baseline.tokens[scheme]).filter(([name]) => !DELETED_TOKENS.has(name))),
     ...Object.fromEntries(
-      Object.entries({ ...STYLESHEET_LITERAL_TOKENS, ...LIBRARY_COLOUR_TOKENS }).map(([name, values]) => [
-        name,
-        values[literalIndex],
-      ]),
+      Object.entries({ ...STYLESHEET_LITERAL_TOKENS, ...LIBRARY_COLOUR_TOKENS, ...BRIDGE_SHADOWED_TOKENS }).map(
+        ([name, values]) => [name, values[literalIndex]],
+      ),
     ),
   };
   assert.deepEqual(normaliseTokens(buildThemeTokens(getTheme(themeId))), normaliseTokens(expected));
 }
+
+test("the .bn-root bridge redefines each BlockNote variable whose tokens.css value never painted", () => {
+  const bridge = blockNoteBridge();
+  for (const name of Object.keys(BRIDGE_SHADOWED_TOKENS)) {
+    assert.ok(bridge.has(name), `the bridge declares ${name}`);
+    assert.notEqual(bridge.get(name), "inherit", `the bridge reads ${name} from the root`);
+  }
+});
 
 test("NotePane Light tokens equal the captured tokens.css values and today's stylesheet literals", () =>
   assertNotePaneTokens("notepane-light", "light"));
@@ -811,6 +840,34 @@ function listSources(directory, extensions) {
   });
 }
 
+// The custom properties the stylesheets, the side menu's inline <style> and the scripts read.
+// Scripts read a token through a var() they hand to the page, or through getPropertyValue.
+function readTokenNames() {
+  const stylesheets = listSources("src/styles", [".css"]).map(readSource).join("\n");
+  const sideMenuStyle = [...readSource("src/editor/sideMenu.jsx").matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)]
+    .map((match) => match[1])
+    .join("\n");
+  const scriptReads = listSources("src", [".js", ".jsx"]).flatMap((file) => {
+    const source = readSource(file);
+    return [
+      ...[...source.matchAll(/var\(\s*(--[\w-]+)/g)].map((match) => match[1]),
+      ...[...source.matchAll(/getPropertyValue\(\s*["'`](--[\w-]+)["'`]/g)].map((match) => match[1]),
+    ];
+  });
+  return new Set([
+    ...[...`${stylesheets}\n${sideMenuStyle}`.matchAll(/var\(\s*(--[\w-]+)/g)].map((match) => match[1]),
+    ...scriptReads,
+  ]);
+}
+
+// The --bn-colors-* variables the bridge in blocknote.css declares on every .bn-root, with
+// their values.
+function blockNoteBridge() {
+  const rule = /\.bn-root\.bn-root\[data-color-scheme\]\s*\{([^}]*)\}/.exec(readSource("src/styles/blocknote.css"));
+  assert.ok(rule, "blocknote.css declares the .bn-root bridge");
+  return new Map([...rule[1].matchAll(/(--bn-colors-[\w-]+)\s*:\s*([^;]+);/g)].map((match) => [match[1], match[2].trim()]));
+}
+
 test("every token a stylesheet or script reads is defined", async () => {
   globalThis.window ??= {};
   const { THEME_TOKEN_NAMES } = await loadTokens();
@@ -818,21 +875,7 @@ test("every token a stylesheet or script reads is defined", async () => {
   const { getStickyShellStyle, getSessionTabStyle } = await import("../../src/style/themeStyles.js");
   const stylesheets = listSources("src/styles", [".css"]).map(readSource).join("\n");
   const scriptFiles = listSources("src", [".js", ".jsx"]);
-  const sideMenuStyle = [...readSource("src/editor/sideMenu.jsx").matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)]
-    .map((match) => match[1])
-    .join("\n");
-  // Scripts read a token through a var() they hand to the page, or through getPropertyValue.
-  const scriptReads = scriptFiles.flatMap((file) => {
-    const source = readSource(file);
-    return [
-      ...[...source.matchAll(/var\(\s*(--[\w-]+)/g)].map((match) => match[1]),
-      ...[...source.matchAll(/getPropertyValue\(\s*["'`](--[\w-]+)["'`]/g)].map((match) => match[1]),
-    ];
-  });
-  const readNames = new Set([
-    ...[...`${stylesheets}\n${sideMenuStyle}`.matchAll(/var\(\s*(--[\w-]+)/g)].map((match) => match[1]),
-    ...scriptReads,
-  ]);
+  const readNames = readTokenNames();
   const declaredByRule = new Set(
     [...stylesheets.matchAll(/(?:^|[{;\s])(--[\w-]+)\s*:/g)].map((match) => match[1]),
   );
@@ -873,3 +916,24 @@ test("every token a stylesheet or script reads is defined", async () => {
   assert.deepEqual(undefinedNames, []);
 });
 
+// An override matters only where the page reads its token. BlockNote reads its --bn-colors-*
+// variables inside .bn-root, where BlockNote and the bridge in blocknote.css declare every one
+// of them: a variable the bridge does not declare `inherit` never sees the root's value.
+test("every override sets a token the page reads", async () => {
+  const { listThemes } = await loadThemes();
+  const { buildThemeTokens } = await loadTokens();
+  const bridge = blockNoteBridge();
+  // A token is read too when another token's value reads it.
+  const readNames = readTokenNames();
+  for (const theme of listThemes()) {
+    for (const value of Object.values(buildThemeTokens(theme))) {
+      for (const match of value.matchAll(/var\(\s*(--[\w-]+)/g)) readNames.add(match[1]);
+    }
+  }
+  const unread = listThemes().flatMap((theme) =>
+    Object.keys(theme.overrides)
+      .filter((name) => (name.startsWith("--bn-colors-") ? bridge.get(name) !== "inherit" : !readNames.has(name)))
+      .map((name) => `${theme.id} ${name}`),
+  );
+  assert.deepEqual(unread, []);
+});
