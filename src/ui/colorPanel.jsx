@@ -7,6 +7,7 @@ import {
 
 export function ColorPanel({
   theme,
+  activeTheme,
   variant = "sticky",
   defaultColor,
   onChange,
@@ -44,6 +45,7 @@ export function ColorPanel({
       <div className="preferences-panel-body">
         <ColorSettingsSection
           theme={theme}
+          activeTheme={activeTheme}
           variant={variant}
           defaultColor={defaultColor}
           onChange={onChange}

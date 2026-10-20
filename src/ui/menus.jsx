@@ -18,14 +18,19 @@ import {
 import {
   resolveSessionTabAccentColor,
 } from "../style/themeStyles.js";
+import {
+  toneMatch,
+} from "../style/toneMatch.js";
 
 export function SessionTabContextMenu({
   x,
   y,
   sessionNote,
+  activeTheme,
   onOpenColor,
 }) {
-  const colorPreview = resolveSessionTabAccentColor(sessionNote.theme);
+  const storedColor = resolveSessionTabAccentColor(sessionNote.theme);
+  const colorPreview = storedColor ? toneMatch(storedColor, activeTheme, "mark") : undefined;
 
   return (
     <div

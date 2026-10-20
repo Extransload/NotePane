@@ -329,7 +329,80 @@
         ],
         "reason": "Mantine's primary hover is NotePane's control accent #2383e2 mixed 15% toward the text colour (#2677c7), so it matches the button it hovers; the derivation starts from the purple accent."
       }
-    ]
+    ],
+    "noteChrome": {
+      "base": "#ffffff",
+      "inkDark": "#37352f",
+      "inkLight": "#f7f7f4",
+      "tabBase": "#f1f1ef",
+      "tabInkDark": "#1f1f1f",
+      "tabInkLight": "#fbfbfa",
+      "tabToneMix": 0,
+      "headerColor": {
+        "onLight": "#ffffff",
+        "onDark": "#000000"
+      },
+      "panelColor": {
+        "onLight": "#ffffff",
+        "onDark": "#ffffff"
+      },
+      "tableControlBackground": {
+        "onLight": "#000000",
+        "onDark": "#000000"
+      },
+      "tableControlHoverBackground": {
+        "onLight": "#000000",
+        "onDark": "#000000"
+      },
+      "portalMenuBackground": {
+        "onLight": "#ffffff",
+        "onDark": "#000000"
+      },
+      "tableControlShadow": {
+        "onLight": "0 5px 12px rgb(55 53 47 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.28)",
+        "onDark": "0 7px 16px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.08)"
+      },
+      "portalMenuShadow": {
+        "onLight": "0 12px 26px rgb(55 53 47 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.38)",
+        "onDark": "0 14px 34px rgb(0 0 0 / 0.46), inset 0 1px 0 rgb(255 255 255 / 0.08)"
+      },
+      "blockNoteShadowColor": {
+        "onLight": "rgb(55 53 47 / 0.18)",
+        "onDark": "rgb(0 0 0 / 0.48)"
+      },
+      "controlBackground": {
+        "onLight": "rgb(255 255 255 / 0.46)",
+        "onDark": "rgb(0 0 0 / 0.20)"
+      },
+      "controlHoverBackground": {
+        "onLight": "rgb(255 255 255 / 0.68)",
+        "onDark": "rgb(255 255 255 / 0.16)"
+      },
+      "codeBorderColor": {
+        "onLight": "rgb(31 35 40 / 0.32)",
+        "onDark": "rgb(139 148 158 / 0.42)"
+      },
+      "selectedBackground": {
+        "onLight": "#37352f",
+        "onDark": "#f7f7f4"
+      },
+      "selectedText": {
+        "onLight": "#ffffff",
+        "onDark": "#191919"
+      },
+      "iconColor": {
+        "onLight": "#4f534f",
+        "onDark": "#f1f1ef"
+      },
+      "iconActiveColor": {
+        "onLight": "#2f3437",
+        "onDark": "#ffffff"
+      },
+      "iconSurfaceFill": {
+        "onLight": "rgb(255 255 255 / 0.40)",
+        "onDark": "rgb(255 255 255 / 0.10)"
+      }
+    }
   },
   {
     "id": "notepane-dark",
@@ -691,6 +764,79 @@
         ],
         "reason": "Mantine's primary hover is NotePane's control accent #2383e2 mixed 15% toward the text colour (#4294e4), so it matches the button it hovers; the derivation starts from the lavender accent."
       }
-    ]
+    ],
+    "noteChrome": {
+      "base": "#191919",
+      "inkDark": "#37352f",
+      "inkLight": "#f7f7f4",
+      "tabBase": "#2a2a2a",
+      "tabInkDark": "#1f1f1f",
+      "tabInkLight": "#fbfbfa",
+      "tabToneMix": 0.12,
+      "headerColor": {
+        "onLight": "#ffffff",
+        "onDark": "#000000"
+      },
+      "panelColor": {
+        "onLight": "#ffffff",
+        "onDark": "#ffffff"
+      },
+      "tableControlBackground": {
+        "onLight": "#000000",
+        "onDark": "#000000"
+      },
+      "tableControlHoverBackground": {
+        "onLight": "#000000",
+        "onDark": "#000000"
+      },
+      "portalMenuBackground": {
+        "onLight": "#ffffff",
+        "onDark": "#000000"
+      },
+      "tableControlShadow": {
+        "onLight": "0 5px 12px rgb(55 53 47 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.28)",
+        "onDark": "0 7px 16px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.08)"
+      },
+      "portalMenuShadow": {
+        "onLight": "0 12px 26px rgb(55 53 47 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.38)",
+        "onDark": "0 14px 34px rgb(0 0 0 / 0.46), inset 0 1px 0 rgb(255 255 255 / 0.08)"
+      },
+      "blockNoteShadowColor": {
+        "onLight": "rgb(55 53 47 / 0.18)",
+        "onDark": "rgb(0 0 0 / 0.48)"
+      },
+      "controlBackground": {
+        "onLight": "rgb(255 255 255 / 0.46)",
+        "onDark": "rgb(0 0 0 / 0.20)"
+      },
+      "controlHoverBackground": {
+        "onLight": "rgb(255 255 255 / 0.68)",
+        "onDark": "rgb(255 255 255 / 0.16)"
+      },
+      "codeBorderColor": {
+        "onLight": "rgb(31 35 40 / 0.32)",
+        "onDark": "rgb(139 148 158 / 0.42)"
+      },
+      "selectedBackground": {
+        "onLight": "#37352f",
+        "onDark": "#f7f7f4"
+      },
+      "selectedText": {
+        "onLight": "#ffffff",
+        "onDark": "#191919"
+      },
+      "iconColor": {
+        "onLight": "#4f534f",
+        "onDark": "#f1f1ef"
+      },
+      "iconActiveColor": {
+        "onLight": "#2f3437",
+        "onDark": "#ffffff"
+      },
+      "iconSurfaceFill": {
+        "onLight": "rgb(255 255 255 / 0.40)",
+        "onDark": "rgb(255 255 255 / 0.10)"
+      }
+    }
   }
 ]

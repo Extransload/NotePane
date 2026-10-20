@@ -49,6 +49,9 @@ import {
   resolveThemeAccentColor,
 } from "../style/themeStyles.js";
 import {
+  toneMatch,
+} from "../style/toneMatch.js";
+import {
   ColorWheel,
 } from "./ColorWheel.jsx";
 import {
@@ -64,11 +67,15 @@ import {
 
 export function ColorSettingsSection({
   theme,
+  activeTheme,
   variant = "tabs",
   defaultColor,
   onChange,
 }) {
   const isStickyVariant = variant === "sticky";
+  // Swatches show a colour as the sticky window or tab will paint it in the active theme; the
+  // value picked and stored stays the raw colour.
+  const previewRole = isStickyVariant ? "surface" : "fill";
   const activeColor = isStickyVariant
     ? resolveThemeAccentColor(theme, defaultColor ?? DEFAULT_STICKY_ACCENT_COLOR)
     : resolveSessionTabAccentColor(
@@ -173,7 +180,7 @@ export function ColorSettingsSection({
               type="button"
               aria-label={`Pastel color ${index + 1}`}
               aria-pressed={activeColor === color}
-              style={{ "--pastel-color": color }}
+              style={{ "--pastel-color": toneMatch(color, activeTheme, "surface") }}
               onMouseDown={preventFocusLoss}
               onClick={() => updateTabTextColor(color)}
             />
@@ -225,7 +232,7 @@ export function ColorSettingsSection({
           step="0.01"
           value={activeOpacity}
           style={{
-            "--opacity-color": activeColor,
+            "--opacity-color": toneMatch(activeColor, activeTheme, previewRole),
           }}
           onInput={(event) => updateTabTextOpacity(event.currentTarget.value)}
           onChange={(event) => updateTabTextOpacity(event.target.value)}

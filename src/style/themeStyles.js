@@ -1,10 +1,6 @@
 import {
-  DEFAULT_APP_THEME,
   DEFAULT_STICKY_ACCENT_COLOR,
   DEFAULT_THEME,
-  MODE_TAB_TEXT_DEFAULTS,
-  SESSION_TAB_DARK_MODE_TONE_MIX,
-  SESSION_TAB_MODE_BASE_COLORS,
   STICKY_PASTEL_PALETTE,
 } from "../constants.js";
 import {
@@ -13,21 +9,23 @@ import {
 } from "../model/preferences.js";
 import {
   blendHexOverHex,
-  getContrastingTextColor,
   getReadableBoundaryColor,
-  getSessionTabContrastingTextColor,
+  getRelativeLuminance,
   hexToCssRgb,
   isHexColor,
   mixHexColors,
+  pickReadableText,
+  readableOn,
 } from "./colorMath.js";
+import {
+  toneMatch,
+} from "./toneMatch.js";
 
-export function resolveTabTextColor(theme, appThemeMode = DEFAULT_APP_THEME.mode) {
-  const normalizedTheme = normalizeTheme(theme);
-  const modeDefaults =
-    MODE_TAB_TEXT_DEFAULTS[appThemeMode] ?? MODE_TAB_TEXT_DEFAULTS.light;
+export function resolveTabTextColor(noteTheme, theme) {
+  const normalizedTheme = normalizeTheme(noteTheme);
   return isHexColor(normalizedTheme.tabTextColor)
     ? normalizedTheme.tabTextColor
-    : modeDefaults.tabTextColor;
+    : theme.palette.text;
 }
 
 export function resolveThemeAccentColor(theme, fallbackColor) {
@@ -59,39 +57,98 @@ export function resolveDefaultStickyAccentColor(noteIndex = 0) {
   ];
 }
 
-export function getSessionTabStyle(
-  theme,
-  appThemeMode = DEFAULT_APP_THEME.mode,
-  noteIndex = 0,
-) {
+// The colour that marks a note in small places, such as the search result dot: its own
+// colour, or its default pastel, in the active theme's tone.
+export function resolveNoteMarkColor(noteTheme, theme, noteIndex = 0) {
+  return toneMatch(resolveStickyAccentColor(noteTheme, noteIndex), theme, "mark");
+}
+
+/**
+ * The colours a sticky window and a session tab draw around a note's own colour, derived from
+ * the palette. NotePane Light and Dark carry today's hand-tuned values as `theme.noteChrome`
+ * instead, in the same shape:
+ * - `base`, `tabBase`: what a sticky window's and a session tab's colour is blended over;
+ * - `inkDark`/`inkLight`, `tabInkDark`/`tabInkLight`: the two text candidates, darker first;
+ * - `tabToneMix`: how far a tab's colour is darkened toward `palette.shadow`;
+ * - every other field is an `{ onLight, onDark }` pair, taken by whether the note's text is
+ *   darker than its background. `headerColor`, `panelColor`, `portalMenuBackground`,
+ *   `tableControlBackground` and `tableControlHoverBackground` are the colours mixed into the
+ *   note colour for that part; the rest are CSS values used as they are.
+ * The light ink lifts and the shadow colour deepens, as white and black do in NotePane.
+ */
+export function deriveNoteChrome(theme) {
+  const { palette } = theme;
+  const [inkDark, inkLight] =
+    getRelativeLuminance(palette.text) < getRelativeLuminance(palette.window)
+      ? [palette.text, palette.window]
+      : [palette.window, palette.text];
+  const shade = palette.shadow;
+  const withAlpha = hexToCssRgb;
+  const pair = (onLight, onDark) => ({ onLight, onDark });
+  return {
+    base: palette.window,
+    inkDark,
+    inkLight,
+    tabBase: palette.sidebar,
+    tabInkDark: inkDark,
+    tabInkLight: inkLight,
+    tabToneMix: 0,
+    headerColor: pair(inkLight, shade),
+    panelColor: pair(inkLight, inkLight),
+    tableControlBackground: pair(shade, shade),
+    tableControlHoverBackground: pair(shade, shade),
+    portalMenuBackground: pair(inkLight, shade),
+    tableControlShadow: pair(
+      `0 5px 12px ${withAlpha(inkDark, 0.12)}, inset 0 1px 0 ${withAlpha(inkLight, 0.28)}`,
+      `0 7px 16px ${withAlpha(shade, 0.34)}, inset 0 1px 0 ${withAlpha(inkLight, 0.08)}`,
+    ),
+    portalMenuShadow: pair(
+      `0 12px 26px ${withAlpha(inkDark, 0.16)}, inset 0 1px 0 ${withAlpha(inkLight, 0.38)}`,
+      `0 14px 34px ${withAlpha(shade, 0.46)}, inset 0 1px 0 ${withAlpha(inkLight, 0.08)}`,
+    ),
+    blockNoteShadowColor: pair(withAlpha(inkDark, 0.18), withAlpha(shade, 0.48)),
+    controlBackground: pair(withAlpha(inkLight, 0.46), withAlpha(shade, 0.2)),
+    controlHoverBackground: pair(withAlpha(inkLight, 0.68), withAlpha(inkLight, 0.16)),
+    codeBorderColor: pair(withAlpha(inkDark, 0.32), withAlpha(palette.codeMuted, 0.42)),
+    selectedBackground: pair(inkDark, inkLight),
+    selectedText: pair(inkLight, inkDark),
+    iconColor: pair(mixHexColors(inkDark, inkLight, 0.2), mixHexColors(inkLight, inkDark, 0.04)),
+    iconActiveColor: pair(inkDark, inkLight),
+    iconSurfaceFill: pair(withAlpha(inkLight, 0.4), withAlpha(inkLight, 0.1)),
+  };
+}
+
+export function getNoteChrome(theme) {
+  return theme.noteChrome ?? deriveNoteChrome(theme);
+}
+
+export function getSessionTabStyle(noteTheme, theme, noteIndex = 0) {
   const accentColor = resolveSessionTabAccentColor(
-    theme,
+    noteTheme,
     resolveDefaultStickyAccentColor(noteIndex),
   );
-  const tabTextOpacity = resolveTabTextOpacity(theme);
+  const tabTextOpacity = resolveTabTextOpacity(noteTheme);
 
   if (!accentColor && tabTextOpacity === DEFAULT_THEME.tabTextOpacity) {
     return {};
   }
 
-  const resolvedAccentColor = accentColor ?? DEFAULT_STICKY_ACCENT_COLOR;
-  const displayAccentColor =
-    appThemeMode === "dark"
-      ? mixHexColors(resolvedAccentColor, "#000000", SESSION_TAB_DARK_MODE_TONE_MIX)
-      : resolvedAccentColor;
-  const modeBase =
-    SESSION_TAB_MODE_BASE_COLORS[appThemeMode] ?? SESSION_TAB_MODE_BASE_COLORS.light;
-  const activeEffectiveBackground = blendHexOverHex(
-    displayAccentColor,
-    modeBase.active,
-    tabTextOpacity,
+  const chrome = getNoteChrome(theme);
+  const fillColor = mixHexColors(
+    toneMatch(accentColor ?? DEFAULT_STICKY_ACCENT_COLOR, theme, "fill"),
+    theme.palette.shadow,
+    chrome.tabToneMix,
   );
-  const activeTextColor = getSessionTabContrastingTextColor(activeEffectiveBackground);
+  const activeEffectiveBackground = blendHexOverHex(fillColor, chrome.tabBase, tabTextOpacity);
+  const activeTextColor = pickReadableText(activeEffectiveBackground, [
+    chrome.tabInkDark,
+    chrome.tabInkLight,
+  ]);
   const inactiveTextColor = hexToCssRgb(activeTextColor, 0.72);
   const activeBorderColor = hexToCssRgb(activeTextColor, 0.34);
   const activeShadowColor = hexToCssRgb(activeTextColor, 0.12);
   const inactiveShadowColor = hexToCssRgb(activeTextColor, 0.04);
-  const tabBackground = hexToCssRgb(displayAccentColor, tabTextOpacity);
+  const tabBackground = hexToCssRgb(fillColor, tabTextOpacity);
 
   return {
     "--session-tab-active-bg": tabBackground,
@@ -102,48 +159,48 @@ export function getSessionTabStyle(
     "--session-tab-border-color": activeBorderColor,
     "--session-tab-active-shadow": `inset 0 0 0 1px ${activeBorderColor}, 0 7px 16px ${activeShadowColor}`,
     "--session-tab-inactive-shadow": `inset 0 0 0 1px ${inactiveShadowColor}`,
-    "--session-tab-dot-bg": hexToCssRgb(displayAccentColor, 0.24),
+    "--session-tab-dot-bg": hexToCssRgb(fillColor, 0.24),
     "--session-tab-dot-text-color": activeTextColor,
   };
 }
 
-export function getStickyShellStyle(
-  theme,
-  accentColor,
-  appThemeMode = DEFAULT_APP_THEME.mode,
-) {
-  const opacity = resolveTabTextOpacity(theme);
-  const baseBackground = appThemeMode === "dark" ? "#191919" : "#ffffff";
-  const effectiveBackground = blendHexOverHex(accentColor, baseBackground, opacity);
-  const textColor = getContrastingTextColor(
-    effectiveBackground,
-    "#37352f",
-    "#f7f7f4",
+export function getStickyShellStyle(noteTheme, accentColor, theme) {
+  const chrome = getNoteChrome(theme);
+  const { palette } = theme;
+  const noteColor = toneMatch(accentColor, theme, "surface");
+  const opacity = resolveTabTextOpacity(noteTheme);
+  const baseBackground = chrome.base;
+  const inks = [chrome.inkDark, chrome.inkLight];
+  const effectiveBackground = blendHexOverHex(noteColor, baseBackground, opacity);
+  const textColor = pickReadableText(effectiveBackground, inks);
+  const isLightBackground =
+    getRelativeLuminance(textColor) < getRelativeLuminance(effectiveBackground);
+  // The value of a note chrome pair for this note's background.
+  const forBackground = (name) => chrome[name][isLightBackground ? "onLight" : "onDark"];
+  const headerColor = mixHexColors(
+    noteColor,
+    forBackground("headerColor"),
+    isLightBackground ? 0.46 : 0.08,
   );
-  const isLightBackground = textColor === "#37352f";
-  const headerColor = isLightBackground
-    ? mixHexColors(accentColor, "#ffffff", 0.46)
-    : mixHexColors(accentColor, "#000000", 0.08);
   const headerEffectiveBackground = blendHexOverHex(
     headerColor,
     baseBackground,
     Math.max(opacity, 0.96),
   );
-  const panelColor = isLightBackground
-    ? mixHexColors(accentColor, "#ffffff", 0.34)
-    : mixHexColors(accentColor, "#ffffff", 0.08);
+  const panelColor = mixHexColors(
+    noteColor,
+    forBackground("panelColor"),
+    isLightBackground ? 0.34 : 0.08,
+  );
   const panelOpacity = Math.min(opacity + 0.04, 1);
   const panelEffectiveBackground = blendHexOverHex(
     panelColor,
     baseBackground,
     panelOpacity,
   );
-  const panelTextColor = getContrastingTextColor(
-    panelEffectiveBackground,
-    "#37352f",
-    "#f7f7f4",
-  );
-  const isLightPanelBackground = panelTextColor === "#37352f";
+  const panelTextColor = pickReadableText(panelEffectiveBackground, inks);
+  const isLightPanelBackground =
+    getRelativeLuminance(panelTextColor) < getRelativeLuminance(panelEffectiveBackground);
   const mutedColor = hexToCssRgb(textColor, isLightBackground ? 0.72 : 0.78);
   const panelMutedColor = hexToCssRgb(
     panelTextColor,
@@ -156,12 +213,12 @@ export function getStickyShellStyle(
   );
   const tableControlBackground = mixHexColors(
     effectiveBackground,
-    "#000000",
+    forBackground("tableControlBackground"),
     isLightBackground ? 0.055 : 0.11,
   );
   const tableControlHoverBackground = mixHexColors(
     effectiveBackground,
-    "#000000",
+    forBackground("tableControlHoverBackground"),
     isLightBackground ? 0.09 : 0.16,
   );
   const tableControlBorderColor = mixHexColors(
@@ -171,7 +228,7 @@ export function getStickyShellStyle(
   );
   const portalMenuBackground = mixHexColors(
     effectiveBackground,
-    isLightBackground ? "#ffffff" : "#000000",
+    forBackground("portalMenuBackground"),
     isLightBackground ? 0.18 : 0.1,
   );
   const portalMenuHoverBackground = mixHexColors(
@@ -184,46 +241,19 @@ export function getStickyShellStyle(
     textColor,
     isLightBackground ? 0.16 : 0.22,
   );
-  const tableControlShadow = isLightBackground
-    ? "0 5px 12px rgb(55 53 47 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.28)"
-    : "0 7px 16px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.08)";
-  const portalMenuShadow = isLightBackground
-    ? "0 12px 26px rgb(55 53 47 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.38)"
-    : "0 14px 34px rgb(0 0 0 / 0.46), inset 0 1px 0 rgb(255 255 255 / 0.08)";
-  const blockNoteShadowColor = isLightBackground
-    ? "rgb(55 53 47 / 0.18)"
-    : "rgb(0 0 0 / 0.48)";
-  const controlBackground = isLightBackground
-    ? "rgb(255 255 255 / 0.46)"
-    : "rgb(0 0 0 / 0.20)";
-  const controlHoverBackground = isLightBackground
-    ? "rgb(255 255 255 / 0.68)"
-    : "rgb(255 255 255 / 0.16)";
-  const codeBorderColor = isLightBackground
-    ? "rgb(31 35 40 / 0.32)"
-    : "rgb(139 148 158 / 0.42)";
-  const glassHighlight = isLightBackground
-    ? "rgb(255 255 255 / 0.52)"
-    : "rgb(255 255 255 / 0.14)";
-  const glassLowlight = isLightBackground
-    ? "rgb(55 53 47 / 0.10)"
-    : "rgb(0 0 0 / 0.34)";
-  const glassStroke = isLightBackground
-    ? "rgb(255 255 255 / 0.46)"
-    : "rgb(255 255 255 / 0.12)";
-  const selectedBackground = isLightBackground ? "#37352f" : "#f7f7f4";
-  const selectedText = isLightBackground ? "#ffffff" : "#191919";
-  const iconColor = isLightBackground ? "#4f534f" : "#f1f1ef";
-  const iconActiveColor = isLightBackground ? "#2f3437" : "#ffffff";
-  const iconSurfaceFill = isLightBackground
-    ? "rgb(255 255 255 / 0.40)"
-    : "rgb(255 255 255 / 0.10)";
   const iconMutedFill = hexToCssRgb(textColor, isLightBackground ? 0.10 : 0.14);
+  // Links: the theme's blue toward the note's text colour until it reads at 4.5:1 on the note,
+  // as --notepane-link is fitted to the window. NotePane Light and Dark show note colours as
+  // they are and keep the link colours their theme pins.
+  const linkStyle = theme.toneMatching === false
+    ? {}
+    : { "--notepane-link": readableOn(palette.blue, [effectiveBackground], textColor) };
 
   return {
-    "--sticky-note-accent-color": accentColor,
+    ...linkStyle,
+    "--sticky-note-accent-color": toneMatch(accentColor, theme, "mark"),
     "--sticky-effective-bg": effectiveBackground,
-    "--sticky-note-bg": hexToCssRgb(accentColor, opacity),
+    "--sticky-note-bg": hexToCssRgb(noteColor, opacity),
     "--sticky-note-header-bg": headerEffectiveBackground,
     "--sticky-note-panel-bg": hexToCssRgb(panelColor, panelOpacity),
     "--sticky-text-color": textColor,
@@ -236,20 +266,17 @@ export function getStickyShellStyle(
     "--sticky-table-control-bg": tableControlBackground,
     "--sticky-table-control-hover-bg": tableControlHoverBackground,
     "--sticky-table-control-text": textColor,
-    "--sticky-table-control-shadow": tableControlShadow,
+    "--sticky-table-control-shadow": forBackground("tableControlShadow"),
     "--sticky-portal-menu-bg": portalMenuBackground,
     "--sticky-portal-menu-hover-bg": portalMenuHoverBackground,
     "--sticky-portal-menu-border-color": portalMenuBorderColor,
-    "--sticky-portal-menu-shadow": portalMenuShadow,
-    "--sticky-control-bg": controlBackground,
-    "--sticky-control-hover-bg": controlHoverBackground,
-    "--sticky-code-bg": "#0d1117",
-    "--sticky-code-text": "#f0f6fc",
-    "--sticky-code-border": codeBorderColor,
-    "--sticky-code-muted": "#8b949e",
-    "--sticky-glass-highlight": glassHighlight,
-    "--sticky-glass-lowlight": glassLowlight,
-    "--sticky-glass-stroke": glassStroke,
+    "--sticky-portal-menu-shadow": forBackground("portalMenuShadow"),
+    "--sticky-control-bg": forBackground("controlBackground"),
+    "--sticky-control-hover-bg": forBackground("controlHoverBackground"),
+    "--sticky-code-bg": palette.codeBg,
+    "--sticky-code-text": palette.codeText,
+    "--sticky-code-border": forBackground("codeBorderColor"),
+    "--sticky-code-muted": palette.codeMuted,
     "--bn-colors-editor-text": textColor,
     "--bn-colors-menu-text": textColor,
     "--bn-colors-menu-background": portalMenuBackground,
@@ -257,16 +284,16 @@ export function getStickyShellStyle(
     "--bn-colors-tooltip-background": portalMenuHoverBackground,
     "--bn-colors-hovered-text": textColor,
     "--bn-colors-hovered-background": portalMenuHoverBackground,
-    "--bn-colors-selected-text": selectedText,
-    "--bn-colors-selected-background": selectedBackground,
+    "--bn-colors-selected-text": forBackground("selectedText"),
+    "--bn-colors-selected-background": forBackground("selectedBackground"),
     "--bn-colors-disabled-text": hexToCssRgb(textColor, isLightBackground ? 0.42 : 0.48),
     "--bn-colors-disabled-background": hexToCssRgb(textColor, isLightBackground ? 0.08 : 0.12),
     "--bn-colors-border": borderColor,
-    "--bn-colors-shadow": blockNoteShadowColor,
+    "--bn-colors-shadow": forBackground("blockNoteShadowColor"),
     "--bn-colors-side-menu": mutedColor,
-    "--icon-chrome-color": iconColor,
-    "--icon-chrome-active-color": iconActiveColor,
-    "--icon-surface-fill": iconSurfaceFill,
+    "--icon-chrome-color": forBackground("iconColor"),
+    "--icon-chrome-active-color": forBackground("iconActiveColor"),
+    "--icon-surface-fill": forBackground("iconSurfaceFill"),
     "--icon-muted-fill": iconMutedFill,
   };
 }

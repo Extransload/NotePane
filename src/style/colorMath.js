@@ -1,11 +1,16 @@
 import {
   DEFAULT_THEME,
-  MODE_TAB_TEXT_DEFAULTS,
-  SESSION_TAB_CONTRAST_TEXT,
 } from "../constants.js";
 import {
   clamp,
 } from "../utils/values.js";
+
+// The ends of the sRGB range: the contrast fallback when no theme colour is readable.
+export const WHITE = "#ffffff";
+export const BLACK = "#000000";
+
+// The contrast WCAG asks of body text.
+const READABLE_CONTRAST = 4.5;
 
 export function isHexColor(value) {
   return typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value);
@@ -30,9 +35,7 @@ export function normalizeOpacity(value, fallback = DEFAULT_THEME.tabTextOpacity)
 }
 
 export function hexToRgb(hexColor) {
-  const hex = isHexColor(hexColor)
-    ? hexColor.slice(1)
-    : MODE_TAB_TEXT_DEFAULTS.light.tabTextColor.slice(1);
+  const hex = isHexColor(hexColor) ? hexColor.slice(1) : BLACK.slice(1);
   return [
     Number.parseInt(hex.slice(0, 2), 16),
     Number.parseInt(hex.slice(2, 4), 16),
@@ -67,20 +70,20 @@ export function blendHexOverHex(foregroundHexColor, backgroundHexColor, foregrou
   );
 }
 
-export function getContrastingTextColor(
-  backgroundHexColor,
-  darkTextColor = SESSION_TAB_CONTRAST_TEXT.dark,
-  lightTextColor = SESSION_TAB_CONTRAST_TEXT.light,
-) {
+export function getContrastingTextColor(backgroundHexColor, darkTextColor, lightTextColor) {
   const darkContrast = getContrastRatio(backgroundHexColor, darkTextColor);
   const lightContrast = getContrastRatio(backgroundHexColor, lightTextColor);
   return darkContrast >= lightContrast ? darkTextColor : lightTextColor;
 }
 
-export function getSessionTabContrastingTextColor(backgroundHexColor) {
-  return getRelativeLuminance(backgroundHexColor) > 0.46
-    ? SESSION_TAB_CONTRAST_TEXT.dark
-    : SESSION_TAB_CONTRAST_TEXT.light;
+// The text colour for `backgroundHexColor`: whichever of the theme's two inks reads better,
+// when it reaches 4.5:1, and otherwise black or white, whichever reads better. One of those
+// two always reaches at least 4.58:1.
+export function pickReadableText(backgroundHexColor, [darkTextColor, lightTextColor]) {
+  const candidate = getContrastingTextColor(backgroundHexColor, darkTextColor, lightTextColor);
+  return getContrastRatio(backgroundHexColor, candidate) >= READABLE_CONTRAST
+    ? candidate
+    : getContrastingTextColor(backgroundHexColor, BLACK, WHITE);
 }
 
 export function getReadableBoundaryColor(
@@ -468,6 +471,63 @@ export function lchToRgb(lightness, chroma, hue) {
     linearToSrgb(-0.969266 * x + 1.8760108 * y + 0.041556 * z),
     linearToSrgb(0.0556434 * x - 0.2040259 * y + 1.0572252 * z),
   ];
+}
+
+// OKLab and its polar form OKLCH (Björn Ottosson): lightness 0–1 and chroma that track what the
+// eye sees evenly across hues, which CIE LCH does poorly for blues. Tone matching works in it.
+export function hexToOklab(hexColor) {
+  const [red, green, blue] = hexToRgb(hexColor).map((channel) => srgbToLinear(channel / 255));
+  const l = Math.cbrt(0.4122214708 * red + 0.5363325363 * green + 0.0514459929 * blue);
+  const m = Math.cbrt(0.2119034982 * red + 0.6806995451 * green + 0.1073969566 * blue);
+  const s = Math.cbrt(0.0883024619 * red + 0.2817188376 * green + 0.6299787005 * blue);
+  return {
+    l: 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    a: 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    b: 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  };
+}
+
+function oklabToLinearRgb(lightness, a, b) {
+  const l = (lightness + 0.3963377774 * a + 0.2158037573 * b) ** 3;
+  const m = (lightness - 0.1055613458 * a - 0.0638541728 * b) ** 3;
+  const s = (lightness - 0.0894841775 * a - 1.291485548 * b) ** 3;
+  return [
+    4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+    -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+  ];
+}
+
+export function hexToOklch(hexColor) {
+  const { l, a, b } = hexToOklab(hexColor);
+  const hue = (Math.atan2(b, a) * 180) / Math.PI;
+  return { l, c: Math.hypot(a, b), h: (hue + 360) % 360 };
+}
+
+// An OKLCH colour as hex. A colour outside sRGB keeps its lightness and hue and loses chroma,
+// found by bisection, until it fits.
+export function oklchToHex({ l, c, h }) {
+  const lightness = clamp(l, 0, 1, 0);
+  const radians = (h * Math.PI) / 180;
+  const toLinear = (chroma) =>
+    oklabToLinearRgb(lightness, chroma * Math.cos(radians), chroma * Math.sin(radians));
+  const fits = (chroma) => toLinear(chroma).every((channel) => channel >= -1e-6 && channel <= 1 + 1e-6);
+  let chroma = Math.max(c, 0);
+  if (!fits(chroma)) {
+    let inside = 0;
+    let outside = chroma;
+    for (let step = 0; step < 24; step += 1) {
+      const middle = (inside + outside) / 2;
+      if (fits(middle)) {
+        inside = middle;
+      } else {
+        outside = middle;
+      }
+    }
+    chroma = inside;
+  }
+  const [red, green, blue] = toLinear(chroma).map((channel) => linearToSrgb(clamp(channel, 0, 1, 0)));
+  return rgbToHex(red, green, blue);
 }
 
 export function srgbToLinear(value) {

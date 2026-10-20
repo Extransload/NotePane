@@ -16,6 +16,7 @@ import {
 export function StickySettingsWindow({
   noteTitle,
   theme,
+  activeTheme,
   defaultColor,
   onThemeChange,
   onClose,
@@ -59,6 +60,7 @@ export function StickySettingsWindow({
             <div className="preferences-section-title">Appearance</div>
             <ColorSettingsSection
               theme={theme}
+              activeTheme={activeTheme}
               variant="sticky"
               defaultColor={defaultColor}
               onChange={onThemeChange}

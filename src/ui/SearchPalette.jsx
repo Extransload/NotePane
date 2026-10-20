@@ -3,6 +3,9 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  resolveNoteMarkColor,
+} from "../style/themeStyles.js";
 
 function HighlightedText({ text, ranges }) {
   const parts = [];
@@ -20,7 +23,15 @@ function HighlightedText({ text, ranges }) {
   return parts;
 }
 
-export function SearchPalette({ query, results, onQueryChange, onChoose, onClose }) {
+export function SearchPalette({
+  query,
+  results,
+  activeTheme,
+  noteIndexById,
+  onQueryChange,
+  onChoose,
+  onClose,
+}) {
   const inputRef = useRef(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -116,7 +127,13 @@ export function SearchPalette({ query, results, onQueryChange, onChoose, onClose
                 <span
                   className="search-result-dot"
                   aria-hidden="true"
-                  style={{ background: result.note.theme?.tabTextColor ?? "var(--sticky-border-color)" }}
+                  style={{
+                    background: resolveNoteMarkColor(
+                      result.note.theme,
+                      activeTheme,
+                      noteIndexById.get(result.note.id) ?? 0,
+                    ),
+                  }}
                 />
                 <span className="search-result-title">
                   <HighlightedText text={result.title} ranges={result.titleRanges} />

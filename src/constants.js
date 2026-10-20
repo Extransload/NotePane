@@ -205,37 +205,6 @@ export const SESSION_TAB_EXIT_MS = 170;
 
 export const SESSION_TAB_REORDER_ANIMATION_MS = 180;
 
-export const MODE_TAB_TEXT_DEFAULTS = {
-  light: {
-    tabTextColor: "#37352f",
-    tabTextOpacity: 1,
-  },
-  dark: {
-    tabTextColor: "#f1f1ef",
-    tabTextOpacity: 1,
-  },
-};
-
-export const SESSION_TAB_MODE_BASE_COLORS = {
-  light: {
-    active: "#f1f1ef",
-    inactive: "#e7e7e4",
-    hover: "#ededeb",
-  },
-  dark: {
-    active: "#2a2a2a",
-    inactive: "#202020",
-    hover: "#252525",
-  },
-};
-
-export const SESSION_TAB_CONTRAST_TEXT = {
-  dark: "#1f1f1f",
-  light: "#fbfbfa",
-};
-
-export const SESSION_TAB_DARK_MODE_TONE_MIX = 0.12;
-
 export const STICKY_PASTEL_PALETTE = [
   "#fff2b8",
   "#ffd7e8",

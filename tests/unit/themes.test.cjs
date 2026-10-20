@@ -57,6 +57,36 @@ test("every theme defines every palette key as six-digit hex", async () => {
   }
 });
 
+// noteChrome is optional. A theme that sets it gives every field deriveNoteChrome derives, in
+// the same shape: a colour, an { onLight, onDark } pair of CSS colour values, or the tab tone mix.
+test("a theme's noteChrome has the derived fields and types", async () => {
+  const { listThemes } = await loadThemes();
+  const { deriveNoteChrome } = await import("../../src/style/themeStyles.js");
+  const shape = (chrome) =>
+    Object.fromEntries(
+      Object.entries(chrome).map(([name, value]) => [
+        name,
+        typeof value === "object" ? Object.keys(value).sort().join() : typeof value,
+      ]),
+    );
+  const isColour = (value) => /^(?:#[0-9a-f]{6}\b|rgb\(|\d)/.test(value) && !/undefined|NaN/.test(value);
+  const themesWithChrome = listThemes().filter((theme) => theme.noteChrome !== undefined);
+  assert.deepEqual(themesWithChrome.map((theme) => theme.id), ["notepane-light", "notepane-dark"]);
+  for (const theme of themesWithChrome) {
+    const { noteChrome } = theme;
+    assert.deepEqual(shape(noteChrome), shape(deriveNoteChrome(theme)), theme.id);
+    for (const [name, value] of Object.entries(noteChrome)) {
+      if (name === "tabToneMix") {
+        assert.ok(value >= 0 && value <= 1, `${theme.id}.${name}`);
+      } else if (typeof value === "string") {
+        assert.match(value, /^#[0-9a-f]{6}$/, `${theme.id}.${name}`);
+      } else {
+        for (const side of ["onLight", "onDark"]) assert.ok(isColour(value[side]), `${theme.id}.${name}.${side}`);
+      }
+    }
+  }
+});
+
 test("theme ids are unique", async () => {
   const { listThemes } = await loadThemes();
   const ids = listThemes().map((theme) => theme.id);
@@ -387,6 +417,7 @@ function listSources(directory, extensions) {
 test("every token a stylesheet or script reads is defined", async () => {
   globalThis.window ??= {};
   const { THEME_TOKEN_NAMES } = await loadTokens();
+  const { getTheme } = await loadThemes();
   const { getStickyShellStyle, getSessionTabStyle } = await import("../../src/style/themeStyles.js");
   const stylesheets = listSources("src/styles", [".css"]).map(readSource).join("\n");
   const scriptFiles = listSources("src", [".js", ".jsx"]);
@@ -410,9 +441,9 @@ test("every token a stylesheet or script reads is defined", async () => {
   );
   const pastel = { tabTextColor: "#fff2b8", tabTextOpacity: 1 };
   const setByStyleFunctions = new Set(
-    ["light", "dark"].flatMap((mode) => [
-      ...Object.keys(getStickyShellStyle(pastel, "#fff2b8", mode)),
-      ...Object.keys(getSessionTabStyle(pastel, mode, 0)),
+    ["notepane-light", "notepane-dark"].map(getTheme).flatMap((theme) => [
+      ...Object.keys(getStickyShellStyle(pastel, "#fff2b8", theme)),
+      ...Object.keys(getSessionTabStyle(pastel, theme, 0)),
     ]),
   );
   // Layout and picker variables that components define as inline styles: the quoted keys of a

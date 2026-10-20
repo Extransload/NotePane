@@ -1293,9 +1293,9 @@ function StickyEditor({
   const stickyChromeStyle = useMemo(
     () =>
       effectiveLayoutMode === "sticky"
-        ? getStickyShellStyle(theme, stickyAccentColor, activeTheme.scheme)
+        ? getStickyShellStyle(theme, stickyAccentColor, activeTheme)
         : {},
-    [activeTheme.scheme, effectiveLayoutMode, stickyAccentColor, theme],
+    [activeTheme, effectiveLayoutMode, stickyAccentColor, theme],
   );
   const shellStyle = {
     ...stickyChromeStyle,
@@ -3159,7 +3159,7 @@ function StickyEditor({
                       data-note-id={sessionNote.id}
                       style={getSessionTabStyle(
                         sessionNote.theme,
-                        activeTheme.scheme,
+                        activeTheme,
                         noteIndexById.get(sessionNote.id) ?? index,
                       )}
                     >
@@ -3201,7 +3201,7 @@ function StickyEditor({
                       data-note-id={sessionNote.id}
                       style={getSessionTabStyle(
                         sessionNote.theme,
-                        activeTheme.scheme,
+                        activeTheme,
                         noteIndexById.get(sessionNote.id) ?? index,
                       )}
                       draggable={normalizedLayoutMode === "tabs"}
@@ -3556,6 +3556,7 @@ function StickyEditor({
           x={sessionTabMenu.x}
           y={sessionTabMenu.y}
           sessionNote={sessionTabMenuNote}
+          activeTheme={activeTheme}
           onOpenColor={() => openSessionColorPanel(sessionTabMenuNote.id)}
         />
       )}
@@ -3575,6 +3576,7 @@ function StickyEditor({
       {isColorPanelOpen && (
         <ColorPanel
           theme={theme}
+          activeTheme={activeTheme}
           variant="sticky"
           defaultColor={
             effectiveLayoutMode === "sticky" ? stickyAccentColor : undefined
@@ -3586,6 +3588,7 @@ function StickyEditor({
       {sessionColorPanelNote && (
         <ColorPanel
           theme={normalizeTheme(sessionColorPanelNote.theme)}
+          activeTheme={activeTheme}
           variant="tabs"
           defaultColor={resolveSessionTabAccentColor(
             sessionColorPanelNote.theme,
@@ -3618,6 +3621,7 @@ function StickyEditor({
         <StickySettingsWindow
           noteTitle={title}
           theme={theme}
+          activeTheme={activeTheme}
           defaultColor={stickyAccentColor}
           onThemeChange={updateTheme}
           onClose={() => setIsStickySettingsOpen(false)}
@@ -3653,6 +3657,8 @@ function StickyEditor({
         <SearchPalette
           query={notePalette.query}
           results={notePalette.results}
+          activeTheme={activeTheme}
+          noteIndexById={noteIndexById}
           onQueryChange={notePalette.setQuery}
           onChoose={(result) => void notePalette.chooseResult(result)}
           onClose={notePalette.closePalette}

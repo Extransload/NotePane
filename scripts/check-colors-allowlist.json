@@ -104,5 +104,15 @@
     "file": "src/style/themeTokens.js",
     "text": "return `rgba(${red}",
     "reason": "Template that formats a palette colour as comma-separated rgba for the find highlights; it holds no literal colour."
+  },
+  {
+    "file": "src/style/colorMath.js",
+    "text": "export const WHITE = \"#ffffff\";",
+    "reason": "The white endpoint of sRGB in colour maths: the readable-text fallback when neither theme ink reaches 4.5:1."
+  },
+  {
+    "file": "src/style/colorMath.js",
+    "text": "export const BLACK = \"#000000\";",
+    "reason": "The black endpoint of sRGB in colour maths: the readable-text fallback when neither theme ink reaches 4.5:1, and hexToRgb's fallback for a malformed value."
   }
 ]
