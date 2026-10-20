@@ -3517,6 +3517,24 @@
   },
   {
     "screen": "dark / session colour panel",
+    "selector": "div.color-wheel[role=\"slider\"]",
+    "property": "box-shadow[0]",
+    "value": "rgba(255, 255, 255, 0.18)"
+  },
+  {
+    "screen": "dark / session colour panel",
+    "selector": "div.color-wheel[role=\"slider\"]",
+    "property": "box-shadow[1]",
+    "value": "rgba(0, 0, 0, 0.2)"
+  },
+  {
+    "screen": "dark / session colour panel",
+    "selector": "div.color-wheel[role=\"slider\"]",
+    "property": "outline-color",
+    "value": "rgba(90, 150, 255, 0.66)"
+  },
+  {
+    "screen": "dark / session colour panel",
     "selector": "div.preferences-panel.color-panel.editor-floating-menu[role=\"dialog\"]",
     "property": "border-bottom-color",
     "value": "rgba(255, 255, 255, 0.12)"
@@ -3538,18 +3556,6 @@
     "selector": "div.preferences-panel.color-panel.editor-floating-menu[role=\"dialog\"]",
     "property": "border-top-color",
     "value": "rgba(255, 255, 255, 0.12)"
-  },
-  {
-    "screen": "dark / session colour panel",
-    "selector": "label.color-brightness-row input[type=\"range\"]",
-    "property": "accent-color",
-    "value": "auto"
-  },
-  {
-    "screen": "dark / session colour panel",
-    "selector": "label.color-opacity-row input[type=\"range\"]",
-    "property": "accent-color",
-    "value": "auto"
   },
   {
     "screen": "dark / session tab menu",
@@ -3985,6 +3991,18 @@
   },
   {
     "screen": "dark / sticky settings",
+    "selector": "div.color-wheel[role=\"slider\"]",
+    "property": "box-shadow[0]",
+    "value": "rgba(255, 255, 255, 0.18)"
+  },
+  {
+    "screen": "dark / sticky settings",
+    "selector": "div.color-wheel[role=\"slider\"]",
+    "property": "box-shadow[1]",
+    "value": "rgba(0, 0, 0, 0.2)"
+  },
+  {
+    "screen": "dark / sticky settings",
     "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
     "property": "background-color",
     "value": "rgb(255, 242, 184)"
@@ -4216,18 +4234,6 @@
     "selector": "header.preferences-window-header",
     "property": "border-bottom-color",
     "value": "rgba(55, 53, 47, 0.14)"
-  },
-  {
-    "screen": "dark / sticky settings",
-    "selector": "label.color-brightness-row input[type=\"range\"]",
-    "property": "accent-color",
-    "value": "auto"
-  },
-  {
-    "screen": "dark / sticky settings",
-    "selector": "label.color-opacity-row input[type=\"range\"]",
-    "property": "accent-color",
-    "value": "auto"
   },
   {
     "screen": "dark / sticky settings",
@@ -6631,15 +6637,21 @@
   },
   {
     "screen": "light / session colour panel",
-    "selector": "label.color-brightness-row input[type=\"range\"]",
-    "property": "accent-color",
-    "value": "auto"
+    "selector": "div.color-wheel[role=\"slider\"]",
+    "property": "box-shadow[0]",
+    "value": "rgba(255, 255, 255, 0.18)"
   },
   {
     "screen": "light / session colour panel",
-    "selector": "label.color-opacity-row input[type=\"range\"]",
-    "property": "accent-color",
-    "value": "auto"
+    "selector": "div.color-wheel[role=\"slider\"]",
+    "property": "box-shadow[1]",
+    "value": "rgba(0, 0, 0, 0.2)"
+  },
+  {
+    "screen": "light / session colour panel",
+    "selector": "div.color-wheel[role=\"slider\"]",
+    "property": "outline-color",
+    "value": "rgba(90, 150, 255, 0.66)"
   },
   {
     "screen": "light / session tab menu",
@@ -6931,6 +6943,18 @@
   },
   {
     "screen": "light / sticky settings",
+    "selector": "div.color-wheel[role=\"slider\"]",
+    "property": "box-shadow[0]",
+    "value": "rgba(255, 255, 255, 0.18)"
+  },
+  {
+    "screen": "light / sticky settings",
+    "selector": "div.color-wheel[role=\"slider\"]",
+    "property": "box-shadow[1]",
+    "value": "rgba(0, 0, 0, 0.2)"
+  },
+  {
+    "screen": "light / sticky settings",
     "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
     "property": "background-color",
     "value": "rgb(255, 242, 184)"
@@ -7162,18 +7186,6 @@
     "selector": "header.preferences-window-header",
     "property": "border-bottom-color",
     "value": "rgba(55, 53, 47, 0.14)"
-  },
-  {
-    "screen": "light / sticky settings",
-    "selector": "label.color-brightness-row input[type=\"range\"]",
-    "property": "accent-color",
-    "value": "auto"
-  },
-  {
-    "screen": "light / sticky settings",
-    "selector": "label.color-opacity-row input[type=\"range\"]",
-    "property": "accent-color",
-    "value": "auto"
   },
   {
     "screen": "light / sticky settings",

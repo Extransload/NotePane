@@ -27,15 +27,20 @@ const PAIRS = [
   { scheme: "dark", themeIds: ["sentinel-dark-a", "sentinel-dark-b"] },
 ];
 
-// Theme-independent by design, so never reported. A selector without `properties` skips the
-// matching elements and everything inside them.
+// Theme-independent by design, so never reported. Each selector skips the matching elements
+// and everything inside them, pseudo-elements included. The spec allowlists what draws over
+// images; nothing else under `.color-wheel` is skipped, so its rim, drop shadow and focus ring
+// are checked.
 const ALLOWLIST = [
   { selector: "img, canvas", reason: "Image pixels; this includes the wordmark PNGs (.brand-wordmark-image)." },
-  { selector: ".color-wheel > *", reason: "The colour wheel draws the colours it picks." },
+  { selector: ".color-wheel > .color-wheel-canvas", reason: "The hue and saturation disc the wheel picks from." },
   {
-    selector: ".color-wheel",
-    properties: ["box-shadow[0]", "box-shadow[1]"],
-    reason: "The colour wheel's rim; its focus ring is still checked.",
+    selector: ".color-wheel > .color-wheel-crosshair",
+    reason: "The crosshair ring and its ::before/::after bars, drawn over the disc to mark the picked point.",
+  },
+  {
+    selector: ".color-wheel > .color-wheel-thumb",
+    reason: "The dot over the disc at the picked point, filled with the picked colour.",
   },
   { selector: ".crop-image-frame", reason: "The crop frame, selection and handles draw over the image." },
 ];
@@ -141,7 +146,10 @@ function colourScan({ phase, scope, indices, allowlist }) {
       if (style.fill !== "none") properties.push("fill");
       if (style.stroke !== "none" && Number.parseFloat(style.strokeWidth) > 0) properties.push("stroke");
     }
-    if (element instanceof HTMLInputElement && ["checkbox", "radio", "range"].includes(element.type)) {
+    // The accent paints only the native control; `appearance: none` (the colour panel's
+    // sliders) replaces it with styled parts.
+    if (element instanceof HTMLInputElement && ["checkbox", "radio", "range"].includes(element.type) &&
+      style.appearance !== "none") {
       properties.push("accent-color");
     }
     if (isScrollContainer(element, style)) properties.push("scrollbar-color");
@@ -160,13 +168,7 @@ function colourScan({ phase, scope, indices, allowlist }) {
   }
 
   function isAllowlisted(element) {
-    return allowlist.some((entry) => !entry.properties && element.closest(entry.selector));
-  }
-
-  function allowedProperties(element) {
-    return allowlist
-      .filter((entry) => entry.properties && element.matches(entry.selector))
-      .flatMap((entry) => entry.properties);
+    return allowlist.some((entry) => element.closest(entry.selector));
   }
 
   function readTarget(target) {
@@ -189,7 +191,6 @@ function colourScan({ phase, scope, indices, allowlist }) {
         values[property] = style.getPropertyValue(property);
       }
     }
-    for (const property of target.allowed) delete values[property];
     return values;
   }
 
@@ -257,14 +258,13 @@ function colourScan({ phase, scope, indices, allowlist }) {
     for (const element of ordered) {
       if (NON_PAINTING.has(element.tagName.toLowerCase()) || isAllowlisted(element) || excluded(element)) continue;
       if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true }) || !hasBox(element)) continue;
-      const allowed = allowedProperties(element);
-      targets.push({ element, pseudo: null, allowed, properties: elementProperties(element, getComputedStyle(element)) });
+      targets.push({ element, pseudo: null, properties: elementProperties(element, getComputedStyle(element)) });
       for (const pseudo of ["::before", "::after"]) {
         const properties = pseudoProperties(getComputedStyle(element, pseudo));
-        if (properties.length) targets.push({ element, pseudo, allowed, properties });
+        if (properties.length) targets.push({ element, pseudo, properties });
       }
       if (isTextField(element) && element.placeholder && !element.value) {
-        targets.push({ element, pseudo: "::placeholder", allowed, properties: ["color"] });
+        targets.push({ element, pseudo: "::placeholder", properties: ["color"] });
       }
     }
     window[STORE] = targets;
@@ -358,6 +358,10 @@ function createScanner(page, pair) {
   // `scrollbars` asserts that the screen has a visible scrollbar the scan read.
   const scan = async (screen, { include, exclude = [], scrollbars = false }) => {
     const screenName = `${pair.scheme} / ${screen}`;
+    // The first reading must be under the sentinel the scanner believes is applied, so the
+    // comparison is provably one sentinel against the other.
+    await expect(page.locator("html"), `${screenName} starts under ${state.themeId}`)
+      .toHaveAttribute("data-theme-id", state.themeId);
     // Playwright counts an element under an opacity: 0 fade wrapper as visible; the scan
     // does not, so wait until a match is visible by both measures.
     for (const selector of include) {
@@ -538,7 +542,13 @@ const SCREEN_GROUPS = [
       await scan("session tab menu", { include: [".session-tab-context-menu"] });
       await tabMenu.getByRole("menuitem", { name: "Color..." }).click();
       await expect(page.locator(".color-panel")).toBeVisible();
+      // Focused, so the wheel's focus ring is part of the scan.
+      const wheel = page.locator(".color-panel .color-wheel");
+      await wheel.focus();
+      await expect(wheel).toBeFocused();
+      await expect.poll(() => wheel.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe("solid");
       await scan("session colour panel", { include: [".color-panel"] });
+      await expect(wheel, "the wheel kept focus through both readings").toBeFocused();
     },
   },
   {
