@@ -16,7 +16,13 @@
 - Editable title in sticky mode header
 - Session rename by double-clicking a sidebar tab
 - Hover-only session delete button in the sidebar tab row
-- Global Notion-style Light/Dark app theme via sidebar Preferences or shortcut
+- Nine app themes: NotePane Light (default) and NotePane Dark, Catppuccin Latte, Frappé, Macchiato and Mocha, Nord,
+  Dracula and Tokyo Night
+- Theme picker in Preferences > General > App theme: preview cards that apply the theme at once to every window
+- Every colour comes from the selected theme, code block syntax colours included
+- Session and sticky colours are shown in each theme's tone (tone matching): the hue is kept, the stored colour never
+  changes, and text on it stays readable
+- No light/dark toggle and no light/dark shortcut; `Command/Ctrl + Shift + L` is unbound
 - Preferences panel via sidebar footer button, native app menu, or `Command/Ctrl + ,`
 - Default editor font family and font size customization for newly created sessions
 - Right-click session tab context menu for per-session tab color
@@ -36,13 +42,13 @@
 - Cycle sticky windows: `Command/Ctrl + Backtick`
 - Toggle always on top: `Command/Ctrl + Shift + P`
 - Toggle Tab/Sticky mode: `Command/Ctrl + Shift + T`
-- Toggle Light/Dark mode: `Command/Ctrl + Shift + L`
 - Open export menu: `Command/Ctrl + Shift + E`
 - Delayed hover tooltips for clickable controls
 - Window bounds persistence
 - Editor area is explicitly non-drag so BlockNote mouse interactions remain intact
 - Single share-style export icon with PNG/PDF format choices
 - PNG/PDF export hides app chrome and sticky background
+- PDF export renders with NotePane Light colours whatever theme is selected
 
 ## Editor
 
@@ -98,7 +104,8 @@ Stored fields:
 - always-on-top flag
 - detached/docked state
 - note title
-- app-wide theme mode: `appTheme.mode`, either `light` or `dark`
+- app-wide theme: `appTheme.themeId`, one of the nine theme ids, with `appTheme.mode` (`light` or `dark`, the theme's
+  scheme) kept so older versions fall back to the matching NotePane theme
 - app-wide layout mode: `layoutMode`, either `tabs` or `sticky`
 - app-wide editor defaults: default font size scale and default font family
 - optional sidebar tab accent color

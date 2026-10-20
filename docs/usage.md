@@ -41,14 +41,23 @@ for Option. Configurable shortcuts can be changed in Preferences.
 
 | Shortcut | Action |
 | --- | --- |
-| `⌘⇧L` | Light / Dark |
 | `⌘,` | Preferences |
 | `⌘⇧E` | Export menu |
 
-Light and Dark are app-wide. Per-session colour is set from a tab's
+Choose the app theme in Preferences > General > App theme. Nine themes are
+available: NotePane Light (the default), NotePane Dark, Catppuccin Latte,
+Frappé, Macchiato and Mocha, Nord, Dracula and Tokyo Night. Click a card, or
+move between cards with the arrow keys, and the theme applies at once to every
+window. There is no separate light/dark toggle and no light/dark shortcut:
+pick a light or a dark theme instead.
+
+Per-session colour is set from a tab's
 right-click menu, with a colour wheel, opacity, an eyedropper where the
 browser supports it, and editable HEX/HSL/RGB/LCH values. That colour becomes
 the sticky window's background in Sticky windows mode and returns to the tab in Tab sessions
-mode.
+mode. Each theme shows it in its own tone, keeping the hue and keeping the
+text on it readable; the colour you picked is stored unchanged, so switching
+themes never loses it.
 
-Export produces a PNG or PDF of the note with all app chrome removed.
+Export produces a PNG or PDF of the note with all app chrome removed. A PDF
+uses NotePane Light's colours whatever theme is selected.

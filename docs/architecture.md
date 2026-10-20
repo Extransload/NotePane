@@ -16,6 +16,7 @@
 | `electron/store.cjs` | local JSON persistence |
 | `electron/assetStore.cjs` | content-addressed media files under `userData/assets`, served as `notepane-asset://local/<sha256>.<ext>` |
 | `electron/preload.cjs` | safe renderer bridge |
+| `electron/themes.json` | the nine theme definitions (palette, code theme, overrides), the single source read by the renderer (`src/style/themes.js`) and the main process (`electron/windowTheme.cjs`, `electron/store.cjs`) |
 | `src/main.jsx` | composition only: the `App` shell and the `StickyEditor` component that wires everything below together |
 | `src/styles.css` | ordered `@import` list for `src/styles/` |
 
@@ -28,7 +29,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | `src/` | entry point and shared constants | `main.jsx`, `constants.js` |
 | `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `selection.js`, `blocks.js`, `clipboard.js`, `images.js` |
 | `src/model/` | normalising and deriving stored data | `notes.js`, `preferences.js`, `keyboardShortcuts.js` |
-| `src/style/` | colour maths and computed inline styles | `colorMath.js`, `themeStyles.js` |
+| `src/style/` | themes, theme tokens, tone matching, colour maths and computed inline styles | `themes.js`, `themeTokens.js`, `toneMatch.js`, `applyTheme.js`, `themeStyles.js`, `colorMath.js` |
 | `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
 | `src/hooks/` | stateful behaviour lifted out of `StickyEditor` | `useNotePersistence.js`, `useEditorSurfaceShortcuts.js` |
 | `src/utils/` | small generic helpers | `values.js`, `dom.js`, `sessionTabAnimation.js` |
@@ -51,6 +52,13 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Note titles, ordering, trash previews | `src/model/notes.js` |
 | Preference and font normalisation and defaults | `src/model/preferences.js` |
 | Shortcut parsing, matching, display labels | `src/model/keyboardShortcuts.js` |
+| Theme list, lookup and the fallback for an unknown theme id | `src/style/themes.js` (data in `electron/themes.json`) |
+| Every colour token a theme produces, derived from its palette | `src/style/themeTokens.js` |
+| Showing a user-painted colour in the theme's tone | `src/style/toneMatch.js` |
+| Applying a theme to the document, the first-paint theme, the export theme | `src/style/applyTheme.js` |
+| Applying the selected theme in a window, code theme included | `src/hooks/useAppliedTheme.js` |
+| Code block syntax colours per theme, re-highlighting on a theme change | `src/editor/codeHighlighter.js` |
+| The theme picker in Preferences | `src/ui/ThemePicker.jsx` |
 | Sticky shell and session tab computed styles | `src/style/themeStyles.js` |
 | Colour conversion and contrast | `src/style/colorMath.js` |
 | Saving, debouncing, version snapshots | `src/hooks/useNotePersistence.js` |
@@ -76,6 +84,16 @@ file.
 imported, or provided by the runtime. It runs in about a second and catches an import dropped during a refactor long
 before the browser suites would. It is the first step of both `verify:quick` and `verify`.
 
+### Colour check
+
+Every colour must come from the theme. `npm run check:colors` scans `src/**/*.{css,js,jsx}`, `electron/**/*.cjs` and
+`index.html` for colour literals: hex, `rgb()`, `hsl()`, `oklch()`, `lch()`, and named colours in colour declarations,
+read whole even when a value spans several lines. A deliberate literal goes in `scripts/check-colors-allowlist.json`
+with its reason. It runs right after `check:refs` in `verify:quick` and `verify`. The theme leak detector
+(`tests/e2e/renderer/theme-leaks.spec.mjs`) renders each screen under two test-only themes that share no colour and
+fails on any visible colour that stays the same; its themes and test hook load only in a dev build, and
+`scripts/verify-dist.mjs` fails if they reach the built bundle.
+
 The renderer owns editor behavior. The desktop shell does not override BlockNote keyboard or mouse behavior.
 
 ## Persistence flow
@@ -100,9 +118,13 @@ backups and Markdown export inline the assets again, so those files stay self-co
 asset store and keeps data URLs.
 
 Appearance changes use a separate IPC path and persist the note title, optional sidebar tab accent color/opacity, and
-per-note editor typography in the matching local JSON note record. Light/Dark mode is app-wide state and is persisted
-separately at the root of `notes.json` as `appTheme.mode`. Layout mode is also app-wide and is stored as root
-`layoutMode`.
+per-note editor typography in the matching local JSON note record. The app theme is app-wide state and is persisted
+separately at the root of `notes.json` as `appTheme`, `{ themeId, mode }`. `appTheme.themeId` names the selected
+theme; `mode` is always that theme's scheme (`light` or `dark`), written so an older build reading the file, or
+restoring a backup, still gets a matching light or dark theme. On reading, a known `themeId` wins; otherwise
+`mode: "dark"` gives NotePane Dark and anything else NotePane Light, so an unknown id from a newer build or a
+hand-edited file falls back by `mode`. Backups go through the same normalisation and keep format version 1. Layout
+mode is also app-wide and is stored as root `layoutMode`.
 
 The renderer keeps a built-in font list for browser preview mode. In Electron, the preload bridge exposes `fonts:list`;
 the main process reads macOS installed font families through `system_profiler SPFontsDataType`, caches the result, and
@@ -157,36 +179,72 @@ The renderer uses:
 - PNG export captures the visible editor surface with Electron `capturePage`.
 - PDF export uses Electron `printToPDF` with print CSS that hides app chrome.
 - Both export paths temporarily remove app chrome/background styling so the exported content has no NotePane shell background.
+- PDF export renders with NotePane Light's colours whatever theme is selected, its GitHub dark code blocks included, so
+  exports stay printable and look the same in every theme; the selected theme returns afterwards.
 - Image download is handled in Electron main so `data:`, `notepane-asset:`, `file:`, and `http(s):` image URLs can be saved through the native save dialog.
 - Copy image puts the image pixels, not its URL, on the clipboard: Electron reads the URL through the same reader as download (`assets:copy-image`) and writes a native image; the browser preview writes a PNG `ClipboardItem` and hides the action when the async clipboard is unavailable.
 - Image toolbar actions resolve the clicked image's block from its rendered `.bn-block-outer[data-id]`, because identical images share one asset URL.
 - Image crop is renderer-side canvas processing; the cropped PNG is stored as an asset and replaces the block URL.
 
-## Theme mode and Preferences panel
+## Themes and Preferences panel
 
-The app theme is intentionally limited to a Notion-style binary mode:
+The app ships nine themes, in picker order:
 
-- `light`
-- `dark`
+| Theme id | Name | Scheme |
+| --- | --- | --- |
+| `notepane-light` | NotePane Light (the default) | light |
+| `notepane-dark` | NotePane Dark | dark |
+| `catppuccin-latte` | Catppuccin Latte | light |
+| `catppuccin-frappe` | Catppuccin Frappé | dark |
+| `catppuccin-macchiato` | Catppuccin Macchiato | dark |
+| `catppuccin-mocha` | Catppuccin Mocha | dark |
+| `nord` | Nord | dark |
+| `dracula` | Dracula | dark |
+| `tokyo-night` | Tokyo Night | dark |
 
-The Light/Dark mode drives the shell, header, sidebar, editor surface, BlockNote theme, text, code background, code
-text, menus, image tools, and crop dialog through CSS tokens. Full-window custom background colors are deliberately
-not supported because they conflict with editor-level colors such as text color, code background, code text, and user
-authored inline colors.
+A theme is data in `electron/themes.json`: a `scheme`, a `palette` of 27 primitive colours (surfaces, lines, text,
+roles, the nine named colours, code colours), a Shiki `codeTheme`, and `overrides`. `buildThemeTokens`
+(`src/style/themeTokens.js`) derives every CSS custom property the stylesheets read from the palette; NotePane Light
+and Dark use `overrides`, each with a recorded reason, to keep today's hand-tuned values exactly. The renderer sets the
+tokens on the document root together with `data-theme-id`, `data-theme-scheme` and `color-scheme`, so BlockNote's
+menus portalled to `document.body` inherit them. Stylesheets and components use tokens only (see Colour check). The
+scheme is internal: it drives tone matching, BlockNote's `theme` prop, `color-scheme` and the wordmark, which keeps its
+brand colours in every theme (the light PNG for light themes, the dark PNG for dark themes).
 
-Light/Dark mode is global for the whole app. Switching sidebar sessions or opening another sticky window does not
-change the mode; all windows receive the same app theme via Electron IPC.
+The theme is chosen in Preferences > General > App theme ("The theme applies to every window."): a radio group of
+preview cards, each a small window drawn in that theme's colours. Clicking a card, or moving with the arrow keys,
+applies the theme at once in every open window, sticky windows and their portalled menus included, through the
+`app-theme:update` and `app-theme:changed` IPC broadcast. There is no light/dark toggle: the former Light/Dark switch,
+its `toggleThemeMode` command and its `Command/Ctrl + Shift + L` shortcut are gone, and `Command/Ctrl + Shift + L` is
+left unbound. A stored custom binding for the removed command is dropped on load.
+
+Colours the user paints are stored unchanged and shown through tone matching (`src/style/toneMatch.js`): the hue is
+kept, and lightness and chroma move into the theme's own range, measured from its palette. A session tab fill and a
+sticky window surface become a quiet tint, a small mark such as a search result dot takes the tone of the theme's
+named colours, and whites, greys and blacks map onto the theme's neutral surfaces. Text on a painted colour is the
+theme text colour that reaches 4.5:1, or black or white when neither does. NotePane Light and Dark skip tone matching
+and show the pastels as they are, the contrast fallback being their only change. Preferences swatches and the colour
+panel preview show the tone-matched colour. Named editor colours (the formatting menu's text and background colours)
+are stored by name and take the theme's named colours directly.
 
 Session tab backgrounds can use each session's accent color. Active, inactive, and hover backgrounds are derived from
-that accent plus the current Light/Dark mode. The title text color is calculated from the effective background so the
-tab remains readable in both modes.
+that accent, tone-matched to the current theme, and the title text color is calculated from the effective background
+so the tab remains readable in every theme. Full-window custom background colors are deliberately not supported
+because they conflict with editor-level colors such as text color, code background, code text, and user authored
+inline colors.
 
-Light/Dark mode is changed through Preferences or `Command/Ctrl + Shift + L`; the app-wide shortcut/menu state remains global.
-Tab and Sticky mode do not expose a persistent Light/Dark switch in the primary chrome.
+Code blocks are highlighted with the theme's Shiki theme: GitHub dark in NotePane Light and Dark, and the matching
+bundled theme in the others. A theme change re-highlights the open code blocks without saving the note or touching
+undo history.
+
+The theme is global for the whole app. Switching sidebar sessions or opening another sticky window does not change it.
+The main process passes the theme id in each new window's URL, and the renderer applies the theme before React mounts,
+so a window opened under a dark theme never shows a light frame. On Windows, where windows are opaque, the window
+background colour is the theme's window colour; on macOS and Linux windows stay transparent.
 
 The Preferences panel is opened from the sidebar footer button, native app menu, or `Command/Ctrl + ,` and keeps app-wide/default settings:
 
-- Light/Dark app theme
+- app theme
 - default editor font family and size for newly created sessions
 - keyboard shortcut reference
 

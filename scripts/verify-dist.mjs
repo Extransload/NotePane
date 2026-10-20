@@ -109,6 +109,22 @@ for (const snippet of requiredRendererSnippets) {
   }
 }
 
+// The leak detector's sentinel themes and their test hook load only in a dev build
+// (`import.meta.env.DEV` in src/main.jsx). A production bundle must contain neither.
+const devOnlyBundleSnippets = ["sentinelThemes", "installSentinelThemes", "__notepaneTest"];
+const bundleFiles = listFiles(path.dirname(distIndexPath), /\.(?:js|html)$/);
+if (!bundleFiles.some((file) => file.endsWith(".js"))) {
+  fail("Built bundle has no JavaScript files");
+}
+for (const file of bundleFiles) {
+  const content = fs.readFileSync(file, "utf8");
+  for (const snippet of devOnlyBundleSnippets) {
+    if (content.includes(snippet)) {
+      fail(`Built bundle contains the dev-only test hook ${snippet}: ${path.relative(projectRoot, file)}`);
+    }
+  }
+}
+
 const main = fs.readFileSync(mainPath, "utf8");
 const requiredMainSnippets = [
   "alwaysOnTop",
@@ -159,6 +175,14 @@ function readRendererSources(directory) {
     }
   }
   return parts.join("\n");
+}
+
+function listFiles(directory, pattern) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) return listFiles(full, pattern);
+    return pattern.test(entry.name) ? [full] : [];
+  });
 }
 
 function assertFile(filePath) {
