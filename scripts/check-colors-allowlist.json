@@ -99,5 +99,15 @@
       146
     ],
     "reason": "Image crop frame and handles: they draw over arbitrary image content."
+  },
+  {
+    "file": "src/style/themeTokens.js",
+    "text": "const WHITE = \"#ffffff\";",
+    "reason": "Glass highlights and chrome fills are white in every theme; the single mixing endpoint of the token derivation."
+  },
+  {
+    "file": "src/style/themeTokens.js",
+    "text": "return `rgba(${red}",
+    "reason": "Template that formats a palette colour as comma-separated rgba for the find highlights; it holds no literal colour."
   }
 ]
