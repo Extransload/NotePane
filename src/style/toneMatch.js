@@ -94,7 +94,16 @@ export function toneMatch(hex, theme, role) {
   if (theme.toneMatching === false || !isHexColor(hex)) {
     return hex;
   }
-  const target = toneTargets(theme)[role];
+  return toneMatchToTarget(hex, theme, toneTargets(theme)[role]);
+}
+
+/**
+ * `hex` placed at `target` ({ l, c }), as toneMatch places it at a role's target: a chromatic
+ * colour keeps its hue, a neutral one stays on `theme`'s neutral axis. toneMatch is this with the
+ * target its role measures on the palette; the theme tests use it with a target measured on part
+ * of the palette (a theme's official named colours, ruling R33).
+ */
+export function toneMatchToTarget(hex, theme, target) {
   const input = hexToOklch(hex);
   if (input.c < NEUTRAL_CHROMA) {
     return matchNeutral(input, theme, target);

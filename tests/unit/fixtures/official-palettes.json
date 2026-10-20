@@ -313,14 +313,14 @@
     },
     "named": {
       "gray": {
-        "colour": "nord4",
-        "kind": "stand-in",
-        "reason": "Nord has no gray; nord4 (Snow Storm) is its grey that reads on nord0."
+        "kind": "derived",
+        "value": "#81868f",
+        "reason": "Nord has no gray. Its only greys that read on nord0 (nord4 to nord6) sit within 0.1 ΔE of the text colour nord6 (nord4 is 0.053), which R38 forbids. toneMatch(#bebdb8, nord, \"mark\") with the median of Nord's official named colours (red, orange, yellow, green, blue and purple; L 0.6947, C 0.0821): a neutral on Nord's window-to-text axis, 3.41:1 on nord0 and 0.33 ΔE from the text."
       },
       "brown": {
         "kind": "derived",
-        "value": "#b18672",
-        "reason": "Nord has no brown, and no official colour is within 30° of NotePane Dark's brown #8e6552 while 0.05 ΔE from the other eight (nord12 is the orange). toneMatch(#8e6552, nord, \"mark\") with the median of Nord's official named colours gives #be927e, 0.037 ΔE from nord12, so its lightness moved 0.040 toward #8e6552's."
+        "value": "#b28773",
+        "reason": "Nord has no brown, and no official colour is within 30° of NotePane Dark's brown #8e6552 while 0.05 ΔE from the other eight (nord12 is the orange). toneMatch(#8e6552, nord, \"mark\") with the median of Nord's official named colours (red, orange, yellow, green, blue and purple; L 0.6947, C 0.0821) gives #bd927d, within 0.05 ΔE of nord12, so its lightness moved 0.035 toward #8e6552's (R35)."
       },
       "red": {
         "colour": "nord11",
@@ -354,8 +354,18 @@
       },
       "pink": {
         "kind": "derived",
-        "value": "#b27b94",
-        "reason": "Nord has no pink, and no unused official colour is within 30° of NotePane Dark's pink #da208f (nord15 is the purple, nord11 the red). toneMatch(#da208f, nord, \"mark\") with the median of Nord's official named colours gives #c28aa3, 0.026 ΔE from nord15, so its lightness moved 0.050 toward #da208f's."
+        "value": "#b67a95",
+        "reason": "Nord has no pink, and no unused official colour is within 30° of NotePane Dark's pink #da208f (nord15 is the purple, nord11 the red). toneMatch(#da208f, nord, \"mark\") with the median of Nord's official named colours (red, orange, yellow, green, blue and purple; L 0.6947, C 0.0821) gives #c588a3, within 0.05 ΔE of nord15, so its lightness moved 0.045 toward #da208f's (R35)."
+      }
+    },
+    "derivedKeys": {
+      "shadow": {
+        "value": "#1e222a",
+        "reason": "Nord has no colour darker than nord0, its window, so a nord0 shadow vanishes (R38). nord0 mixed 35% toward black: the median step from window to shadow in the other dark themes (Dracula 18%, Frappé 26%, Macchiato 35%, Mocha 42%, Tokyo Night 49%)."
+      },
+      "codeMuted": {
+        "value": "#81868f",
+        "reason": "codeMuted is gray in every theme's mapping, and Nord's gray is derived (R38); nord4 equalled codeText. Nord's brightened comment colour #616e88 (nord-visual-studio-code) reads only 2.43:1 on nord0; #81868f reads 3.41:1."
       }
     }
   },

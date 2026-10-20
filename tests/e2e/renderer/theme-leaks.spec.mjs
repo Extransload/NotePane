@@ -171,10 +171,11 @@ function colourScan({ phase, scope, indices, allowlist }) {
     return allowlist.some((entry) => element.closest(entry.selector));
   }
 
-  // A theme change re-highlights code blocks with the new code theme, which replaces their token
-  // spans, split where that theme's tokens split. A target inside a code block's text is
-  // therefore followed by its code element and the offset of its first character there, and read
-  // again on the element that holds that character after the change.
+  // A theme change re-highlights code blocks with the new code theme, which splits their text into
+  // token spans where that theme's tokens split. ProseMirror replaces some spans and reuses others
+  // in place, so a span still in the document may now hold other characters. A target inside a
+  // code block's text is therefore always read again by its code element and the offset of its
+  // first character there: on whichever element holds that character after the change.
   const CODE_TEXT = ".bn-editor [data-content-type='codeBlock'] code";
   function codeTextNodes(code) {
     const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
@@ -317,7 +318,7 @@ function colourScan({ phase, scope, indices, allowlist }) {
   if (phase === "read") {
     return {
       readings: window[STORE].map((target) => {
-        if (!target.element.isConnected && target.codeAnchor?.code.isConnected) {
+        if (target.codeAnchor?.code.isConnected) {
           target.element = elementAtCodeOffset(target.codeAnchor) ?? target.element;
         }
         return target.element.isConnected ? readTarget(target) : null;

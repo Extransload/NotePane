@@ -13,7 +13,12 @@ import {
   selectAppTheme,
 } from "../support/renderer-helpers.mjs";
 
-test.beforeEach(async ({ page }) => {
+// Tests tagged OPENS_OWN_PAGE open the page themselves (with the dev-only theme hook, or a stub
+// bridge installed first), so the page loads once.
+const OPENS_OWN_PAGE = "@opens-own-page";
+
+test.beforeEach(async ({ page }, testInfo) => {
+  if (testInfo.tags.includes(OPENS_OWN_PAGE)) return;
   await page.goto("/");
   await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
 });
@@ -103,7 +108,7 @@ async function readCodeColours(page) {
   });
 }
 
-test("code blocks follow the theme", async ({ page }) => {
+test("code blocks follow the theme", { tag: OPENS_OWN_PAGE }, async ({ page }) => {
   // `?sentinelThemes` exposes the dev-only theme setter selectAppTheme uses.
   await page.goto("/?sentinelThemes=1");
   await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
@@ -193,7 +198,7 @@ function stubVersionHistoryBridge() {
   };
 }
 
-test("the version history preview recolours its code blocks with the theme", async ({ page }) => {
+test("the version history preview recolours its code blocks with the theme", { tag: OPENS_OWN_PAGE }, async ({ page }) => {
   await page.addInitScript(stubVersionHistoryBridge);
   // `?sentinelThemes` exposes the dev-only theme setter selectAppTheme uses.
   await page.goto("/?sentinelThemes=1");

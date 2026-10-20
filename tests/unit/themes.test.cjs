@@ -107,7 +107,13 @@ const SHIPPED_THEMES = [
 ];
 const NOTEPANE_THEME_IDS = new Set(["notepane-light", "notepane-dark"]);
 const OFFICIAL_PALETTES = require("./fixtures/official-palettes.json");
-const NAMED_COLOUR_KEYS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
+const loadColorMath = () => import("../../src/style/colorMath.js");
+
+// The OKLab ΔE between two hex colours: the distance every "apart" and "distinct" rule here uses.
+function oklabDistance({ hexToOklab }, first, second) {
+  const [a, b] = [hexToOklab(first), hexToOklab(second)];
+  return Math.hypot(a.l - b.l, a.a - b.a, a.b - b.b);
+}
 
 test("ships the nine themes in picker order", async () => {
   const { listThemes } = await loadThemes();
@@ -139,18 +145,23 @@ test("text contrast meets the spec bar in every theme", async () => {
 // colours the fixture marks as derived, which must hold exactly the recorded value. The fixture's
 // `named` map says where each of the nine named colours comes from: the palette's own colour of
 // that name ("own", with the palette's documented `name` where its colour names differ), another
-// official colour standing in for a name the palette lacks ("stand-in"), or a derived value.
+// official colour standing in for a name the palette lacks ("stand-in"), or a derived value. Its
+// `derivedKeys` map marks the other palette keys that hold a derived value, each with its reason.
 test("the new themes use only their official palette colours, apart from the marked derived ones", async () => {
   const { listThemes, PALETTE_KEYS } = await loadThemes();
+  const { NAMED_COLOURS } = await loadTokens();
   const newThemes = listThemes().filter((theme) => !NOTEPANE_THEME_IDS.has(theme.id));
   assert.deepEqual(newThemes.map((theme) => theme.id).sort(), Object.keys(OFFICIAL_PALETTES).sort());
   for (const theme of newThemes) {
-    const { colours, named } = OFFICIAL_PALETTES[theme.id];
-    assert.deepEqual(Object.keys(named).sort(), [...NAMED_COLOUR_KEYS].sort(), theme.id);
+    const { colours, named, derivedKeys = {} } = OFFICIAL_PALETTES[theme.id];
+    assert.deepEqual(Object.keys(named).sort(), [...NAMED_COLOURS].sort(), theme.id);
+    for (const key of Object.keys(derivedKeys)) {
+      assert.ok(PALETTE_KEYS.includes(key) && !NAMED_COLOURS.includes(key), `${theme.id} derivedKeys.${key}`);
+    }
     const official = new Set(Object.values(colours));
     for (const key of PALETTE_KEYS) {
       const value = theme.palette[key];
-      const source = named[key];
+      const source = named[key] ?? (derivedKeys[key] && { ...derivedKeys[key], kind: "derived" });
       if (source?.kind === "derived") {
         assert.match(source.reason, /\S/, `${theme.id}.${key} derived without a reason`);
         assert.equal(value, source.value, `${theme.id}.${key} is not its recorded derived value`);
@@ -213,25 +224,41 @@ test("stand-in named colours keep their hue family", async () => {
 // median lightness. R35: where that mark tone sits within 0.05 ΔE of another named colour (Nord's
 // brown and pink), only its lightness moves, toward NotePane's own lightness for that colour, in
 // 0.005 steps until it is 0.05 ΔE from all eight; hue and chroma stay. The fixture records each
-// move in the entry's reason.
+// move in the entry's reason. This test derives each value that way, the median taken from the
+// named colours the fixture does not mark derived, and expects exactly the recorded value.
 test("derived named colours are NotePane's colour in the theme's mark tone", async () => {
   const { listThemes, getTheme } = await loadThemes();
-  const { hexToOklch } = await import("../../src/style/colorMath.js");
-  const { toneMatch } = await import("../../src/style/toneMatch.js");
+  const { NAMED_COLOURS } = await loadTokens();
+  const colorMath = await loadColorMath();
+  const { hexToOklch, oklchToHex } = colorMath;
+  const { toneMatchToTarget } = await import("../../src/style/toneMatch.js");
+  const median = (values) => {
+    const sorted = [...values].sort((first, second) => first - second);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  };
   let derivedCount = 0;
   for (const theme of listThemes().filter((candidate) => !NOTEPANE_THEME_IDS.has(candidate.id))) {
     const reference = getTheme(theme.scheme === "dark" ? "notepane-dark" : "notepane-light");
-    for (const [key, source] of Object.entries(OFFICIAL_PALETTES[theme.id].named)) {
-      if (source.kind !== "derived") continue;
+    const { named } = OFFICIAL_PALETTES[theme.id];
+    const official = NAMED_COLOURS.filter((key) => named[key].kind !== "derived").map((key) => hexToOklch(theme.palette[key]));
+    const officialMedian = { l: median(official.map(({ l }) => l)), c: median(official.map(({ c }) => c)) };
+    for (const key of NAMED_COLOURS.filter((candidate) => named[candidate].kind === "derived")) {
       derivedCount += 1;
-      const value = hexToOklch(theme.palette[key]);
-      const target = hexToOklch(reference.palette[key]);
-      const mark = hexToOklch(toneMatch(reference.palette[key], theme, "mark"));
-      const label = `${theme.id}.${key} ${theme.palette[key]}`;
-      assert.ok(hueDistance(value.h, target.h) <= 3, `${label} hue ${value.h.toFixed(1)} vs ${target.h.toFixed(1)}`);
-      assert.ok(Math.abs(value.c - mark.c) <= 0.005, `${label} chroma ${value.c.toFixed(4)} vs mark ${mark.c.toFixed(4)}`);
-      const [low, high] = [Math.min(mark.l, target.l), Math.max(mark.l, target.l)];
-      assert.ok(value.l >= low - 0.005 && value.l <= high + 0.005, `${label} lightness ${value.l.toFixed(3)} outside ${low.toFixed(3)}–${high.toFixed(3)}`);
+      const others = NAMED_COLOURS.filter((other) => other !== key).map((other) => theme.palette[other]);
+      const apart = (hex) => others.every((other) => oklabDistance(colorMath, hex, other) >= 0.05);
+      let expected = toneMatchToTarget(reference.palette[key], theme, officialMedian);
+      if (!apart(expected)) {
+        const start = hexToOklch(expected);
+        const direction = Math.sign(hexToOklch(reference.palette[key]).l - start.l);
+        expected = null;
+        for (let step = 1; step <= 100 && !expected; step += 1) {
+          const candidate = oklchToHex({ l: start.l + direction * step * 0.005, c: start.c, h: start.h });
+          if (apart(candidate)) expected = candidate;
+        }
+      }
+      assert.equal(named[key].value, expected, `${theme.id}.${key}: the fixture records ${named[key].value}`);
+      assert.equal(theme.palette[key], expected, `${theme.id}.${key}: the theme holds ${theme.palette[key]}`);
     }
   }
   assert.ok(derivedCount > 0);
@@ -246,11 +273,9 @@ test("derived named colours are NotePane's colour in the theme's mark tone", asy
 const HOVER_EXEMPT = new Set(["notepane-light"]);
 test("hover stays visible on every surface and carries readable text", async () => {
   const { listThemes } = await loadThemes();
-  const { getContrastRatio, hexToOklab } = await import("../../src/style/colorMath.js");
-  const distance = (first, second) => {
-    const [a, b] = [hexToOklab(first), hexToOklab(second)];
-    return Math.hypot(a.l - b.l, a.a - b.a, a.b - b.b);
-  };
+  const colorMath = await loadColorMath();
+  const { getContrastRatio } = colorMath;
+  const distance = (first, second) => oklabDistance(colorMath, first, second);
   for (const theme of listThemes()) {
     const { palette } = theme;
     const ratio = getContrastRatio(palette.text, palette.hover);
@@ -312,19 +337,46 @@ test("faint text reads on the window and stays at or below muted", async () => {
 // The nine named colours (the editor's text and background colours) must stay apart.
 test("named colours are pairwise distinct in every theme", async () => {
   const { listThemes } = await loadThemes();
-  const { hexToOklab } = await import("../../src/style/colorMath.js");
-  const distance = (first, second) => {
-    const [a, b] = [hexToOklab(first), hexToOklab(second)];
-    return Math.hypot(a.l - b.l, a.a - b.a, a.b - b.b);
-  };
+  const { NAMED_COLOURS } = await loadTokens();
+  const colorMath = await loadColorMath();
   for (const theme of listThemes()) {
-    for (let first = 0; first < NAMED_COLOUR_KEYS.length; first += 1) {
-      for (let second = first + 1; second < NAMED_COLOUR_KEYS.length; second += 1) {
-        const [firstKey, secondKey] = [NAMED_COLOUR_KEYS[first], NAMED_COLOUR_KEYS[second]];
-        const delta = distance(theme.palette[firstKey], theme.palette[secondKey]);
+    for (let first = 0; first < NAMED_COLOURS.length; first += 1) {
+      for (let second = first + 1; second < NAMED_COLOURS.length; second += 1) {
+        const [firstKey, secondKey] = [NAMED_COLOURS[first], NAMED_COLOURS[second]];
+        const delta = oklabDistance(colorMath, theme.palette[firstKey], theme.palette[secondKey]);
         assert.ok(delta >= 0.05, `${theme.id} ${firstKey} and ${secondKey}: OKLab ΔE ${delta.toFixed(4)}`);
       }
     }
+  }
+});
+
+// R38: the palette keeps its hierarchy, in every shipped theme (NotePane Light and Dark meet these
+// too). On a dark theme, shadows are darker than the window, or they vanish (0.02 ΔE). Muted code
+// (the language menu, the code border) stays apart from code text (0.05 ΔE), and gray text from
+// body text (0.1 ΔE), or the two read as one.
+test("shadows sit below the window in every dark theme", async () => {
+  const { listThemes } = await loadThemes();
+  const colorMath = await loadColorMath();
+  for (const theme of listThemes().filter((candidate) => candidate.scheme === "dark")) {
+    const { shadow, window } = theme.palette;
+    assert.ok(
+      colorMath.getRelativeLuminance(shadow) < colorMath.getRelativeLuminance(window),
+      `${theme.id} shadow ${shadow} is not darker than the window ${window}`,
+    );
+    const apart = oklabDistance(colorMath, shadow, window);
+    assert.ok(apart >= 0.02, `${theme.id} shadow ${shadow} is ${apart.toFixed(4)} from the window ${window}`);
+  }
+});
+
+test("muted code and gray text stay apart from their text colours", async () => {
+  const { listThemes } = await loadThemes();
+  const colorMath = await loadColorMath();
+  for (const theme of listThemes()) {
+    const { codeMuted, codeText, gray, text } = theme.palette;
+    const code = oklabDistance(colorMath, codeMuted, codeText);
+    assert.ok(code >= 0.05, `${theme.id} codeMuted ${codeMuted} is ${code.toFixed(4)} from codeText ${codeText}`);
+    const grayText = oklabDistance(colorMath, gray, text);
+    assert.ok(grayText >= 0.1, `${theme.id} gray ${gray} is ${grayText.toFixed(4)} from text ${text}`);
   }
 });
 

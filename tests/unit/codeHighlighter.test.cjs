@@ -23,7 +23,12 @@ function fakeEditor(nodes) {
   const dispatched = [];
   return {
     dispatched,
+    // While true, transact throws, as an editor whose view has gone away would.
+    broken: false,
     transact(callback) {
+      if (this.broken) {
+        throw new Error("The editor view is gone");
+      }
       const tr = {
         marked: [],
         meta: {},
@@ -83,6 +88,84 @@ test("the highlighter loads every code theme and highlights with the active one"
   setActiveCodeTheme("solarized-dark");
   assert.equal(getActiveCodeTheme(), "github-dark");
   assert.equal(keywordColour(), "#f97583");
+});
+
+// Collects console.error calls while `run` runs.
+async function capturingErrors(run) {
+  const errors = [];
+  const original = console.error;
+  console.error = (...args) => errors.push(args);
+  try {
+    await run(errors);
+  } finally {
+    console.error = original;
+  }
+  return errors;
+}
+
+test("a code theme that fails to load leaves the others working and falls back to github-dark", async () => {
+  const { createNotePaneHighlighter, setActiveCodeTheme } = await load();
+  const errors = await capturingErrors(async () => {
+    const highlighter = await createNotePaneHighlighter({
+      nord: () => Promise.reject(new Error("The nord chunk failed to load")),
+      "catppuccin-mocha": () => import("@shikijs/themes/catppuccin-mocha"),
+    });
+    await highlighter.loadLanguage("javascript");
+    const keywordColour = () =>
+      highlighter
+        .codeToTokens("const answer = 42;", { lang: "javascript", theme: highlighter.getLoadedThemes()[0] })
+        .tokens[0][0].color.toLowerCase();
+    assert.ok(!highlighter.getLoadedThemes().includes("nord"));
+    assert.ok(highlighter.getLoadedThemes().includes("catppuccin-mocha"));
+    setActiveCodeTheme("nord");
+    assert.equal(highlighter.getLoadedThemes()[0], "github-dark");
+    assert.equal(keywordColour(), "#f97583");
+    setActiveCodeTheme("catppuccin-mocha");
+    assert.equal(highlighter.getLoadedThemes()[0], "catppuccin-mocha");
+    assert.equal(keywordColour(), "#cba6f7");
+  });
+  assert.equal(errors.length, 1);
+  assert.match(String(errors[0].join(" ")), /nord/);
+});
+
+test("an editor that fails to re-highlight stops neither the others nor the export", async () => {
+  const { followCodeTheme, setActiveCodeTheme, withCodeTheme } = await load();
+  const failing = fakeEditor([[0, "codeBlock"]]);
+  const healthy = fakeEditor([[0, "codeBlock"]]);
+  const unfollowFailing = followCodeTheme(failing);
+  const unfollowHealthy = followCodeTheme(healthy);
+  try {
+    const errors = await capturingErrors(async () => {
+      failing.broken = true;
+      setActiveCodeTheme("nord");
+      assert.deepEqual(failing.dispatched, []);
+      assert.equal(healthy.dispatched.length, 1);
+
+      // The failed editor was not marked as highlighted, so the next pass retries it alone.
+      failing.broken = false;
+      setActiveCodeTheme("nord");
+      assert.equal(failing.dispatched.length, 1);
+      assert.equal(healthy.dispatched.length, 1);
+
+      // The export's own result and error survive a failing re-highlight around it.
+      failing.broken = true;
+      assert.equal(await withCodeTheme("github-dark", async () => "rendered"), "rendered");
+      await assert.rejects(
+        withCodeTheme("github-dark", async () => {
+          throw new Error("export failed");
+        }),
+        /export failed/,
+      );
+      assert.equal(healthy.dispatched.length, 5);
+    });
+    // The first switch, then one on the way into each export. On the way out the window's code
+    // theme is back to nord, which the failing editor already shows, so it is left alone.
+    assert.equal(errors.length, 3);
+  } finally {
+    failing.broken = false;
+    unfollowFailing();
+    unfollowHealthy();
+  }
 });
 
 test("a theme change re-highlights the code blocks of every followed editor, outside history", async () => {

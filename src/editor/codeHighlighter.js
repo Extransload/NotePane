@@ -44,17 +44,28 @@ export function getActiveCodeTheme() {
 
 /**
  * BlockNote's `createHighlighter`: its language bundle with github-dark and github-light, plus
- * every other code theme, all loaded before it resolves, so switching never waits and never
- * asks Shiki for a theme it lacks. Only `getLoadedThemes` is wrapped.
+ * every other code theme, all loaded before it resolves, so switching never waits. Each theme
+ * loads on its own: one that fails (a chunk that does not load) is logged and left out, and code
+ * highlights with github-dark while that theme is active, because Shiki throws on a theme it
+ * lacks. Only `getLoadedThemes` is wrapped. `loaders` replaces the theme chunks in tests.
  */
-export async function createNotePaneHighlighter() {
+export async function createNotePaneHighlighter(loaders = CODE_THEME_LOADERS) {
   const highlighter = await blockNoteCodeBlockOptions.createHighlighter();
-  await highlighter.loadTheme(...Object.values(CODE_THEME_LOADERS));
+  await Promise.all(
+    Object.entries(loaders).map(async ([codeTheme, load]) => {
+      try {
+        await highlighter.loadTheme(load);
+      } catch (error) {
+        console.error(`The ${codeTheme} code theme did not load; code highlights with ${DEFAULT_CODE_THEME}.`, error);
+      }
+    }),
+  );
   return {
     ...highlighter,
     getLoadedThemes: () => {
-      const active = getActiveCodeTheme();
-      return [active, ...highlighter.getLoadedThemes().filter((id) => id !== active)];
+      const loaded = highlighter.getLoadedThemes();
+      const active = loaded.includes(getActiveCodeTheme()) ? getActiveCodeTheme() : DEFAULT_CODE_THEME;
+      return [active, ...loaded.filter((id) => id !== active)];
     },
   };
 }
@@ -71,7 +82,7 @@ export const codeBlockOptions = {
  * The document stays equal, so nothing is saved, and the step stays out of the undo history.
  */
 export function rehighlightCodeBlocks(editor) {
-  highlightedWith.set(editor, getActiveCodeTheme());
+  const codeTheme = getActiveCodeTheme();
   editor.transact((tr) => {
     let codeBlockCount = 0;
     tr.doc.descendants((node, position) => {
@@ -87,14 +98,28 @@ export function rehighlightCodeBlocks(editor) {
       tr.setMeta("addToHistory", false);
     }
   });
+  // Only once the transaction went through, so a failed editor is tried again next time.
+  highlightedWith.set(editor, codeTheme);
+}
+
+// Re-highlights one editor if it shows another code theme. An editor that throws (its view has
+// gone) is logged and skipped: the other editors still change, a mount is not broken, and
+// withCodeTheme's export result or error is never replaced by it.
+function rehighlightIfStale(editor) {
+  const active = getActiveCodeTheme();
+  if (highlightedWith.get(editor) === active) {
+    return;
+  }
+  try {
+    rehighlightCodeBlocks(editor);
+  } catch (error) {
+    console.error(`Code blocks could not be re-highlighted with ${active}.`, error);
+  }
 }
 
 function rehighlightFollowingEditors() {
-  const active = getActiveCodeTheme();
   for (const editor of followingEditors) {
-    if (highlightedWith.get(editor) !== active) {
-      rehighlightCodeBlocks(editor);
-    }
+    rehighlightIfStale(editor);
   }
 }
 
@@ -107,8 +132,8 @@ export function followCodeTheme(editor) {
   followingEditors.add(editor);
   if (!highlightedWith.has(editor)) {
     highlightedWith.set(editor, getActiveCodeTheme());
-  } else if (highlightedWith.get(editor) !== getActiveCodeTheme()) {
-    rehighlightCodeBlocks(editor);
+  } else {
+    rehighlightIfStale(editor);
   }
   return () => {
     followingEditors.delete(editor);
