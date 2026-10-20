@@ -164,7 +164,10 @@ export function focusLastEditorBlock(editor) {
 }
 
 export async function cutCurrentBlocks(editor, activeImageBlockId, scheduleSave) {
-  const blocks = resolveBlocksForCut(editor, activeImageBlockId);
+  await cutBlocks(editor, resolveBlocksForCut(editor, activeImageBlockId), scheduleSave);
+}
+
+export async function cutBlocks(editor, blocks, scheduleSave) {
   if (blocks.length === 0) {
     return;
   }
@@ -228,6 +231,21 @@ export function resolveBlocksForCut(editor, activeImageBlockId) {
   } catch {
     return [];
   }
+}
+
+// A six-dot menu action takes the selection only when it includes the menu's
+// block, as BlockNote's Delete item does; otherwise just the menu's block. A
+// block that is no longer in this editor gives nothing to act on.
+export function resolveBlocksForMenuBlock(editor, menuBlockId) {
+  const menuBlock = menuBlockId ? editor.getBlock(menuBlockId) : undefined;
+  if (!menuBlock) {
+    return [];
+  }
+
+  const selectedBlocks = editor.getSelection()?.blocks;
+  return selectedBlocks?.some((block) => block.id === menuBlock.id)
+    ? selectedBlocks
+    : [menuBlock];
 }
 
 export function extractTableOfContentsEntries(blocks) {

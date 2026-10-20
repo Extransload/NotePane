@@ -17,6 +17,12 @@ export function isEditorShortcutTarget(target) {
   );
 }
 
+// Opening the six-dot menu moves focus into its Mantine dropdown, which is
+// portalled outside `.bn-container`, so it is not an editor shortcut target.
+export function isDragHandleMenuTarget(target) {
+  return target instanceof Element && Boolean(target.closest(".bn-drag-handle-menu"));
+}
+
 export function isSelectionInsideCodeBlock(editor) {
   try {
     return editor.transact(

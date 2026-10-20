@@ -1013,3 +1013,166 @@ test("cuts the block under the caret after the six-dot handle menu is dismissed"
   await expect(editor.getByText("Alpha handle block", { exact: true })).toHaveCount(1);
   await expect(editor.getByText("Bravo middle block", { exact: true })).toHaveCount(1);
 });
+
+const handleMenuBlockTexts = [
+  "Alpha handle block",
+  "Bravo middle block",
+  "Charlie caret block",
+];
+
+// Types Alpha, Bravo and Charlie above an empty last paragraph and seeds the
+// clipboard, so a cut is visible as a change of clipboard text.
+async function typeHandleMenuBlocks(page) {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  for (const text of handleMenuBlockTexts) {
+    await page.keyboard.type(text);
+    await page.keyboard.press("Enter");
+  }
+  await page.evaluate(() => navigator.clipboard.writeText("clipboard before the cut"));
+  const editor = page.locator(".bn-editor");
+  return {
+    editor,
+    alpha: editor.getByText("Alpha handle block", { exact: true }),
+    bravo: editor.getByText("Bravo middle block", { exact: true }),
+  };
+}
+
+// Opens the six-dot menu of `block` and checks the menu stands for that block.
+async function openBlockMenuFor(page, block) {
+  const box = await block.boundingBox();
+  await page.mouse.move(box.x + 4, box.y + box.height / 2);
+  await page.mouse.move(box.x - 24, box.y + box.height / 2);
+  await page.locator(".bn-side-menu")
+    .getByRole("button", { name: "Open block menu" })
+    .click();
+  const blockMenu = page.locator(".bn-drag-handle-menu:visible");
+  await expect(blockMenu).toBeVisible();
+  const blockId = await block.evaluate((element) =>
+    element.closest(".bn-block-outer").dataset.id,
+  );
+  await expect(page.locator("style[data-block-menu-highlight]"))
+    .toHaveAttribute("data-block-menu-highlight", blockId);
+  return blockMenu;
+}
+
+async function expectBlockTexts(editor, texts) {
+  await expect.poll(() => editor.locator(".bn-block-content").evaluateAll((elements) =>
+    elements.map((element) => element.textContent).filter(Boolean),
+  )).toEqual(texts);
+}
+
+async function expectClipboardToHoldOnly(page, kept, left) {
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toContain(kept[0]);
+  const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+  for (const text of kept) {
+    expect(clipboardText).toContain(text);
+  }
+  for (const text of left) {
+    expect(clipboardText).not.toContain(text);
+  }
+  return clipboardText;
+}
+
+test("cuts the block selected with the six-dot handle using the cut shortcut", async ({ page }) => {
+  const { editor, alpha, bravo } = await typeHandleMenuBlocks(page);
+  // The caret stays in another block, so only the handle identifies Bravo.
+  await alpha.click();
+  const blockMenu = await openBlockMenuFor(page, bravo);
+
+  await page.keyboard.press(modifierShortcut("X"));
+
+  await expectBlockTexts(editor, ["Alpha handle block", "Charlie caret block"]);
+  await expect(blockMenu).toHaveCount(0);
+  await expectEditorFocused(page);
+  const clipboardText = await expectClipboardToHoldOnly(
+    page,
+    ["Bravo middle block"],
+    ["Alpha", "Charlie"],
+  );
+
+  // Paste restores the block, undoing the paste and then the cut leaves it in
+  // place. pastePlainText dispatches a synthetic ClipboardEvent carrying the
+  // clipboard text, because a real paste shortcut is racy in headless Chromium.
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, clipboardText);
+  await expectBlockTexts(editor, [
+    "Alpha handle block",
+    "Charlie caret block",
+    "Bravo middle block",
+  ]);
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expectBlockTexts(editor, ["Alpha handle block", "Charlie caret block"]);
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expectBlockTexts(editor, handleMenuBlockTexts);
+});
+
+test("cuts the six-dot menu's block after the arrow keys move through the menu", async ({ page }) => {
+  const { editor, alpha, bravo } = await typeHandleMenuBlocks(page);
+  await alpha.click();
+  const blockMenu = await openBlockMenuFor(page, bravo);
+
+  // A plain key inside the menu ends the handle-click hint, so the cut has to
+  // take Bravo from the menu itself rather than fall back to the caret in Alpha.
+  await page.keyboard.press("ArrowDown");
+  await expect(blockMenu.getByRole("menuitem").first()).toBeFocused();
+  await page.keyboard.press(modifierShortcut("X"));
+
+  await expectBlockTexts(editor, ["Alpha handle block", "Charlie caret block"]);
+  await expect(blockMenu).toHaveCount(0);
+  await expectClipboardToHoldOnly(page, ["Bravo middle block"], ["Alpha", "Charlie"]);
+});
+
+test("cuts the six-dot menu's block after a menu item click keeps the menu open", async ({ page }) => {
+  const { editor, alpha, bravo } = await typeHandleMenuBlocks(page);
+  await alpha.click();
+  const blockMenu = await openBlockMenuFor(page, bravo);
+
+  // Colors opens a subpanel and leaves the menu open; its mousedown ends the
+  // handle-click hint.
+  await blockMenu.getByRole("menuitem", { name: "Colors" }).click();
+  await expect(page.locator(".notepane-block-menu-subpanel[data-panel='colors']:visible"))
+    .toBeVisible();
+  await page.keyboard.press(modifierShortcut("X"));
+
+  await expectBlockTexts(editor, ["Alpha handle block", "Charlie caret block"]);
+  await expect(blockMenu).toHaveCount(0);
+  await expectClipboardToHoldOnly(page, ["Bravo middle block"], ["Alpha", "Charlie"]);
+});
+
+test("cuts the six-dot menu's block instead of a text selection in another block", async ({ page }) => {
+  const { editor, alpha, bravo } = await typeHandleMenuBlocks(page);
+  await alpha.dblclick();
+  const selectedText = await page.evaluate(() => String(window.getSelection()));
+  expect(selectedText).not.toBe("");
+  expect("Alpha handle block").toContain(selectedText);
+  const blockMenu = await openBlockMenuFor(page, bravo);
+
+  await page.keyboard.press(modifierShortcut("X"));
+
+  await expectBlockTexts(editor, ["Alpha handle block", "Charlie caret block"]);
+  await expect(blockMenu).toHaveCount(0);
+  await expectClipboardToHoldOnly(page, ["Bravo middle block"], ["Alpha", "Charlie"]);
+});
+
+test("cuts every selected block when the selection includes the six-dot menu's block", async ({ page }) => {
+  const { editor, alpha, bravo } = await typeHandleMenuBlocks(page);
+  await alpha.click();
+  await page.keyboard.press("Shift+ArrowDown");
+  const selectedText = await page.evaluate(() => String(window.getSelection()));
+  expect(selectedText).toContain("Bravo");
+  expect(selectedText).not.toContain("Charlie");
+  const blockMenu = await openBlockMenuFor(page, bravo);
+
+  await page.keyboard.press(modifierShortcut("X"));
+
+  await expectBlockTexts(editor, ["Charlie caret block"]);
+  await expect(blockMenu).toHaveCount(0);
+  await expectClipboardToHoldOnly(
+    page,
+    ["Alpha handle block", "Bravo middle block"],
+    ["Charlie"],
+  );
+});

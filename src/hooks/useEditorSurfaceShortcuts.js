@@ -1,5 +1,7 @@
 import {
+  cutBlocks,
   cutCurrentBlocks,
+  resolveBlocksForMenuBlock,
 } from "../editor/blocks.js";
 import {
   applyEditorColor,
@@ -24,6 +26,7 @@ import {
 } from "../editor/tableColumnSizing.js";
 import {
   hasEditorRangeSelection,
+  isDragHandleMenuTarget,
   isEditorShortcutTarget,
   isSelectionInsideCodeBlock,
 } from "../editor/targets.js";
@@ -37,6 +40,9 @@ import {
   isInsideDialog,
   isVisibleElement,
 } from "../utils/dom.js";
+import {
+  SideMenuExtension,
+} from "@blocknote/core/extensions";
 import {
   mergeCells,
   splitCell,
@@ -121,6 +127,27 @@ export function useEditorSurfaceShortcuts({
       }
 
       if (isEditableFormTarget(event.target)) {
+        return;
+      }
+
+      // The open six-dot menu holds focus outside the editor and stands for its
+      // block. The side menu stays frozen on that block while the menu is open,
+      // but the handle-click hint ends at any click or plain key in the menu, so
+      // the block comes from the side menu and never from the caret.
+      if (key === "x" && !event.shiftKey && isDragHandleMenuTarget(event.target)) {
+        event.preventDefault();
+        const sideMenu = editor.getExtension(SideMenuExtension);
+        const blocks = resolveBlocksForMenuBlock(editor, sideMenu?.store.state?.block?.id);
+        void cutBlocks(editor, blocks, scheduleSave)
+          .catch(() => {
+            // The block can change while the clipboard write is pending; the
+            // menu still has to close.
+          })
+          .finally(() => {
+            editor.domElement?.removeAttribute("data-notepane-handle-block-id");
+            sideMenu?.unfreezeMenu();
+            editor.focus();
+          });
         return;
       }
 
