@@ -162,6 +162,11 @@ redeclaring tokens on the menu dropdowns (`blocknote.css` 358–365, 472–476).
   object to `BlockNoteView` would also work. That includes the 18 `--bn-colors-highlights-{gray..pink}-{text,background}`
   variables, which colour the text and background colours in note content and which NotePane never sets today.
   These come from the theme's named colours.
+  - **Spike result:** a `.bn-root.bn-root[data-color-scheme]` rule setting `--bn-colors-menu-background: red`
+    reached both menus, in light and dark. The slash menu (`.bn-suggestion-menu`) painted red, and the side menu
+    (`.bn-side-menu`, `.bn-side-menu .mantine-UnstyledButton-root`) resolved the variable to red; it paints no menu
+    background, but its icons turned red when the same rule set `--bn-colors-side-menu`. Both menus live in the
+    portal `.bn-root`, not in the editor's `bn-root bn-container`.
 - **Picker icons** use `--notepane-editor-*` (`blocknote.css` 782–851). Derive them from the same named colours so
   the picker and the content agree.
 - **`BlockNoteView theme`** (`main.jsx:3491`, `overlays.jsx` ~96) is set to the theme's `scheme`. It drives
@@ -201,11 +206,41 @@ Today `codeBlockOptions` loads Shiki with `themes: ["github-dark", "github-light
     It would therefore change NotePane's code colours, which the anti-goals forbid.
   - **The constraint:** `codeBlockOptions.createHighlighter` is replaceable, but the parser always uses
     `getLoadedThemes()[0]`.
-  - **Preferred route:** Shiki's multi-theme output emits each theme's colour as a `--shiki-<id>` variable on the
-    token, and CSS selects the active one. Switching themes then needs no re-highlighting.
-  - **Fallback route:** the highlighter is recreated with the active theme first, and open code blocks are
-    re-highlighted when the theme changes.
-- **Spike this first:** it is the main technical unknown. *(Updated during planning.)*
+  - **Route taken: highlight with the active code theme only, and re-highlight open code blocks when the theme
+    changes.** This was the fallback. The multi-theme route (`themes: {…}`, `--shiki-<id>` variables selected by
+    CSS) does reach the DOM through the parser, but Shiki tokenizes the whole block once per theme on every edit,
+    so it was rejected (see Limitation).
+  - **Highlighter:** `src/editor/schema.jsx` passes `createCodeBlockSpec({ ...codeBlockOptions, createHighlighter })`.
+    `createHighlighter` awaits `codeBlockOptions.createHighlighter()`, which brings BlockNote's language bundle and
+    loads `github-dark` and `github-light`. Any other code theme is loaded with
+    `highlighter.loadTheme(() => import("@shikijs/themes/<id>"))`. It keeps the raw highlighter in a module variable
+    and returns `{ ...highlighter, getLoadedThemes: () => [activeCodeTheme, ...the other loaded themes] }`. Nothing
+    else is wrapped. `@shikijs/themes` is only a transitive dependency today, so it is added to `package.json`,
+    pinned to 4.3.1.
+  - **Selecting the colours:** the parser (`prosemirror-highlight` 0.15.3) evaluates `getLoadedThemes()[0]` on
+    every call, so each highlight uses the code theme active at that moment. The output stays single-theme, as
+    today: an inline `color` on each token, and `--prosemirror-highlight`/`--prosemirror-highlight-bg` on the block.
+  - **Switching without a reload:** load the new code theme first (Shiki throws on a theme that is not loaded), set
+    `activeCodeTheme`, then in every BlockNote editor of the window run one `editor.transact((tr) => …)` that calls
+    `tr.setNodeMarkup(pos, undefined, node.attrs)` on each `codeBlock` and sets `tr.setMeta("addToHistory", false)`.
+    Replacing a node with an equal node drops its entry from `prosemirror-highlight`'s position cache, so the block
+    is re-parsed. The document stays equal, so TipTap emits no `update`: BlockNote's `onChange` does not fire, the
+    note is not saved, and undo is untouched. A `prosemirror-highlight-refresh` meta alone does not recolour,
+    because the cache keeps the decorations of unchanged nodes. The highlighter is never recreated: BlockNote caches
+    its promise and the parser on `globalThis` (`Symbol.for("blocknote.shikiHighlighterPromise")`,
+    `Symbol.for("blocknote.shikiParser")`).
+  - **Limitation:** the switch must reach every editor in the window; each sticky window is its own renderer and
+    re-highlights its own editors. Export, which renders with NotePane Light, switches the code theme to
+    `github-dark` and back around the capture the same way. The rejected route, measured: typing one character in a
+    200-line TypeScript block costs about 36 ms with one theme, 142 ms with four and 325 ms with all nine code
+    themes.
+  - **NotePane colours unchanged:** checked in the rendered DOM of a JavaScript, Python, Markdown, CSS and plain
+    text block: the computed `color`, `font-style`, `font-weight` and `text-decoration-line` of all 385 characters,
+    and the background and colour of each block and its `pre`. Today's build and the new highlighter after switching
+    to `catppuccin-mocha` and back are identical: `const` is `rgb(249, 117, 131)` (`#f97583`), a highlighted
+    block's background is `rgb(36, 41, 46)` (`#24292e`, Shiki's `github-dark` background), and a plain text block's
+    is `rgb(13, 17, 23)` (`#0d1117`, `--sticky-code-bg`).
+- **Spiked** in Task 1. The route above is the result. *(Updated after the spike.)*
 - **Code block tool bar:** it takes tokens.
 - **NotePane Light and Dark:** they keep today's GitHub dark code block.
 
