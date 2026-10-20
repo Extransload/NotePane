@@ -137,6 +137,9 @@ const LIBRARY_COLOUR_TOKENS = {
     "var(--sticky-portal-menu-border-color)",
     "var(--sticky-portal-menu-border-color)",
   ],
+  // The browser's own link colours in the light and dark schemes, kept: links are not among the
+  // allowed visible changes.
+  "--notepane-link": ["#0000ee", "#9e9eff"],
 };
 
 async function assertNotePaneTokens(themeId, scheme) {
@@ -269,6 +272,24 @@ test("derivation is total for a theme without overrides", async () => {
       assert.equal(typeof value, "string", `${theme.id} ${name}`);
       assert.notEqual(value.trim(), "", `${theme.id} ${name}`);
       assert.doesNotMatch(value, /undefined|NaN|null/, `${theme.id} ${name}`);
+    }
+  }
+});
+
+test("link text reads at 4.5:1 on the window colour, derived and as applied", async () => {
+  const { buildThemeTokens } = await loadTokens();
+  const { listThemes } = await loadThemes();
+  const { SENTINEL_THEMES } = await import("../../src/style/sentinelThemes.js");
+  const { getContrastRatio } = await import("../../src/style/colorMath.js");
+  for (const theme of [...listThemes(), ...SENTINEL_THEMES]) {
+    for (const [label, tokens] of [
+      ["derived", buildThemeTokens({ ...theme, overrides: {} })],
+      ["applied", buildThemeTokens(theme)],
+    ]) {
+      const link = tokens["--notepane-link"];
+      assert.match(link, /^#[0-9a-f]{6}$/, `${theme.id} ${label}`);
+      const ratio = getContrastRatio(link, theme.palette.window);
+      assert.ok(ratio >= 4.5, `${theme.id} ${label} link ${link} on ${theme.palette.window}: ${ratio.toFixed(2)}`);
     }
   }
 });

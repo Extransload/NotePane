@@ -100,6 +100,12 @@
   background-color: var(--notepane-selection-bg);
 }
 
+/* Links in note content, in the editor and the version history preview. Without this rule the
+   browser paints them in its own link colour. The underline follows `color`. */
+.bn-root .bn-editor a {
+  color: var(--notepane-link);
+}
+
 .bn-editor {
   min-height: 100%;
   color: var(--sticky-text-color);

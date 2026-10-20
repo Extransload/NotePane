@@ -7,18 +7,6 @@
   },
   {
     "screen": "dark / note",
-    "selector": "a",
-    "property": "color",
-    "value": "rgb(158, 158, 255)"
-  },
-  {
-    "screen": "dark / note",
-    "selector": "a",
-    "property": "text-decoration-color",
-    "value": "rgb(158, 158, 255)"
-  },
-  {
-    "screen": "dark / note",
     "selector": "div.bn-block-content[data-content-type=\"codeBlock\"]",
     "property": "background-color",
     "value": "rgb(36, 41, 46)"
@@ -652,18 +640,6 @@
     "selector": "section.preferences-section.preferences-window-section > div.preferences-section-title",
     "property": "color",
     "value": "rgba(55, 53, 47, 0.68)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "a",
-    "property": "color",
-    "value": "rgb(158, 158, 255)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "a",
-    "property": "text-decoration-color",
-    "value": "rgb(158, 158, 255)"
   },
   {
     "screen": "dark / sticky window",
@@ -1507,18 +1483,6 @@
   },
   {
     "screen": "light / note",
-    "selector": "a",
-    "property": "color",
-    "value": "rgb(0, 0, 238)"
-  },
-  {
-    "screen": "light / note",
-    "selector": "a",
-    "property": "text-decoration-color",
-    "value": "rgb(0, 0, 238)"
-  },
-  {
-    "screen": "light / note",
     "selector": "div.bn-block-content[data-content-type=\"codeBlock\"]",
     "property": "background-color",
     "value": "rgb(36, 41, 46)"
@@ -2152,18 +2116,6 @@
     "selector": "section.preferences-section.preferences-window-section > div.preferences-section-title",
     "property": "color",
     "value": "rgba(55, 53, 47, 0.68)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "a",
-    "property": "color",
-    "value": "rgb(0, 0, 238)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "a",
-    "property": "text-decoration-color",
-    "value": "rgb(0, 0, 238)"
   },
   {
     "screen": "light / sticky window",

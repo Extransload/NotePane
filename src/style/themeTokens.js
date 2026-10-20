@@ -1,4 +1,4 @@
-import { getContrastingTextColor, hexToCssRgb, hexToRgb, mixHexColors } from "./colorMath.js";
+import { getContrastingTextColor, getContrastRatio, hexToCssRgb, hexToRgb, mixHexColors } from "./colorMath.js";
 import { DEFAULT_THEME_ID, getTheme } from "./themes.js";
 
 const NAMED_COLOURS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
@@ -55,6 +55,18 @@ function commaRgba(hex, alpha) {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
+// `colour` mixed toward `ink` in 5% steps until it reads at `minimum` contrast on `background`:
+// unchanged when it already does, `ink` itself when no mix does.
+function readableOn(colour, background, ink, minimum = 4.5) {
+  for (let step = 0; step <= 20; step += 1) {
+    const candidate = mixHexColors(colour, ink, step / 20);
+    if (getContrastRatio(candidate, background) >= minimum) {
+      return candidate;
+    }
+  }
+  return ink;
+}
+
 // Roles the stylesheets painted with a fixed colour before themes existed: status dots,
 // focus rings, tooltips, the code block tool bar, glass highlights, backdrops and shadows.
 function stylesheetRoleTokens(palette, scheme, glass) {
@@ -89,6 +101,9 @@ function stylesheetRoleTokens(palette, scheme, glass) {
     "--notepane-pastel-swatch-ink": palette.text,
     "--notepane-icon-turn-into": palette.blue,
     "--notepane-icon-colors": palette.purple,
+    // Links in note content: the theme's blue, the colour themes give links, darkened or
+    // lightened toward the text colour until it reads as body text does (4.5:1 on the window).
+    "--notepane-link": readableOn(palette.blue, palette.window, palette.text),
     "--notepane-tooltip-bg": tooltipBg,
     "--notepane-tooltip-text": tooltipText,
     "--notepane-tooltip-border": hexToCssRgb(tooltipText, 0.12),
