@@ -87,12 +87,16 @@ before the browser suites would. It is the first step of both `verify:quick` and
 ### Colour check
 
 Every colour must come from the theme. `npm run check:colors` scans `src/**/*.{css,js,jsx}`, `electron/**/*.cjs` and
-`index.html` for colour literals: hex, `rgb()`, `hsl()`, `oklch()`, `lch()`, and named colours in colour declarations,
-read whole even when a value spans several lines. A deliberate literal goes in `scripts/check-colors-allowlist.json`
-with its reason. It runs right after `check:refs` in `verify:quick` and `verify`. The theme leak detector
-(`tests/e2e/renderer/theme-leaks.spec.mjs`) renders each screen under two test-only themes that share no colour and
-fails on any visible colour that stays the same; its themes and test hook load only in a dev build, and
-`scripts/verify-dist.mjs` fails if they reach the built bundle.
+`index.html` for colour literals: hex, `rgb()`, `hsl()`, `oklch()`, `lch()`, and the 148 CSS named colours in any case
+wherever they are colours: in the value of a colour property (any `*-color`, shorthands, shadows, gradients, filters
+and masks), read whole even when it spans several lines, inside a colour function or a shadow, and in JS style values
+such as `{ borderLeftColor: "red" }`, `{ "--x": "white" }` or `"border-color: red"`. A deliberate literal goes in
+`scripts/check-colors-allowlist.json` with its reason, one entry per literal line. It runs right after `check:refs` in
+`verify:quick` and `verify`. The theme leak detector (`tests/e2e/renderer/theme-leaks.spec.mjs`) renders each screen
+under two test-only themes that share no colour and fails on any visible colour that stays the same; its themes and
+test hook load only in a dev build, and `scripts/verify-dist.mjs` fails if they reach the built bundle. The colour
+migration is finished, so neither check keeps a known-debt list: a committed `scripts/check-colors-known.json` or
+`tests/e2e/fixtures/theme-leaks-known.json` fails it.
 
 The renderer owns editor behavior. The desktop shell does not override BlockNote keyboard or mouse behavior.
 
@@ -219,13 +223,14 @@ its `toggleThemeMode` command and its `Command/Ctrl + Shift + L` shortcut are go
 left unbound. A stored custom binding for the removed command is dropped on load.
 
 Colours the user paints are stored unchanged and shown through tone matching (`src/style/toneMatch.js`): the hue is
-kept, and lightness and chroma move into the theme's own range, measured from its palette. A session tab fill and a
-sticky window surface become a quiet tint, a small mark such as a search result dot takes the tone of the theme's
-named colours, and whites, greys and blacks map onto the theme's neutral surfaces. Text on a painted colour is the
-theme text colour that reaches 4.5:1, or black or white when neither does. NotePane Light and Dark skip tone matching
-and show the pastels as they are, the contrast fallback being their only change. Preferences swatches and the colour
-panel preview show the tone-matched colour. Named editor colours (the formatting menu's text and background colours)
-are stored by name and take the theme's named colours directly.
+kept, and lightness and chroma move into the theme's own range, measured from its palette. A sticky window surface
+becomes a quiet tint; a session tab fill does too on light themes, and on dark themes becomes a bright pastel in the
+tone of the theme's named colours, like NotePane Dark's tabs. A small mark such as a search result dot takes the tone
+of the theme's named colours, and whites, greys and blacks map onto the theme's neutral surfaces. Text on a painted
+colour is the theme text colour that reaches 4.5:1, or black or white when neither does. NotePane Light and Dark skip
+tone matching and show the pastels as they are, the contrast fallback being their only change. Preferences swatches
+and the colour panel preview show the tone-matched colour. Named editor colours (the formatting menu's text and
+background colours) are stored by name and take the theme's named colours directly.
 
 Session tab backgrounds can use each session's accent color. Active, inactive, and hover backgrounds are derived from
 that accent, tone-matched to the current theme, and the title text color is calculated from the effective background

@@ -32,13 +32,6 @@ import {
 // Inactive session tabs show the tab text at this opacity, or more where it would not read.
 const INACTIVE_TAB_TEXT_OPACITY = 0.72;
 
-export function resolveTabTextColor(noteTheme, theme) {
-  const normalizedTheme = normalizeTheme(noteTheme);
-  return isHexColor(normalizedTheme.tabTextColor)
-    ? normalizedTheme.tabTextColor
-    : theme.palette.text;
-}
-
 export function resolveThemeAccentColor(theme, fallbackColor) {
   const normalizedTheme = normalizeTheme(theme);
   return isHexColor(normalizedTheme.tabTextColor)
@@ -130,7 +123,6 @@ export function deriveNoteChrome(theme) {
     selectedText: pair(inkLight, inkDark),
     iconColor: pair(mixHexColors(inkDark, inkLight, 0.2), mixHexColors(inkLight, inkDark, 0.04)),
     iconActiveColor: pair(inkDark, inkLight),
-    iconSurfaceFill: pair(withAlpha(inkLight, 0.4), withAlpha(inkLight, 0.1)),
   };
 }
 
@@ -260,7 +252,6 @@ export function getStickyShellStyle(noteTheme, accentColor, theme) {
     textColor,
     isLightBackground ? 0.16 : 0.22,
   );
-  const iconMutedFill = hexToCssRgb(textColor, isLightBackground ? 0.10 : 0.14);
   // Links: the theme's link where it reads on the note at 4.5:1. Elsewhere the theme's blue,
   // mixed toward the note's text colour until it does, as --notepane-link is fitted to the window.
   const linkStyle =
@@ -323,7 +314,5 @@ export function getStickyShellStyle(noteTheme, accentColor, theme) {
     "--bn-colors-side-menu": mutedColor,
     "--icon-chrome-color": forBackground("iconColor"),
     "--icon-chrome-active-color": forBackground("iconActiveColor"),
-    "--icon-surface-fill": forBackground("iconSurfaceFill"),
-    "--icon-muted-fill": iconMutedFill,
   };
 }

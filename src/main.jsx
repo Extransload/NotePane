@@ -3692,11 +3692,17 @@ function renderApp(bindTestThemeSetter = null) {
 }
 
 // Dev-only: `?sentinelThemes` registers the leak detector's sentinel themes before the first
-// theme is applied. Production builds drop this branch and the module it loads.
+// theme is applied. Production builds drop this branch and the module it loads. If the dev chunk
+// fails to load, the app still renders, without the sentinels.
 if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("sentinelThemes")) {
-  import("./style/sentinelThemes.js").then(({ installSentinelThemes }) => {
-    renderApp(installSentinelThemes());
-  });
+  import("./style/sentinelThemes.js")
+    .then(({ installSentinelThemes }) => {
+      renderApp(installSentinelThemes());
+    })
+    .catch((error) => {
+      console.error(error);
+      renderApp();
+    });
 } else {
   renderApp();
 }

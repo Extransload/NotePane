@@ -86,19 +86,103 @@
   },
   {
     "file": "src/styles/controls.css",
-    "lines": [
-      119,
-      227
-    ],
-    "reason": "Colour-picking tools (colour wheel crosshair and thumb, brightness gradient, opacity checkerboard, slider thumb outlines and shadows): they draw over arbitrary user colours."
+    "text": "border: 1.5px solid rgb(255 255 255 / 0.92);",
+    "reason": "Colour-picking tool: the colour wheel crosshair ring, drawn over the hue and saturation disc at the picked point, so it reads over any user colour."
+  },
+  {
+    "file": "src/styles/controls.css",
+    "text": "background: rgb(255 255 255 / 0.92);",
+    "reason": "Colour-picking tool: the colour wheel crosshair bars (::before/::after), drawn over the disc at the picked point, so they read over any user colour."
+  },
+  {
+    "file": "src/styles/controls.css",
+    "text": "border: 1px solid rgb(0 0 0 / 0.75);",
+    "reason": "Colour-picking tool: the rim of the colour wheel thumb, the dot filled with the picked colour over the disc, so it reads over any user colour."
+  },
+  {
+    "file": "src/styles/controls.css",
+    "text": "background: linear-gradient(90deg, #000, var(--brightness-color));",
+    "reason": "Colour-picking tool: the brightness slider track, a gradient from black to the picked colour; black is the brightness endpoint, not a theme colour."
+  },
+  {
+    "file": "src/styles/controls.css",
+    "text": "border: 1px solid rgb(0 0 0 / 0.28);",
+    "reason": "Colour-picking tool: the brightness slider thumb outline. ::-webkit-slider-thumb has no computed-style API, so neither a token read nor the leak detector can follow it, and the thumbs are colour-picking controls that must stay visible over any picked colour."
+  },
+  {
+    "file": "src/styles/controls.css",
+    "text": "box-shadow: 0 1px 2px rgb(0 0 0 / 0.34);",
+    "reason": "Colour-picking tool: the brightness slider thumb shadow. ::-webkit-slider-thumb has no computed-style API, so neither a token read nor the leak detector can follow it, and the thumbs are colour-picking controls that must stay visible over any picked colour."
+  },
+  {
+    "file": "src/styles/controls.css",
+    "text": "linear-gradient(45deg, rgb(127 127 127 / 0.18) 25%, transparent 25% 75%, rgb(127 127 127 / 0.18) 75%),",
+    "reason": "Colour-picking tool: the opacity slider checkerboard (first layer), neutral grey squares that show transparency under the picked colour."
+  },
+  {
+    "file": "src/styles/controls.css",
+    "text": "linear-gradient(45deg, rgb(127 127 127 / 0.18) 25%, transparent 25% 75%, rgb(127 127 127 / 0.18) 75%);",
+    "reason": "Colour-picking tool: the opacity slider checkerboard (offset layer), neutral grey squares that show transparency under the picked colour."
+  },
+  {
+    "file": "src/styles/controls.css",
+    "text": "border: 1px solid rgb(0 0 0 / 0.28);",
+    "reason": "Colour-picking tool: the opacity slider thumb outline. ::-webkit-slider-thumb has no computed-style API, so neither a token read nor the leak detector can follow it, and the thumbs are colour-picking controls that must stay visible over any picked colour."
+  },
+  {
+    "file": "src/styles/controls.css",
+    "text": "box-shadow: 0 1px 2px rgb(0 0 0 / 0.34);",
+    "reason": "Colour-picking tool: the opacity slider thumb shadow. ::-webkit-slider-thumb has no computed-style API, so neither a token read nor the leak detector can follow it, and the thumbs are colour-picking controls that must stay visible over any picked colour."
   },
   {
     "file": "src/styles/overlays.css",
-    "lines": [
-      103,
-      146
-    ],
-    "reason": "Image crop frame and handles: they draw over arbitrary image content."
+    "text": "background: #161616;",
+    "reason": "Image crop tool: it draws over arbitrary image content. The crop frame backdrop, the dark stage the image is cropped on."
+  },
+  {
+    "file": "src/styles/overlays.css",
+    "text": "border: 2px solid #fff;",
+    "reason": "Image crop tool: it draws over arbitrary image content. The crop selection border."
+  },
+  {
+    "file": "src/styles/overlays.css",
+    "text": "linear-gradient(to right, transparent 33.1%, rgb(255 255 255 / 0.58) 33.3%, rgb(255 255 255 / 0.58) 33.7%, transparent 33.9%),",
+    "reason": "Image crop tool: it draws over arbitrary image content. The crop selection's first vertical rule-of-thirds line."
+  },
+  {
+    "file": "src/styles/overlays.css",
+    "text": "linear-gradient(to right, transparent 66.1%, rgb(255 255 255 / 0.58) 66.3%, rgb(255 255 255 / 0.58) 66.7%, transparent 66.9%),",
+    "reason": "Image crop tool: it draws over arbitrary image content. The crop selection's second vertical rule-of-thirds line."
+  },
+  {
+    "file": "src/styles/overlays.css",
+    "text": "linear-gradient(to bottom, transparent 33.1%, rgb(255 255 255 / 0.58) 33.3%, rgb(255 255 255 / 0.58) 33.7%, transparent 33.9%),",
+    "reason": "Image crop tool: it draws over arbitrary image content. The crop selection's first horizontal rule-of-thirds line."
+  },
+  {
+    "file": "src/styles/overlays.css",
+    "text": "linear-gradient(to bottom, transparent 66.1%, rgb(255 255 255 / 0.58) 66.3%, rgb(255 255 255 / 0.58) 66.7%, transparent 66.9%);",
+    "reason": "Image crop tool: it draws over arbitrary image content. The crop selection's second horizontal rule-of-thirds line."
+  },
+  {
+    "file": "src/styles/overlays.css",
+    "text": "0 0 0 1px rgb(0 0 0 / 0.35);",
+    "reason": "Image crop tool: it draws over arbitrary image content. The crop selection's dark outer edge."
+  },
+  {
+    "file": "src/styles/overlays.css",
+    "text": "border: 2px solid #1a1a1a;",
+    "reason": "Image crop tool: it draws over arbitrary image content. The crop handle border."
+  },
+  {
+    "file": "src/styles/overlays.css",
+    "text": "background: #fff;",
+    "reason": "Image crop tool: it draws over arbitrary image content. The crop handle fill."
+  },
+  {
+    "file": "src/styles/overlays.css",
+    "text": "box-shadow: 0 1px 3px rgb(0 0 0 / 0.42);",
+    "reason": "Image crop tool: it draws over arbitrary image content. The crop handle shadow."
   },
   {
     "file": "src/style/themeTokens.js",

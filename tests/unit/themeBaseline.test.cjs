@@ -10,8 +10,15 @@ const fixture = require("./fixtures/theme-baseline.json");
 // colour, or whose inactive tab text, read below 4.5:1 on its own background (rulings R6, R24,
 // R25).
 const READABLE = 4.5;
-// Task 8 deleted the glass variables: no stylesheet reads them.
-const DELETED_STICKY_KEYS = new Set(["--sticky-glass-highlight", "--sticky-glass-lowlight", "--sticky-glass-stroke"]);
+// Sticky variables that no stylesheet read, deleted: the glass variables (Task 8) and the icon
+// fills (final review).
+const DELETED_STICKY_KEYS = new Set([
+  "--sticky-glass-highlight",
+  "--sticky-glass-lowlight",
+  "--sticky-glass-stroke",
+  "--icon-surface-fill",
+  "--icon-muted-fill",
+]);
 // Inactive tabs show the tab text at this opacity, raised only where it would not read.
 const INACTIVE_TEXT_OPACITY = 0.72;
 // Today's link colours, the browser's own, which NotePane Light and Dark pin (ruling R26).
@@ -164,8 +171,6 @@ function stickyModel(cm, { accentColor, noteTheme, mode }, pickText) {
     "--bn-colors-side-menu": muted,
     "--icon-chrome-color": side("#4f534f", "#f1f1ef"),
     "--icon-chrome-active-color": side("#2f3437", "#ffffff"),
-    "--icon-surface-fill": side("rgb(255 255 255 / 0.40)", "rgb(255 255 255 / 0.10)"),
-    "--icon-muted-fill": rgb(text, side(0.1, 0.14)),
   };
 }
 

@@ -376,10 +376,6 @@
       "iconActiveColor": {
         "onLight": "#2f3437",
         "onDark": "#ffffff"
-      },
-      "iconSurfaceFill": {
-        "onLight": "rgb(255 255 255 / 0.40)",
-        "onDark": "rgb(255 255 255 / 0.10)"
       }
     }
   },
@@ -792,10 +788,6 @@
       "iconActiveColor": {
         "onLight": "#2f3437",
         "onDark": "#ffffff"
-      },
-      "iconSurfaceFill": {
-        "onLight": "rgb(255 255 255 / 0.40)",
-        "onDark": "rgb(255 255 255 / 0.10)"
       }
     }
   },

@@ -13,16 +13,19 @@ import {
 // under both did not come from the theme: it is a leak, reported as { screen, selector,
 // property, value }.
 //
-// The ratchet: tests/e2e/fixtures/theme-leaks-known.json lists the leaks still expected. The
-// test fails on a leak missing from it (a listed place whose value changed counts) and on a
-// listed leak that no longer occurs. The list is empty, so the file is gone: a missing file is
-// an empty list, and every leak fails the test.
+// The colour migration is finished, so there is no known-leak list: every leak fails the test.
+// A committed tests/e2e/fixtures/theme-leaks-known.json fails every test too, rather than being
+// honoured: fix the colour at its source, or, where the spec allows it, add the element to
+// ALLOWLIST below with its reason.
 //
-// Rewrite the list:  NOTEPANE_WRITE_KNOWN_LEAKS=1 npx playwright test tests/e2e/renderer/theme-leaks.spec.mjs
-//                    (an empty list leaves no file)
-// Compare:           npx playwright test tests/e2e/renderer/theme-leaks.spec.mjs
+// Check:      npx playwright test tests/e2e/renderer/theme-leaks.spec.mjs
+// Diagnose:   NOTEPANE_WRITE_KNOWN_LEAKS=1 npx playwright test tests/e2e/renderer/theme-leaks.spec.mjs
+//             prints each group's leaks to stdout, the list such a file would hold, and passes;
+//             it writes no file.
 const KNOWN_LEAKS_FILE = path.resolve("tests/e2e/fixtures/theme-leaks-known.json");
 const WRITE_KNOWN_LEAKS = process.env.NOTEPANE_WRITE_KNOWN_LEAKS === "1";
+const FINISHED =
+  "The colour migration is finished: fix the colour at its source or allowlist it with a reason";
 
 const PAIRS = [
   { scheme: "light", themeIds: ["sentinel-light-a", "sentinel-light-b"] },
@@ -393,11 +396,11 @@ function compareLeakKeys(first, second) {
 
 // One reading per screen, element and property; a run never reports it twice.
 const placeKey = (leak) => `${leak.screen} | ${leak.selector} | ${leak.property}`;
-// The ratchet compares values too, so a known leak whose colour changes is reported.
 const leakKey = (leak) => `${placeKey(leak)} = ${leak.value}`;
 
-function readKnownLeaks() {
-  return fs.existsSync(KNOWN_LEAKS_FILE) ? JSON.parse(fs.readFileSync(KNOWN_LEAKS_FILE, "utf8")) : [];
+function expectNoKnownLeakList() {
+  expect(fs.existsSync(KNOWN_LEAKS_FILE), `${path.relative(process.cwd(), KNOWN_LEAKS_FILE)} exists. ${FINISHED}.`)
+    .toBe(false);
 }
 
 // A screen run under one pair. It reads every target under the current sentinel, switches to
@@ -473,30 +476,14 @@ function settleRatchet(pair, group, state) {
   const unique = new Map();
   for (const leak of state.leaks) unique.set(placeKey(leak), leak);
   const leaks = [...unique.values()].sort(compareLeakKeys);
-  const screenSet = new Set(screens);
-  const known = readKnownLeaks();
+  expectNoKnownLeakList();
 
   if (WRITE_KNOWN_LEAKS) {
-    const merged = [...known.filter((leak) => !screenSet.has(leak.screen)), ...leaks].sort(compareLeakKeys);
-    if (merged.length) {
-      fs.mkdirSync(path.dirname(KNOWN_LEAKS_FILE), { recursive: true });
-      fs.writeFileSync(KNOWN_LEAKS_FILE, `${JSON.stringify(merged, null, 2)}\n`);
-    } else {
-      fs.rmSync(KNOWN_LEAKS_FILE, { force: true });
-    }
+    console.log(`theme leaks, ${pair.scheme} / ${group.name}:\n${JSON.stringify(leaks, null, 2)}`);
     return;
   }
 
-  const expected = known.filter((leak) => screenSet.has(leak.screen));
-  const expectedKeys = new Set(expected.map(leakKey));
-  const foundKeys = new Set(leaks.map(leakKey));
-  expect({
-    newLeaks: leaks.filter((leak) => !expectedKeys.has(leakKey(leak))).map(leakKey),
-    resolvedLeaks: expected.filter((leak) => !foundKeys.has(leakKey(leak))).map(leakKey),
-  }, "new leaks must be fixed; resolved leaks must be removed from theme-leaks-known.json").toEqual({
-    newLeaks: [],
-    resolvedLeaks: [],
-  });
+  expect(leaks.map(leakKey), `every colour comes from the theme. ${FINISHED}.`).toEqual([]);
 }
 
 async function serveTemplateImage(page) {
@@ -849,11 +836,6 @@ const HISTORY_GROUP = {
   screens: ["version history"],
 };
 
-if (WRITE_KNOWN_LEAKS) {
-  // Each test merges its screens into one file, so writes must not run in parallel.
-  test.describe.configure({ mode: "serial" });
-}
-
 for (const pair of PAIRS) {
   for (const group of SCREEN_GROUPS) {
     test(`${pair.scheme} sentinels: ${group.name} take every colour from the theme`, async ({ page }) => {
@@ -882,13 +864,8 @@ for (const pair of PAIRS) {
   });
 }
 
-test("the known leak list names only screens this spec scans", () => {
-  const screens = new Set(
-    PAIRS.flatMap((pair) =>
-      [...SCREEN_GROUPS, HISTORY_GROUP].flatMap((group) => group.screens.map((screen) => `${pair.scheme} / ${screen}`))),
-  );
-  const strays = readKnownLeaks().filter((leak) => !screens.has(leak.screen)).map(leakKey);
-  expect(strays).toEqual([]);
+test("no known leak list is committed", () => {
+  expectNoKnownLeakList();
 });
 
 // Runs in the page before the app loads. A minimal preload bridge: one note, no trash, and two
