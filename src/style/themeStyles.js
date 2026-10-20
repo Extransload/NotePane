@@ -8,7 +8,9 @@ import {
   normalizeTheme,
 } from "../model/preferences.js";
 import {
+  BLACK,
   READABLE_CONTRAST,
+  WHITE,
   blendHexOverHex,
   getContrastRatio,
   getReadableBoundaryColor,
@@ -21,7 +23,7 @@ import {
   readableOpacity,
 } from "./colorMath.js";
 import {
-  buildThemeTokens,
+  resolveLinkColor,
 } from "./themeTokens.js";
 import {
   toneMatch,
@@ -66,10 +68,15 @@ export function resolveDefaultStickyAccentColor(noteIndex = 0) {
   ];
 }
 
-// The colour that marks a note in small places, such as the search result dot: its own
-// colour, or its default pastel, in the active theme's tone.
-export function resolveNoteMarkColor(noteTheme, theme, noteIndex = 0) {
-  return toneMatch(resolveStickyAccentColor(noteTheme, noteIndex), theme, "mark");
+// The colour that marks a note in small places, such as the search result dot: the colour its
+// session tab resolves (its own colour, or the default pastel of `noteIndex`, its place in the
+// stored notes; see getNoteIndexById), in the active theme's tone.
+export function resolveNoteMarkColor(noteTheme, theme, noteIndex) {
+  const accentColor = resolveSessionTabAccentColor(
+    noteTheme,
+    resolveDefaultStickyAccentColor(noteIndex),
+  );
+  return toneMatch(accentColor, theme, "mark");
 }
 
 /**
@@ -257,13 +264,24 @@ export function getStickyShellStyle(noteTheme, accentColor, theme) {
   // Links: the theme's link where it reads on the note at 4.5:1. Elsewhere the theme's blue,
   // mixed toward the note's text colour until it does, as --notepane-link is fitted to the window.
   const linkStyle =
-    getContrastRatio(buildThemeTokens(theme)["--notepane-link"], effectiveBackground) >= READABLE_CONTRAST
+    getContrastRatio(resolveLinkColor(theme), effectiveBackground) >= READABLE_CONTRAST
       ? {}
       : { "--notepane-link": readableOn(palette.blue, [effectiveBackground], textColor) };
+  // The accent marks the note; the table of contents also writes its current entry in it, on its
+  // panel over the note. As text it is fitted like the link, on both the note and the panel:
+  // mixed toward the first ink that reads on both until it does.
+  const accentMarkColor = toneMatch(accentColor, theme, "mark");
+  const accentBackgrounds = [effectiveBackground, panelEffectiveBackground];
+  const accentInk =
+    [textColor, panelTextColor, BLACK, WHITE].find((ink) =>
+      accentBackgrounds.every((background) => getContrastRatio(ink, background) >= READABLE_CONTRAST),
+    ) ?? textColor;
+  const accentTextColor = readableOn(accentMarkColor, accentBackgrounds, accentInk);
 
   return {
     ...linkStyle,
-    "--sticky-note-accent-color": toneMatch(accentColor, theme, "mark"),
+    "--sticky-note-accent-color": accentMarkColor,
+    "--sticky-note-accent-text": accentTextColor,
     "--sticky-effective-bg": effectiveBackground,
     "--sticky-note-bg": hexToCssRgb(noteColor, opacity),
     "--sticky-note-header-bg": headerEffectiveBackground,

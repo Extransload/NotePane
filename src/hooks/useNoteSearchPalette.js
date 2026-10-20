@@ -3,6 +3,7 @@ import {
 } from "../constants.js";
 import {
   getNoteDisplayTitle,
+  getNoteIndexById,
 } from "../model/notes.js";
 import {
   blocksToPlainText,
@@ -51,6 +52,12 @@ export function useNoteSearchPalette({
     }));
     return searchNotes(entries, query);
   }, [editor, note.id, notes, query, readNoteText, storedNotes]);
+  // Each result's place in the notes it was found in, which may include notes this window has
+  // not heard of yet: its default pastel then matches its tab in the window that shows it.
+  const noteIndexById = useMemo(
+    () => getNoteIndexById(storedNotes ?? notes),
+    [notes, storedNotes],
+  );
 
   const openPalette = useCallback(async () => {
     setQuery("");
@@ -124,6 +131,7 @@ export function useNoteSearchPalette({
   return {
     query,
     results,
+    noteIndexById,
     setQuery,
     openPalette,
     closePalette,

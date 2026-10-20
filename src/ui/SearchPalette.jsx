@@ -131,7 +131,7 @@ export function SearchPalette({
                     background: resolveNoteMarkColor(
                       result.note.theme,
                       activeTheme,
-                      noteIndexById.get(result.note.id) ?? 0,
+                      noteIndexById.get(result.note.id),
                     ),
                   }}
                 />

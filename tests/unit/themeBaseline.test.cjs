@@ -3,7 +3,9 @@ const assert = require("node:assert/strict");
 const fixture = require("./fixtures/theme-baseline.json");
 
 // The sticky and tab style output captured before the theme system existed (Task 2), for the
-// six pastels, pure red and mid grey at three opacities in both modes. NotePane Light and Dark
+// six pastels, pure red and mid grey at three opacities in both modes. The fixture is frozen:
+// commit e84e5a4 captured it from the code of that time, and it is never regenerated, because
+// it records what NotePane looked like before themes. NotePane Light and Dark
 // must reproduce it, except where the spec's contrast fallback applies: an entry whose text
 // colour, or whose inactive tab text, read below 4.5:1 on its own background (rulings R6, R24,
 // R25).
@@ -219,13 +221,24 @@ test("NotePane sticky and tab output equals the baseline", async () => {
   for (const entry of fixture.sticky) {
     const label = describeSticky(entry);
     const theme = notePaneTheme(getTheme, entry.mode);
-    const { "--notepane-link": link, ...style } = themeStyles.getStickyShellStyle(
-      entry.noteTheme,
-      entry.accentColor,
-      theme,
-    );
+    const {
+      "--notepane-link": link,
+      "--sticky-note-accent-text": accentText,
+      ...style
+    } = themeStyles.getStickyShellStyle(entry.noteTheme, entry.accentColor, theme);
     const actual = normalise(style);
     const background = entry.style["--sticky-effective-bg"];
+
+    // The table of contents writes its current entry in the accent; the accent text is the accent
+    // where it reads on the note and on its panel, and is fitted toward an ink elsewhere.
+    const panelBackground = compositeOver(cm, style["--sticky-note-panel-bg"], entry.mode === "dark" ? "#191919" : "#ffffff");
+    const accentBackgrounds = [background, panelBackground];
+    if (accentBackgrounds.every((surface) => cm.getContrastRatio(entry.accentColor, surface) >= READABLE)) {
+      assert.equal(accentText, entry.accentColor, `${label} accent text`);
+    }
+    for (const surface of accentBackgrounds) {
+      assert.ok(cm.getContrastRatio(accentText, surface) >= READABLE, `${label} accent text on ${surface}`);
+    }
 
     // Links keep today's colour where it reads on the note, and are fitted to it elsewhere: the
     // theme's blue toward the note's text colour until it reads at 4.5:1 (ruling R26).

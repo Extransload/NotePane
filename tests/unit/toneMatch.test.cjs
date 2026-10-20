@@ -51,7 +51,7 @@ const CATPPUCCIN_MOCHA = {
   overrideReasons: [],
 };
 
-const EXTREMES = ["#ff0000", "#00ff00", "#0000ff", "#ffffff", "#000000", "#808080"];
+const EXTREMES = ["#ff0000", "#00ff00", "#0000ff", "#ffffff", "#000000", "#808080", "#404040", "#c0c0c0"];
 const ROLES = ["fill", "surface", "mark"];
 const OPACITIES = [1, 0.6, 0.35];
 const NEUTRAL_CHROMA = 0.02;
@@ -263,6 +263,38 @@ test("sticky links read at 4.5:1 on every surface result", async () => {
   }
 });
 
+// The table of contents writes its current and hovered entry in the note's accent colour, a
+// mark that need not read as text: the sticky window gives it a text colour that does, on the
+// surface and on the panel the table of contents sits on.
+test("sticky accent text reads at 4.5:1 on every surface result", async () => {
+  const { listThemes, inputs, getStickyShellStyle, getContrastRatio, getNoteChrome, ...colorMath } = await load();
+  for (const theme of listThemes()) {
+    const { base } = getNoteChrome(theme);
+    for (const hex of inputs) {
+      for (const tabTextOpacity of OPACITIES) {
+        const style = getStickyShellStyle({ tabTextColor: hex, tabTextOpacity }, hex, theme);
+        const text = style["--sticky-note-accent-text"];
+        const accent = style["--sticky-note-accent-color"];
+        const backgrounds = [
+          style["--sticky-effective-bg"],
+          compositeOver(colorMath, style["--sticky-note-panel-bg"], base),
+        ];
+        for (const background of backgrounds) {
+          const ratio = getContrastRatio(text, background);
+          assert.ok(
+            ratio >= 4.5,
+            `${theme.id} ${hex} @${tabTextOpacity}: ${text} on ${background} reads ${ratio.toFixed(2)}`,
+          );
+        }
+        // Where the accent already reads, it is the text colour unchanged.
+        if (backgrounds.every((background) => getContrastRatio(accent, background) >= 4.5)) {
+          assert.equal(text, accent, `${theme.id} ${hex} @${tabTextOpacity}`);
+        }
+      }
+    }
+  }
+});
+
 test("distinct pastels stay distinct", async () => {
   const { toneMatch, toneMatchedThemes, pastels, hexToOklch } = await load();
   for (const theme of toneMatchedThemes) {
@@ -287,6 +319,34 @@ test("Mocha matches the spec's worked values", async () => {
   assert.equal(mocha, CATPPUCCIN_MOCHA);
   assert.ok(deltaE(hexToOklch, toneMatch("#fff2b8", mocha, "fill"), "#dacd95") < 0.03);
   assert.ok(deltaE(hexToOklch, toneMatch("#fff2b8", mocha, "surface"), "#3a3417") < 0.03);
+});
+
+test("toneMatch rejects an unknown role on every path", async () => {
+  const { toneMatch, getTheme } = await load();
+  // NotePane (no tone matching), a chromatic input, a neutral input and a malformed one.
+  for (const [themeId, hex] of [
+    ["notepane-light", "#fff2b8"],
+    ["sentinel-dark-a", "#fff2b8"],
+    ["sentinel-light-a", "#808080"],
+    ["catppuccin-mocha", "not a colour"],
+  ]) {
+    assert.throws(
+      () => toneMatch(hex, getTheme(themeId), "background"),
+      { name: "Error", message: 'Unknown tone-matching role "background": use "fill", "surface" or "mark".' },
+      `${themeId} ${hex}`,
+    );
+  }
+});
+
+test("toneMatch returns a value that is not six-digit hex unchanged", async () => {
+  const { toneMatch, getTheme } = await load();
+  for (const themeId of ["notepane-dark", "sentinel-light-b", "catppuccin-mocha"]) {
+    for (const role of ROLES) {
+      for (const value of ["#fff", "#fff2b8cc", "red", "", null, undefined]) {
+        assert.equal(toneMatch(value, getTheme(themeId), role), value, `${themeId} ${role} ${value}`);
+      }
+    }
+  }
 });
 
 test("NotePane themes are never tone matched", async () => {

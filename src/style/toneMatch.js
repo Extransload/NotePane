@@ -1,15 +1,19 @@
 import {
   hexToOklab,
   hexToOklch,
+  isHexColor,
   oklchToHex,
 } from "./colorMath.js";
+import {
+  NAMED_COLOURS,
+} from "./themeTokens.js";
 
 // Tone matching: a colour the user painted (a sticky window, a session tab, an accent mark) is
 // shown in the active theme's tone. Its hue is kept; its lightness, and at most its chroma, come
 // from targets measured on the theme's palette, so a new theme needs no tuning. The stored
 // colour is never rewritten. See "Tone matching" in the theme system spec.
 
-const NAMED_COLOUR_KEYS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
+const ROLES = ["fill", "surface", "mark"];
 
 // Below this OKLCH chroma a colour counts as neutral: a white, a grey or a black.
 const NEUTRAL_CHROMA = 0.02;
@@ -42,7 +46,7 @@ function median(values) {
  */
 function toneTargets(theme) {
   const { palette, scheme } = theme;
-  const named = NAMED_COLOUR_KEYS.map((key) => hexToOklch(palette[key]));
+  const named = NAMED_COLOURS.map((key) => hexToOklch(palette[key]));
   const accentTone = { l: median(named.map(({ l }) => l)), c: median(named.map(({ c }) => c)) };
   const windowLightness = hexToOklch(palette.window).l;
   const step = Math.max(Math.abs(hexToOklch(palette.header).l - windowLightness), MIN_TINT_STEP);
@@ -60,14 +64,14 @@ function toneTargets(theme) {
 // darkest neutral (its text on light themes, its window on dark ones), greys in between. The
 // result takes the axis's tint at that lightness, kept below the neutral threshold.
 function matchNeutral(input, theme, target) {
-  const window = hexToOklab(theme.palette.window);
-  const text = hexToOklab(theme.palette.text);
-  const darkest = Math.min(window.l, text.l);
+  const windowLab = hexToOklab(theme.palette.window);
+  const textLab = hexToOklab(theme.palette.text);
+  const darkest = Math.min(windowLab.l, textLab.l);
   const lightness = darkest + input.l * (target.l - darkest);
-  const span = text.l - window.l;
-  const along = span === 0 ? 0 : Math.min(Math.max((lightness - window.l) / span, 0), 1);
-  const a = window.a + (text.a - window.a) * along;
-  const b = window.b + (text.b - window.b) * along;
+  const span = textLab.l - windowLab.l;
+  const along = span === 0 ? 0 : Math.min(Math.max((lightness - windowLab.l) / span, 0), 1);
+  const a = windowLab.a + (textLab.a - windowLab.a) * along;
+  const b = windowLab.b + (textLab.b - windowLab.b) * along;
   return oklchToHex({
     l: lightness,
     c: Math.min(Math.hypot(a, b), NEUTRAL_TINT_CHROMA),
@@ -80,10 +84,14 @@ function matchNeutral(input, theme, target) {
  * - "fill": a session tab's background;
  * - "surface": a sticky window's background;
  * - "mark": a small mark, such as the search result dot or the tab menu swatch.
- * Themes with `toneMatching: false` (NotePane Light and Dark) get `hex` back unchanged.
+ * Any other role throws. Themes with `toneMatching: false` (NotePane Light and Dark) get `hex`
+ * back unchanged, and so does a value that is not six-digit hex, rather than turning black.
  */
 export function toneMatch(hex, theme, role) {
-  if (theme.toneMatching === false) {
+  if (!ROLES.includes(role)) {
+    throw new Error(`Unknown tone-matching role "${role}": use "fill", "surface" or "mark".`);
+  }
+  if (theme.toneMatching === false || !isHexColor(hex)) {
     return hex;
   }
   const target = toneTargets(theme)[role];

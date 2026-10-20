@@ -308,11 +308,11 @@
 .editor-toc-entry:focus-visible {
   outline: none;
   background: color-mix(in srgb, var(--sticky-note-accent-color, var(--sticky-panel-text)) 5%, transparent);
-  color: var(--sticky-note-accent-color, var(--sticky-panel-text));
+  color: var(--sticky-note-accent-text, var(--sticky-panel-text));
 }
 
 .editor-toc-entry[aria-current="location"] {
-  color: var(--sticky-note-accent-color, var(--sticky-panel-text));
+  color: var(--sticky-note-accent-text, var(--sticky-panel-text));
   font-weight: 760;
   background: transparent;
   box-shadow: none;
@@ -346,7 +346,7 @@
 }
 
 .editor-toc-entry[aria-current="location"] {
-  color: var(--sticky-note-accent-color, var(--sticky-panel-text));
+  color: var(--sticky-note-accent-text, var(--sticky-panel-text));
   font-weight: 760;
 }
 

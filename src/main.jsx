@@ -154,6 +154,7 @@ import {
   createTemplateSessionNote,
   deriveAutomaticTitleFromBlocks,
   getNoteDisplayTitle,
+  getNoteIndexById,
   isTitleManuallyEdited,
   mergeNotes,
   mergeTrashedNotes,
@@ -1284,10 +1285,7 @@ function StickyEditor({
     () => visibleSessionNotes.map((sessionNote) => sessionNote.id),
     [visibleSessionNotes],
   );
-  const noteIndexById = useMemo(
-    () => new Map(notes.map((candidate, index) => [candidate.id, index])),
-    [notes],
-  );
+  const noteIndexById = useMemo(() => getNoteIndexById(notes), [notes]);
   const noteIndex = noteIndexById.get(note.id) ?? 0;
   const stickyAccentColor = resolveStickyAccentColor(theme, noteIndex);
   const stickyChromeStyle = useMemo(
@@ -3658,7 +3656,7 @@ function StickyEditor({
           query={notePalette.query}
           results={notePalette.results}
           activeTheme={activeTheme}
-          noteIndexById={noteIndexById}
+          noteIndexById={notePalette.noteIndexById}
           onQueryChange={notePalette.setQuery}
           onChoose={(result) => void notePalette.chooseResult(result)}
           onClose={notePalette.closePalette}

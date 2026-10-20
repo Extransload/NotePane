@@ -272,6 +272,84 @@ test("find opened from the palette expands the toggle holding the match", async 
   await expect(wrapper).toHaveAttribute("data-show-children", "true");
 });
 
+// A preload bridge with two stored notes and no stored colours, so each note shows the default
+// pastel of its place in the stored order. `__searchBridge.addNote` stores a note the way another
+// window would, without telling this one; `__searchBridge.broadcast` then sends the main
+// process's notes-changed message.
+function stubTwoNoteBridge() {
+  const now = Date.now();
+  const makeNote = (index, title) => ({
+    id: `search-note-${index + 1}`,
+    title,
+    titleManuallyEdited: true,
+    blocksJSON: null,
+    markdown: "",
+    theme: {},
+    seedDemoContent: false,
+    editorFontScale: 1,
+    editorFontFamily: "Inter",
+    detached: false,
+    trashedAt: null,
+    sortOrder: index + 1,
+    createdAt: now + index,
+    updatedAt: now + index,
+  });
+  const notes = [makeNote(0, "First stored note"), makeNote(1, "Second stored note")];
+  let notesChangedListener = null;
+  window.__searchBridge = {
+    addNote: (title) => notes.push(makeNote(notes.length, title)),
+    broadcast: () => notesChangedListener?.({ notes: [...notes] }),
+  };
+  window.blocknoteSticky = {
+    getCurrentNoteId: async () => notes[0].id,
+    getNote: async (noteId) => notes.find((note) => note.id === noteId) ?? notes[0],
+    listNotes: async () => [...notes],
+    listTrash: async () => [],
+    getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
+    getLayoutMode: async () => "tabs",
+    getEditorPreferences: async () => ({}),
+    listFonts: async () => [],
+    saveContent: async () => undefined,
+    updateAppearance: async () => undefined,
+    onNotesChanged: (callback) => {
+      notesChangedListener = callback;
+      return () => {
+        notesChangedListener = null;
+      };
+    },
+  };
+}
+
+test("colours a search result dot like the note's own tab, notes from other windows included", async ({ page }) => {
+  await page.addInitScript(stubTwoNoteBridge);
+  await page.reload();
+  const tabColour = (title) =>
+    page.locator(".session-tab-row").filter({ hasText: title }).evaluate((row) => getComputedStyle(row).backgroundColor);
+  const dotColour = (title) =>
+    palette(page)
+      .getByRole("option", { name: new RegExp(title) })
+      .locator(".search-result-dot")
+      .evaluate((dot) => getComputedStyle(dot).backgroundColor);
+  await expect(page.locator(".session-tab-row")).toHaveCount(2);
+
+  // Another window stores a third note; this window has not heard of it yet, but the palette
+  // searches the stored notes.
+  await page.evaluate(() => window.__searchBridge.addNote("Third stored note"));
+  await page.keyboard.press(modifierShortcut("P"));
+  await expect(palette(page).getByRole("option")).toHaveCount(3);
+  const secondDot = await dotColour("Second stored note");
+  const thirdDot = await dotColour("Third stored note");
+  await palette(page).getByRole("textbox", { name: "Search notes" }).press("Escape");
+
+  // Once this window hears of the third note, its tab shows the colour its dot showed.
+  await page.evaluate(() => window.__searchBridge.broadcast());
+  await expect(page.locator(".session-tab-row")).toHaveCount(3);
+  expect(secondDot).toBe(await tabColour("Second stored note"));
+  expect(thirdDot).toBe(await tabColour("Third stored note"));
+  // Both default to their own pastel, not the first one.
+  expect(new Set([await tabColour("First stored note"), secondDot, thirdDot]).size).toBe(3);
+});
+
 test("refining the find query stays on the current match", async ({ page }) => {
   await typeParagraphs(page, ["needle thin", "needle one", "needle two", "needle three"]);
   await page.keyboard.press(modifierShortcut("F"));

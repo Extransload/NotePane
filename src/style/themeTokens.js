@@ -1,7 +1,19 @@
 import { getContrastingTextColor, hexToCssRgb, hexToRgb, mixHexColors, readableOn } from "./colorMath.js";
 import { DEFAULT_THEME_ID, getTheme } from "./themes.js";
 
-const NAMED_COLOURS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
+// The palette's named colours: the editor's text and background colours, and the tone that
+// tone matching measures.
+export const NAMED_COLOURS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
+
+/**
+ * The colour of links in note content, as `--notepane-link` applies it: the theme's override
+ * when it has one, and otherwise the theme's blue, the colour themes give links, darkened or
+ * lightened toward the text colour until it reads as body text does (4.5:1 on the window).
+ */
+export function resolveLinkColor(theme) {
+  const { overrides = {}, palette } = theme;
+  return overrides["--notepane-link"] ?? readableOn(palette.blue, [palette.window], palette.text);
+}
 
 // Strength of derived values per scheme: [light, dark].
 const STRENGTH = {
@@ -122,16 +134,15 @@ function stylesheetRoleTokens(palette, scheme, glass) {
 // before themes existed. Lines and accents over the note take the theme's colour; the caret,
 // placeholders and the add-file button's fill follow the surface they sit on, so they stay
 // readable where a sticky window recolours the --sticky-* tokens with its note's colour.
-function libraryRoleTokens(palette, scheme) {
+function libraryRoleTokens(theme) {
+  const { palette, scheme } = theme;
   return {
     "--notepane-selection-bg": hexToCssRgb(palette.accent, pick(STRENGTH.selection, scheme)),
     // The browser's focus ring on controls that draw none of their own: the accent, darkened or
     // lightened toward the text colour until it reaches the 3:1 a focus indicator needs on
     // both the window and the panel.
     "--notepane-focus-outline": readableOn(palette.accent, [palette.window, palette.panel], palette.text, 3),
-    // Links in note content: the theme's blue, the colour themes give links, darkened or
-    // lightened toward the text colour until it reads as body text does (4.5:1 on the window).
-    "--notepane-link": readableOn(palette.blue, [palette.window], palette.text),
+    "--notepane-link": resolveLinkColor(theme),
     // The colour of the text the caret is in, as the browser's `auto` caret: readable on dark
     // code blocks, note-coloured session tabs and sticky notes alike.
     "--notepane-caret": "currentcolor",
@@ -264,7 +275,7 @@ export function buildThemeTokens(theme) {
     "--notepane-find-match-bg": commaRgba(palette.warning, s("findMatch")),
     "--notepane-find-current-bg": commaRgba(palette.orange, s("findCurrent")),
     ...stylesheetRoleTokens(palette, scheme, glass),
-    ...libraryRoleTokens(palette, scheme),
+    ...libraryRoleTokens(theme),
   };
 
   for (const name of NAMED_COLOURS) {
