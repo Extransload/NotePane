@@ -271,7 +271,7 @@ import {
 } from "./utils/values.js";
 import "./styles.css";
 
-function App() {
+function App({ bindTestThemeSetter }) {
   const [note, setNote] = useState(null);
   const [notes, setNotes] = useState([]);
   const [trashedNotes, setTrashedNotes] = useState([]);
@@ -795,6 +795,9 @@ function App() {
     setAppTheme(nextAppTheme);
     await electronApi?.updateAppTheme?.(nextAppTheme);
   }, []);
+
+  // Dev-only test hook (src/style/sentinelThemes.js); null in production.
+  useEffect(() => bindTestThemeSetter?.(updateAppTheme), [bindTestThemeSetter, updateAppTheme]);
 
   const updateLayoutMode = useCallback(async (mode) => {
     const previousLayoutMode = normalizeLayoutMode(layoutMode);
@@ -3661,7 +3664,21 @@ function StickyEditor({
   );
 }
 
-// Before React mounts, so the first frame already has the window's theme.
-applyThemeToDocument(getTheme(readInitialThemeId()));
-createRoot(document.getElementById("root")).render(<App />);
+function renderApp(bindTestThemeSetter = null) {
+  // Before React mounts, so the first frame already has the window's theme.
+  applyThemeToDocument(getTheme(readInitialThemeId()));
+  createRoot(document.getElementById("root")).render(
+    <App bindTestThemeSetter={bindTestThemeSetter} />,
+  );
+}
+
+// Dev-only: `?sentinelThemes` registers the leak detector's sentinel themes before the first
+// theme is applied. Production builds drop this branch and the module it loads.
+if (import.meta.env.DEV && new URLSearchParams(window.location.search).has("sentinelThemes")) {
+  import("./style/sentinelThemes.js").then(({ installSentinelThemes }) => {
+    renderApp(installSentinelThemes());
+  });
+} else {
+  renderApp();
+}
 

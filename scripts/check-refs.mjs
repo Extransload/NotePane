@@ -151,6 +151,8 @@ function analyze(ast, filename) {
         return;
       }
       case "ImportDeclaration": return;
+      // `import.meta`: both names are syntax, not references.
+      case "MetaProperty": return;
       case "Identifier": reference(node, scope); return;
       case "JSXIdentifier":
         // element names starting lowercase are intrinsic tags, not references

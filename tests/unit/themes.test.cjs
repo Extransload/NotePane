@@ -134,6 +134,52 @@ test("registered test themes follow the JSON themes", async () => {
   assert.ok(!isKnownThemeId("test-extra"));
 });
 
+test("each sentinel pair shares a scheme and no palette value", async () => {
+  const { PALETTE_KEYS } = await loadThemes();
+  const { SENTINEL_THEMES } = await import("../../src/style/sentinelThemes.js");
+  const byId = Object.fromEntries(SENTINEL_THEMES.map((theme) => [theme.id, theme]));
+  const channels = (hex) => [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
+  for (const scheme of ["light", "dark"]) {
+    const first = byId[`sentinel-${scheme}-a`];
+    const second = byId[`sentinel-${scheme}-b`];
+    for (const theme of [first, second]) {
+      assert.equal(theme.scheme, scheme, theme.id);
+      assert.equal(theme.toneMatching, true, theme.id);
+      assert.deepEqual(theme.overrides, {}, theme.id);
+      assert.deepEqual(Object.keys(theme.palette).sort(), [...PALETTE_KEYS].sort(), theme.id);
+      for (const key of PALETTE_KEYS) assert.match(theme.palette[key], /^#[0-9a-f]{6}$/, `${theme.id}.${key}`);
+    }
+    assert.notEqual(first.codeTheme, second.codeTheme, scheme);
+    const secondValues = new Set(Object.values(second.palette));
+    for (const key of PALETTE_KEYS) {
+      assert.ok(!secondValues.has(first.palette[key]), `${first.id}.${key} also appears in ${second.id}`);
+      const difference = Math.max(
+        ...channels(first.palette[key]).map((value, index) => Math.abs(value - channels(second.palette[key])[index])),
+      );
+      assert.ok(difference >= 40, `${scheme} ${key} differs by only ${difference} in every channel`);
+    }
+  }
+});
+
+test("installSentinelThemes registers the sentinels and forwards setThemeId to the bound setter", async () => {
+  const { isKnownThemeId, registerTestThemes } = await loadThemes();
+  const { installSentinelThemes } = await import("../../src/style/sentinelThemes.js");
+  const target = {};
+  try {
+    const bindThemeSetter = installSentinelThemes(target);
+    assert.ok(isKnownThemeId("sentinel-dark-b"));
+    assert.throws(() => target.__notepaneTest.setThemeId("sentinel-dark-b"), /not mounted/);
+    const calls = [];
+    const unbind = bindThemeSetter((themeId) => calls.push(themeId));
+    target.__notepaneTest.setThemeId("sentinel-dark-b");
+    assert.deepEqual(calls, ["sentinel-dark-b"]);
+    unbind();
+    assert.throws(() => target.__notepaneTest.setThemeId("sentinel-dark-a"), /not mounted/);
+  } finally {
+    registerTestThemes([]);
+  }
+});
+
 test("derivation is total for a theme without overrides", async () => {
   const { buildThemeTokens, THEME_TOKEN_NAMES } = await loadTokens();
   const { listThemes } = await loadThemes();
