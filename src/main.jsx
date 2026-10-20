@@ -57,7 +57,6 @@ import {
   handleToggleSpace,
 } from "./editor/toggleKeyboard.js";
 import {
-  DEFAULT_APP_THEME,
   DEFAULT_EDITOR_FONT_FAMILY,
   DEFAULT_EDITOR_FONT_SCALE,
   DEFAULT_EDITOR_PREFERENCES,
@@ -180,6 +179,13 @@ import {
   resolveStickyAccentColor,
 } from "./style/themeStyles.js";
 import {
+  applyThemeToDocument,
+  readInitialThemeId,
+} from "./style/applyTheme.js";
+import {
+  getTheme,
+} from "./style/themes.js";
+import {
   AdaptiveTooltipPortal,
 } from "./ui/AdaptiveTooltip.jsx";
 import {
@@ -234,6 +240,7 @@ import {
   isPointInsideElement,
   isVisibleElement,
 } from "./utils/dom.js";
+import { useAppliedTheme } from "./hooks/useAppliedTheme.js";
 import { useEditorSurfaceShortcuts } from "./hooks/useEditorSurfaceShortcuts.js";
 import { useFindInNote } from "./hooks/useFindInNote.js";
 import { FindInNote, getFindSeedText } from "./editor/findInNote.js";
@@ -269,7 +276,9 @@ function App() {
   const [notes, setNotes] = useState([]);
   const [trashedNotes, setTrashedNotes] = useState([]);
   const [pendingFind, setPendingFind] = useState(null);
-  const [appTheme, setAppTheme] = useState(DEFAULT_APP_THEME);
+  const [appTheme, setAppTheme] = useState(() =>
+    normalizeAppTheme({ themeId: readInitialThemeId() }),
+  );
   const [layoutMode, setLayoutMode] = useState(DEFAULT_LAYOUT_MODE);
   const [installedFontFamilies, setInstalledFontFamilies] = useState([]);
   const [editorPreferences, setEditorPreferences] = useState(
@@ -781,8 +790,8 @@ function App() {
     );
   }, []);
 
-  const updateAppThemeMode = useCallback(async (mode) => {
-    const nextAppTheme = normalizeAppTheme({ mode });
+  const updateAppTheme = useCallback(async (themeId) => {
+    const nextAppTheme = normalizeAppTheme({ themeId });
     setAppTheme(nextAppTheme);
     await electronApi?.updateAppTheme?.(nextAppTheme);
   }, []);
@@ -876,7 +885,7 @@ function App() {
         onPurgeTrashedNote={purgeTrashedNote}
         onSelectNote={selectNote}
         onNoteChanged={updateNoteInList}
-        onAppThemeModeChanged={updateAppThemeMode}
+        onAppThemeChanged={updateAppTheme}
         onLayoutModeChanged={updateLayoutMode}
         onDetachNote={detachNote}
         onAttachNote={attachNote}
@@ -929,7 +938,7 @@ function StickyEditor({
   onPurgeTrashedNote,
   onSelectNote,
   onNoteChanged,
-  onAppThemeModeChanged,
+  onAppThemeChanged,
   onLayoutModeChanged,
   onDetachNote,
   onAttachNote,
@@ -1255,7 +1264,7 @@ function StickyEditor({
       "--notepane-display-font": appFontFamilyCss,
     };
   }, [appFontFamily, appFontOptions]);
-  const appThemeMode = normalizeAppTheme(appTheme).mode;
+  const activeTheme = useAppliedTheme(normalizeAppTheme(appTheme).themeId);
   const normalizedLayoutMode = normalizeLayoutMode(layoutMode);
   const effectiveLayoutMode =
     normalizedLayoutMode === "sticky" || note.detached ? "sticky" : "tabs";
@@ -1277,9 +1286,9 @@ function StickyEditor({
   const stickyChromeStyle = useMemo(
     () =>
       effectiveLayoutMode === "sticky"
-        ? getStickyShellStyle(theme, stickyAccentColor, appThemeMode)
+        ? getStickyShellStyle(theme, stickyAccentColor, activeTheme.scheme)
         : {},
-    [appThemeMode, effectiveLayoutMode, stickyAccentColor, theme],
+    [activeTheme.scheme, effectiveLayoutMode, stickyAccentColor, theme],
   );
   const shellStyle = {
     ...stickyChromeStyle,
@@ -1357,17 +1366,6 @@ function StickyEditor({
     tableOfContentsEntries.length > 0;
   const shouldRenderChromeHeader =
     effectiveLayoutMode === "sticky" || !isWindowsRuntime();
-
-  useEffect(() => {
-    document.body.classList.toggle("theme-dark", appThemeMode === "dark");
-    document.body.classList.toggle("theme-light", appThemeMode === "light");
-    document.body.dataset.themeMode = appThemeMode;
-
-    return () => {
-      document.body.classList.remove("theme-dark", "theme-light");
-      delete document.body.dataset.themeMode;
-    };
-  }, [appThemeMode]);
 
   useEffect(() => {
     const portalStyleEntries = Object.entries({
@@ -2151,13 +2149,13 @@ function StickyEditor({
     adjustEditorFontScale,
     openFindInNote,
     openSearchPalette: notePalette.openPalette,
-    appThemeMode,
+    activeThemeId: activeTheme.id,
     effectiveLayoutMode,
     exportNote,
     focusEditor,
     matchesEnabledKeyboardShortcut,
     note,
-    onAppThemeModeChanged,
+    onAppThemeChanged,
     onAttachNote,
     onEditorWidthChange,
     requestNewSession,
@@ -2995,10 +2993,10 @@ function StickyEditor({
 
   return (
     <main
-      className={`sticky-shell theme-${appThemeMode} layout-${effectiveLayoutMode} sidebar-${sidebarState}`}
+      className={`sticky-shell layout-${effectiveLayoutMode} sidebar-${sidebarState}`}
       style={shellStyle}
       data-testid="sticky-shell"
-      data-theme-mode={appThemeMode}
+      data-theme-mode={activeTheme.scheme}
       data-layout-mode={effectiveLayoutMode}
     >
       {shouldRenderChromeHeader && (
@@ -3151,7 +3149,7 @@ function StickyEditor({
                       data-note-id={sessionNote.id}
                       style={getSessionTabStyle(
                         sessionNote.theme,
-                        appThemeMode,
+                        activeTheme.scheme,
                         noteIndexById.get(sessionNote.id) ?? index,
                       )}
                     >
@@ -3193,7 +3191,7 @@ function StickyEditor({
                       data-note-id={sessionNote.id}
                       style={getSessionTabStyle(
                         sessionNote.theme,
-                        appThemeMode,
+                        activeTheme.scheme,
                         noteIndexById.get(sessionNote.id) ?? index,
                       )}
                       draggable={normalizedLayoutMode === "tabs"}
@@ -3488,7 +3486,7 @@ function StickyEditor({
           )}
           <BlockNoteView
             editor={editor}
-            theme={appThemeMode}
+            theme={activeTheme.scheme}
             onChange={handleEditorChange}
             onSelectionChange={() => {
               window.requestAnimationFrame(() => {
@@ -3535,7 +3533,7 @@ function StickyEditor({
         <VersionHistoryPanel
           versions={noteVersions}
           isBusy={isVersionBusy}
-          theme={appThemeMode}
+          scheme={activeTheme.scheme}
           onClose={() => setIsVersionHistoryOpen(false)}
           onRestore={(version) => void restoreVersion(version)}
         />
@@ -3625,13 +3623,13 @@ function StickyEditor({
       {isPreferencesWindowOpen && (
         <PreferencesWindow
           initialPage={preferencesInitialPage}
-          appThemeMode={appThemeMode}
+          appThemeMode={activeTheme.scheme}
           editorPreferences={editorPreferences}
           keyboardShortcuts={keyboardShortcuts}
           appFontOptions={appFontOptions}
           fontOptions={editorFontOptions}
           trashedNotes={trashedNotes}
-          onAppThemeModeChange={onAppThemeModeChanged}
+          onAppThemeChange={onAppThemeChanged}
           onEditorPreferencesChange={updateGlobalEditorPreferences}
           onExportBackup={exportDataBackup}
           onImportBackup={importDataBackup}
@@ -3663,5 +3661,7 @@ function StickyEditor({
   );
 }
 
+// Before React mounts, so the first frame already has the window's theme.
+applyThemeToDocument(getTheme(readInitialThemeId()));
 createRoot(document.getElementById("root")).render(<App />);
 

@@ -21,6 +21,11 @@ import {
   normalizeEditorPreferences,
 } from "../model/preferences.js";
 import {
+  // The light/dark switch below maps its mode to a NotePane theme until the theme picker
+  // replaces it.
+  themeIdForMode,
+} from "../style/themes.js";
+import {
   HeaderModeSwitch,
 } from "./controls.jsx";
 import {
@@ -55,7 +60,7 @@ export function PreferencesWindow({
   appFontOptions,
   fontOptions,
   trashedNotes,
-  onAppThemeModeChange,
+  onAppThemeChange,
   onEditorPreferencesChange,
   onExportBackup,
   onImportBackup,
@@ -201,7 +206,7 @@ export function PreferencesWindow({
                 ? keyboardShortcuts.toggleThemeMode
                 : ""
             }
-            onChange={onAppThemeModeChange}
+            onChange={(mode) => onAppThemeChange(themeIdForMode(mode))}
           />
         </div>
         <div className="preference-setting-row app-font-family-setting">

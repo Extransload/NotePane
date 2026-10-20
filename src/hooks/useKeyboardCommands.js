@@ -14,14 +14,14 @@ import {
  * layout mode, theme, font size and table of contents.
  */
 export function useChromeShortcuts({
+  activeThemeId,
   adjustEditorFontScale,
-  appThemeMode,
   effectiveLayoutMode,
   exportNote,
   focusEditor,
   matchesEnabledKeyboardShortcut,
   note,
-  onAppThemeModeChanged,
+  onAppThemeChanged,
   onAttachNote,
   onEditorWidthChange,
   openFindInNote,
@@ -94,7 +94,9 @@ export function useChromeShortcuts({
 
       if (matchesEnabledKeyboardShortcut(event, "toggleThemeMode")) {
         event.preventDefault();
-        void onAppThemeModeChanged(appThemeMode === "dark" ? "light" : "dark");
+        void onAppThemeChanged(
+          activeThemeId === "notepane-dark" ? "notepane-light" : "notepane-dark",
+        );
         return;
       }
 
@@ -163,12 +165,12 @@ export function useChromeShortcuts({
       document.removeEventListener("keydown", handleChromeShortcut, true);
     };
   }, [
-    appThemeMode,
+    activeThemeId,
     effectiveLayoutMode,
     matchesEnabledKeyboardShortcut,
     note.detached,
     note.id,
-    onAppThemeModeChanged,
+    onAppThemeChanged,
     onAttachNote,
     adjustEditorFontScale,
     exportNote,

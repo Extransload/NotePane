@@ -5,6 +5,7 @@ export const DEFAULT_TITLE = "Untitled";
 export const AUTO_TITLE_MAX_LENGTH = 48;
 
 export const DEFAULT_APP_THEME = {
+  themeId: "notepane-light",
   mode: "light",
 };
 

@@ -48,6 +48,7 @@ test("creates, saves, and reloads a local note", () => {
     tabTextOpacity: 0.42,
   });
   assert.deepEqual(reloadedStore.getAppTheme(), {
+    themeId: "notepane-dark",
     mode: "dark",
   });
   assert.equal(reloadedStore.getLayoutMode(), "tabs");
@@ -217,11 +218,6 @@ test("normalizes invalid blocks JSON and clamps window bounds", () => {
     tabTextColor: null,
     tabTextOpacity: 1,
   });
-
-  store.updateAppTheme({ mode: "solarized" });
-  assert.deepEqual(store.getAppTheme(), {
-    mode: "light",
-  });
 });
 
 test("derives note titles from content until the title is manually edited", () => {
@@ -276,17 +272,111 @@ test("updates the global app theme from dark back to light", () => {
   const store = new StickyStore(directory);
 
   assert.deepEqual(store.updateAppTheme({ mode: "dark" }), {
+    themeId: "notepane-dark",
     mode: "dark",
   });
   assert.deepEqual(store.updateAppTheme({ mode: "light" }), {
+    themeId: "notepane-light",
     mode: "light",
   });
 
   const reloadedStore = new StickyStore(directory);
 
   assert.deepEqual(reloadedStore.getAppTheme(), {
+    themeId: "notepane-light",
     mode: "light",
   });
+});
+
+test("normalizes a known theme id and keeps mode in step", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+
+  // Task 9 adds the catppuccin-mocha case here.
+  assert.deepEqual(store.updateAppTheme({ themeId: "notepane-dark" }), {
+    themeId: "notepane-dark",
+    mode: "dark",
+  });
+  // A known theme id wins over a stale mode, and mode follows the theme's scheme.
+  assert.deepEqual(store.updateAppTheme({ themeId: "notepane-dark", mode: "light" }), {
+    themeId: "notepane-dark",
+    mode: "dark",
+  });
+
+  assert.deepEqual(new StickyStore(directory).getAppTheme(), {
+    themeId: "notepane-dark",
+    mode: "dark",
+  });
+});
+
+test("maps a legacy mode to the NotePane theme", () => {
+  const directory = createTemporaryDirectory();
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({ version: 11, appTheme: { mode: "dark" }, notes: [] }),
+    "utf8",
+  );
+
+  const store = new StickyStore(directory);
+
+  assert.deepEqual(store.getAppTheme(), {
+    themeId: "notepane-dark",
+    mode: "dark",
+  });
+  assert.deepEqual(store.updateAppTheme({ mode: "light" }), {
+    themeId: "notepane-light",
+    mode: "light",
+  });
+});
+
+test("an unknown theme id falls back by mode", () => {
+  const directory = createTemporaryDirectory();
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({
+      version: 11,
+      appTheme: { themeId: "solarized", mode: "dark" },
+      notes: [],
+    }),
+    "utf8",
+  );
+
+  const store = new StickyStore(directory);
+
+  assert.deepEqual(store.getAppTheme(), {
+    themeId: "notepane-dark",
+    mode: "dark",
+  });
+  assert.deepEqual(store.updateAppTheme({ themeId: "solarized", mode: "light" }), {
+    themeId: "notepane-light",
+    mode: "light",
+  });
+  // Neither a known id nor a valid mode: the update keeps the current theme.
+  assert.deepEqual(store.updateAppTheme({ themeId: "solarized", mode: "sepia" }), {
+    themeId: "notepane-light",
+    mode: "light",
+  });
+  const freshStore = new StickyStore(createTemporaryDirectory());
+  assert.deepEqual(freshStore.updateAppTheme({ mode: "solarized" }), {
+    themeId: "notepane-light",
+    mode: "light",
+  });
+});
+
+test("resolves the window background from the current theme", () => {
+  const { resolveWindowBackgroundColor } = require("../../electron/windowTheme.cjs");
+  assert.equal(resolveWindowBackgroundColor({ themeId: "notepane-dark" }), "#191919");
+  assert.equal(
+    resolveWindowBackgroundColor({ themeId: "notepane-light", mode: "light" }),
+    "#f5f5f2",
+  );
+  assert.equal(
+    resolveWindowBackgroundColor({ themeId: "solarized", mode: "dark" }),
+    "#191919",
+  );
+  assert.equal(resolveWindowBackgroundColor(null), "#f5f5f2");
 });
 
 test("updates and persists the global layout mode", () => {
@@ -623,6 +713,7 @@ test("migrates legacy per-note mode to global app theme", () => {
   const store = new StickyStore(directory);
 
   assert.deepEqual(store.getAppTheme(), {
+    themeId: "notepane-dark",
     mode: "dark",
   });
   assert.deepEqual(store.getNote("legacy-note").theme, {
@@ -1127,6 +1218,24 @@ test("exports and restores a versioned portable workspace backup", () => {
   const reloadedStore = new StickyStore(targetDirectory);
   assert.equal(reloadedStore.getNote(activeNote.id).markdown, "Portable data");
   assert.deepEqual(reloadedStore.listTrash().map((note) => note.id), [trashedNote.id]);
+});
+
+test("a backup with only mode restores the matching NotePane theme", () => {
+  const sourceStore = new StickyStore(createTemporaryDirectory());
+  sourceStore.createNote({ width: 800, height: 600 });
+  const backup = sourceStore.createBackup({ exportedAt: "2026-08-04T08:30:00.000Z" });
+  // An older build writes appTheme without a theme id.
+  backup.data.appTheme = { mode: "dark" };
+
+  const targetStore = new StickyStore(createTemporaryDirectory());
+  targetStore.createNote({ width: 800, height: 600 });
+  targetStore.restoreBackup(backup);
+
+  assert.equal(backup.version, NOTE_PANE_BACKUP_VERSION);
+  assert.deepEqual(targetStore.getAppTheme(), {
+    themeId: "notepane-dark",
+    mode: "dark",
+  });
 });
 
 test("rejects malformed, duplicate, and newer NotePane backups", () => {

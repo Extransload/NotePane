@@ -1,5 +1,9 @@
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
+
+const ROOT = path.resolve(__dirname, "../..");
 
 const loadThemes = () => {
   // src/constants.js reads window.blocknoteSticky at import time.
@@ -155,5 +159,101 @@ test("every override has a recorded reason", async () => {
     assert.deepEqual([...grouped].sort(), overrideKeys, theme.id);
     assert.equal(new Set(grouped).size, grouped.length, `${theme.id} token listed twice`);
   }
+});
+
+test("renderer and store normalizeAppTheme agree", async () => {
+  globalThis.window ??= {};
+  const { normalizeAppTheme: normalizeRendererAppTheme } = await import("../../src/model/preferences.js");
+  const { normalizeAppTheme: normalizeStoreAppTheme } = require("../../electron/store.cjs");
+  const inputs = [
+    { themeId: "notepane-dark" },
+    { themeId: "notepane-light", mode: "dark" },
+    { themeId: "solarized", mode: "dark" },
+    { themeId: "solarized" },
+    { mode: "dark" },
+    { mode: "light" },
+    { mode: "sepia" },
+    { themeId: 3, mode: "dark" },
+    "notepane-dark",
+    null,
+    undefined,
+    [],
+  ];
+  const fallbacks = [undefined, { themeId: "notepane-dark", mode: "dark" }, { mode: "dark" }, "garbage"];
+  for (const fallback of fallbacks) {
+    for (const input of inputs) {
+      const label = JSON.stringify({ input, fallback });
+      const fromStore = normalizeStoreAppTheme(input, fallback);
+      assert.deepEqual(normalizeRendererAppTheme(input, fallback), fromStore, label);
+      assert.deepEqual(Object.keys(fromStore), ["themeId", "mode"], label);
+    }
+  }
+  assert.deepEqual(normalizeStoreAppTheme({ themeId: "solarized", mode: "dark" }), {
+    themeId: "notepane-dark",
+    mode: "dark",
+  });
+  assert.deepEqual(normalizeStoreAppTheme("notepane-dark"), {
+    themeId: "notepane-light",
+    mode: "light",
+  });
+});
+
+// Read with a fallback and never set anywhere; layout, not colour.
+const UNSET_WITH_FALLBACK = new Set(["--sticky-window-radius"]);
+const LIBRARY_PREFIX = /^--(?:bn|mantine|shiki|prosemirror)-/;
+
+function readSource(relativePath) {
+  return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+}
+
+function listSources(directory, extensions) {
+  return fs.readdirSync(path.join(ROOT, directory), { withFileTypes: true }).flatMap((entry) => {
+    const relativePath = `${directory}/${entry.name}`;
+    if (entry.isDirectory()) return listSources(relativePath, extensions);
+    return extensions.includes(path.extname(entry.name)) ? [relativePath] : [];
+  });
+}
+
+test("every token a stylesheet reads is defined", async () => {
+  globalThis.window ??= {};
+  const { THEME_TOKEN_NAMES } = await loadTokens();
+  const { getStickyShellStyle, getSessionTabStyle } = await import("../../src/style/themeStyles.js");
+  const stylesheets = listSources("src/styles", [".css"]).map(readSource).join("\n");
+  const sideMenuStyle = [...readSource("src/editor/sideMenu.jsx").matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)]
+    .map((match) => match[1])
+    .join("\n");
+  const readNames = new Set(
+    [...`${stylesheets}\n${sideMenuStyle}`.matchAll(/var\(\s*(--[\w-]+)/g)].map((match) => match[1]),
+  );
+  const declaredByRule = new Set(
+    [...stylesheets.matchAll(/(?:^|[{;\s])(--[\w-]+)\s*:/g)].map((match) => match[1]),
+  );
+  const pastel = { tabTextColor: "#fff2b8", tabTextOpacity: 1 };
+  const setByStyleFunctions = new Set(
+    ["light", "dark"].flatMap((mode) => [
+      ...Object.keys(getStickyShellStyle(pastel, "#fff2b8", mode)),
+      ...Object.keys(getSessionTabStyle(pastel, mode, 0)),
+    ]),
+  );
+  // Layout and picker variables that components set as inline styles (style={{ "--x": … }} or
+  // style.setProperty("--x", …)). The two theme style modules are covered through their APIs above.
+  const themeModules = new Set(["src/style/themeTokens.js", "src/style/themeStyles.js"]);
+  const setByComponents = new Set(
+    listSources("src", [".js", ".jsx"])
+      .filter((file) => !themeModules.has(file))
+      .flatMap((file) => [...readSource(file).matchAll(/["'`](--[\w-]+)["'`]/g)].map((match) => match[1])),
+  );
+  const undefinedNames = [...readNames]
+    .filter(
+      (name) =>
+        !THEME_TOKEN_NAMES.includes(name) &&
+        !declaredByRule.has(name) &&
+        !setByStyleFunctions.has(name) &&
+        !setByComponents.has(name) &&
+        !LIBRARY_PREFIX.test(name) &&
+        !UNSET_WITH_FALLBACK.has(name),
+    )
+    .sort();
+  assert.deepEqual(undefinedNames, []);
 });
 

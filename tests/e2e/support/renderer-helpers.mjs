@@ -942,10 +942,10 @@ export function modifierOptionShortcut(key) {
   return `${process.platform === "darwin" ? "Meta" : "Control"}+Alt+${key}`;
 }
 
-// Theme mode as the page exposes it. Task 4 moves the flag to
-// document.documentElement.dataset.themeScheme; this is the only place that reads it.
+// The applied theme's scheme, as the document root exposes it. This is the only place
+// that reads it.
 async function readThemeScheme(page) {
-  return await page.evaluate(() => document.body.dataset.themeMode);
+  return await page.evaluate(() => document.documentElement.dataset.themeScheme);
 }
 
 // Until the theme picker exists this supports only the two NotePane themes, switched

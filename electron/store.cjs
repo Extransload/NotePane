@@ -3,6 +3,8 @@ const path = require("path");
 const { randomUUID } = require("crypto");
 const { AssetStore, hasBase64DataUrl } = require("./assetStore.cjs");
 const { writeFileAtomic } = require("./atomicWrite.cjs");
+// The renderer reads the same file (src/style/themes.js), so theme ids live in one place.
+const THEMES = require("./themes.json");
 
 const DEFAULT_NOTE_TITLE = "Untitled";
 const NOTE_PANE_BACKUP_FORMAT = "notepane-backup";
@@ -12,6 +14,7 @@ const MAX_NOTE_HISTORY = 50;
 const NOTE_HISTORY_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_NOTE_TITLE_MAX_LENGTH = 48;
 const DEFAULT_APP_THEME = Object.freeze({
+  themeId: "notepane-light",
   mode: "light",
 });
 const DEFAULT_LAYOUT_MODE = "tabs";
@@ -1276,21 +1279,35 @@ function migrateLegacyEditorPreferences(value, version = 1) {
   };
 }
 
+// Same rules as normalizeAppTheme in src/model/preferences.js (tests/unit/themes.test.cjs checks
+// that they agree). `mode` is always the theme's scheme, so an older build still reads a
+// sensible light or dark value.
 function normalizeAppTheme(value, fallback = DEFAULT_APP_THEME) {
-  const source = value && typeof value === "object" ? value : {};
-  const fallbackTheme = fallback && typeof fallback === "object"
-    ? fallback
-    : DEFAULT_APP_THEME;
-
-  if (source.mode === "dark" || source.mode === "light") {
-    return {
-      mode: source.mode,
-    };
-  }
+  const themeId =
+    resolveAppThemeId(value) ??
+    resolveAppThemeId(fallback) ??
+    DEFAULT_APP_THEME.themeId;
 
   return {
-    mode: fallbackTheme.mode === "dark" ? "dark" : "light",
+    themeId,
+    mode: THEMES.find((theme) => theme.id === themeId).scheme,
   };
+}
+
+// A known theme id wins. Otherwise a legacy mode, or the mode stored beside an unknown id
+// (for example after a downgrade), picks the matching NotePane theme.
+function resolveAppThemeId(value) {
+  const source = value && typeof value === "object" ? value : {};
+  if (THEMES.some((theme) => theme.id === source.themeId)) {
+    return source.themeId;
+  }
+  if (source.mode === "dark") {
+    return "notepane-dark";
+  }
+  if (source.mode === "light") {
+    return "notepane-light";
+  }
+  return null;
 }
 
 function inferLegacyAppTheme(rawNotes) {
@@ -1738,4 +1755,5 @@ module.exports = {
   DEFAULT_APP_FONT_FAMILY,
   DEFAULT_KEYBOARD_SHORTCUTS,
   DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
+  normalizeAppTheme,
 };

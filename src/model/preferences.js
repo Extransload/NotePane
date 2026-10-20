@@ -1,6 +1,7 @@
 import {
   BASE_EDITOR_FONT_SIZE_PX,
   DEFAULT_APP_FONT_FAMILY,
+  DEFAULT_APP_THEME,
   DEFAULT_EDITOR_FONT_FAMILY,
   DEFAULT_EDITOR_FONT_SCALE,
   DEFAULT_EDITOR_PREFERENCES,
@@ -23,14 +24,38 @@ import {
   normalizeOpacity,
 } from "../style/colorMath.js";
 import {
+  getTheme,
+  isKnownThemeId,
+  themeIdForMode,
+} from "../style/themes.js";
+import {
   clamp,
 } from "../utils/values.js";
 
-export function normalizeAppTheme(value) {
-  const source = value && typeof value === "object" ? value : {};
+// Same rules as normalizeAppTheme in electron/store.cjs (tests/unit/themes.test.cjs checks that
+// they agree). `mode` is always the theme's scheme.
+export function normalizeAppTheme(value, fallback = DEFAULT_APP_THEME) {
+  const themeId =
+    resolveAppThemeId(value) ??
+    resolveAppThemeId(fallback) ??
+    DEFAULT_APP_THEME.themeId;
   return {
-    mode: source.mode === "dark" ? "dark" : "light",
+    themeId,
+    mode: getTheme(themeId).scheme,
   };
+}
+
+// A known theme id wins. Otherwise a legacy mode, or the mode stored beside an unknown id,
+// picks the matching NotePane theme.
+function resolveAppThemeId(value) {
+  const source = value && typeof value === "object" ? value : {};
+  if (isKnownThemeId(source.themeId)) {
+    return source.themeId;
+  }
+  if (source.mode === "dark" || source.mode === "light") {
+    return themeIdForMode(source.mode);
+  }
+  return null;
 }
 
 export function normalizeLayoutMode(value) {

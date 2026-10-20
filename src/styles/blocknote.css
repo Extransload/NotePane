@@ -1,5 +1,48 @@
 /* Overrides for BlockNote's own markup, including its floating menus. */
 
+/* BlockNote declares every --bn-colors-* variable on .bn-root itself (the editor container and
+   the portal root of its menus), so values inherited from the document root never reach
+   inside. This rule is more specific than BlockNote's .bn-root[data-color-scheme=dark] and
+   points each variable at the NotePane token it is derived from. The variables whose theme
+   token is a value of its own (editor background, selected, disabled, shadow, side menu)
+   take the theme's value from the parent with `inherit`; var(--bn-colors-…) here would refer
+   to itself. */
+.bn-root.bn-root[data-color-scheme] {
+  --bn-colors-editor-text: var(--sticky-text-color);
+  --bn-colors-editor-background: inherit;
+  --bn-colors-menu-text: var(--sticky-panel-text);
+  --bn-colors-menu-background: var(--sticky-portal-menu-bg);
+  --bn-colors-tooltip-text: var(--sticky-panel-text);
+  --bn-colors-tooltip-background: var(--sticky-portal-menu-hover-bg);
+  --bn-colors-hovered-text: var(--sticky-text-color);
+  --bn-colors-hovered-background: var(--sticky-portal-menu-hover-bg);
+  --bn-colors-selected-text: inherit;
+  --bn-colors-selected-background: inherit;
+  --bn-colors-disabled-text: inherit;
+  --bn-colors-disabled-background: inherit;
+  --bn-colors-border: var(--sticky-border-color);
+  --bn-colors-shadow: inherit;
+  --bn-colors-side-menu: inherit;
+  --bn-colors-highlights-gray-text: var(--notepane-editor-gray-text);
+  --bn-colors-highlights-gray-background: var(--notepane-editor-gray-bg);
+  --bn-colors-highlights-brown-text: var(--notepane-editor-brown-text);
+  --bn-colors-highlights-brown-background: var(--notepane-editor-brown-bg);
+  --bn-colors-highlights-red-text: var(--notepane-editor-red-text);
+  --bn-colors-highlights-red-background: var(--notepane-editor-red-bg);
+  --bn-colors-highlights-orange-text: var(--notepane-editor-orange-text);
+  --bn-colors-highlights-orange-background: var(--notepane-editor-orange-bg);
+  --bn-colors-highlights-yellow-text: var(--notepane-editor-yellow-text);
+  --bn-colors-highlights-yellow-background: var(--notepane-editor-yellow-bg);
+  --bn-colors-highlights-green-text: var(--notepane-editor-green-text);
+  --bn-colors-highlights-green-background: var(--notepane-editor-green-bg);
+  --bn-colors-highlights-blue-text: var(--notepane-editor-blue-text);
+  --bn-colors-highlights-blue-background: var(--notepane-editor-blue-bg);
+  --bn-colors-highlights-purple-text: var(--notepane-editor-purple-text);
+  --bn-colors-highlights-purple-background: var(--notepane-editor-purple-bg);
+  --bn-colors-highlights-pink-text: var(--notepane-editor-pink-text);
+  --bn-colors-highlights-pink-background: var(--notepane-editor-pink-bg);
+}
+
 .bn-editor {
   min-height: 100%;
   color: var(--sticky-text-color);

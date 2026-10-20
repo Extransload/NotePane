@@ -66,13 +66,11 @@
   display: none;
 }
 
-body.theme-dark .brand-wordmark-image-light,
-.sticky-shell.theme-dark .brand-wordmark-image-light {
+:root[data-theme-scheme="dark"] .brand-wordmark-image-light {
   display: none;
 }
 
-body.theme-dark .brand-wordmark-image-dark,
-.sticky-shell.theme-dark .brand-wordmark-image-dark {
+:root[data-theme-scheme="dark"] .brand-wordmark-image-dark {
   display: block;
 }
 

@@ -51,7 +51,7 @@ export function StickyToast({ toast }) {
   );
 }
 
-export function VersionHistoryPanel({ versions, isBusy, theme, onClose, onRestore }) {
+export function VersionHistoryPanel({ versions, isBusy, scheme, onClose, onRestore }) {
   const [selectedVersionId, setSelectedVersionId] = useState(versions[0]?.id ?? null);
   const selectedVersion = versions.find((version) => version.id === selectedVersionId) ?? versions[0];
   const previewContent = useMemo(
@@ -95,7 +95,7 @@ export function VersionHistoryPanel({ versions, isBusy, theme, onClose, onRestor
               <BlockNoteView
                 editor={previewEditor}
                 editable={false}
-                theme={theme}
+                theme={scheme}
                 formattingToolbar={false}
                 sideMenu={false}
                 slashMenu={false}

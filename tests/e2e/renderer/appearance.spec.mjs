@@ -180,8 +180,8 @@ test("keeps light/dark mode global across sidebar sessions", async ({ page }) =>
   expect(darkIconColors.trash).not.toBe(lightIconColors.trash);
   await expect.poll(async () => {
     return await page.evaluate(() => ({
-      bodyThemeMode: document.body.dataset.themeMode,
-      bodyHasDarkClass: document.body.classList.contains("theme-dark"),
+      rootThemeId: document.documentElement.dataset.themeId,
+      rootHasDarkScheme: document.documentElement.dataset.themeScheme === "dark",
       bodyPanelBackground: getComputedStyle(document.body)
         .getPropertyValue("--sticky-panel-bg")
         .trim(),
@@ -189,8 +189,8 @@ test("keeps light/dark mode global across sidebar sessions", async ({ page }) =>
         .map((element) => element.getAttribute("data-color-scheme")),
     }));
   }).toMatchObject({
-    bodyThemeMode: "dark",
-    bodyHasDarkClass: true,
+    rootThemeId: "notepane-dark",
+    rootHasDarkScheme: true,
     bodyPanelBackground: "#242424",
     blockNoteColorSchemes: expect.arrayContaining(["dark"]),
   });
@@ -210,8 +210,8 @@ test("keeps light/dark mode global across sidebar sessions", async ({ page }) =>
   await expect(page.locator(".brand-wordmark-image-dark")).toBeHidden();
   await expect.poll(async () => {
     return await page.evaluate(() => ({
-      bodyThemeMode: document.body.dataset.themeMode,
-      bodyHasLightClass: document.body.classList.contains("theme-light"),
+      rootThemeId: document.documentElement.dataset.themeId,
+      rootHasLightScheme: document.documentElement.dataset.themeScheme === "light",
       bodyPanelBackground: getComputedStyle(document.body)
         .getPropertyValue("--sticky-panel-bg")
         .trim(),
@@ -219,8 +219,8 @@ test("keeps light/dark mode global across sidebar sessions", async ({ page }) =>
         .map((element) => element.getAttribute("data-color-scheme")),
     }));
   }).toMatchObject({
-    bodyThemeMode: "light",
-    bodyHasLightClass: true,
+    rootThemeId: "notepane-light",
+    rootHasLightScheme: true,
     bodyPanelBackground: "#f5f5f2",
     blockNoteColorSchemes: expect.arrayContaining(["light"]),
   });

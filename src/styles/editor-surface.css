@@ -602,14 +602,14 @@
   animation: tooltipIn 120ms ease both;
 }
 
-body.theme-dark .adaptive-tooltip {
+:root[data-theme-scheme="dark"] .adaptive-tooltip {
   border-color: rgb(255 255 255 / 0.22);
   background: #2b2b2b;
   color: #ffffff;
   box-shadow: 0 12px 28px rgb(0 0 0 / 0.52);
 }
 
-body.theme-dark .bn-mantine :is(.bn-tooltip, .mantine-Tooltip-tooltip) {
+:root[data-theme-scheme="dark"] .bn-mantine :is(.bn-tooltip, .mantine-Tooltip-tooltip) {
   background-color: #2b2b2b !important;
   color: #ffffff !important;
 }

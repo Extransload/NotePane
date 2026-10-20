@@ -20,6 +20,7 @@ const {
   DEFAULT_KEYBOARD_SHORTCUTS,
 } = require("./store.cjs");
 const { fitBoundsToWorkAreas, getDetachedWindowBounds } = require("./windowBounds.cjs");
+const { resolveWindowBackgroundColor } = require("./windowTheme.cjs");
 const { readAssetFromUrl } = require("./assetSources.cjs");
 
 const APP_NAME = "NotePane";
@@ -183,11 +184,16 @@ function createWindow(note, options = {}) {
     }
   });
 
+  // The renderer applies this theme before it mounts, so the first frame is never the
+  // default theme while the stored one is still being read over IPC.
+  const { themeId } = store.getAppTheme();
   if (devServerUrl) {
-    window.loadURL(`${devServerUrl}?noteId=${encodeURIComponent(note.id)}`);
+    window.loadURL(
+      `${devServerUrl}?noteId=${encodeURIComponent(note.id)}&themeId=${encodeURIComponent(themeId)}`,
+    );
   } else {
     window.loadFile(path.join(__dirname, "..", "dist", "index.html"), {
-      query: { noteId: note.id },
+      query: { noteId: note.id, themeId },
     });
   }
 
@@ -196,13 +202,15 @@ function createWindow(note, options = {}) {
 
 function getWindowChromeOptions(isPrimary, trafficLightPosition) {
   if (process.platform === "win32") {
+    // Opaque windows paint this before the renderer does, so it follows the theme.
+    const backgroundColor = resolveWindowBackgroundColor(store?.getAppTheme());
     if (!isPrimary) {
       return {
         // Sticky windows keep their compact in-app header instead of a second
         // Windows caption bar.
         frame: false,
         transparent: false,
-        backgroundColor: "#f7f7f5",
+        backgroundColor,
       };
     }
 
@@ -210,7 +218,7 @@ function getWindowChromeOptions(isPrimary, trafficLightPosition) {
       // Keep Windows responsible for caption buttons, resize borders, and shadows.
       frame: true,
       transparent: false,
-      backgroundColor: "#f7f7f5",
+      backgroundColor,
     };
   }
 

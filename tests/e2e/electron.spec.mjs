@@ -110,6 +110,44 @@ test("Electron app opens a sticky window and persists editor content", async () 
   }
 });
 
+test("a new window starts with the current theme applied", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-theme-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "theme-note", title: "Theme note", createdAt: 1, updatedAt: 1 },
+  ]);
+  const notesPath = path.join(userDataDirectory, "notes.json");
+  const storedState = JSON.parse(fs.readFileSync(notesPath, "utf8"));
+  fs.writeFileSync(
+    notesPath,
+    JSON.stringify({ ...storedState, appTheme: { themeId: "notepane-dark", mode: "dark" } }),
+    "utf8",
+  );
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    // The first load starts before a script can be attached, so reload the window with one
+    // that records the root at DOMContentLoaded: after the entry script has run, before React
+    // has asked the main process for the stored theme.
+    await page.addInitScript(() => {
+      document.addEventListener("DOMContentLoaded", () => {
+        const root = document.documentElement;
+        window.__notepaneThemeAtDomContentLoaded = {
+          themeId: root.dataset.themeId ?? null,
+          shellBackground: getComputedStyle(root).getPropertyValue("--sticky-shell-bg").trim(),
+        };
+      });
+    });
+    await page.reload();
+    await expect.poll(() =>
+      page.evaluate(() => window.__notepaneThemeAtDomContentLoaded ?? null),
+    ).toEqual({ themeId: "notepane-dark", shellBackground: "#191919" });
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("/import inserts a Markdown file as editor blocks", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-markdown-import-");
   const importDirectory = createTemporaryDirectory("notepane-markdown-source-");
