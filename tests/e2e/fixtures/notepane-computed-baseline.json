@@ -1,0 +1,366 @@
+{
+  "notepane-light": {
+    "session sidebar": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(242, 242, 239)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "rgba(255, 255, 255, 0.04) -1px 0px 0px 0px inset"
+    },
+    "active session tab": {
+      "color": "rgb(31, 31, 31)",
+      "backgroundColor": "rgb(255, 242, 184)",
+      "borderTopColor": "rgba(31, 31, 31, 0.34)",
+      "boxShadow": "rgba(31, 31, 31, 0.34) 0px 0px 0px 1px inset, rgba(31, 31, 31, 0.12) 0px 7px 16px 0px"
+    },
+    "sticky header": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(240, 240, 237)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset"
+    },
+    "editor surface text": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(245, 245, 242)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "none"
+    },
+    "heading": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "none"
+    },
+    "inline code": {
+      "color": "rgb(189, 63, 63)",
+      "backgroundColor": "rgba(135, 131, 120, 0.16)",
+      "borderTopColor": "rgb(189, 63, 63)",
+      "boxShadow": "none"
+    },
+    "text colour gray": {
+      "color": "rgb(155, 154, 151)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(155, 154, 151)",
+      "boxShadow": "none"
+    },
+    "background colour gray": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(235, 236, 237)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "none"
+    },
+    "text colour brown": {
+      "color": "rgb(100, 71, 58)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(100, 71, 58)",
+      "boxShadow": "none"
+    },
+    "background colour brown": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(233, 229, 227)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "none"
+    },
+    "text colour orange": {
+      "color": "rgb(217, 115, 13)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(217, 115, 13)",
+      "boxShadow": "none"
+    },
+    "background colour orange": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(246, 233, 217)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "none"
+    },
+    "text colour yellow": {
+      "color": "rgb(223, 171, 1)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(223, 171, 1)",
+      "boxShadow": "none"
+    },
+    "background colour yellow": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(251, 243, 219)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "none"
+    },
+    "text colour green": {
+      "color": "rgb(77, 100, 97)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(77, 100, 97)",
+      "boxShadow": "none"
+    },
+    "background colour green": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(221, 237, 234)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "none"
+    },
+    "text colour blue": {
+      "color": "rgb(11, 110, 153)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(11, 110, 153)",
+      "boxShadow": "none"
+    },
+    "background colour blue": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(221, 235, 241)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "none"
+    },
+    "text colour purple": {
+      "color": "rgb(105, 64, 165)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(105, 64, 165)",
+      "boxShadow": "none"
+    },
+    "background colour purple": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(234, 228, 242)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "none"
+    },
+    "text colour pink": {
+      "color": "rgb(173, 26, 114)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(173, 26, 114)",
+      "boxShadow": "none"
+    },
+    "background colour pink": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(244, 223, 235)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "none"
+    },
+    "text colour red": {
+      "color": "rgb(224, 62, 62)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(224, 62, 62)",
+      "boxShadow": "none"
+    },
+    "background colour red": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(251, 228, 228)",
+      "borderTopColor": "rgb(55, 53, 47)",
+      "boxShadow": "none"
+    },
+    "table border": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(143, 142, 137)",
+      "boxShadow": "none"
+    },
+    "find bar": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(245, 245, 242)",
+      "borderTopColor": "color(srgb 0.215686 0.207843 0.184314 / 0.0583529)",
+      "boxShadow": "color(srgb 0.215686 0.207843 0.184314 / 0.1) 0px 8px 22px 0px"
+    },
+    "toast": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "color(srgb 0.960784 0.960784 0.94902 / 0.94)",
+      "borderTopColor": "color(srgb 0.215686 0.207843 0.184314 / 0.0923922)",
+      "boxShadow": "color(srgb 0.215686 0.207843 0.184314 / 0.14) 0px 14px 30px 0px, color(srgb 1 1 1 / 0.42) 0px 1px 0px 0px inset"
+    },
+    "formatting toolbar": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(247, 247, 245)",
+      "borderTopColor": "rgb(210, 209, 206)",
+      "boxShadow": "rgba(55, 53, 47, 0.16) 0px 12px 26px 0px, rgba(255, 255, 255, 0.38) 0px 1px 0px 0px inset"
+    },
+    "preferences dialog surface": {
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "rgb(245, 245, 242)",
+      "borderTopColor": "rgba(55, 53, 47, 0.12)",
+      "boxShadow": "rgba(0, 0, 0, 0.18) 0px 22px 54px 0px"
+    },
+    "preferences section title": {
+      "color": "rgb(120, 119, 116)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(120, 119, 116)",
+      "boxShadow": "none"
+    }
+  },
+  "notepane-dark": {
+    "session sidebar": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(26, 26, 26)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "rgba(255, 255, 255, 0.04) -1px 0px 0px 0px inset"
+    },
+    "active session tab": {
+      "color": "rgb(31, 31, 31)",
+      "backgroundColor": "rgb(224, 213, 162)",
+      "borderTopColor": "rgba(31, 31, 31, 0.34)",
+      "boxShadow": "rgba(31, 31, 31, 0.34) 0px 0px 0px 1px inset, rgba(31, 31, 31, 0.12) 0px 7px 16px 0px"
+    },
+    "sticky header": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(31, 31, 31)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset"
+    },
+    "editor surface text": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(25, 25, 25)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "none"
+    },
+    "heading": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "none"
+    },
+    "inline code": {
+      "color": "rgb(255, 138, 128)",
+      "backgroundColor": "rgba(255, 255, 255, 0.1)",
+      "borderTopColor": "rgb(255, 138, 128)",
+      "boxShadow": "none"
+    },
+    "text colour gray": {
+      "color": "rgb(190, 189, 184)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(190, 189, 184)",
+      "boxShadow": "none"
+    },
+    "background colour gray": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(155, 154, 151)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "none"
+    },
+    "text colour brown": {
+      "color": "rgb(142, 101, 82)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(142, 101, 82)",
+      "boxShadow": "none"
+    },
+    "background colour brown": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(100, 71, 58)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "none"
+    },
+    "text colour orange": {
+      "color": "rgb(227, 121, 13)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(227, 121, 13)",
+      "boxShadow": "none"
+    },
+    "background colour orange": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(183, 96, 10)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "none"
+    },
+    "text colour yellow": {
+      "color": "rgb(223, 171, 1)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(223, 171, 1)",
+      "boxShadow": "none"
+    },
+    "background colour yellow": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(181, 139, 0)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "none"
+    },
+    "text colour green": {
+      "color": "rgb(107, 139, 135)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(107, 139, 135)",
+      "boxShadow": "none"
+    },
+    "background colour green": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(77, 100, 97)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "none"
+    },
+    "text colour blue": {
+      "color": "rgb(14, 135, 188)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(14, 135, 188)",
+      "boxShadow": "none"
+    },
+    "background colour blue": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(11, 110, 153)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "none"
+    },
+    "text colour purple": {
+      "color": "rgb(133, 82, 215)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(133, 82, 215)",
+      "boxShadow": "none"
+    },
+    "background colour purple": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(105, 64, 165)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "none"
+    },
+    "text colour pink": {
+      "color": "rgb(218, 32, 143)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(218, 32, 143)",
+      "boxShadow": "none"
+    },
+    "background colour pink": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(173, 26, 114)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "none"
+    },
+    "text colour red": {
+      "color": "rgb(236, 64, 64)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(236, 64, 64)",
+      "boxShadow": "none"
+    },
+    "background colour red": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(190, 52, 52)",
+      "borderTopColor": "rgb(241, 241, 239)",
+      "boxShadow": "none"
+    },
+    "table border": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(116, 116, 113)",
+      "boxShadow": "none"
+    },
+    "find bar": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(36, 36, 36)",
+      "borderTopColor": "color(srgb 1 1 1 / 0.0583529)",
+      "boxShadow": "color(srgb 0.945098 0.945098 0.937255 / 0.1) 0px 8px 22px 0px"
+    },
+    "toast": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "color(srgb 0.141176 0.141176 0.141176 / 0.94)",
+      "borderTopColor": "color(srgb 1 1 1 / 0.0923922)",
+      "boxShadow": "color(srgb 0.945098 0.945098 0.937255 / 0.14) 0px 14px 30px 0px, color(srgb 1 1 1 / 0.42) 0px 1px 0px 0px inset"
+    },
+    "formatting toolbar": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(32, 32, 32)",
+      "borderTopColor": "rgb(75, 75, 74)",
+      "boxShadow": "rgba(0, 0, 0, 0.46) 0px 14px 34px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset"
+    },
+    "preferences dialog surface": {
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "rgb(36, 36, 36)",
+      "borderTopColor": "rgba(255, 255, 255, 0.12)",
+      "boxShadow": "rgba(0, 0, 0, 0.42) 0px 22px 54px 0px"
+    },
+    "preferences section title": {
+      "color": "rgb(165, 165, 161)",
+      "backgroundColor": "rgba(0, 0, 0, 0)",
+      "borderTopColor": "rgb(165, 165, 161)",
+      "boxShadow": "none"
+    }
+  }
+}

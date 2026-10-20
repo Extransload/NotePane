@@ -1,0 +1,113 @@
+[
+  {
+    "file": "*",
+    "text": "transparent",
+    "reason": "Keyword, not a themed colour. Never matched by the patterns; listed for documentation."
+  },
+  {
+    "file": "*",
+    "text": "currentColor",
+    "reason": "Keyword that inherits a themed colour. Never matched by the patterns; listed for documentation."
+  },
+  {
+    "file": "electron/main.cjs",
+    "text": "\"#00000000\"",
+    "reason": "Fully transparent window background, not a visible colour."
+  },
+  {
+    "file": "electron/store.cjs",
+    "text": "placehold.co/960x360/1f2937/f8fafc.png",
+    "reason": "Template image URL: note content, not UI colour. Not matched by the patterns; listed for documentation."
+  },
+  {
+    "file": "src/editor/schema.jsx",
+    "text": "placehold.co/960x360/1f2937/f8fafc.png",
+    "reason": "Template image URL: note content, not UI colour. Not matched by the patterns; listed for documentation."
+  },
+  {
+    "file": "electron/store.cjs",
+    "text": "#211b0c",
+    "reason": "Legacy stored text colour recognised and discarded on load; a data sentinel, not a UI colour."
+  },
+  {
+    "file": "src/model/preferences.js",
+    "text": "#211b0c",
+    "reason": "Legacy stored text colour recognised and discarded on load; a data sentinel, not a UI colour."
+  },
+  {
+    "file": "src/constants.js",
+    "text": "\"#fff2b8\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "src/constants.js",
+    "text": "\"#ffd7e8\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "src/constants.js",
+    "text": "\"#dff4d7\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "src/constants.js",
+    "text": "\"#d9efff\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "src/constants.js",
+    "text": "\"#eadcff\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "src/constants.js",
+    "text": "\"#ffe4ca\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "electron/main.cjs",
+    "text": "\"#fff2b8\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "electron/main.cjs",
+    "text": "\"#ffd7e8\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "electron/main.cjs",
+    "text": "\"#dff4d7\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "electron/main.cjs",
+    "text": "\"#d9efff\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "electron/main.cjs",
+    "text": "\"#eadcff\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "electron/main.cjs",
+    "text": "\"#ffe4ca\",",
+    "reason": "STICKY_PASTEL_PALETTE: user colour defaults for new notes, not theme colours."
+  },
+  {
+    "file": "src/styles/controls.css",
+    "lines": [
+      160,
+      285
+    ],
+    "reason": "Colour-picking tools (colour wheel crosshair and thumb, brightness gradient, opacity checkerboard, slider thumbs): they draw over arbitrary user colours."
+  },
+  {
+    "file": "src/styles/overlays.css",
+    "lines": [
+      103,
+      146
+    ],
+    "reason": "Image crop frame and handles: they draw over arbitrary image content."
+  }
+]

@@ -941,3 +941,22 @@ export function modifierShortcut(key) {
 export function modifierOptionShortcut(key) {
   return `${process.platform === "darwin" ? "Meta" : "Control"}+Alt+${key}`;
 }
+
+// Theme mode as the page exposes it. Task 4 moves the flag to
+// document.documentElement.dataset.themeScheme; this is the only place that reads it.
+async function readThemeScheme(page) {
+  return await page.evaluate(() => document.body.dataset.themeMode);
+}
+
+// Until the theme picker exists this supports only the two NotePane themes, switched
+// with the Mod+Shift+L shortcut.
+export async function selectAppTheme(page, themeId) {
+  const targetScheme = { "notepane-light": "light", "notepane-dark": "dark" }[themeId];
+  if (!targetScheme) {
+    throw new Error(`selectAppTheme does not support "${themeId}" yet`);
+  }
+  if ((await readThemeScheme(page)) !== targetScheme) {
+    await page.keyboard.press(modifierShortcut("Shift+L"));
+  }
+  await expect.poll(() => readThemeScheme(page)).toBe(targetScheme);
+}
