@@ -848,7 +848,7 @@
     "palette": {
       "window": "#eff1f5",
       "sidebar": "#e6e9ef",
-      "header": "#ccd0da",
+      "header": "#dce0e8",
       "panel": "#e6e9ef",
       "hover": "#ccd0da",
       "line": "#bcc0cc",
@@ -1038,7 +1038,7 @@
     "palette": {
       "window": "#282a36",
       "sidebar": "#21222c",
-      "header": "#44475a",
+      "header": "#282a36",
       "panel": "#21222c",
       "hover": "#44475a",
       "line": "#44475a",

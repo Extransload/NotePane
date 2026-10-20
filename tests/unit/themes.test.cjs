@@ -208,9 +208,12 @@ test("stand-in named colours keep their hue family", async () => {
 });
 
 // R33: where no official colour qualifies, the name is derived as tone matching shows NotePane's
-// colour of that name as a mark: its hue, chroma capped at the theme's median, lightness at the
-// theme's median. The fixture records where that mark tone sat within 0.05 ΔE of another named
-// colour, in which case only the lightness was moved, toward NotePane's own.
+// colour of that name as a mark, toneMatch(colour, theme, "mark"), with the median taken from the
+// theme's official named colours: its hue, chroma capped at the median chroma, lightness at the
+// median lightness. R35: where that mark tone sits within 0.05 ΔE of another named colour (Nord's
+// brown and pink), only its lightness moves, toward NotePane's own lightness for that colour, in
+// 0.005 steps until it is 0.05 ΔE from all eight; hue and chroma stay. The fixture records each
+// move in the entry's reason.
 test("derived named colours are NotePane's colour in the theme's mark tone", async () => {
   const { listThemes, getTheme } = await loadThemes();
   const { hexToOklch } = await import("../../src/style/colorMath.js");
@@ -234,8 +237,14 @@ test("derived named colours are NotePane's colour in the theme's mark tone", asy
   assert.ok(derivedCount > 0);
 });
 
-// R34: readability floors, in every shipped theme.
-test("text reads at 4.5:1 on the hover colour, which stays apart from the window", async () => {
+// R34 and R36: readability floors, in every shipped theme.
+// Hover fills sit on the window, the header, the sidebar and the panel, so the hover colour stays
+// visible on each (0.02 ΔE), stays well apart from the window (the 0.05 ΔE the named colours
+// keep), and carries text at 4.5:1; text on the header reads at 4.5:1 too. NotePane Light's
+// pinned hover is a subtler step and is exempt from the distances: 0.0238 from its window, 0.0089
+// from its header and 0.0148 from its sidebar. NotePane Dark meets them.
+const HOVER_EXEMPT = new Set(["notepane-light"]);
+test("hover stays visible on every surface and carries readable text", async () => {
   const { listThemes } = await loadThemes();
   const { getContrastRatio, hexToOklab } = await import("../../src/style/colorMath.js");
   const distance = (first, second) => {
@@ -246,8 +255,13 @@ test("text reads at 4.5:1 on the hover colour, which stays apart from the window
     const { palette } = theme;
     const ratio = getContrastRatio(palette.text, palette.hover);
     assert.ok(ratio >= 4.5, `${theme.id} text ${palette.text} on hover ${palette.hover}: ${ratio.toFixed(2)}`);
-    // Visibly apart (the 0.05 ΔE the named colours keep). NotePane Light's hover is a pinned,
-    // subtler step (0.024).
+    const onHeader = getContrastRatio(palette.text, palette.header);
+    assert.ok(onHeader >= 4.5, `${theme.id} text ${palette.text} on header ${palette.header}: ${onHeader.toFixed(2)}`);
+    if (HOVER_EXEMPT.has(theme.id)) continue;
+    for (const surface of ["window", "header", "sidebar", "panel"]) {
+      const apart = distance(palette.hover, palette[surface]);
+      assert.ok(apart >= 0.02, `${theme.id} hover ${palette.hover} is ${apart.toFixed(4)} from ${surface} ${palette[surface]}`);
+    }
     if (NOTEPANE_THEME_IDS.has(theme.id)) continue;
     const apart = distance(palette.hover, palette.window);
     assert.ok(apart >= 0.05, `${theme.id} hover is ${apart.toFixed(4)} from the window`);
