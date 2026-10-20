@@ -1,4 +1,4 @@
-import { getContrastingTextColor, getContrastRatio, hexToCssRgb, hexToRgb, mixHexColors } from "./colorMath.js";
+import { getContrastingTextColor, hexToCssRgb, hexToRgb, mixHexColors, readableOn } from "./colorMath.js";
 import { DEFAULT_THEME_ID, getTheme } from "./themes.js";
 
 const NAMED_COLOURS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
@@ -33,6 +33,7 @@ const STRENGTH = {
   editorBgMix: [0.15, 0.35],
   findMatch: [0.32, 0.22],
   findCurrent: [0.55, 0.5],
+  selection: [0.3, 0.35],
   scrollbarTrack: [90, 84],
   scrollbarThumb: [22, 28],
   scrollbarThumbHover: [34, 42],
@@ -53,18 +54,6 @@ function pick(pair, scheme) {
 function commaRgba(hex, alpha) {
   const [red, green, blue] = hexToRgb(hex);
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-}
-
-// `colour` mixed toward `ink` in 5% steps until it reads at `minimum` contrast on `background`:
-// unchanged when it already does, `ink` itself when no mix does.
-function readableOn(colour, background, ink, minimum = 4.5) {
-  for (let step = 0; step <= 20; step += 1) {
-    const candidate = mixHexColors(colour, ink, step / 20);
-    if (getContrastRatio(candidate, background) >= minimum) {
-      return candidate;
-    }
-  }
-  return ink;
 }
 
 // Roles the stylesheets painted with a fixed colour before themes existed: status dots,
@@ -101,9 +90,6 @@ function stylesheetRoleTokens(palette, scheme, glass) {
     "--notepane-pastel-swatch-ink": palette.text,
     "--notepane-icon-turn-into": palette.blue,
     "--notepane-icon-colors": palette.purple,
-    // Links in note content: the theme's blue, the colour themes give links, darkened or
-    // lightened toward the text colour until it reads as body text does (4.5:1 on the window).
-    "--notepane-link": readableOn(palette.blue, palette.window, palette.text),
     "--notepane-tooltip-bg": tooltipBg,
     "--notepane-tooltip-text": tooltipText,
     "--notepane-tooltip-border": hexToCssRgb(tooltipText, 0.12),
@@ -138,12 +124,22 @@ function stylesheetRoleTokens(palette, scheme, glass) {
 // readable where a sticky window recolours the --sticky-* tokens with its note's colour.
 function libraryRoleTokens(palette, scheme) {
   return {
-    "--notepane-selection-bg": hexToCssRgb(palette.accent, scheme === "dark" ? 0.35 : 0.3),
+    "--notepane-selection-bg": hexToCssRgb(palette.accent, pick(STRENGTH.selection, scheme)),
+    // The browser's focus ring on controls that draw none of their own: the accent, darkened or
+    // lightened toward the text colour until it reaches the 3:1 a focus indicator needs on
+    // both the window and the panel.
+    "--notepane-focus-outline": readableOn(palette.accent, [palette.window, palette.panel], palette.text, 3),
+    // Links in note content: the theme's blue, the colour themes give links, darkened or
+    // lightened toward the text colour until it reads as body text does (4.5:1 on the window).
+    "--notepane-link": readableOn(palette.blue, [palette.window], palette.text),
     // The colour of the text the caret is in, as the browser's `auto` caret: readable on dark
     // code blocks, note-coloured session tabs and sticky notes alike.
     "--notepane-caret": "currentcolor",
     // Checkboxes, and Mantine's primary colour (BlockNote's file panel buttons and tabs).
     "--notepane-control-accent": "var(--notepane-input-focus-border)",
+    // Mantine's primary hover (the file panel button and the chip): the accent a step toward the
+    // text colour.
+    "--notepane-control-accent-hover": mixHexColors(palette.accent, palette.text, 0.15),
     "--notepane-placeholder": "var(--sticky-panel-muted)",
     // The quote bar, the divider and the page break line.
     "--notepane-quote": palette.lineStrong,

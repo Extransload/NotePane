@@ -49,11 +49,7 @@
    input placeholders. This rule is more specific than the scheme rules. */
 .bn-mantine.bn-mantine[data-mantine-color-scheme] {
   --mantine-primary-color-filled: var(--notepane-control-accent);
-  --mantine-primary-color-filled-hover: color-mix(
-    in srgb,
-    var(--notepane-control-accent) 85%,
-    var(--sticky-text-color)
-  );
+  --mantine-primary-color-filled-hover: var(--notepane-control-accent-hover);
   --mantine-color-gray-2: var(--sticky-portal-menu-border-color);
   --mantine-color-dimmed: var(--sticky-panel-muted);
   --mantine-color-placeholder: var(--notepane-placeholder);

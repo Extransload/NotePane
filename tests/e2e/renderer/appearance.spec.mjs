@@ -1288,6 +1288,10 @@ test("takes selection, placeholder, Mantine and drop cursor colours from the the
         resolve(mantine, "color", "--mantine-primary-color-filled"),
         resolve(mantine, "color", "--notepane-control-accent"),
       ],
+      mantinePrimaryHover: [
+        resolve(mantine, "color", "--mantine-primary-color-filled-hover"),
+        resolve(mantine, "color", "--notepane-control-accent-hover"),
+      ],
       mantineGray2: [
         resolve(mantine, "color", "--mantine-color-gray-2"),
         resolve(mantine, "color", "--sticky-portal-menu-border-color"),

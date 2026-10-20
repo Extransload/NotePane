@@ -111,6 +111,19 @@ export function getContrastRatio(firstHexColor, secondHexColor) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+// `hexColor` mixed toward `inkHexColor` in 5% steps until it reads at `minimumContrast` on
+// every one of `backgroundHexColors`: unchanged when it already does, the ink itself when no
+// mix does.
+export function readableOn(hexColor, backgroundHexColors, inkHexColor, minimumContrast = 4.5) {
+  for (let step = 0; step <= 20; step += 1) {
+    const candidate = mixHexColors(hexColor, inkHexColor, step / 20);
+    if (backgroundHexColors.every((background) => getContrastRatio(candidate, background) >= minimumContrast)) {
+      return candidate;
+    }
+  }
+  return inkHexColor;
+}
+
 export function getRelativeLuminance(hexColor) {
   const [red, green, blue] = hexToRgb(hexColor).map((channel) => {
     const normalized = channel / 255;

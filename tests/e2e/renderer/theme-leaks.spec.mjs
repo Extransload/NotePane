@@ -378,7 +378,8 @@ function createScanner(page, pair) {
       scope: { include, exclude },
       allowlist: ALLOWLIST,
     });
-    expect(first.readings.length, `${screenName} has targets in ${first.roots} roots`).toBeGreaterThan(0);    if (scrollbars) {
+    expect(first.readings.length, `${screenName} has targets in ${first.roots} roots`).toBeGreaterThan(0);
+    if (scrollbars) {
       const scrollbarReadings = first.readings.filter((reading) =>
         Object.keys(reading).some((property) => property.startsWith("scrollbar-color")));
       expect(scrollbarReadings.length, `${screenName} shows a scrollbar`).toBeGreaterThan(0);

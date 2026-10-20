@@ -122,7 +122,11 @@ const STYLESHEET_LITERAL_TOKENS = {
 // nearest existing NotePane colour, which each entry names: [NotePane Light, NotePane Dark].
 const LIBRARY_COLOUR_TOKENS = {
   // The colour wheel focus ring, the NotePane colour nearest the system selection blue.
-  "--notepane-selection-bg": ["rgb(90 150 255 / 0.66)", "rgb(90 150 255 / 0.66)"],
+  "--notepane-selection-bg": ["var(--notepane-focus-ring)", "var(--notepane-focus-ring)"],
+  // The input focus blue #2383e2, the nearest NotePane colour that reaches 3:1 as a focus ring.
+  "--notepane-focus-outline": ["var(--notepane-input-focus-border)", "var(--notepane-input-focus-border)"],
+  // #2383e2 mixed 15% toward each theme's text colour.
+  "--notepane-control-accent-hover": ["#2677c7", "#4294e4"],
   // The text colour wherever the caret is, as the browser's `auto` drew it.
   "--notepane-caret": ["currentcolor", "currentcolor"],
   "--notepane-control-accent": ["var(--notepane-input-focus-border)", "var(--notepane-input-focus-border)"],
@@ -276,23 +280,43 @@ test("derivation is total for a theme without overrides", async () => {
   }
 });
 
-test("link text reads at 4.5:1 on the window colour, derived and as applied", async () => {
+// Asserts that `token` reads at `minimum` contrast on each palette surface in `surfaces`, for
+// every JSON theme and sentinel, both as derived (no overrides) and as applied. A token that
+// reads another one through var() is followed to its value.
+async function assertTokenReadable(token, surfaces, minimum) {
   const { buildThemeTokens } = await loadTokens();
   const { listThemes } = await loadThemes();
   const { SENTINEL_THEMES } = await import("../../src/style/sentinelThemes.js");
   const { getContrastRatio } = await import("../../src/style/colorMath.js");
+  const resolve = (tokens, value) => {
+    for (let reference = /^var\((--[\w-]+)\)$/.exec(value); reference; reference = /^var\((--[\w-]+)\)$/.exec(value)) {
+      value = tokens[reference[1]];
+    }
+    return value;
+  };
   for (const theme of [...listThemes(), ...SENTINEL_THEMES]) {
     for (const [label, tokens] of [
       ["derived", buildThemeTokens({ ...theme, overrides: {} })],
       ["applied", buildThemeTokens(theme)],
     ]) {
-      const link = tokens["--notepane-link"];
-      assert.match(link, /^#[0-9a-f]{6}$/, `${theme.id} ${label}`);
-      const ratio = getContrastRatio(link, theme.palette.window);
-      assert.ok(ratio >= 4.5, `${theme.id} ${label} link ${link} on ${theme.palette.window}: ${ratio.toFixed(2)}`);
+      const colour = resolve(tokens, tokens[token]);
+      assert.match(colour, /^#[0-9a-f]{6}$/, `${theme.id} ${label} ${token}`);
+      for (const surface of surfaces) {
+        const ratio = getContrastRatio(colour, theme.palette[surface]);
+        assert.ok(
+          ratio >= minimum,
+          `${theme.id} ${label} ${token} ${colour} on ${surface} ${theme.palette[surface]}: ${ratio.toFixed(2)}`,
+        );
+      }
     }
   }
-});
+}
+
+test("link text reads at 4.5:1 on the window colour, derived and as applied", () =>
+  assertTokenReadable("--notepane-link", ["window"], 4.5));
+
+test("the browser focus ring reaches 3:1 on the window and panel, derived and as applied", () =>
+  assertTokenReadable("--notepane-focus-outline", ["window", "panel"], 3));
 
 test("every override has a recorded reason", async () => {
   const { listThemes } = await loadThemes();

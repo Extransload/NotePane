@@ -117,8 +117,10 @@
       "--notepane-code-tool-focus-ring": "rgb(149 179 255 / 0.7)",
       "--notepane-code-tool-success": "#9ee6ad",
       "--notepane-code-tool-error": "#ffaaa3",
-      "--notepane-selection-bg": "rgb(90 150 255 / 0.66)",
-      "--notepane-link": "#0000ee"
+      "--notepane-selection-bg": "var(--notepane-focus-ring)",
+      "--notepane-link": "#0000ee",
+      "--notepane-focus-outline": "var(--notepane-input-focus-border)",
+      "--notepane-control-accent-hover": "#2677c7"
     },
     "overrideReasons": [
       {
@@ -307,13 +309,25 @@
         "tokens": [
           "--notepane-selection-bg"
         ],
-        "reason": "Text selection takes NotePane's blue focus ring, the NotePane colour nearest the system selection blue it showed before themes; the derivation uses NotePane's purple accent."
+        "reason": "Text selection reads NotePane's blue focus ring token, so the two cannot drift: the NotePane colour nearest the system selection blue it showed before themes. The derivation uses NotePane's purple accent."
       },
       {
         "tokens": [
           "--notepane-link"
         ],
         "reason": "Today's links are Chromium's light-scheme link blue #0000ee; links are not among the spec's allowed visible changes, and the derivation gives the theme blue #0b6e99."
+      },
+      {
+        "tokens": [
+          "--notepane-focus-outline"
+        ],
+        "reason": "The browser focus ring takes NotePane's input focus blue #2383e2, the nearest accessible NotePane colour to the system ring it replaces (3.55:1 on the window and panel, where the colour wheel ring rgb(90 150 255 / 0.66) reads 1.88:1); the derivation uses the purple accent."
+      },
+      {
+        "tokens": [
+          "--notepane-control-accent-hover"
+        ],
+        "reason": "Mantine's primary hover is NotePane's control accent #2383e2 mixed 15% toward the text colour (#2677c7), so it matches the button it hovers; the derivation starts from the purple accent."
       }
     ]
   },
@@ -445,8 +459,10 @@
       "--notepane-code-tool-focus-ring": "rgb(149 179 255 / 0.7)",
       "--notepane-code-tool-success": "#9ee6ad",
       "--notepane-code-tool-error": "#ffaaa3",
-      "--notepane-selection-bg": "rgb(90 150 255 / 0.66)",
-      "--notepane-link": "#9e9eff"
+      "--notepane-selection-bg": "var(--notepane-focus-ring)",
+      "--notepane-link": "#9e9eff",
+      "--notepane-focus-outline": "var(--notepane-input-focus-border)",
+      "--notepane-control-accent-hover": "#4294e4"
     },
     "overrideReasons": [
       {
@@ -655,13 +671,25 @@
         "tokens": [
           "--notepane-selection-bg"
         ],
-        "reason": "Text selection takes NotePane's blue focus ring, the NotePane colour nearest the system selection blue it showed before themes; the derivation uses NotePane's lavender accent."
+        "reason": "Text selection reads NotePane's blue focus ring token, so the two cannot drift: the NotePane colour nearest the system selection blue it showed before themes. The derivation uses NotePane's lavender accent."
       },
       {
         "tokens": [
           "--notepane-link"
         ],
         "reason": "Today's links are Chromium's dark-scheme link colour #9e9eff; links are not among the spec's allowed visible changes, and the derivation gives the theme blue lightened to #198cbf."
+      },
+      {
+        "tokens": [
+          "--notepane-focus-outline"
+        ],
+        "reason": "The browser focus ring takes the same input focus blue #2383e2 as NotePane Light (4.53:1 on the window, 4.00:1 on the panel, where the colour wheel ring reads 3.37:1 and 3.12:1); the derivation uses the lavender accent."
+      },
+      {
+        "tokens": [
+          "--notepane-control-accent-hover"
+        ],
+        "reason": "Mantine's primary hover is NotePane's control accent #2383e2 mixed 15% toward the text colour (#4294e4), so it matches the button it hovers; the derivation starts from the lavender accent."
       }
     ]
   }
