@@ -28,6 +28,48 @@
       "base": "#eff1f5",
       "mantle": "#e6e9ef",
       "crust": "#dce0e8"
+    },
+    "named": {
+      "gray": {
+        "colour": "overlay2",
+        "kind": "stand-in",
+        "reason": "Catppuccin has no gray; the brief names overlay2."
+      },
+      "brown": {
+        "colour": "flamingo",
+        "kind": "stand-in",
+        "reason": "Catppuccin has no brown; the brief names flamingo (18–21° hue, within 30° of NotePane's brown)."
+      },
+      "red": {
+        "colour": "red",
+        "kind": "own"
+      },
+      "orange": {
+        "colour": "peach",
+        "kind": "own",
+        "name": "orange"
+      },
+      "yellow": {
+        "colour": "yellow",
+        "kind": "own"
+      },
+      "green": {
+        "colour": "green",
+        "kind": "own"
+      },
+      "blue": {
+        "colour": "blue",
+        "kind": "own"
+      },
+      "purple": {
+        "colour": "mauve",
+        "kind": "own",
+        "name": "purple"
+      },
+      "pink": {
+        "colour": "pink",
+        "kind": "own"
+      }
     }
   },
   "catppuccin-frappe": {
@@ -59,6 +101,48 @@
       "base": "#303446",
       "mantle": "#292c3c",
       "crust": "#232634"
+    },
+    "named": {
+      "gray": {
+        "colour": "overlay2",
+        "kind": "stand-in",
+        "reason": "Catppuccin has no gray; the brief names overlay2."
+      },
+      "brown": {
+        "colour": "flamingo",
+        "kind": "stand-in",
+        "reason": "Catppuccin has no brown; the brief names flamingo (18–21° hue, within 30° of NotePane's brown)."
+      },
+      "red": {
+        "colour": "red",
+        "kind": "own"
+      },
+      "orange": {
+        "colour": "peach",
+        "kind": "own",
+        "name": "orange"
+      },
+      "yellow": {
+        "colour": "yellow",
+        "kind": "own"
+      },
+      "green": {
+        "colour": "green",
+        "kind": "own"
+      },
+      "blue": {
+        "colour": "blue",
+        "kind": "own"
+      },
+      "purple": {
+        "colour": "mauve",
+        "kind": "own",
+        "name": "purple"
+      },
+      "pink": {
+        "colour": "pink",
+        "kind": "own"
+      }
     }
   },
   "catppuccin-macchiato": {
@@ -90,6 +174,48 @@
       "base": "#24273a",
       "mantle": "#1e2030",
       "crust": "#181926"
+    },
+    "named": {
+      "gray": {
+        "colour": "overlay2",
+        "kind": "stand-in",
+        "reason": "Catppuccin has no gray; the brief names overlay2."
+      },
+      "brown": {
+        "colour": "flamingo",
+        "kind": "stand-in",
+        "reason": "Catppuccin has no brown; the brief names flamingo (18–21° hue, within 30° of NotePane's brown)."
+      },
+      "red": {
+        "colour": "red",
+        "kind": "own"
+      },
+      "orange": {
+        "colour": "peach",
+        "kind": "own",
+        "name": "orange"
+      },
+      "yellow": {
+        "colour": "yellow",
+        "kind": "own"
+      },
+      "green": {
+        "colour": "green",
+        "kind": "own"
+      },
+      "blue": {
+        "colour": "blue",
+        "kind": "own"
+      },
+      "purple": {
+        "colour": "mauve",
+        "kind": "own",
+        "name": "purple"
+      },
+      "pink": {
+        "colour": "pink",
+        "kind": "own"
+      }
     }
   },
   "catppuccin-mocha": {
@@ -121,6 +247,48 @@
       "base": "#1e1e2e",
       "mantle": "#181825",
       "crust": "#11111b"
+    },
+    "named": {
+      "gray": {
+        "colour": "overlay2",
+        "kind": "stand-in",
+        "reason": "Catppuccin has no gray; the brief names overlay2."
+      },
+      "brown": {
+        "colour": "flamingo",
+        "kind": "stand-in",
+        "reason": "Catppuccin has no brown; the brief names flamingo (18–21° hue, within 30° of NotePane's brown)."
+      },
+      "red": {
+        "colour": "red",
+        "kind": "own"
+      },
+      "orange": {
+        "colour": "peach",
+        "kind": "own",
+        "name": "orange"
+      },
+      "yellow": {
+        "colour": "yellow",
+        "kind": "own"
+      },
+      "green": {
+        "colour": "green",
+        "kind": "own"
+      },
+      "blue": {
+        "colour": "blue",
+        "kind": "own"
+      },
+      "purple": {
+        "colour": "mauve",
+        "kind": "own",
+        "name": "purple"
+      },
+      "pink": {
+        "colour": "pink",
+        "kind": "own"
+      }
     }
   },
   "nord": {
@@ -142,6 +310,53 @@
       "nord13": "#ebcb8b",
       "nord14": "#a3be8c",
       "nord15": "#b48ead"
+    },
+    "named": {
+      "gray": {
+        "colour": "nord4",
+        "kind": "stand-in",
+        "reason": "Nord has no gray; nord4 (Snow Storm) is its grey that reads on nord0."
+      },
+      "brown": {
+        "kind": "derived",
+        "value": "#b18672",
+        "reason": "Nord has no brown, and no official colour is within 30° of NotePane Dark's brown #8e6552 while 0.05 ΔE from the other eight (nord12 is the orange). toneMatch(#8e6552, nord, \"mark\") with the median of Nord's official named colours gives #be927e, 0.037 ΔE from nord12, so its lightness moved 0.040 toward #8e6552's."
+      },
+      "red": {
+        "colour": "nord11",
+        "kind": "own",
+        "name": "red"
+      },
+      "orange": {
+        "colour": "nord12",
+        "kind": "own",
+        "name": "orange"
+      },
+      "yellow": {
+        "colour": "nord13",
+        "kind": "own",
+        "name": "yellow"
+      },
+      "green": {
+        "colour": "nord14",
+        "kind": "own",
+        "name": "green"
+      },
+      "blue": {
+        "colour": "nord9",
+        "kind": "stand-in",
+        "reason": "Nord names no blue; nord9 (Frost) is the nearest in hue to NotePane Dark's blue (13°)."
+      },
+      "purple": {
+        "colour": "nord15",
+        "kind": "own",
+        "name": "purple"
+      },
+      "pink": {
+        "kind": "derived",
+        "value": "#b27b94",
+        "reason": "Nord has no pink, and no unused official colour is within 30° of NotePane Dark's pink #da208f (nord15 is the purple, nord11 the red). toneMatch(#da208f, nord, \"mark\") with the median of Nord's official named colours gives #c28aa3, 0.026 ΔE from nord15, so its lightness moved 0.050 toward #da208f's."
+      }
     }
   },
   "dracula": {
@@ -166,6 +381,47 @@
       "AnsiBrightMagenta": "#ff92df",
       "AnsiBrightCyan": "#a4ffff",
       "AnsiBrightWhite": "#ffffff"
+    },
+    "named": {
+      "gray": {
+        "colour": "Comment",
+        "kind": "stand-in",
+        "reason": "Dracula has no gray; Comment is its ANSI bright black."
+      },
+      "brown": {
+        "kind": "derived",
+        "value": "#deb09c",
+        "reason": "Dracula has no brown, and no official colour is within 30° of NotePane Dark's brown #8e6552 while 0.05 ΔE from the other eight (AnsiBrightRed is 0.044 from Red). toneMatch(#8e6552, dracula, \"mark\") with the median of Dracula's official named colours."
+      },
+      "red": {
+        "colour": "Red",
+        "kind": "own"
+      },
+      "orange": {
+        "colour": "Orange",
+        "kind": "own"
+      },
+      "yellow": {
+        "colour": "Yellow",
+        "kind": "own"
+      },
+      "green": {
+        "colour": "Green",
+        "kind": "own"
+      },
+      "blue": {
+        "colour": "Cyan",
+        "kind": "stand-in",
+        "reason": "Dracula names no blue (its ANSI blue is Purple); Cyan is 23° from NotePane Dark's blue."
+      },
+      "purple": {
+        "colour": "Purple",
+        "kind": "own"
+      },
+      "pink": {
+        "colour": "Pink",
+        "kind": "own"
+      }
     }
   },
   "tokyo-night": {
@@ -201,6 +457,47 @@
       "teal": "#1abc9c",
       "terminal_black": "#414868",
       "yellow": "#e0af68"
+    },
+    "named": {
+      "gray": {
+        "colour": "dark5",
+        "kind": "stand-in",
+        "reason": "Tokyo Night names no gray; dark5 is its mid grey."
+      },
+      "brown": {
+        "colour": "red1",
+        "kind": "stand-in",
+        "reason": "Tokyo Night has no brown; red1 is 22° from NotePane Dark's brown."
+      },
+      "red": {
+        "colour": "red",
+        "kind": "own"
+      },
+      "orange": {
+        "colour": "orange",
+        "kind": "own"
+      },
+      "yellow": {
+        "colour": "yellow",
+        "kind": "own"
+      },
+      "green": {
+        "colour": "green",
+        "kind": "own"
+      },
+      "blue": {
+        "colour": "blue",
+        "kind": "own"
+      },
+      "purple": {
+        "colour": "purple",
+        "kind": "own"
+      },
+      "pink": {
+        "colour": "magenta2",
+        "kind": "stand-in",
+        "reason": "Tokyo Night has no pink; magenta2 is 13° from NotePane Dark's pink."
+      }
     }
   }
 }

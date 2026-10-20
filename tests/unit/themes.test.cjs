@@ -135,17 +135,163 @@ test("text contrast meets the spec bar in every theme", async () => {
 });
 
 // Every new theme takes each palette value from its official palette
-// (tests/unit/fixtures/official-palettes.json names the source of each).
-test("the new themes use only their official palette colours", async () => {
+// (tests/unit/fixtures/official-palettes.json names the source of each), except the named
+// colours the fixture marks as derived, which must hold exactly the recorded value. The fixture's
+// `named` map says where each of the nine named colours comes from: the palette's own colour of
+// that name ("own", with the palette's documented `name` where its colour names differ), another
+// official colour standing in for a name the palette lacks ("stand-in"), or a derived value.
+test("the new themes use only their official palette colours, apart from the marked derived ones", async () => {
   const { listThemes, PALETTE_KEYS } = await loadThemes();
   const newThemes = listThemes().filter((theme) => !NOTEPANE_THEME_IDS.has(theme.id));
   assert.deepEqual(newThemes.map((theme) => theme.id).sort(), Object.keys(OFFICIAL_PALETTES).sort());
   for (const theme of newThemes) {
-    const official = new Set(Object.values(OFFICIAL_PALETTES[theme.id].colours));
+    const { colours, named } = OFFICIAL_PALETTES[theme.id];
+    assert.deepEqual(Object.keys(named).sort(), [...NAMED_COLOUR_KEYS].sort(), theme.id);
+    const official = new Set(Object.values(colours));
     for (const key of PALETTE_KEYS) {
-      assert.ok(official.has(theme.palette[key]), `${theme.id}.${key} ${theme.palette[key]} is not in its official palette`);
+      const value = theme.palette[key];
+      const source = named[key];
+      if (source?.kind === "derived") {
+        assert.match(source.reason, /\S/, `${theme.id}.${key} derived without a reason`);
+        assert.equal(value, source.value, `${theme.id}.${key} is not its recorded derived value`);
+        assert.ok(!official.has(value), `${theme.id}.${key} is marked derived but is official`);
+        continue;
+      }
+      assert.ok(official.has(value), `${theme.id}.${key} ${value} is not in its official palette`);
+      if (source) {
+        assert.ok(["own", "stand-in"].includes(source.kind), `${theme.id}.${key} kind ${source.kind}`);
+        assert.equal(value, colours[source.colour], `${theme.id}.${key} is not ${source.colour}`);
+        if (source.kind === "own") {
+          assert.equal((source.name ?? source.colour).toLowerCase(), key, `${theme.id}.${key} is not the palette's own ${key}`);
+        }
+      }
     }
     assert.equal(theme.toneMatching, true, theme.id);
+  }
+});
+
+const hueDistance = (first, second) => {
+  const difference = Math.abs(first - second) % 360;
+  return Math.min(difference, 360 - difference);
+};
+
+// R33: a colour that stands in for a name the palette lacks keeps that name's hue family: within
+// 30° of NotePane's colour of that name in the same scheme. It also reads as text on the window
+// at 3:1, or as well as the palette's own named colours do where one of them reads less (Latte's
+// yellow reads 2.31). Gray is exempt from the hue rule: NotePane's grays are neutral (OKLCH chroma
+// below 0.02, tone matching's neutral threshold), so they have no hue to keep.
+test("stand-in named colours keep their hue family", async () => {
+  const { listThemes, getTheme } = await loadThemes();
+  const { hexToOklch, getContrastRatio } = await import("../../src/style/colorMath.js");
+  for (const theme of listThemes().filter((candidate) => !NOTEPANE_THEME_IDS.has(candidate.id))) {
+    const reference = getTheme(theme.scheme === "dark" ? "notepane-dark" : "notepane-light");
+    const { named } = OFFICIAL_PALETTES[theme.id];
+    const ownContrasts = Object.entries(named)
+      .filter(([, source]) => source.kind === "own")
+      .map(([key]) => getContrastRatio(theme.palette[key], theme.palette.window));
+    const readableFloor = Math.min(3, ...ownContrasts);
+    for (const [key, source] of Object.entries(named)) {
+      if (source.kind === "own") continue;
+      const own = hexToOklch(theme.palette[key]);
+      const target = hexToOklch(reference.palette[key]);
+      const label = `${theme.id}.${key} ${theme.palette[key]} (${source.kind})`;
+      if (target.c >= 0.02) {
+        const distance = hueDistance(own.h, target.h);
+        assert.ok(distance <= 30, `${label} is ${distance.toFixed(1)}° from ${reference.id}'s ${reference.palette[key]}`);
+      }
+      if (source.kind === "stand-in") {
+        const ratio = getContrastRatio(theme.palette[key], theme.palette.window);
+        assert.ok(ratio >= readableFloor, `${label} reads ${ratio.toFixed(2)} on the window, below ${readableFloor.toFixed(2)}`);
+      }
+    }
+  }
+});
+
+// R33: where no official colour qualifies, the name is derived as tone matching shows NotePane's
+// colour of that name as a mark: its hue, chroma capped at the theme's median, lightness at the
+// theme's median. The fixture records where that mark tone sat within 0.05 ΔE of another named
+// colour, in which case only the lightness was moved, toward NotePane's own.
+test("derived named colours are NotePane's colour in the theme's mark tone", async () => {
+  const { listThemes, getTheme } = await loadThemes();
+  const { hexToOklch } = await import("../../src/style/colorMath.js");
+  const { toneMatch } = await import("../../src/style/toneMatch.js");
+  let derivedCount = 0;
+  for (const theme of listThemes().filter((candidate) => !NOTEPANE_THEME_IDS.has(candidate.id))) {
+    const reference = getTheme(theme.scheme === "dark" ? "notepane-dark" : "notepane-light");
+    for (const [key, source] of Object.entries(OFFICIAL_PALETTES[theme.id].named)) {
+      if (source.kind !== "derived") continue;
+      derivedCount += 1;
+      const value = hexToOklch(theme.palette[key]);
+      const target = hexToOklch(reference.palette[key]);
+      const mark = hexToOklch(toneMatch(reference.palette[key], theme, "mark"));
+      const label = `${theme.id}.${key} ${theme.palette[key]}`;
+      assert.ok(hueDistance(value.h, target.h) <= 3, `${label} hue ${value.h.toFixed(1)} vs ${target.h.toFixed(1)}`);
+      assert.ok(Math.abs(value.c - mark.c) <= 0.005, `${label} chroma ${value.c.toFixed(4)} vs mark ${mark.c.toFixed(4)}`);
+      const [low, high] = [Math.min(mark.l, target.l), Math.max(mark.l, target.l)];
+      assert.ok(value.l >= low - 0.005 && value.l <= high + 0.005, `${label} lightness ${value.l.toFixed(3)} outside ${low.toFixed(3)}–${high.toFixed(3)}`);
+    }
+  }
+  assert.ok(derivedCount > 0);
+});
+
+// R34: readability floors, in every shipped theme.
+test("text reads at 4.5:1 on the hover colour, which stays apart from the window", async () => {
+  const { listThemes } = await loadThemes();
+  const { getContrastRatio, hexToOklab } = await import("../../src/style/colorMath.js");
+  const distance = (first, second) => {
+    const [a, b] = [hexToOklab(first), hexToOklab(second)];
+    return Math.hypot(a.l - b.l, a.a - b.a, a.b - b.b);
+  };
+  for (const theme of listThemes()) {
+    const { palette } = theme;
+    const ratio = getContrastRatio(palette.text, palette.hover);
+    assert.ok(ratio >= 4.5, `${theme.id} text ${palette.text} on hover ${palette.hover}: ${ratio.toFixed(2)}`);
+    // Visibly apart (the 0.05 ΔE the named colours keep). NotePane Light's hover is a pinned,
+    // subtler step (0.024).
+    if (NOTEPANE_THEME_IDS.has(theme.id)) continue;
+    const apart = distance(palette.hover, palette.window);
+    assert.ok(apart >= 0.05, `${theme.id} hover is ${apart.toFixed(4)} from the window`);
+  }
+});
+
+// The inline code chip: its text on its background composited over the window. NotePane Light and
+// Dark keep today's hand-tuned pair (pinned above); every tone-matched theme fits its danger
+// colour to 4.5:1 there, derived and as applied.
+test("inline code text reads at 4.5:1 on the inline code background", async () => {
+  const { buildThemeTokens } = await loadTokens();
+  const { listThemes } = await loadThemes();
+  const { SENTINEL_THEMES } = await import("../../src/style/sentinelThemes.js");
+  const { getContrastRatio, hexToRgb, rgbToHex } = await import("../../src/style/colorMath.js");
+  const compositeOver = (cssRgb, backgroundHex) => {
+    const [red, green, blue, alpha] = cssRgb.match(/[\d.]+/g).map(Number);
+    const background = hexToRgb(backgroundHex);
+    return rgbToHex(...[red, green, blue].map((channel, index) => channel * alpha + background[index] * (1 - alpha)));
+  };
+  for (const theme of [...listThemes(), ...SENTINEL_THEMES].filter((candidate) => candidate.toneMatching)) {
+    for (const [label, tokens] of [
+      ["derived", buildThemeTokens({ ...theme, overrides: {} })],
+      ["applied", buildThemeTokens(theme)],
+    ]) {
+      const background = compositeOver(tokens["--sticky-inline-code-bg"], theme.palette.window);
+      const ratio = getContrastRatio(tokens["--sticky-inline-code-text"], background);
+      assert.ok(ratio >= 4.5, `${theme.id} ${label} ${tokens["--sticky-inline-code-text"]} on ${background}: ${ratio.toFixed(2)}`);
+    }
+  }
+});
+
+// Faint text (disabled items, the block side menu) reads on the window at least as NotePane's
+// faint does in the same scheme, capped at 3:1, and never above muted text.
+test("faint text reads on the window and stays at or below muted", async () => {
+  const { listThemes, getTheme } = await loadThemes();
+  const { getContrastRatio } = await import("../../src/style/colorMath.js");
+  for (const theme of listThemes()) {
+    const { palette } = theme;
+    const reference = getTheme(theme.scheme === "dark" ? "notepane-dark" : "notepane-light").palette;
+    const floor = Math.min(3, getContrastRatio(reference.faint, reference.window));
+    const faint = getContrastRatio(palette.faint, palette.window);
+    assert.ok(faint >= floor, `${theme.id} faint ${palette.faint} reads ${faint.toFixed(2)}, below ${floor.toFixed(2)}`);
+    const muted = getContrastRatio(palette.muted, palette.window);
+    assert.ok(faint <= muted, `${theme.id} faint ${faint.toFixed(2)} reads above muted ${muted.toFixed(2)}`);
   }
 });
 

@@ -230,7 +230,13 @@ export function buildThemeTokens(theme) {
     "--sticky-code-color-scheme":
       getRelativeLuminance(palette.codeBg) < getRelativeLuminance(palette.codeText) ? "dark" : "light",
     "--sticky-inline-code-bg": hexToCssRgb(palette.text, s("inlineCode")),
-    "--sticky-inline-code-text": palette.danger,
+    // The danger colour, darkened or lightened toward the text colour until it reads at 4.5:1 on
+    // the inline code chip as it shows over the window.
+    "--sticky-inline-code-text": readableOn(
+      palette.danger,
+      [mixHexColors(palette.window, palette.text, s("inlineCode"))],
+      palette.text,
+    ),
     "--sticky-menu-shadow": shadow("menu", "menuShadow"),
     "--sticky-panel-shadow": shadow("panel", "panelShadow"),
     "--sticky-scrollbar-track": `color-mix(in srgb, var(--sticky-editor-bg) ${s("scrollbarTrack")}%, transparent)`,
