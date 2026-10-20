@@ -116,7 +116,8 @@
       "--notepane-code-tool-disabled": "rgb(255 255 255 / 0.3)",
       "--notepane-code-tool-focus-ring": "rgb(149 179 255 / 0.7)",
       "--notepane-code-tool-success": "#9ee6ad",
-      "--notepane-code-tool-error": "#ffaaa3"
+      "--notepane-code-tool-error": "#ffaaa3",
+      "--notepane-selection-bg": "rgb(90 150 255 / 0.66)"
     },
     "overrideReasons": [
       {
@@ -300,6 +301,12 @@
           "--notepane-code-tool-error"
         ],
         "reason": "Today's code block tool bar: near-black glass with white controls and pastel green and red states over the GitHub-dark code block, not derived from the code colours."
+      },
+      {
+        "tokens": [
+          "--notepane-selection-bg"
+        ],
+        "reason": "Text selection takes NotePane's blue focus ring, the NotePane colour nearest the system selection blue it showed before themes; the derivation uses NotePane's purple accent."
       }
     ]
   },
@@ -430,7 +437,8 @@
       "--notepane-code-tool-disabled": "rgb(255 255 255 / 0.3)",
       "--notepane-code-tool-focus-ring": "rgb(149 179 255 / 0.7)",
       "--notepane-code-tool-success": "#9ee6ad",
-      "--notepane-code-tool-error": "#ffaaa3"
+      "--notepane-code-tool-error": "#ffaaa3",
+      "--notepane-selection-bg": "rgb(90 150 255 / 0.66)"
     },
     "overrideReasons": [
       {
@@ -634,6 +642,12 @@
           "--notepane-code-tool-error"
         ],
         "reason": "Today's code block tool bar: near-black glass with white controls and pastel green and red states over the GitHub-dark code block, not derived from the code colours."
+      },
+      {
+        "tokens": [
+          "--notepane-selection-bg"
+        ],
+        "reason": "Text selection takes NotePane's blue focus ring, the NotePane colour nearest the system selection blue it showed before themes; the derivation uses NotePane's lavender accent."
       }
     ]
   }

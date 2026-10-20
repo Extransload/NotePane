@@ -43,6 +43,63 @@
   --bn-colors-highlights-pink-background: var(--notepane-editor-pink-bg);
 }
 
+/* BlockNote scopes Mantine's palette to .bn-mantine[data-mantine-color-scheme]. The Mantine
+   colours its components paint with come from the theme: the primary colour (file panel
+   button and tabs, and the chip hover), the suggestion menu border (gray-2), dimmed labels and
+   input placeholders. This rule is more specific than the scheme rules. */
+.bn-mantine.bn-mantine[data-mantine-color-scheme] {
+  --mantine-primary-color-filled: var(--notepane-control-accent);
+  --mantine-primary-color-filled-hover: color-mix(
+    in srgb,
+    var(--notepane-control-accent) 85%,
+    var(--sticky-text-color)
+  );
+  --mantine-color-gray-2: var(--sticky-portal-menu-border-color);
+  --mantine-color-dimmed: var(--sticky-panel-muted);
+  --mantine-color-placeholder: var(--notepane-placeholder);
+}
+
+/* Colours BlockNote's Block.css and prosemirror-tables write as literals. */
+.bn-root [data-content-type="quote"] blockquote {
+  border-left-color: var(--notepane-quote);
+}
+
+.bn-root [data-content-type="divider"] hr,
+.bn-root .bn-block-content[data-content-type="pageBreak"] > div {
+  border-top-color: var(--notepane-quote);
+}
+
+.bn-root .bn-block-content.ProseMirror-selectednode > *,
+.bn-root .ProseMirror-selectednode > .bn-block-content > * {
+  outline-color: var(--notepane-node-outline);
+}
+
+.bn-root [data-file-block] .bn-add-file-button {
+  background-color: var(--notepane-add-file-bg);
+  color: var(--sticky-muted-color);
+}
+
+.bn-root .bn-editor[contenteditable="true"] [data-file-block] .bn-add-file-button:hover,
+.bn-root [data-file-block] .bn-file-name-with-icon:hover,
+.bn-root .ProseMirror-selectednode .bn-file-name-with-icon {
+  background-color: var(--notepane-add-file-hover-bg);
+}
+
+.bn-root [data-file-block] .bn-resize-handle {
+  border-color: var(--notepane-glass);
+  background-color: var(--notepane-resize-handle);
+}
+
+.bn-root .bn-table-drop-cursor,
+.bn-root .ProseMirror .column-resize-handle {
+  background-color: var(--notepane-drop-cursor);
+}
+
+/* BlockNote keeps the text selection painted while focus is in its link or file inputs. */
+.bn-root [data-show-selection] {
+  background-color: var(--notepane-selection-bg);
+}
+
 .bn-editor {
   min-height: 100%;
   color: var(--sticky-text-color);

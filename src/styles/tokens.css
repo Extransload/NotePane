@@ -18,6 +18,29 @@ body,
   --chrome-icon-button-radius: 9px;
 }
 
+/* Browser-native colours from the theme. accent-color paints the checklist checkboxes;
+   --notepane-caret keeps the caret in the colour of the text it is in. */
+:root {
+  accent-color: var(--notepane-control-accent);
+  caret-color: var(--notepane-caret);
+}
+
+/* Only the background, so selected text keeps its colour. blocknote.css clears it while
+   whole blocks are selected. */
+::selection {
+  background-color: var(--notepane-selection-bg);
+}
+
+/* The find, search and font inputs; BlockNote's link and file inputs set their own. */
+::placeholder {
+  color: var(--notepane-placeholder);
+}
+
+/* The browser's focus ring; controls that draw their own ring override it. */
+:focus-visible {
+  outline-color: var(--notepane-focus-ring);
+}
+
 body {
   overflow: hidden;
   background: transparent;

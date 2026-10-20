@@ -117,6 +117,28 @@ const STYLESHEET_LITERAL_TOKENS = {
   "--notepane-shadow-code-tool": ["0 5px 14px rgb(0 0 0 / 0.22)", "0 5px 14px rgb(0 0 0 / 0.22)"],
 };
 
+// Tokens for colours that BlockNote, Mantine and the browser painted before themes existed.
+// The spec's "Allowed visible changes" lets NotePane Light and Dark change these, to the
+// nearest existing NotePane colour, which each entry names: [NotePane Light, NotePane Dark].
+const LIBRARY_COLOUR_TOKENS = {
+  // The colour wheel focus ring, the NotePane colour nearest the system selection blue.
+  "--notepane-selection-bg": ["rgb(90 150 255 / 0.66)", "rgb(90 150 255 / 0.66)"],
+  // The text colour wherever the caret is, as the browser's `auto` drew it.
+  "--notepane-caret": ["currentcolor", "currentcolor"],
+  "--notepane-control-accent": ["var(--notepane-input-focus-border)", "var(--notepane-input-focus-border)"],
+  "--notepane-placeholder": ["var(--sticky-panel-muted)", "var(--sticky-panel-muted)"],
+  // --sticky-table-border-color.
+  "--notepane-quote": ["#8f8e89", "#747471"],
+  "--notepane-node-outline": ["var(--notepane-focus-ring)", "var(--notepane-focus-ring)"],
+  "--notepane-drop-cursor": ["var(--notepane-brand-accent)", "var(--notepane-brand-accent)"],
+  "--notepane-resize-handle": ["var(--notepane-shadow-color)", "var(--notepane-shadow-color)"],
+  "--notepane-add-file-bg": ["var(--sticky-portal-menu-hover-bg)", "var(--sticky-portal-menu-hover-bg)"],
+  "--notepane-add-file-hover-bg": [
+    "var(--sticky-portal-menu-border-color)",
+    "var(--sticky-portal-menu-border-color)",
+  ],
+};
+
 async function assertNotePaneTokens(themeId, scheme) {
   const baseline = require("./fixtures/theme-baseline.json");
   const { buildThemeTokens } = await loadTokens();
@@ -125,7 +147,10 @@ async function assertNotePaneTokens(themeId, scheme) {
   const expected = {
     ...baseline.tokens[scheme],
     ...Object.fromEntries(
-      Object.entries(STYLESHEET_LITERAL_TOKENS).map(([name, values]) => [name, values[literalIndex]]),
+      Object.entries({ ...STYLESHEET_LITERAL_TOKENS, ...LIBRARY_COLOUR_TOKENS }).map(([name, values]) => [
+        name,
+        values[literalIndex],
+      ]),
     ),
   };
   assert.deepEqual(normaliseTokens(buildThemeTokens(getTheme(themeId))), normaliseTokens(expected));
@@ -314,17 +339,27 @@ function listSources(directory, extensions) {
   });
 }
 
-test("every token a stylesheet reads is defined", async () => {
+test("every token a stylesheet or script reads is defined", async () => {
   globalThis.window ??= {};
   const { THEME_TOKEN_NAMES } = await loadTokens();
   const { getStickyShellStyle, getSessionTabStyle } = await import("../../src/style/themeStyles.js");
   const stylesheets = listSources("src/styles", [".css"]).map(readSource).join("\n");
+  const scriptFiles = listSources("src", [".js", ".jsx"]);
   const sideMenuStyle = [...readSource("src/editor/sideMenu.jsx").matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)]
     .map((match) => match[1])
     .join("\n");
-  const readNames = new Set(
-    [...`${stylesheets}\n${sideMenuStyle}`.matchAll(/var\(\s*(--[\w-]+)/g)].map((match) => match[1]),
-  );
+  // Scripts read a token through a var() they hand to the page, or through getPropertyValue.
+  const scriptReads = scriptFiles.flatMap((file) => {
+    const source = readSource(file);
+    return [
+      ...[...source.matchAll(/var\(\s*(--[\w-]+)/g)].map((match) => match[1]),
+      ...[...source.matchAll(/getPropertyValue\(\s*["'`](--[\w-]+)["'`]/g)].map((match) => match[1]),
+    ];
+  });
+  const readNames = new Set([
+    ...[...`${stylesheets}\n${sideMenuStyle}`.matchAll(/var\(\s*(--[\w-]+)/g)].map((match) => match[1]),
+    ...scriptReads,
+  ]);
   const declaredByRule = new Set(
     [...stylesheets.matchAll(/(?:^|[{;\s])(--[\w-]+)\s*:/g)].map((match) => match[1]),
   );
@@ -335,13 +370,21 @@ test("every token a stylesheet reads is defined", async () => {
       ...Object.keys(getSessionTabStyle(pastel, mode, 0)),
     ]),
   );
-  // Layout and picker variables that components set as inline styles (style={{ "--x": … }} or
-  // style.setProperty("--x", …)). The two theme style modules are covered through their APIs above.
+  // Layout and picker variables that components define as inline styles: the quoted keys of a
+  // style object ({ "--x": … }) and the first argument of style.setProperty("--x", …). Only a
+  // definition counts; a name that is merely quoted, such as getPropertyValue("--x"), defines
+  // nothing. The two theme style modules are covered through their APIs above.
   const themeModules = new Set(["src/style/themeTokens.js", "src/style/themeStyles.js"]);
   const setByComponents = new Set(
-    listSources("src", [".js", ".jsx"])
+    scriptFiles
       .filter((file) => !themeModules.has(file))
-      .flatMap((file) => [...readSource(file).matchAll(/["'`](--[\w-]+)["'`]/g)].map((match) => match[1])),
+      .flatMap((file) => {
+        const source = readSource(file);
+        return [
+          ...[...source.matchAll(/["'`](--[\w-]+)["'`]\s*:/g)].map((match) => match[1]),
+          ...[...source.matchAll(/\.setProperty\(\s*["'`](--[\w-]+)["'`]/g)].map((match) => match[1]),
+        ];
+      }),
   );
   const undefinedNames = [...readNames]
     .filter(

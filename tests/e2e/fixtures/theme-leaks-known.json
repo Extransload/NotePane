@@ -19,33 +19,9 @@
   },
   {
     "screen": "dark / note",
-    "selector": "blockquote.bn-inline-content",
-    "property": "border-left-color",
-    "value": "rgb(125, 121, 122)"
-  },
-  {
-    "screen": "dark / note",
     "selector": "div.bn-block-content[data-content-type=\"codeBlock\"]",
     "property": "background-color",
     "value": "rgb(36, 41, 46)"
-  },
-  {
-    "screen": "dark / note",
-    "selector": "div.bn-block-outer:nth-of-type(5) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
-  },
-  {
-    "screen": "dark / note",
-    "selector": "div.bn-block-outer:nth-of-type(6) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
-  },
-  {
-    "screen": "dark / note",
-    "selector": "div.bn-block-outer:nth-of-type(7) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
   },
   {
     "screen": "dark / note",
@@ -166,12 +142,6 @@
     "selector": "span.theme-mode-switch-thumb",
     "property": "box-shadow[0]",
     "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "dark / session trash confirmation",
-    "selector": "button.trash-confirm-button.trash-confirm-danger",
-    "property": "outline-color",
-    "value": "rgb(153, 200, 255)"
   },
   {
     "screen": "dark / sticky actions",
@@ -698,12 +668,6 @@
   {
     "screen": "dark / sticky window",
     "selector": "blockquote.bn-inline-content",
-    "property": "border-left-color",
-    "value": "rgb(125, 121, 122)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "blockquote.bn-inline-content",
     "property": "color",
     "value": "rgb(55, 53, 47)"
   },
@@ -829,33 +793,15 @@
   },
   {
     "screen": "dark / sticky window",
-    "selector": "div.bn-block-outer:nth-of-type(5) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
-  },
-  {
-    "screen": "dark / sticky window",
     "selector": "div.bn-block-outer:nth-of-type(5) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > p.bn-inline-content",
     "property": "color",
     "value": "rgb(55, 53, 47)"
   },
   {
     "screen": "dark / sticky window",
-    "selector": "div.bn-block-outer:nth-of-type(6) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
-  },
-  {
-    "screen": "dark / sticky window",
     "selector": "div.bn-block-outer:nth-of-type(6) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > p.bn-inline-content",
     "property": "color",
     "value": "rgb(55, 53, 47)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "div.bn-block-outer:nth-of-type(7) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
   },
   {
     "screen": "dark / sticky window",
@@ -1573,33 +1519,9 @@
   },
   {
     "screen": "light / note",
-    "selector": "blockquote.bn-inline-content",
-    "property": "border-left-color",
-    "value": "rgb(125, 121, 122)"
-  },
-  {
-    "screen": "light / note",
     "selector": "div.bn-block-content[data-content-type=\"codeBlock\"]",
     "property": "background-color",
     "value": "rgb(36, 41, 46)"
-  },
-  {
-    "screen": "light / note",
-    "selector": "div.bn-block-outer:nth-of-type(5) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
-  },
-  {
-    "screen": "light / note",
-    "selector": "div.bn-block-outer:nth-of-type(6) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
-  },
-  {
-    "screen": "light / note",
-    "selector": "div.bn-block-outer:nth-of-type(7) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
   },
   {
     "screen": "light / note",
@@ -1720,12 +1642,6 @@
     "selector": "span.theme-mode-switch-thumb",
     "property": "box-shadow[0]",
     "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "light / session trash confirmation",
-    "selector": "button.trash-confirm-button.trash-confirm-danger",
-    "property": "outline-color",
-    "value": "rgb(0, 95, 204)"
   },
   {
     "screen": "light / sticky actions",
@@ -2252,12 +2168,6 @@
   {
     "screen": "light / sticky window",
     "selector": "blockquote.bn-inline-content",
-    "property": "border-left-color",
-    "value": "rgb(125, 121, 122)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "blockquote.bn-inline-content",
     "property": "color",
     "value": "rgb(55, 53, 47)"
   },
@@ -2383,33 +2293,15 @@
   },
   {
     "screen": "light / sticky window",
-    "selector": "div.bn-block-outer:nth-of-type(5) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
-  },
-  {
-    "screen": "light / sticky window",
     "selector": "div.bn-block-outer:nth-of-type(5) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > p.bn-inline-content",
     "property": "color",
     "value": "rgb(55, 53, 47)"
   },
   {
     "screen": "light / sticky window",
-    "selector": "div.bn-block-outer:nth-of-type(6) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
-  },
-  {
-    "screen": "light / sticky window",
     "selector": "div.bn-block-outer:nth-of-type(6) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > p.bn-inline-content",
     "property": "color",
     "value": "rgb(55, 53, 47)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "div.bn-block-outer:nth-of-type(7) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
-    "property": "accent-color",
-    "value": "auto"
   },
   {
     "screen": "light / sticky window",

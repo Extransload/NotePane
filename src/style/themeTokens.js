@@ -117,6 +117,32 @@ function stylesheetRoleTokens(palette, scheme, glass) {
   };
 }
 
+// Colours that BlockNote's Block.css, Mantine and the browser painted with their own palette
+// before themes existed. Lines and accents over the note take the theme's colour; the caret,
+// placeholders and the add-file button's fill follow the surface they sit on, so they stay
+// readable where a sticky window recolours the --sticky-* tokens with its note's colour.
+function libraryRoleTokens(palette, scheme) {
+  return {
+    "--notepane-selection-bg": hexToCssRgb(palette.accent, scheme === "dark" ? 0.35 : 0.3),
+    // The colour of the text the caret is in, as the browser's `auto` caret: readable on dark
+    // code blocks, note-coloured session tabs and sticky notes alike.
+    "--notepane-caret": "currentcolor",
+    // Checkboxes, and Mantine's primary colour (BlockNote's file panel buttons and tabs).
+    "--notepane-control-accent": "var(--notepane-input-focus-border)",
+    "--notepane-placeholder": "var(--sticky-panel-muted)",
+    // The quote bar, the divider and the page break line.
+    "--notepane-quote": palette.lineStrong,
+    // The outline around a selected image or file block.
+    "--notepane-node-outline": "var(--notepane-focus-ring)",
+    // Where a dragged block, table row or column will land, and the table column resize bar.
+    "--notepane-drop-cursor": "var(--notepane-brand-accent)",
+    // The image resize handles, outlined with --notepane-glass so they show over any image.
+    "--notepane-resize-handle": "var(--notepane-shadow-color)",
+    "--notepane-add-file-bg": "var(--sticky-portal-menu-hover-bg)",
+    "--notepane-add-file-hover-bg": "var(--sticky-portal-menu-border-color)",
+  };
+}
+
 /**
  * Derives every colour custom property from a theme's palette. Hover, border, shadow, menu,
  * table control, scrollbar and find-highlight values are computed; `theme.overrides` replaces
@@ -227,6 +253,7 @@ export function buildThemeTokens(theme) {
     "--notepane-find-match-bg": commaRgba(palette.warning, s("findMatch")),
     "--notepane-find-current-bg": commaRgba(palette.orange, s("findCurrent")),
     ...stylesheetRoleTokens(palette, scheme, glass),
+    ...libraryRoleTokens(palette, scheme),
   };
 
   for (const name of NAMED_COLOURS) {

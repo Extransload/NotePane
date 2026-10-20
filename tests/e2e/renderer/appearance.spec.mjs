@@ -1231,3 +1231,93 @@ test("keeps the sticky header draggable without title chrome", async ({ page }) 
   await expect(page.getByLabel("Note title")).toHaveCount(0);
   await expect(page.getByTestId("sticky-title-drag-label")).toHaveCount(0);
 });
+
+// Colours the leak detector (theme-leaks.spec.mjs) cannot read: text selection, an input
+// placeholder, the Mantine palette variables BlockNote's components paint with, and BlockNote's
+// drop cursor, which exists only while something is dragged over the editor.
+test("takes selection, placeholder, Mantine and drop cursor colours from the theme", async ({ page }) => {
+  await page.goto("/?sentinelThemes=1");
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("Dragged over");
+  await page.keyboard.press(modifierShortcut("F"));
+  const findInput = page
+    .getByRole("search", { name: "Find in note" })
+    .getByRole("textbox", { name: "Find in note" });
+  await expect(findInput).toHaveValue("");
+
+  const readColours = () => page.evaluate(() => {
+    // Paints `property: var(token)` on a probe inside `parent` and reads the colour back.
+    const resolve = (parent, property, token) => {
+      const probe = document.createElement("span");
+      probe.style.setProperty(property, `var(${token})`);
+      parent.append(probe);
+      const value = getComputedStyle(probe).getPropertyValue(property);
+      probe.remove();
+      return value;
+    };
+    const text = [...document.querySelectorAll(".bn-editor .bn-inline-content")]
+      .find((element) => element.textContent === "Dragged over");
+    const findField = document.querySelector(".find-bar-input");
+    const mantine = document.querySelector(".bn-container[data-mantine-color-scheme]");
+    // BlockNote shows its drop cursor on dragover and removes it 5 s later; a second dragover
+    // at the same point keeps the same element.
+    const rect = text.getBoundingClientRect();
+    text.dispatchEvent(new DragEvent("dragover", {
+      bubbles: true,
+      cancelable: true,
+      clientX: rect.left + 4,
+      clientY: rect.top + rect.height / 2,
+      dataTransfer: new DataTransfer(),
+    }));
+    const dropCursor = document.querySelector(".prosemirror-dropcursor-inline, .prosemirror-dropcursor-block");
+    const pairs = {
+      selection: [
+        getComputedStyle(text, "::selection").backgroundColor,
+        resolve(text, "background-color", "--notepane-selection-bg"),
+      ],
+      placeholder: [
+        getComputedStyle(findField, "::placeholder").color,
+        resolve(findField.parentElement, "color", "--notepane-placeholder"),
+      ],
+      dropCursor: [
+        getComputedStyle(dropCursor).backgroundColor,
+        resolve(dropCursor.parentElement, "background-color", "--notepane-drop-cursor"),
+      ],
+      mantinePrimary: [
+        resolve(mantine, "color", "--mantine-primary-color-filled"),
+        resolve(mantine, "color", "--notepane-control-accent"),
+      ],
+      mantineGray2: [
+        resolve(mantine, "color", "--mantine-color-gray-2"),
+        resolve(mantine, "color", "--sticky-portal-menu-border-color"),
+      ],
+      mantineDimmed: [
+        resolve(mantine, "color", "--mantine-color-dimmed"),
+        resolve(mantine, "color", "--sticky-panel-muted"),
+      ],
+      mantinePlaceholder: [
+        resolve(mantine, "color", "--mantine-color-placeholder"),
+        resolve(mantine, "color", "--notepane-placeholder"),
+      ],
+    };
+    return {
+      actual: Object.fromEntries(Object.entries(pairs).map(([name, [value]]) => [name, value])),
+      expected: Object.fromEntries(Object.entries(pairs).map(([name, [, value]]) => [name, value])),
+    };
+  });
+
+  const byTheme = [];
+  for (const themeId of ["sentinel-light-a", "sentinel-light-b"]) {
+    await page.evaluate((id) => window.__notepaneTest.setThemeId(id), themeId);
+    await expect(page.locator("html")).toHaveAttribute("data-theme-id", themeId);
+    const { actual, expected } = await readColours();
+    expect(actual, themeId).toEqual(expected);
+    byTheme.push(actual);
+  }
+  // The drop cursor was created under the first sentinel, so this also shows that it follows a
+  // theme change without a new editor.
+  for (const name of Object.keys(byTheme[0])) {
+    expect(byTheme[1][name], `${name} follows the theme`).not.toBe(byTheme[0][name]);
+  }
+});

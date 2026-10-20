@@ -378,8 +378,7 @@ function createScanner(page, pair) {
       scope: { include, exclude },
       allowlist: ALLOWLIST,
     });
-    expect(first.readings.length, `${screenName} has targets in ${first.roots} roots`).toBeGreaterThan(0);
-    if (scrollbars) {
+    expect(first.readings.length, `${screenName} has targets in ${first.roots} roots`).toBeGreaterThan(0);    if (scrollbars) {
       const scrollbarReadings = first.readings.filter((reading) =>
         Object.keys(reading).some((property) => property.startsWith("scrollbar-color")));
       expect(scrollbarReadings.length, `${screenName} shows a scrollbar`).toBeGreaterThan(0);
@@ -612,6 +611,33 @@ const SCREEN_GROUPS = [
       await page.locator(".bn-side-menu [draggable='true']").click();
       await expect(page.locator(".bn-drag-handle-menu")).toBeVisible();
       await scan("drag handle menu", { include: [".bn-drag-handle-menu"] });
+    },
+  },
+  {
+    name: "tooltips and code block tools",
+    screens: ["formatting toolbar tooltip", "code block language select", "code block tool bar"],
+    async run(page, scan) {
+      // BlockNote's toolbar buttons show a Mantine tooltip while hovered.
+      await selectWord(page, "First bullet");
+      await page.locator(".bn-formatting-toolbar").getByRole("button", { name: "Bold", exact: true }).hover();
+      await expect(page.locator(".mantine-Tooltip-tooltip .bn-tooltip")).toBeVisible();
+      await scan("formatting toolbar tooltip", { include: [".mantine-Tooltip-tooltip"] });
+      await page.keyboard.press("Escape");
+      await expect(page.locator(".bn-formatting-toolbar")).toHaveCount(0);
+
+      // BlockNote fades the language select in while the code block is hovered.
+      const codeBlock = page.locator(".bn-editor [data-content-type='codeBlock']");
+      const languageSelect = ".bn-editor [data-content-type='codeBlock'] > div > select";
+      await hoverAfterScrolling(codeBlock);
+      await scan("code block language select", { include: [languageSelect] });
+
+      // The tool bar sits outside the code block, so hovering it hides the select again; the
+      // note screen reads the tool bar at rest, this one its hover colours.
+      const toolBar = page.getByRole("toolbar", { name: /code block actions$/ });
+      const copyButton = toolBar.getByRole("button", { name: /^Copy .+ code$/ });
+      await copyButton.hover();
+      await expect.poll(() => copyButton.evaluate((button) => button.matches(":hover"))).toBe(true);
+      await scan("code block tool bar", { include: [".code-block-tools"] });
     },
   },
   {

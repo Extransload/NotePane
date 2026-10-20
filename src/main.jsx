@@ -978,6 +978,9 @@ function StickyEditor({
     extensions: [BlockDragSelection, FindInNote],
     initialContent: initialEditorContent,
     tabBehavior: "prefer-indent",
+    // BlockNote paints this onto the drop cursor element, which resolves the token itself and
+    // so follows a theme change without a new editor.
+    dropCursor: { color: "var(--notepane-drop-cursor)" },
     tables: {
       splitCells: true,
       cellBackgroundColor: true,
