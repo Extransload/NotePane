@@ -55,6 +55,68 @@ function commaRgba(hex, alpha) {
   return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
+// Roles the stylesheets painted with a fixed colour before themes existed: status dots,
+// focus rings, tooltips, the code block tool bar, glass highlights, backdrops and shadows.
+function stylesheetRoleTokens(palette, scheme, glass) {
+  const shadowColour = (alpha) => hexToCssRgb(palette.shadow, alpha);
+  // BlockNote's tooltip is an inverted chip on light themes and a raised panel on dark ones.
+  const tooltipBg = scheme === "dark" ? palette.panel : palette.text;
+  const tooltipText = scheme === "dark" ? palette.text : palette.window;
+  return {
+    "--notepane-glass": glass,
+    "--notepane-shadow-color": palette.shadow,
+    // The inset highlight along the top of the sticky header and of its title field.
+    "--notepane-shadow-header-glass": `inset 0 1px 0 ${hexToCssRgb(glass, 0.08)}`,
+    "--notepane-shadow-sidebar-edge": `inset -1px 0 0 ${hexToCssRgb(glass, 0.04)}`,
+    "--notepane-shadow-swatch": `inset 0 1px 0 ${hexToCssRgb(glass, 0.35)}`,
+    "--notepane-shadow-color-wheel": `inset 0 0 0 1px ${hexToCssRgb(glass, 0.18)}, 0 6px 14px ${shadowColour(0.2)}`,
+    "--notepane-shadow-history-panel": `0 18px 45px ${shadowColour(0.2)}`,
+    "--notepane-backdrop-preferences": shadowColour(0.18),
+    "--notepane-backdrop-history": shadowColour(0.28),
+    "--notepane-backdrop-crop": shadowColour(0.34),
+    "--notepane-success": palette.success,
+    "--notepane-progress": palette.blue,
+    "--notepane-focus-ring": hexToCssRgb(palette.accent, 0.66),
+    "--notepane-input-focus-border": palette.accent,
+    "--notepane-input-focus-ring": hexToCssRgb(palette.accent, 0.18),
+    "--notepane-input-error": palette.danger,
+    "--notepane-error-text": palette.danger,
+    "--notepane-import-tint": palette.orange,
+    "--notepane-loading-text": palette.muted,
+    "--notepane-slider-thumb": palette.muted,
+    "--notepane-brand-accent": mixHexColors(palette.window, palette.accent, 0.3),
+    // The border of the selected pastel preset swatch, mixed into the swatch colour.
+    "--notepane-pastel-swatch-ink": palette.text,
+    "--notepane-icon-turn-into": palette.blue,
+    "--notepane-icon-colors": palette.purple,
+    "--notepane-tooltip-bg": tooltipBg,
+    "--notepane-tooltip-text": tooltipText,
+    "--notepane-tooltip-border": hexToCssRgb(tooltipText, 0.12),
+    "--notepane-tooltip-muted": hexToCssRgb(tooltipText, 0.68),
+    // Mantine's tooltip box around BlockNote's chip: invisible on light themes, the chip's
+    // colour on dark ones, where it squares off the chip's rounded corners.
+    "--notepane-tooltip-frame-bg": scheme === "dark" ? "var(--notepane-tooltip-bg)" : "transparent",
+    "--notepane-shadow-tooltip": `0 5px 14px ${shadowColour(0.2)}`,
+    // NotePane's own tooltip (AdaptiveTooltip) is drawn like a menu panel.
+    "--notepane-adaptive-tooltip-bg": "var(--sticky-panel-bg)",
+    "--notepane-adaptive-tooltip-text": "var(--sticky-panel-text)",
+    "--notepane-adaptive-tooltip-border": "var(--sticky-border-color)",
+    "--notepane-shadow-adaptive-tooltip": "var(--sticky-menu-shadow)",
+    // The code block tool bar is glass over the code block, so it follows the code colours.
+    "--notepane-code-tool-bg": hexToCssRgb(palette.codeBg, 0.76),
+    "--notepane-code-tool-border": hexToCssRgb(palette.codeText, 0.1),
+    "--notepane-code-tool-hover-border": hexToCssRgb(palette.codeText, 0.18),
+    "--notepane-code-tool-text": hexToCssRgb(palette.codeText, 0.72),
+    "--notepane-code-tool-hover-bg": hexToCssRgb(palette.codeText, 0.1),
+    "--notepane-code-tool-hover-text": palette.codeText,
+    "--notepane-code-tool-disabled": hexToCssRgb(palette.codeText, 0.3),
+    "--notepane-code-tool-focus-ring": hexToCssRgb(palette.accent, 0.7),
+    "--notepane-code-tool-success": mixHexColors(palette.success, palette.codeText, 0.5),
+    "--notepane-code-tool-error": mixHexColors(palette.danger, palette.codeText, 0.5),
+    "--notepane-shadow-code-tool": `0 5px 14px ${shadowColour(0.22)}`,
+  };
+}
+
 /**
  * Derives every colour custom property from a theme's palette. Hover, border, shadow, menu,
  * table control, scrollbar and find-highlight values are computed; `theme.overrides` replaces
@@ -164,6 +226,7 @@ export function buildThemeTokens(theme) {
     "--bn-colors-side-menu": palette.faint,
     "--notepane-find-match-bg": commaRgba(palette.warning, s("findMatch")),
     "--notepane-find-current-bg": commaRgba(palette.orange, s("findCurrent")),
+    ...stylesheetRoleTokens(palette, scheme, glass),
   };
 
   for (const name of NAMED_COLOURS) {

@@ -165,10 +165,10 @@
   align-items: center;
   gap: 4px;
   padding: 3px;
-  border: 1px solid rgb(255 255 255 / 0.1);
+  border: 1px solid var(--notepane-code-tool-border);
   border-radius: 8px;
-  background: rgb(15 15 15 / 0.76);
-  box-shadow: 0 5px 14px rgb(0 0 0 / 0.22);
+  background: var(--notepane-code-tool-bg);
+  box-shadow: var(--notepane-shadow-code-tool);
   opacity: 0.82;
   transform: translateX(-100%);
   backdrop-filter: blur(8px);
@@ -178,7 +178,7 @@
 
 .code-block-tools:hover,
 .code-block-tools:focus-within {
-  border-color: rgb(255 255 255 / 0.18);
+  border-color: var(--notepane-code-tool-hover-border);
   opacity: 1;
 }
 
@@ -191,7 +191,7 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: rgb(255 255 255 / 0.72);
+  color: var(--notepane-code-tool-text);
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
 }
@@ -210,27 +210,27 @@
 .code-block-tool-button:hover,
 .code-block-tool-button:focus-visible {
   outline: none;
-  background: rgb(255 255 255 / 0.1);
-  color: #fff;
+  background: var(--notepane-code-tool-hover-bg);
+  color: var(--notepane-code-tool-hover-text);
 }
 
 .code-block-tool-button:focus-visible {
-  box-shadow: 0 0 0 2px rgb(149 179 255 / 0.7);
+  box-shadow: 0 0 0 2px var(--notepane-code-tool-focus-ring);
 }
 
 .code-block-tool-button:disabled {
-  color: rgb(255 255 255 / 0.3);
+  color: var(--notepane-code-tool-disabled);
   cursor: not-allowed;
   opacity: 0.7;
 }
 
 .code-block-tool-button.is-success,
 .code-block-tool-button.is-unchanged {
-  color: #9ee6ad;
+  color: var(--notepane-code-tool-success);
 }
 
 .code-block-tool-button.is-error {
-  color: #ffaaa3;
+  color: var(--notepane-code-tool-error);
 }
 
 .code-block-tool-button svg {
@@ -463,15 +463,15 @@ body:has(.bn-editor[data-block-selection="true"]) .bn-formatting-toolbar {
 
 .bn-menu-dropdown .notepane-block-menu-icon.is-turn-into,
 .bn-menu-dropdown .notepane-block-menu-icon.is-block-type {
-  color: #4d79b8 !important;
+  color: var(--notepane-icon-turn-into) !important;
 }
 
 .bn-menu-dropdown .notepane-block-menu-icon.is-colors {
-  color: #a45bb9 !important;
+  color: var(--notepane-icon-colors) !important;
 }
 
 .bn-menu-dropdown .notepane-block-menu-icon.is-delete {
-  color: var(--icon-tone-delete, #c14a4a) !important;
+  color: var(--icon-tone-delete) !important;
 }
 
 .bn-menu-dropdown :is(.mantine-Divider-root, .mantine-Menu-divider),
@@ -544,8 +544,8 @@ body:has(.bn-editor[data-block-selection="true"]) .bn-formatting-toolbar {
 
 .bn-form-popover
   :is(.mantine-TextInput-wrapper, .mantine-FileInput-wrapper):focus-within {
-  border-color: #2383e2;
-  box-shadow: 0 0 0 2px rgb(35 131 226 / 0.18);
+  border-color: var(--notepane-input-focus-border);
+  box-shadow: 0 0 0 2px var(--notepane-input-focus-ring);
 }
 
 .bn-form-popover

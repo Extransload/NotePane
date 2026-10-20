@@ -42,7 +42,7 @@
 }
 
 .find-bar-input.has-no-match {
-  border-color: #e5484d;
+  border-color: var(--notepane-input-error);
 }
 
 .find-bar-count {

@@ -25,7 +25,7 @@
   display: grid;
   place-items: center;
   padding: 28px;
-  background: rgb(0 0 0 / 0.18);
+  background: var(--notepane-backdrop-preferences);
   -webkit-app-region: no-drag;
 }
 
@@ -126,7 +126,7 @@
 
 .markdown-import-error {
   margin: 10px 2px 0;
-  color: #d95c5c;
+  color: var(--notepane-error-text);
 }
 
 .sticky-settings-window {
@@ -313,7 +313,7 @@
 }
 
 .preference-data-button-import {
-  color: color-mix(in srgb, var(--sticky-panel-text) 86%, #b45309);
+  color: color-mix(in srgb, var(--sticky-panel-text) 86%, var(--notepane-import-tint));
 }
 
 .preference-toggle-switch {
@@ -958,7 +958,7 @@
 
 .pastel-preset-row button:hover,
 .pastel-preset-row button[aria-pressed="true"] {
-  border-color: color-mix(in srgb, #37352f 38%, var(--pastel-color));
+  border-color: color-mix(in srgb, var(--notepane-pastel-swatch-ink) 38%, var(--pastel-color));
   transform: translateY(-1px);
 }
 

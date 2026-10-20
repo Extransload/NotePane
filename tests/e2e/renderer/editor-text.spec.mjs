@@ -510,15 +510,21 @@ test("renders Command+E inline code with Notion-like styling and composable colo
     color: "rgb(255, 138, 128)",
   });
 
-  const exportStyle = await inlineCode.evaluate((element) => {
+  // A PDF export sets is-exporting and applies NotePane Light through withExportTheme.
+  const exportStyle = await inlineCode.evaluate(async (element) => {
+    const { withExportTheme } = await import("/src/style/applyTheme.js");
     document.body.classList.add("is-exporting");
-    const style = getComputedStyle(element);
-    const values = {
-      backgroundColor: style.backgroundColor,
-      color: style.color,
-    };
-    document.body.classList.remove("is-exporting");
-    return values;
+    try {
+      return await withExportTheme(async () => {
+        const style = getComputedStyle(element);
+        return {
+          backgroundColor: style.backgroundColor,
+          color: style.color,
+        };
+      });
+    } finally {
+      document.body.classList.remove("is-exporting");
+    }
   });
   expect(exportStyle).toEqual({
     backgroundColor: "rgba(135, 131, 120, 0.16)",

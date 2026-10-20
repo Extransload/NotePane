@@ -16,7 +16,7 @@
   background: color-mix(in srgb, var(--sticky-panel-bg) 94%, transparent);
   box-shadow:
     0 14px 30px color-mix(in srgb, var(--sticky-text-color) 14%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #fff 42%, transparent);
+    inset 0 1px 0 color-mix(in srgb, var(--notepane-glass) 42%, transparent);
   color: var(--sticky-panel-text);
   font: 720 11px/1 var(--notepane-ui-font);
   pointer-events: auto;
@@ -34,12 +34,12 @@
 }
 
 .sticky-toast-success::before {
-  background: #2f9e44;
+  background: var(--notepane-success);
 }
 
 .sticky-toast-progress::before {
-  background: #3478f6;
-  box-shadow: 0 0 0 4px color-mix(in srgb, #3478f6 16%, transparent);
+  background: var(--notepane-progress);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--notepane-progress) 16%, transparent);
 }
 
 .sticky-toast-error::before {
@@ -78,7 +78,7 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgb(0 0 0 / 0.34);
+  background: var(--notepane-backdrop-crop);
   -webkit-app-region: no-drag;
 }
 
@@ -177,56 +177,6 @@
   font: 600 11px/1.4 var(--notepane-ui-font);
 }
 
-body.is-exporting {
-  --sticky-effective-bg: #ffffff;
-  --sticky-shell-bg: transparent;
-  --sticky-editor-bg: transparent;
-  --sticky-header-bg: transparent;
-  --sticky-sidebar-bg: transparent;
-  --sticky-panel-bg: #ffffff;
-  --sticky-panel-text: #37352f;
-  --sticky-panel-muted: #787774;
-  --sticky-text-color: #37352f;
-  --sticky-muted-color: #787774;
-  --sticky-border-color: rgb(55 53 47 / 0.12);
-  --sticky-table-border-color: #8f8e89;
-  --sticky-table-control-border-color: #d2d1ce;
-  --sticky-table-control-bg: #f2f2f0;
-  --sticky-table-control-hover-bg: #ededeb;
-  --sticky-table-control-text: #37352f;
-  --sticky-table-control-shadow: none;
-  --sticky-portal-menu-bg: #ffffff;
-  --sticky-portal-menu-hover-bg: #f1f1ef;
-  --sticky-portal-menu-border-color: #d2d1ce;
-  --sticky-portal-menu-shadow: none;
-  --sticky-control-bg: transparent;
-  --sticky-control-hover-bg: transparent;
-  --sticky-code-bg: #0d1117;
-  --sticky-code-text: #f0f6fc;
-  --sticky-code-border: rgb(139 148 158 / 0.34);
-  --sticky-code-muted: #8b949e;
-  --sticky-inline-code-bg: rgb(135 131 120 / 0.16);
-  --sticky-inline-code-text: #bd3f3f;
-  --sticky-note-bg: transparent;
-  --sticky-note-header-bg: transparent;
-  --sticky-note-panel-bg: #ffffff;
-  --bn-colors-editor-text: #37352f;
-  --bn-colors-editor-background: transparent;
-  --bn-colors-menu-text: #37352f;
-  --bn-colors-menu-background: #ffffff;
-  --bn-colors-tooltip-text: #37352f;
-  --bn-colors-tooltip-background: #f1f1ef;
-  --bn-colors-hovered-text: #37352f;
-  --bn-colors-hovered-background: #f1f1ef;
-  --bn-colors-selected-text: #ffffff;
-  --bn-colors-selected-background: #2f3437;
-  --bn-colors-disabled-text: #b7b7b4;
-  --bn-colors-disabled-background: #f1f1ef;
-  --bn-colors-border: rgb(55 53 47 / 0.12);
-  --bn-colors-shadow: rgb(0 0 0 / 0.16);
-  --bn-colors-side-menu: #8a8a86;
-}
-
 body.is-exporting,
 body.is-exporting #root,
 body.is-exporting .sticky-shell,
@@ -283,26 +233,23 @@ body.is-exporting .sticky-editor-surface .bn-editor {
 }
 
 body.is-exporting .sticky-shell {
-  color: #37352f !important;
   border-radius: 0 !important;
 }
 
+/* Export colours come from the export theme, which withExportTheme (src/style/applyTheme.js)
+   applies for the duration of the export. These rules only choose which of its tokens win:
+   block text keeps the text colour, and every code block the plain code background. */
 body.is-exporting .bn-editor,
 body.is-exporting .bn-editor .bn-inline-content,
 body.is-exporting .bn-editor [data-content-type] {
-  color: #37352f !important;
+  color: var(--sticky-text-color) !important;
 }
 
 body.is-exporting .bn-editor [data-content-type="codeBlock"],
 body.is-exporting .bn-editor [data-content-type="codeBlock"] pre,
 body.is-exporting .bn-editor [data-content-type="codeBlock"] code {
-  background-color: #0d1117 !important;
-  color: #f0f6fc !important;
-}
-
-body.is-exporting .bn-editor .bn-inline-content code {
-  background-color: rgb(135 131 120 / 0.16) !important;
-  color: #bd3f3f !important;
+  background-color: var(--sticky-code-bg) !important;
+  color: var(--sticky-code-text) !important;
 }
 
 body.is-exporting .bn-editor [data-content-type="codeBlock"] > pre {

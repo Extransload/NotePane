@@ -3,6 +3,7 @@ import {
   clickLastEmptyParagraph,
   loadTemplatePreview,
   modifierShortcut,
+  selectAppTheme,
 } from "../support/renderer-helpers.mjs";
 
 test.beforeEach(async ({ page }) => {
@@ -78,6 +79,119 @@ test("uses transparent chrome-free styles while exporting", async ({ page }) => 
     exportStyles.surfaceScrollHeight - 1,
   );
 });
+
+// Runs in the page before the app loads. A desktop bridge whose exportNote reads the content
+// colours while the PDF export render is on screen, which is what printToPDF would capture.
+function stubExportBridge() {
+  const now = Date.UTC(2026, 9, 20, 9, 0, 0);
+  const note = {
+    id: "export-note",
+    title: "Export note",
+    titleManuallyEdited: false,
+    blocksJSON: JSON.stringify([
+      { type: "paragraph", props: { backgroundColor: "red" }, content: "Red highlight" },
+      { type: "codeBlock", props: { language: "javascript" }, content: "const answer = 42;" },
+      {
+        type: "table",
+        content: { type: "tableContent", rows: [{ cells: ["Mode", "Colour"] }, { cells: ["Export", "Light"] }] },
+      },
+      { type: "paragraph" },
+    ]),
+    markdown: "",
+    theme: {},
+    seedDemoContent: false,
+    editorFontScale: 1,
+    editorFontFamily: "Inter",
+    detached: false,
+    trashedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  window.__readExportColours = () => {
+    const styleOf = (selector) => getComputedStyle(document.querySelector(selector));
+    // The muted colour has no element of its own in this note, so a probe in the editor
+    // surface reads it as the exported content would.
+    const probe = document.createElement("span");
+    probe.style.color = "var(--sticky-muted-color)";
+    document.querySelector("[data-testid='sticky-editor-surface']").append(probe);
+    const muted = getComputedStyle(probe).color;
+    probe.remove();
+    const shell = styleOf("[data-testid='sticky-shell']");
+    return {
+      exporting: document.body.classList.contains("is-exporting"),
+      shellText: shell.color,
+      colorScheme: shell.colorScheme,
+      // printToPDF paints the page canvas in the root's colour scheme.
+      rootColorScheme: getComputedStyle(document.documentElement).colorScheme,
+      codeBackground: styleOf(".bn-editor [data-content-type='codeBlock']").backgroundColor,
+      redHighlight: styleOf(".bn-editor [data-background-color='red']").backgroundColor,
+      tableBorder: styleOf(".bn-editor td").borderTopColor,
+      muted,
+    };
+  };
+  window.blocknoteSticky = {
+    getCurrentNoteId: async () => note.id,
+    getNote: async () => note,
+    listNotes: async () => [note],
+    listTrash: async () => [],
+    getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
+    getLayoutMode: async () => "tabs",
+    getEditorPreferences: async () => ({}),
+    listFonts: async () => [],
+    saveContent: async () => note,
+    updateAppearance: async () => undefined,
+    exportNote: async () => {
+      window.__exportColours = window.__readExportColours();
+      return { canceled: false };
+    },
+  };
+}
+
+// Export renders with NotePane Light whatever theme is selected. Add a theme id here once
+// selectAppTheme can select it.
+for (const { themeId, label } of [{ themeId: "notepane-dark", label: "a dark theme" }]) {
+  test(`export renders with NotePane Light under ${label}`, async ({ page }) => {
+    await page.addInitScript(stubExportBridge);
+    await page.goto("/");
+    await expect(page.locator(".bn-editor [data-background-color='red']")).toBeVisible();
+    await expect(page.locator(".bn-editor td").first()).toBeVisible();
+    // The shell eases its colours over a theme change; read them once that has finished.
+    const readSettledColours = async () => {
+      await page.waitForFunction(() =>
+        document.querySelector("[data-testid='sticky-shell']")
+          .getAnimations({ subtree: true })
+          .every((animation) => !(animation instanceof CSSTransition)),
+      );
+      return page.evaluate(() => window.__readExportColours());
+    };
+    const lightColours = await readSettledColours();
+
+    await selectAppTheme(page, themeId);
+    const themedColours = await readSettledColours();
+    // The selected theme paints these differently, so the export check below means something.
+    expect(themedColours.redHighlight).not.toBe(lightColours.redHighlight);
+    expect(themedColours.tableBorder).not.toBe(lightColours.tableBorder);
+    expect(themedColours.muted).not.toBe(lightColours.muted);
+
+    await page.getByRole("button", { name: "Export" }).click();
+    await page.getByRole("menu", { name: "Export format" }).getByRole("menuitem", { name: /PDF/ }).click();
+    await expect(page.locator(".sticky-toast-success")).toHaveText("PDF exported");
+
+    const exportColours = await page.evaluate(() => window.__exportColours);
+    expect(exportColours).toEqual({
+      exporting: true,
+      shellText: "rgb(55, 53, 47)",
+      colorScheme: "light",
+      rootColorScheme: "light",
+      codeBackground: "rgb(13, 17, 23)",
+      redHighlight: lightColours.redHighlight,
+      tableBorder: lightColours.tableBorder,
+      muted: lightColours.muted,
+    });
+    // Afterwards the selected theme is back.
+    expect(await readSettledColours()).toEqual(themedColours);
+  });
+}
 
 test("opens BlockNote slash menu with core demo commands", async ({ page }) => {
   await clickLastEmptyParagraph(page);

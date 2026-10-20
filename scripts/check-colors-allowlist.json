@@ -87,10 +87,10 @@
   {
     "file": "src/styles/controls.css",
     "lines": [
-      160,
-      285
+      169,
+      277
     ],
-    "reason": "Colour-picking tools (colour wheel crosshair and thumb, brightness gradient, opacity checkerboard, slider thumbs): they draw over arbitrary user colours."
+    "reason": "Colour-picking tools (colour wheel crosshair and thumb, brightness gradient, opacity checkerboard, slider thumb outlines and shadows): they draw over arbitrary user colours."
   },
   {
     "file": "src/styles/overlays.css",

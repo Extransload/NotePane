@@ -84,7 +84,39 @@
       "--chrome-icon-button-bg": "rgb(255 255 255 / 0.74)",
       "--sticky-table-control-shadow": "0 5px 12px rgb(55 53 47 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.28)",
       "--sticky-portal-menu-shadow": "0 12px 26px rgb(55 53 47 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.38)",
-      "--chrome-icon-button-shadow": "0 4px 10px rgb(0 0 0 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.42)"
+      "--chrome-icon-button-shadow": "0 4px 10px rgb(0 0 0 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.42)",
+      "--notepane-success": "#2f9e44",
+      "--notepane-progress": "#3478f6",
+      "--notepane-focus-ring": "rgb(90 150 255 / 0.66)",
+      "--notepane-input-focus-border": "#2383e2",
+      "--notepane-input-focus-ring": "rgb(35 131 226 / 0.18)",
+      "--notepane-input-error": "#e5484d",
+      "--notepane-error-text": "#d95c5c",
+      "--notepane-import-tint": "#b45309",
+      "--notepane-loading-text": "#9ca3af",
+      "--notepane-slider-thumb": "#a3a8a0",
+      "--notepane-brand-accent": "#d9ecf8",
+      "--notepane-icon-turn-into": "#4d79b8",
+      "--notepane-icon-colors": "#a45bb9",
+      "--notepane-glass": "#ffffff",
+      "--notepane-shadow-header-glass": "inset 0 1px 0 rgb(255 255 255 / 0.08)",
+      "--notepane-shadow-sidebar-edge": "inset -1px 0 0 rgb(255 255 255 / 0.04)",
+      "--notepane-shadow-swatch": "inset 0 1px 0 rgb(255 255 255 / 0.35)",
+      "--notepane-shadow-color-wheel": "inset 0 0 0 1px rgb(255 255 255 / 0.18), 0 6px 14px rgb(0 0 0 / 0.2)",
+      "--notepane-tooltip-bg": "#2f3437",
+      "--notepane-tooltip-text": "#ffffff",
+      "--notepane-tooltip-border": "rgb(255 255 255 / 0.12)",
+      "--notepane-tooltip-muted": "rgb(255 255 255 / 0.68)",
+      "--notepane-code-tool-bg": "rgb(15 15 15 / 0.76)",
+      "--notepane-code-tool-border": "rgb(255 255 255 / 0.1)",
+      "--notepane-code-tool-hover-border": "rgb(255 255 255 / 0.18)",
+      "--notepane-code-tool-text": "rgb(255 255 255 / 0.72)",
+      "--notepane-code-tool-hover-bg": "rgb(255 255 255 / 0.1)",
+      "--notepane-code-tool-hover-text": "#fff",
+      "--notepane-code-tool-disabled": "rgb(255 255 255 / 0.3)",
+      "--notepane-code-tool-focus-ring": "rgb(149 179 255 / 0.7)",
+      "--notepane-code-tool-success": "#9ee6ad",
+      "--notepane-code-tool-error": "#ffaaa3"
     },
     "overrideReasons": [
       {
@@ -191,6 +223,83 @@
           "--chrome-icon-button-shadow"
         ],
         "reason": "NotePane Light's inset glass highlight on table controls, menus and icon buttons is pure white, brighter than its #f5f5f2 panel, which the derivation uses."
+      },
+      {
+        "tokens": [
+          "--notepane-success",
+          "--notepane-progress"
+        ],
+        "reason": "Today's toast status dots: a fixed green and blue, not NotePane's success colour and blue."
+      },
+      {
+        "tokens": [
+          "--notepane-focus-ring",
+          "--notepane-input-focus-border",
+          "--notepane-input-focus-ring"
+        ],
+        "reason": "Today's blue focus rings on the colour wheel and the link and file form inputs; NotePane's accent is purple."
+      },
+      {
+        "tokens": [
+          "--notepane-input-error",
+          "--notepane-error-text",
+          "--notepane-import-tint"
+        ],
+        "reason": "Today's find no-match border, Markdown import error and import button tint: fixed reds and amber, not the danger and orange palette colours."
+      },
+      {
+        "tokens": [
+          "--notepane-loading-text",
+          "--notepane-slider-thumb"
+        ],
+        "reason": "Today's neutral greys for the loading text and the colour slider thumbs, lighter than the muted text colour."
+      },
+      {
+        "tokens": [
+          "--notepane-brand-accent"
+        ],
+        "reason": "The sidebar resize handle hover is the brand pastel sky, not a mix of the window and the accent."
+      },
+      {
+        "tokens": [
+          "--notepane-icon-turn-into",
+          "--notepane-icon-colors"
+        ],
+        "reason": "Today's block menu icon tones for Turn into and Colors, not the blue and purple editor colours."
+      },
+      {
+        "tokens": [
+          "--notepane-glass",
+          "--notepane-shadow-header-glass",
+          "--notepane-shadow-sidebar-edge",
+          "--notepane-shadow-swatch",
+          "--notepane-shadow-color-wheel"
+        ],
+        "reason": "NotePane draws the glass highlights on the header, sidebar edge, title field, swatches and colour wheel rim in pure white; the derivation uses the panel colour."
+      },
+      {
+        "tokens": [
+          "--notepane-tooltip-bg",
+          "--notepane-tooltip-text",
+          "--notepane-tooltip-border",
+          "--notepane-tooltip-muted"
+        ],
+        "reason": "Today's BlockNote tooltip chip on light: graphite #2f3437 with white text, a white hairline and white secondary text, not the theme text and window colours."
+      },
+      {
+        "tokens": [
+          "--notepane-code-tool-bg",
+          "--notepane-code-tool-border",
+          "--notepane-code-tool-hover-border",
+          "--notepane-code-tool-text",
+          "--notepane-code-tool-hover-bg",
+          "--notepane-code-tool-hover-text",
+          "--notepane-code-tool-disabled",
+          "--notepane-code-tool-focus-ring",
+          "--notepane-code-tool-success",
+          "--notepane-code-tool-error"
+        ],
+        "reason": "Today's code block tool bar: near-black glass with white controls and pastel green and red states over the GitHub-dark code block, not derived from the code colours."
       }
     ]
   },
@@ -284,7 +393,44 @@
       "--chrome-icon-button-active-border": "rgb(255 255 255 / 0.30)",
       "--sticky-table-control-shadow": "0 7px 16px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.08)",
       "--sticky-portal-menu-shadow": "0 14px 34px rgb(0 0 0 / 0.46), inset 0 1px 0 rgb(255 255 255 / 0.08)",
-      "--chrome-icon-button-shadow": "0 4px 12px rgb(0 0 0 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.08)"
+      "--chrome-icon-button-shadow": "0 4px 12px rgb(0 0 0 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.08)",
+      "--notepane-success": "#2f9e44",
+      "--notepane-progress": "#3478f6",
+      "--notepane-focus-ring": "rgb(90 150 255 / 0.66)",
+      "--notepane-input-focus-border": "#2383e2",
+      "--notepane-input-focus-ring": "rgb(35 131 226 / 0.18)",
+      "--notepane-input-error": "#e5484d",
+      "--notepane-error-text": "#d95c5c",
+      "--notepane-import-tint": "#b45309",
+      "--notepane-loading-text": "#9ca3af",
+      "--notepane-slider-thumb": "#a3a8a0",
+      "--notepane-brand-accent": "#d9ecf8",
+      "--notepane-pastel-swatch-ink": "#37352f",
+      "--notepane-icon-turn-into": "#4d79b8",
+      "--notepane-icon-colors": "#a45bb9",
+      "--notepane-glass": "#ffffff",
+      "--notepane-shadow-header-glass": "inset 0 1px 0 rgb(255 255 255 / 0.08)",
+      "--notepane-shadow-sidebar-edge": "inset -1px 0 0 rgb(255 255 255 / 0.04)",
+      "--notepane-shadow-swatch": "inset 0 1px 0 rgb(255 255 255 / 0.35)",
+      "--notepane-shadow-color-wheel": "inset 0 0 0 1px rgb(255 255 255 / 0.18), 0 6px 14px rgb(0 0 0 / 0.2)",
+      "--notepane-tooltip-bg": "#2b2b2b",
+      "--notepane-tooltip-text": "#ffffff",
+      "--notepane-tooltip-border": "rgb(255 255 255 / 0.12)",
+      "--notepane-tooltip-muted": "rgb(255 255 255 / 0.68)",
+      "--notepane-adaptive-tooltip-bg": "#2b2b2b",
+      "--notepane-adaptive-tooltip-text": "#ffffff",
+      "--notepane-adaptive-tooltip-border": "rgb(255 255 255 / 0.22)",
+      "--notepane-shadow-adaptive-tooltip": "0 12px 28px rgb(0 0 0 / 0.52)",
+      "--notepane-code-tool-bg": "rgb(15 15 15 / 0.76)",
+      "--notepane-code-tool-border": "rgb(255 255 255 / 0.1)",
+      "--notepane-code-tool-hover-border": "rgb(255 255 255 / 0.18)",
+      "--notepane-code-tool-text": "rgb(255 255 255 / 0.72)",
+      "--notepane-code-tool-hover-bg": "rgb(255 255 255 / 0.1)",
+      "--notepane-code-tool-hover-text": "#fff",
+      "--notepane-code-tool-disabled": "rgb(255 255 255 / 0.3)",
+      "--notepane-code-tool-focus-ring": "rgb(149 179 255 / 0.7)",
+      "--notepane-code-tool-success": "#9ee6ad",
+      "--notepane-code-tool-error": "#ffaaa3"
     },
     "overrideReasons": [
       {
@@ -396,6 +542,98 @@
           "--chrome-icon-button-shadow"
         ],
         "reason": "NotePane Dark's inset glass highlight on table controls, menus and icon buttons is pure white; the derivation uses its text colour #f1f1ef."
+      },
+      {
+        "tokens": [
+          "--notepane-success",
+          "--notepane-progress"
+        ],
+        "reason": "Today's toast status dots: a fixed green and blue, not NotePane's success colour and blue."
+      },
+      {
+        "tokens": [
+          "--notepane-focus-ring",
+          "--notepane-input-focus-border",
+          "--notepane-input-focus-ring"
+        ],
+        "reason": "Today's blue focus rings on the colour wheel and the link and file form inputs; NotePane's accent is lavender."
+      },
+      {
+        "tokens": [
+          "--notepane-input-error",
+          "--notepane-error-text",
+          "--notepane-import-tint"
+        ],
+        "reason": "Today's find no-match border, Markdown import error and import button tint: fixed reds and amber, not the danger and orange palette colours."
+      },
+      {
+        "tokens": [
+          "--notepane-loading-text",
+          "--notepane-slider-thumb"
+        ],
+        "reason": "Today's cool neutral greys for the loading text and the colour slider thumbs, not the warm muted text colour #a5a5a1."
+      },
+      {
+        "tokens": [
+          "--notepane-brand-accent"
+        ],
+        "reason": "The sidebar resize handle hover is the brand pastel sky, not a mix of the window and the accent."
+      },
+      {
+        "tokens": [
+          "--notepane-pastel-swatch-ink"
+        ],
+        "reason": "NotePane Dark shows the pastel presets untouched, so the selected swatch keeps the dark ink #37352f instead of the light text colour."
+      },
+      {
+        "tokens": [
+          "--notepane-icon-turn-into",
+          "--notepane-icon-colors"
+        ],
+        "reason": "Today's block menu icon tones for Turn into and Colors, not the blue and purple editor colours."
+      },
+      {
+        "tokens": [
+          "--notepane-glass",
+          "--notepane-shadow-header-glass",
+          "--notepane-shadow-sidebar-edge",
+          "--notepane-shadow-swatch",
+          "--notepane-shadow-color-wheel"
+        ],
+        "reason": "NotePane draws the glass highlights on the header, sidebar edge, title field, swatches and colour wheel rim in pure white; the derivation uses the text colour."
+      },
+      {
+        "tokens": [
+          "--notepane-tooltip-bg",
+          "--notepane-tooltip-text",
+          "--notepane-tooltip-border",
+          "--notepane-tooltip-muted"
+        ],
+        "reason": "Today's dark tooltip chip: #2b2b2b with white text, a white hairline and white secondary text, lighter than the #242424 panel."
+      },
+      {
+        "tokens": [
+          "--notepane-adaptive-tooltip-bg",
+          "--notepane-adaptive-tooltip-text",
+          "--notepane-adaptive-tooltip-border",
+          "--notepane-shadow-adaptive-tooltip"
+        ],
+        "reason": "NotePane Dark draws its own tooltip as the dark chip (#2b2b2b, white text, a stronger hairline and shadow) instead of the menu panel."
+      },
+      {
+        "tokens": [
+          "--notepane-code-tool-bg",
+          "--notepane-code-tool-border",
+          "--notepane-code-tool-hover-border",
+          "--notepane-code-tool-text",
+          "--notepane-code-tool-hover-bg",
+          "--notepane-code-tool-hover-text",
+          "--notepane-code-tool-disabled",
+          "--notepane-code-tool-focus-ring",
+          "--notepane-code-tool-success",
+          "--notepane-code-tool-error"
+        ],
+        "reason": "Today's code block tool bar: near-black glass with white controls and pastel green and red states over the GitHub-dark code block, not derived from the code colours."
       }
     ]
   }

@@ -63,25 +63,79 @@ test("theme ids are unique", async () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test("NotePane Light tokens equal the captured tokens.css values", async () => {
-  const baseline = require("./fixtures/theme-baseline.json");
-  const { buildThemeTokens } = await loadTokens();
-  const { getTheme } = await loadThemes();
-  assert.deepEqual(
-    normaliseTokens(buildThemeTokens(getTheme("notepane-light"))),
-    normaliseTokens(baseline.tokens.light),
-  );
-});
+// Tokens that replaced colours the stylesheets wrote as literals, which the tokens.css capture
+// predates. Each pins today's value in [NotePane Light, NotePane Dark]: the literal, or the
+// token the rule read. The dark tooltip frame was #2b2b2b, the dark chip colour.
+const STYLESHEET_LITERAL_TOKENS = {
+  "--notepane-glass": ["#ffffff", "#ffffff"],
+  "--notepane-shadow-color": ["#000000", "#000000"],
+  "--notepane-shadow-header-glass": ["inset 0 1px 0 rgb(255 255 255 / 0.08)", "inset 0 1px 0 rgb(255 255 255 / 0.08)"],
+  "--notepane-shadow-sidebar-edge": ["inset -1px 0 0 rgb(255 255 255 / 0.04)", "inset -1px 0 0 rgb(255 255 255 / 0.04)"],
+  "--notepane-shadow-swatch": ["inset 0 1px 0 rgb(255 255 255 / 0.35)", "inset 0 1px 0 rgb(255 255 255 / 0.35)"],
+  "--notepane-shadow-color-wheel": [
+    "inset 0 0 0 1px rgb(255 255 255 / 0.18), 0 6px 14px rgb(0 0 0 / 0.2)",
+    "inset 0 0 0 1px rgb(255 255 255 / 0.18), 0 6px 14px rgb(0 0 0 / 0.2)",
+  ],
+  "--notepane-shadow-history-panel": ["0 18px 45px rgb(0 0 0 / 0.2)", "0 18px 45px rgb(0 0 0 / 0.2)"],
+  "--notepane-backdrop-preferences": ["rgb(0 0 0 / 0.18)", "rgb(0 0 0 / 0.18)"],
+  "--notepane-backdrop-history": ["rgb(0 0 0 / 0.28)", "rgb(0 0 0 / 0.28)"],
+  "--notepane-backdrop-crop": ["rgb(0 0 0 / 0.34)", "rgb(0 0 0 / 0.34)"],
+  "--notepane-success": ["#2f9e44", "#2f9e44"],
+  "--notepane-progress": ["#3478f6", "#3478f6"],
+  "--notepane-focus-ring": ["rgb(90 150 255 / 0.66)", "rgb(90 150 255 / 0.66)"],
+  "--notepane-input-focus-border": ["#2383e2", "#2383e2"],
+  "--notepane-input-focus-ring": ["rgb(35 131 226 / 0.18)", "rgb(35 131 226 / 0.18)"],
+  "--notepane-input-error": ["#e5484d", "#e5484d"],
+  "--notepane-error-text": ["#d95c5c", "#d95c5c"],
+  "--notepane-import-tint": ["#b45309", "#b45309"],
+  "--notepane-loading-text": ["#9ca3af", "#9ca3af"],
+  "--notepane-slider-thumb": ["#a3a8a0", "#a3a8a0"],
+  "--notepane-brand-accent": ["#d9ecf8", "#d9ecf8"],
+  "--notepane-pastel-swatch-ink": ["#37352f", "#37352f"],
+  "--notepane-icon-turn-into": ["#4d79b8", "#4d79b8"],
+  "--notepane-icon-colors": ["#a45bb9", "#a45bb9"],
+  "--notepane-tooltip-bg": ["#2f3437", "#2b2b2b"],
+  "--notepane-tooltip-text": ["#ffffff", "#ffffff"],
+  "--notepane-tooltip-border": ["rgb(255 255 255 / 0.12)", "rgb(255 255 255 / 0.12)"],
+  "--notepane-tooltip-muted": ["rgb(255 255 255 / 0.68)", "rgb(255 255 255 / 0.68)"],
+  "--notepane-tooltip-frame-bg": ["transparent", "var(--notepane-tooltip-bg)"],
+  "--notepane-shadow-tooltip": ["0 5px 14px rgb(0 0 0 / 0.2)", "0 5px 14px rgb(0 0 0 / 0.2)"],
+  "--notepane-adaptive-tooltip-bg": ["var(--sticky-panel-bg)", "#2b2b2b"],
+  "--notepane-adaptive-tooltip-text": ["var(--sticky-panel-text)", "#ffffff"],
+  "--notepane-adaptive-tooltip-border": ["var(--sticky-border-color)", "rgb(255 255 255 / 0.22)"],
+  "--notepane-shadow-adaptive-tooltip": ["var(--sticky-menu-shadow)", "0 12px 28px rgb(0 0 0 / 0.52)"],
+  "--notepane-code-tool-bg": ["rgb(15 15 15 / 0.76)", "rgb(15 15 15 / 0.76)"],
+  "--notepane-code-tool-border": ["rgb(255 255 255 / 0.1)", "rgb(255 255 255 / 0.1)"],
+  "--notepane-code-tool-hover-border": ["rgb(255 255 255 / 0.18)", "rgb(255 255 255 / 0.18)"],
+  "--notepane-code-tool-text": ["rgb(255 255 255 / 0.72)", "rgb(255 255 255 / 0.72)"],
+  "--notepane-code-tool-hover-bg": ["rgb(255 255 255 / 0.1)", "rgb(255 255 255 / 0.1)"],
+  "--notepane-code-tool-hover-text": ["#fff", "#fff"],
+  "--notepane-code-tool-disabled": ["rgb(255 255 255 / 0.3)", "rgb(255 255 255 / 0.3)"],
+  "--notepane-code-tool-focus-ring": ["rgb(149 179 255 / 0.7)", "rgb(149 179 255 / 0.7)"],
+  "--notepane-code-tool-success": ["#9ee6ad", "#9ee6ad"],
+  "--notepane-code-tool-error": ["#ffaaa3", "#ffaaa3"],
+  "--notepane-shadow-code-tool": ["0 5px 14px rgb(0 0 0 / 0.22)", "0 5px 14px rgb(0 0 0 / 0.22)"],
+};
 
-test("NotePane Dark tokens equal the captured tokens.css values", async () => {
+async function assertNotePaneTokens(themeId, scheme) {
   const baseline = require("./fixtures/theme-baseline.json");
   const { buildThemeTokens } = await loadTokens();
   const { getTheme } = await loadThemes();
-  assert.deepEqual(
-    normaliseTokens(buildThemeTokens(getTheme("notepane-dark"))),
-    normaliseTokens(baseline.tokens.dark),
-  );
-});
+  const literalIndex = scheme === "dark" ? 1 : 0;
+  const expected = {
+    ...baseline.tokens[scheme],
+    ...Object.fromEntries(
+      Object.entries(STYLESHEET_LITERAL_TOKENS).map(([name, values]) => [name, values[literalIndex]]),
+    ),
+  };
+  assert.deepEqual(normaliseTokens(buildThemeTokens(getTheme(themeId))), normaliseTokens(expected));
+}
+
+test("NotePane Light tokens equal the captured tokens.css values and today's stylesheet literals", () =>
+  assertNotePaneTokens("notepane-light", "light"));
+
+test("NotePane Dark tokens equal the captured tokens.css values and today's stylesheet literals", () =>
+  assertNotePaneTokens("notepane-dark", "dark"));
 
 test("buildThemeTokens never emits the non-colour tokens", async () => {
   const { THEME_TOKEN_NAMES } = await loadTokens();

@@ -1,95 +1,5 @@
 [
   {
-    "screen": "dark / crop dialog",
-    "selector": "div.crop-dialog[role=\"dialog\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.34)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "circle:nth-of-type(3)",
-    "property": "fill",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "circle:nth-of-type(3)",
-    "property": "stroke",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "circle:nth-of-type(4)",
-    "property": "fill",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "circle:nth-of-type(4)",
-    "property": "stroke",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "svg.lucide.lucide-arrow-right-left.notepane-block-menu-icon.is-turn-into > path:nth-of-type(1)",
-    "property": "stroke",
-    "value": "rgb(77, 121, 184)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "svg.lucide.lucide-arrow-right-left.notepane-block-menu-icon.is-turn-into > path:nth-of-type(2)",
-    "property": "stroke",
-    "value": "rgb(77, 121, 184)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "svg.lucide.lucide-arrow-right-left.notepane-block-menu-icon.is-turn-into > path:nth-of-type(3)",
-    "property": "stroke",
-    "value": "rgb(77, 121, 184)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "svg.lucide.lucide-arrow-right-left.notepane-block-menu-icon.is-turn-into > path:nth-of-type(4)",
-    "property": "stroke",
-    "value": "rgb(77, 121, 184)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "svg.lucide.lucide-palette.notepane-block-menu-icon.is-colors > circle:nth-of-type(1)",
-    "property": "fill",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "svg.lucide.lucide-palette.notepane-block-menu-icon.is-colors > circle:nth-of-type(1)",
-    "property": "stroke",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "svg.lucide.lucide-palette.notepane-block-menu-icon.is-colors > circle:nth-of-type(2)",
-    "property": "fill",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "svg.lucide.lucide-palette.notepane-block-menu-icon.is-colors > circle:nth-of-type(2)",
-    "property": "stroke",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "dark / drag handle menu",
-    "selector": "svg.lucide.lucide-palette.notepane-block-menu-icon.is-colors path",
-    "property": "stroke",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "dark / error toast",
-    "selector": "div.sticky-toast.sticky-toast-error[role=\"status\"]",
-    "property": "box-shadow[1]",
-    "value": "color(srgb 1 1 1 / 0.42)"
-  },
-  {
     "screen": "dark / find bar",
     "selector": "span.shiki.notepane-find-match",
     "property": "color",
@@ -115,12 +25,6 @@
   },
   {
     "screen": "dark / note",
-    "selector": "button.code-block-tool-button.code-block-prettify-button.is-idle",
-    "property": "color",
-    "value": "rgba(255, 255, 255, 0.72)"
-  },
-  {
-    "screen": "dark / note",
     "selector": "div.bn-block-content[data-content-type=\"codeBlock\"]",
     "property": "background-color",
     "value": "rgb(36, 41, 46)"
@@ -142,42 +46,6 @@
     "selector": "div.bn-block-outer:nth-of-type(7) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
     "property": "accent-color",
     "value": "auto"
-  },
-  {
-    "screen": "dark / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "background-color",
-    "value": "rgba(15, 15, 15, 0.76)"
-  },
-  {
-    "screen": "dark / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-bottom-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "dark / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-left-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "dark / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-right-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "dark / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-top-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "dark / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(0, 0, 0, 0.22)"
   },
   {
     "screen": "dark / note",
@@ -282,48 +150,6 @@
     "value": "rgb(225, 228, 232)"
   },
   {
-    "screen": "dark / note",
-    "selector": "svg.lucide.lucide-copy path",
-    "property": "stroke",
-    "value": "rgba(255, 255, 255, 0.72)"
-  },
-  {
-    "screen": "dark / note",
-    "selector": "svg.lucide.lucide-copy rect",
-    "property": "stroke",
-    "value": "rgba(255, 255, 255, 0.72)"
-  },
-  {
-    "screen": "dark / preferences: Editor",
-    "selector": "div.editor-font-family-combobox",
-    "property": "box-shadow[0]",
-    "value": "color(srgb 1 1 1 / 0.26)"
-  },
-  {
-    "screen": "dark / preferences: Editor",
-    "selector": "div.editor-font-size-combobox",
-    "property": "box-shadow[0]",
-    "value": "color(srgb 1 1 1 / 0.26)"
-  },
-  {
-    "screen": "dark / preferences: Editor",
-    "selector": "div.preferences-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "dark / preferences: General",
-    "selector": "div.editor-font-family-combobox",
-    "property": "box-shadow[0]",
-    "value": "color(srgb 1 1 1 / 0.26)"
-  },
-  {
-    "screen": "dark / preferences: General",
-    "selector": "div.preferences-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
     "screen": "dark / preferences: General",
     "selector": "span.theme-mode-switch-icon.moon",
     "property": "color",
@@ -340,42 +166,6 @@
     "selector": "span.theme-mode-switch-thumb",
     "property": "box-shadow[0]",
     "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "dark / preferences: Shortcuts",
-    "selector": "div.preferences-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "dark / preferences: Trash",
-    "selector": "div.preferences-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "dark / session colour panel",
-    "selector": "div.color-wheel[role=\"slider\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(255, 255, 255, 0.18)"
-  },
-  {
-    "screen": "dark / session colour panel",
-    "selector": "div.color-wheel[role=\"slider\"]",
-    "property": "box-shadow[1]",
-    "value": "rgba(0, 0, 0, 0.2)"
-  },
-  {
-    "screen": "dark / session colour panel",
-    "selector": "div.color-wheel[role=\"slider\"]",
-    "property": "outline-color",
-    "value": "rgba(90, 150, 255, 0.66)"
-  },
-  {
-    "screen": "dark / session tab menu",
-    "selector": "span.session-tab-menu-color-swatch",
-    "property": "box-shadow[0]",
-    "value": "rgba(255, 255, 255, 0.35)"
   },
   {
     "screen": "dark / session trash confirmation",
@@ -637,45 +427,9 @@
   },
   {
     "screen": "dark / sticky settings",
-    "selector": "div.color-wheel[role=\"slider\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(255, 255, 255, 0.18)"
-  },
-  {
-    "screen": "dark / sticky settings",
-    "selector": "div.color-wheel[role=\"slider\"]",
-    "property": "box-shadow[1]",
-    "value": "rgba(0, 0, 0, 0.2)"
-  },
-  {
-    "screen": "dark / sticky settings",
     "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
     "property": "background-color",
     "value": "rgb(255, 242, 184)"
-  },
-  {
-    "screen": "dark / sticky settings",
-    "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
-    "property": "border-bottom-color",
-    "value": "color(srgb 0.701961 0.667373 0.517412)"
-  },
-  {
-    "screen": "dark / sticky settings",
-    "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
-    "property": "border-left-color",
-    "value": "color(srgb 0.701961 0.667373 0.517412)"
-  },
-  {
-    "screen": "dark / sticky settings",
-    "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
-    "property": "border-right-color",
-    "value": "color(srgb 0.701961 0.667373 0.517412)"
-  },
-  {
-    "screen": "dark / sticky settings",
-    "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
-    "property": "border-top-color",
-    "value": "color(srgb 0.701961 0.667373 0.517412)"
   },
   {
     "screen": "dark / sticky settings",
@@ -829,12 +583,6 @@
   },
   {
     "screen": "dark / sticky settings",
-    "selector": "div.preferences-backdrop.sticky-settings-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "dark / sticky settings",
     "selector": "div.preferences-window-subtitle",
     "property": "color",
     "value": "rgba(55, 53, 47, 0.68)"
@@ -958,12 +706,6 @@
     "selector": "blockquote.bn-inline-content",
     "property": "color",
     "value": "rgb(55, 53, 47)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "button.code-block-tool-button.code-block-prettify-button.is-idle",
-    "property": "color",
-    "value": "rgba(255, 255, 255, 0.72)"
   },
   {
     "screen": "dark / sticky window",
@@ -1141,42 +883,6 @@
   },
   {
     "screen": "dark / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "background-color",
-    "value": "rgba(15, 15, 15, 0.76)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-bottom-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-left-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-right-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-top-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(0, 0, 0, 0.22)"
-  },
-  {
-    "screen": "dark / sticky window",
     "selector": "div.tiptap.ProseMirror.bn-editor.bn-default-styles.ProseMirror-focused[role=\"textbox\"]",
     "property": "caret-color",
     "value": "rgb(55, 53, 47)"
@@ -1228,12 +934,6 @@
     "selector": "pre",
     "property": "background-color",
     "value": "rgb(36, 41, 46)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "rect",
-    "property": "stroke",
-    "value": "rgba(255, 255, 255, 0.72)"
   },
   {
     "screen": "dark / sticky window",
@@ -1384,12 +1084,6 @@
     "selector": "span[data-style-type=\"backgroundColor\"][data-value=\"yellow\"]",
     "property": "color",
     "value": "rgb(55, 53, 47)"
-  },
-  {
-    "screen": "dark / sticky window",
-    "selector": "svg.lucide.lucide-copy path",
-    "property": "stroke",
-    "value": "rgba(255, 255, 255, 0.72)"
   },
   {
     "screen": "dark / sticky window",
@@ -1770,24 +1464,6 @@
     "value": "rgb(55, 53, 47)"
   },
   {
-    "screen": "dark / success toast",
-    "selector": "div.sticky-toast.sticky-toast-success[role=\"status\"]",
-    "property": "box-shadow[1]",
-    "value": "color(srgb 1 1 1 / 0.42)"
-  },
-  {
-    "screen": "dark / success toast",
-    "selector": "div.sticky-toast.sticky-toast-success[role=\"status\"]::before",
-    "property": "background-color",
-    "value": "rgb(47, 158, 68)"
-  },
-  {
-    "screen": "dark / tabs window",
-    "selector": "aside.session-sidebar[data-testid=\"session-sidebar\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(255, 255, 255, 0.04)"
-  },
-  {
     "screen": "dark / tabs window",
     "selector": "div.session-tab-row.active",
     "property": "background-color",
@@ -1878,126 +1554,6 @@
     "value": "color(srgb 0.121569 0.121569 0.121569 / 0.505098)"
   },
   {
-    "screen": "dark / tabs window",
-    "selector": "header.sticky-header[data-testid=\"sticky-header\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(255, 255, 255, 0.08)"
-  },
-  {
-    "screen": "dark / toast with action",
-    "selector": "div.sticky-toast.sticky-toast-success[role=\"status\"]",
-    "property": "box-shadow[1]",
-    "value": "color(srgb 1 1 1 / 0.42)"
-  },
-  {
-    "screen": "dark / toast with action",
-    "selector": "div.sticky-toast.sticky-toast-success[role=\"status\"]::before",
-    "property": "background-color",
-    "value": "rgb(47, 158, 68)"
-  },
-  {
-    "screen": "dark / version history",
-    "selector": "div.version-history-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.28)"
-  },
-  {
-    "screen": "dark / version history",
-    "selector": "section.version-history-panel[role=\"dialog\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(0, 0, 0, 0.2)"
-  },
-  {
-    "screen": "light / crop dialog",
-    "selector": "div.crop-dialog[role=\"dialog\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.34)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "circle:nth-of-type(3)",
-    "property": "fill",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "circle:nth-of-type(3)",
-    "property": "stroke",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "circle:nth-of-type(4)",
-    "property": "fill",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "circle:nth-of-type(4)",
-    "property": "stroke",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "svg.lucide.lucide-arrow-right-left.notepane-block-menu-icon.is-turn-into > path:nth-of-type(1)",
-    "property": "stroke",
-    "value": "rgb(77, 121, 184)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "svg.lucide.lucide-arrow-right-left.notepane-block-menu-icon.is-turn-into > path:nth-of-type(2)",
-    "property": "stroke",
-    "value": "rgb(77, 121, 184)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "svg.lucide.lucide-arrow-right-left.notepane-block-menu-icon.is-turn-into > path:nth-of-type(3)",
-    "property": "stroke",
-    "value": "rgb(77, 121, 184)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "svg.lucide.lucide-arrow-right-left.notepane-block-menu-icon.is-turn-into > path:nth-of-type(4)",
-    "property": "stroke",
-    "value": "rgb(77, 121, 184)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "svg.lucide.lucide-palette.notepane-block-menu-icon.is-colors > circle:nth-of-type(1)",
-    "property": "fill",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "svg.lucide.lucide-palette.notepane-block-menu-icon.is-colors > circle:nth-of-type(1)",
-    "property": "stroke",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "svg.lucide.lucide-palette.notepane-block-menu-icon.is-colors > circle:nth-of-type(2)",
-    "property": "fill",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "svg.lucide.lucide-palette.notepane-block-menu-icon.is-colors > circle:nth-of-type(2)",
-    "property": "stroke",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "light / drag handle menu",
-    "selector": "svg.lucide.lucide-palette.notepane-block-menu-icon.is-colors path",
-    "property": "stroke",
-    "value": "rgb(164, 91, 185)"
-  },
-  {
-    "screen": "light / error toast",
-    "selector": "div.sticky-toast.sticky-toast-error[role=\"status\"]",
-    "property": "box-shadow[1]",
-    "value": "color(srgb 1 1 1 / 0.42)"
-  },
-  {
     "screen": "light / find bar",
     "selector": "span.shiki.notepane-find-match",
     "property": "color",
@@ -2023,12 +1579,6 @@
   },
   {
     "screen": "light / note",
-    "selector": "button.code-block-tool-button.code-block-prettify-button.is-idle",
-    "property": "color",
-    "value": "rgba(255, 255, 255, 0.72)"
-  },
-  {
-    "screen": "light / note",
     "selector": "div.bn-block-content[data-content-type=\"codeBlock\"]",
     "property": "background-color",
     "value": "rgb(36, 41, 46)"
@@ -2050,42 +1600,6 @@
     "selector": "div.bn-block-outer:nth-of-type(7) > div.bn-block > div.bn-block-content[data-content-type=\"checkListItem\"] > div > input[type=\"checkbox\"]",
     "property": "accent-color",
     "value": "auto"
-  },
-  {
-    "screen": "light / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "background-color",
-    "value": "rgba(15, 15, 15, 0.76)"
-  },
-  {
-    "screen": "light / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-bottom-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "light / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-left-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "light / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-right-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "light / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-top-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "light / note",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(0, 0, 0, 0.22)"
   },
   {
     "screen": "light / note",
@@ -2190,48 +1704,6 @@
     "value": "rgb(225, 228, 232)"
   },
   {
-    "screen": "light / note",
-    "selector": "svg.lucide.lucide-copy path",
-    "property": "stroke",
-    "value": "rgba(255, 255, 255, 0.72)"
-  },
-  {
-    "screen": "light / note",
-    "selector": "svg.lucide.lucide-copy rect",
-    "property": "stroke",
-    "value": "rgba(255, 255, 255, 0.72)"
-  },
-  {
-    "screen": "light / preferences: Editor",
-    "selector": "div.editor-font-family-combobox",
-    "property": "box-shadow[0]",
-    "value": "color(srgb 1 1 1 / 0.26)"
-  },
-  {
-    "screen": "light / preferences: Editor",
-    "selector": "div.editor-font-size-combobox",
-    "property": "box-shadow[0]",
-    "value": "color(srgb 1 1 1 / 0.26)"
-  },
-  {
-    "screen": "light / preferences: Editor",
-    "selector": "div.preferences-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "light / preferences: General",
-    "selector": "div.editor-font-family-combobox",
-    "property": "box-shadow[0]",
-    "value": "color(srgb 1 1 1 / 0.26)"
-  },
-  {
-    "screen": "light / preferences: General",
-    "selector": "div.preferences-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
     "screen": "light / preferences: General",
     "selector": "span.theme-mode-switch-icon.moon",
     "property": "color",
@@ -2248,42 +1720,6 @@
     "selector": "span.theme-mode-switch-thumb",
     "property": "box-shadow[0]",
     "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "light / preferences: Shortcuts",
-    "selector": "div.preferences-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "light / preferences: Trash",
-    "selector": "div.preferences-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "light / session colour panel",
-    "selector": "div.color-wheel[role=\"slider\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(255, 255, 255, 0.18)"
-  },
-  {
-    "screen": "light / session colour panel",
-    "selector": "div.color-wheel[role=\"slider\"]",
-    "property": "box-shadow[1]",
-    "value": "rgba(0, 0, 0, 0.2)"
-  },
-  {
-    "screen": "light / session colour panel",
-    "selector": "div.color-wheel[role=\"slider\"]",
-    "property": "outline-color",
-    "value": "rgba(90, 150, 255, 0.66)"
-  },
-  {
-    "screen": "light / session tab menu",
-    "selector": "span.session-tab-menu-color-swatch",
-    "property": "box-shadow[0]",
-    "value": "rgba(255, 255, 255, 0.35)"
   },
   {
     "screen": "light / session trash confirmation",
@@ -2545,45 +1981,9 @@
   },
   {
     "screen": "light / sticky settings",
-    "selector": "div.color-wheel[role=\"slider\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(255, 255, 255, 0.18)"
-  },
-  {
-    "screen": "light / sticky settings",
-    "selector": "div.color-wheel[role=\"slider\"]",
-    "property": "box-shadow[1]",
-    "value": "rgba(0, 0, 0, 0.2)"
-  },
-  {
-    "screen": "light / sticky settings",
     "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
     "property": "background-color",
     "value": "rgb(255, 242, 184)"
-  },
-  {
-    "screen": "light / sticky settings",
-    "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
-    "property": "border-bottom-color",
-    "value": "color(srgb 0.701961 0.667373 0.517412)"
-  },
-  {
-    "screen": "light / sticky settings",
-    "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
-    "property": "border-left-color",
-    "value": "color(srgb 0.701961 0.667373 0.517412)"
-  },
-  {
-    "screen": "light / sticky settings",
-    "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
-    "property": "border-right-color",
-    "value": "color(srgb 0.701961 0.667373 0.517412)"
-  },
-  {
-    "screen": "light / sticky settings",
-    "selector": "div.pastel-preset-row[role=\"group\"]:nth-of-type(2) > button:nth-of-type(1)",
-    "property": "border-top-color",
-    "value": "color(srgb 0.701961 0.667373 0.517412)"
   },
   {
     "screen": "light / sticky settings",
@@ -2737,12 +2137,6 @@
   },
   {
     "screen": "light / sticky settings",
-    "selector": "div.preferences-backdrop.sticky-settings-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.18)"
-  },
-  {
-    "screen": "light / sticky settings",
     "selector": "div.preferences-window-subtitle",
     "property": "color",
     "value": "rgba(55, 53, 47, 0.68)"
@@ -2866,12 +2260,6 @@
     "selector": "blockquote.bn-inline-content",
     "property": "color",
     "value": "rgb(55, 53, 47)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "button.code-block-tool-button.code-block-prettify-button.is-idle",
-    "property": "color",
-    "value": "rgba(255, 255, 255, 0.72)"
   },
   {
     "screen": "light / sticky window",
@@ -3049,42 +2437,6 @@
   },
   {
     "screen": "light / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "background-color",
-    "value": "rgba(15, 15, 15, 0.76)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-bottom-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-left-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-right-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "border-top-color",
-    "value": "rgba(255, 255, 255, 0.1)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "div.code-block-tools[role=\"toolbar\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(0, 0, 0, 0.22)"
-  },
-  {
-    "screen": "light / sticky window",
     "selector": "div.tiptap.ProseMirror.bn-editor.bn-default-styles.ProseMirror-focused[role=\"textbox\"]",
     "property": "caret-color",
     "value": "rgb(55, 53, 47)"
@@ -3136,12 +2488,6 @@
     "selector": "pre",
     "property": "background-color",
     "value": "rgb(36, 41, 46)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "rect",
-    "property": "stroke",
-    "value": "rgba(255, 255, 255, 0.72)"
   },
   {
     "screen": "light / sticky window",
@@ -3292,12 +2638,6 @@
     "selector": "span[data-style-type=\"backgroundColor\"][data-value=\"yellow\"]",
     "property": "color",
     "value": "rgb(55, 53, 47)"
-  },
-  {
-    "screen": "light / sticky window",
-    "selector": "svg.lucide.lucide-copy path",
-    "property": "stroke",
-    "value": "rgba(255, 255, 255, 0.72)"
   },
   {
     "screen": "light / sticky window",
@@ -3678,24 +3018,6 @@
     "value": "rgb(55, 53, 47)"
   },
   {
-    "screen": "light / success toast",
-    "selector": "div.sticky-toast.sticky-toast-success[role=\"status\"]",
-    "property": "box-shadow[1]",
-    "value": "color(srgb 1 1 1 / 0.42)"
-  },
-  {
-    "screen": "light / success toast",
-    "selector": "div.sticky-toast.sticky-toast-success[role=\"status\"]::before",
-    "property": "background-color",
-    "value": "rgb(47, 158, 68)"
-  },
-  {
-    "screen": "light / tabs window",
-    "selector": "aside.session-sidebar[data-testid=\"session-sidebar\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(255, 255, 255, 0.04)"
-  },
-  {
     "screen": "light / tabs window",
     "selector": "div.session-tab-row.active",
     "property": "background-color",
@@ -3784,35 +3106,5 @@
     "selector": "div.session-tab-row:nth-of-type(2) > span.session-tab-trailing > span.session-shortcut",
     "property": "color",
     "value": "color(srgb 0.121569 0.121569 0.121569 / 0.505098)"
-  },
-  {
-    "screen": "light / tabs window",
-    "selector": "header.sticky-header[data-testid=\"sticky-header\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(255, 255, 255, 0.08)"
-  },
-  {
-    "screen": "light / toast with action",
-    "selector": "div.sticky-toast.sticky-toast-success[role=\"status\"]",
-    "property": "box-shadow[1]",
-    "value": "color(srgb 1 1 1 / 0.42)"
-  },
-  {
-    "screen": "light / toast with action",
-    "selector": "div.sticky-toast.sticky-toast-success[role=\"status\"]::before",
-    "property": "background-color",
-    "value": "rgb(47, 158, 68)"
-  },
-  {
-    "screen": "light / version history",
-    "selector": "div.version-history-backdrop[role=\"presentation\"]",
-    "property": "background-color",
-    "value": "rgba(0, 0, 0, 0.28)"
-  },
-  {
-    "screen": "light / version history",
-    "selector": "section.version-history-panel[role=\"dialog\"]",
-    "property": "box-shadow[0]",
-    "value": "rgba(0, 0, 0, 0.2)"
   }
 ]

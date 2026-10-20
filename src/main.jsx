@@ -181,6 +181,7 @@ import {
 import {
   applyThemeToDocument,
   readInitialThemeId,
+  withExportTheme,
 } from "./style/applyTheme.js";
 import {
   getTheme,
@@ -1975,19 +1976,22 @@ function StickyEditor({
       document.body.classList.add("is-exporting");
     }
     try {
-      if (isPdf) {
-        await nextAnimationFrame();
-        await nextAnimationFrame();
-      }
-      const markdown = isPdf
-        ? undefined
-        : await editor.blocksToMarkdownLossy(editor.document);
-      const result = await electronApi?.exportNote({
-        noteId: note.id,
-        title: normalizeTitle(title),
-        type,
-        markdown,
-      });
+      const render = async () => {
+        if (isPdf) {
+          await nextAnimationFrame();
+          await nextAnimationFrame();
+        }
+        const markdown = isPdf
+          ? undefined
+          : await editor.blocksToMarkdownLossy(editor.document);
+        return electronApi?.exportNote({
+          noteId: note.id,
+          title: normalizeTitle(title),
+          type,
+          markdown,
+        });
+      };
+      const result = isPdf ? await withExportTheme(render) : await render();
 
       if (result?.canceled) {
         hideExportToast();
