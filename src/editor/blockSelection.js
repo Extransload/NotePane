@@ -1,4 +1,4 @@
-import { Selection, SelectionRange } from "@tiptap/pm/state";
+import { Selection, SelectionRange, TextSelection } from "@tiptap/pm/state";
 
 // A selection of whole blockContainers: one range per run of adjacent siblings.
 export class BlockSetSelection extends Selection {
@@ -72,4 +72,19 @@ export function getSelectedBlocks(editor) {
     return getBlockSetIds(selection).map((id) => editor.getBlock(id)).filter(Boolean);
   }
   return editor.getSelection()?.blocks ?? [];
+}
+
+// Removes every block of the block set and leaves the caret in one empty paragraph where the first
+// run was, in one transaction. Later runs go first, so the first run's positions need no mapping.
+export function replaceBlockSelectionWithParagraph(view) {
+  const { state } = view;
+  const { ranges } = state.selection;
+  const { blockContainer, paragraph } = state.schema.nodes;
+  const tr = state.tr;
+  for (let i = ranges.length - 1; i > 0; i -= 1) tr.deleteRange(ranges[i].$from.pos, ranges[i].$to.pos);
+  const start = ranges[0].$from.pos;
+  tr.replaceWith(start, ranges[0].$to.pos, blockContainer.create(null, paragraph.create()));
+  // Inside the new blockContainer, then inside its paragraph.
+  tr.setSelection(TextSelection.create(tr.doc, start + 2));
+  view.dispatch(tr.scrollIntoView());
 }

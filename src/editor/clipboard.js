@@ -7,27 +7,26 @@ export function normalizeCopiedEditorPlainText(editor, clipboardText, selectedTe
 
   try {
     normalizedPlainText = editor.transact((transaction) => {
+      // A non-contiguous block selection has one range per run of blocks.
+      const { ranges } = transaction.selection;
       let containsHardBreak = false;
-      transaction.doc.nodesBetween(
-        transaction.selection.from,
-        transaction.selection.to,
-        (node) => {
+      for (const { $from, $to } of ranges) {
+        transaction.doc.nodesBetween($from.pos, $to.pos, (node) => {
           if (node.type.name === "hardBreak") {
             containsHardBreak = true;
           }
-        },
-      );
+        });
+      }
 
       if (!containsHardBreak) {
         return normalizedPlainText;
       }
 
-      return transaction.doc.textBetween(
-        transaction.selection.from,
-        transaction.selection.to,
-        "\n",
-        "\n",
-      );
+      return ranges
+        .map(({ $from, $to }) =>
+          transaction.doc.textBetween($from.pos, $to.pos, "\n", "\n"),
+        )
+        .join("\n");
     });
   } catch {
     // Keep the clipboard serializer output when the editor selection is unavailable.

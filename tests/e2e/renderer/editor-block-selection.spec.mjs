@@ -361,3 +361,97 @@ test("auto-scrolls a text drag held at the bottom edge", async ({ page }) => {
   })).toEqual({ blocks: [], reachesLine20: true });
   await page.mouse.up();
 });
+
+// {Alpha, Charlie} block-selected with Bravo unselected between them.
+async function selectAlphaAndCharlie(page) {
+  await pasteSelectionFixture(page);
+  await marquee(page, "Alpha paragraph", "Alpha paragraph");
+  await marquee(page, "Charlie paragraph", "Charlie paragraph", { modifier: "Shift" });
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
+}
+
+async function firstBlockTexts(page, count) {
+  const texts = await page.locator(".bn-editor .bn-block-content").allTextContents();
+  return texts.slice(0, count).map((text) => text.trim());
+}
+
+// Seeded first, so a stale clipboard from an earlier test cannot satisfy the assertions.
+async function expectClipboardHoldsAlphaAndCharlie(page) {
+  await expect.poll(() => clipboardText(page)).toContain("Alpha paragraph");
+  const copied = await clipboardText(page);
+  expect(copied).toContain("Charlie paragraph");
+  expect(copied).not.toContain("Bravo");
+}
+
+test("copies exactly the blocks of a non-contiguous selection", async ({ page }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate(() => navigator.clipboard.writeText("clipboard before the copy"));
+  await selectAlphaAndCharlie(page);
+
+  await page.keyboard.press(modifierShortcut("C"));
+
+  await expectClipboardHoldsAlphaAndCharlie(page);
+});
+
+test("cuts exactly the blocks of a non-contiguous selection", async ({ page }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate(() => navigator.clipboard.writeText("clipboard before the cut"));
+  await selectAlphaAndCharlie(page);
+
+  await page.keyboard.press(modifierShortcut("X"));
+
+  await expectClipboardHoldsAlphaAndCharlie(page);
+  await expect(row(page, "Alpha paragraph")).toHaveCount(0);
+  await expect(row(page, "Charlie paragraph")).toHaveCount(0);
+  await expect(row(page, "Bravo paragraph")).toHaveCount(1);
+});
+
+test("deletes a non-contiguous selection and restores it with one undo", async ({ page }) => {
+  await selectAlphaAndCharlie(page);
+
+  await page.keyboard.press("Backspace");
+  await expect(row(page, "Alpha paragraph")).toHaveCount(0);
+  await expect(row(page, "Charlie paragraph")).toHaveCount(0);
+  await expect(row(page, "Bravo paragraph")).toHaveCount(1);
+
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect.poll(() => firstBlockTexts(page, 3))
+    .toEqual(["Alpha paragraph", "Bravo paragraph", "Charlie paragraph"]);
+});
+
+test("replaces a non-contiguous selection with typed text", async ({ page }) => {
+  await selectAlphaAndCharlie(page);
+
+  await page.keyboard.type("x");
+
+  await expect.poll(() => firstBlockTexts(page, 2)).toEqual(["x", "Bravo paragraph"]);
+  await expect(row(page, "Charlie paragraph")).toHaveCount(0);
+});
+
+test("replaces a non-contiguous selection with Korean IME text", async ({ page }) => {
+  await selectAlphaAndCharlie(page);
+  const cdp = await page.context().newCDPSession(page);
+
+  await cdp.send("Input.imeSetComposition", { text: "ㅎ", selectionStart: 1, selectionEnd: 1 });
+  await cdp.send("Input.imeSetComposition", { text: "하", selectionStart: 1, selectionEnd: 1 });
+  await cdp.send("Input.insertText", { text: "한" });
+
+  await expect.poll(() => firstBlockTexts(page, 2)).toEqual(["한", "Bravo paragraph"]);
+  await expect(row(page, "Charlie paragraph")).toHaveCount(0);
+  await expect(row(page, "Delta bullet")).toHaveCount(1);
+});
+
+test("keeps the unselected block when Enter is pressed on a non-contiguous selection", async ({ page }) => {
+  // BlockNote's own Enter throws on a block set, which would also leave the blocks in place.
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await selectAlphaAndCharlie(page);
+
+  await page.keyboard.press("Enter");
+  expect(pageErrors).toEqual([]);
+
+  await expect(row(page, "Alpha paragraph")).toHaveCount(1);
+  await expect(row(page, "Bravo paragraph")).toHaveCount(1);
+  await expect(row(page, "Charlie paragraph")).toHaveCount(1);
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
+});

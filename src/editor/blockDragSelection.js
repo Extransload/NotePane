@@ -3,7 +3,12 @@ import { closeHistory } from "@tiptap/pm/history";
 import { Plugin, Selection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { clamp } from "../utils/values.js";
-import { createBlockSetSelection, getBlockSetIds, isBlockSetSelection } from "./blockSelection.js";
+import {
+  createBlockSetSelection,
+  getBlockSetIds,
+  isBlockSetSelection,
+  replaceBlockSelectionWithParagraph,
+} from "./blockSelection.js";
 import { normalizeTouchedBlocks } from "./blockSelectionRules.js";
 import { focusLastEditorBlock, isEmptyEditorSurfacePointer } from "./blocks.js";
 
@@ -218,6 +223,22 @@ function marqueeView(editor, view) {
   };
 }
 
+// Keys acting on a block set. Returns true when the key is handled and the editor must ignore it.
+function handleBlockSetKeyDown(view, event) {
+  // An IME composes into the DOM selection, which spans the unselected blocks between the runs.
+  if (event.isComposing || event.keyCode === 229) {
+    replaceBlockSelectionWithParagraph(view);
+    return false;
+  }
+  const hasModifier = event.shiftKey || event.altKey || event.ctrlKey || event.metaKey;
+  // BlockNote would split the span from the first run to the last. Keep the block set instead.
+  if (event.key === "Enter" && !hasModifier) {
+    event.preventDefault();
+    return true;
+  }
+  return false;
+}
+
 export const BlockDragSelection = createExtension(({ editor }) => ({
   key: "notepaneBlockDragSelection",
   prosemirrorPlugins: [new Plugin({
@@ -234,6 +255,14 @@ export const BlockDragSelection = createExtension(({ editor }) => ({
             const selection = Selection.near(view.state.doc.resolve(pos.pos));
             view.dispatch(closeHistory(view.state.tr.setSelection(selection)));
           }
+          return false;
+        },
+        keydown(view, event) {
+          return isBlockSetSelection(view.state.selection) && handleBlockSetKeyDown(view, event);
+        },
+        // CDP and some IMEs start a composition without a 229 keydown first.
+        compositionstart(view) {
+          if (isBlockSetSelection(view.state.selection)) replaceBlockSelectionWithParagraph(view);
           return false;
         },
       },

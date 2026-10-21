@@ -2,6 +2,9 @@ import {
   BlockDragSelection,
 } from "./editor/blockDragSelection.js";
 import {
+  isBlockSetSelection,
+} from "./editor/blockSelection.js";
+import {
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -1041,8 +1044,14 @@ function StickyEditor({
 
   useEffect(() => {
     const copySelectedBlock = (event) => {
+      // The editor's own cut of a block set would serialise only its first
+      // run but delete every run, so a block-set cut is handled here too.
+      const isBlockSetCut =
+        event.type === "cut" &&
+        isEditorShortcutTarget(event.target) &&
+        isBlockSetSelection(editor.prosemirrorView?.state.selection);
       if (
-        event.type !== "copy" ||
+        (event.type !== "copy" && !isBlockSetCut) ||
         !event.clipboardData
       ) {
         return false;
@@ -1071,6 +1080,12 @@ function StickyEditor({
           window.getSelection()?.toString() ?? "",
         ),
       );
+      if (isBlockSetCut) {
+        const { state } = editor.prosemirrorView;
+        editor.prosemirrorView.dispatch(
+          state.tr.deleteSelection().scrollIntoView(),
+        );
+      }
       return true;
     };
 

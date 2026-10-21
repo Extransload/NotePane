@@ -206,8 +206,8 @@ export async function cutBlocks(editor, blocks, scheduleSave) {
 }
 
 export function resolveBlocksForCut(editor, activeImageBlockId) {
-  const selectedBlocks = editor.getSelection()?.blocks;
-  if (selectedBlocks?.length) {
+  const selectedBlocks = getSelectedBlocks(editor);
+  if (selectedBlocks.length) {
     return selectedBlocks;
   }
 
