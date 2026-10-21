@@ -362,12 +362,17 @@ test("auto-scrolls a text drag held at the bottom edge", async ({ page }) => {
   await page.mouse.up();
 });
 
+// Block-selects `firstText`, then adds `secondText` with a Shift marquee.
+async function selectTwoBlocks(page, firstText, secondText) {
+  await marquee(page, firstText, firstText);
+  await marquee(page, secondText, secondText, { modifier: "Shift" });
+  expect(await selectedBlockTexts(page)).toEqual([firstText, secondText]);
+}
+
 // {Alpha, Charlie} block-selected with Bravo unselected between them.
 async function selectAlphaAndCharlie(page) {
   await pasteSelectionFixture(page);
-  await marquee(page, "Alpha paragraph", "Alpha paragraph");
-  await marquee(page, "Charlie paragraph", "Charlie paragraph", { modifier: "Shift" });
-  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
+  await selectTwoBlocks(page, "Alpha paragraph", "Charlie paragraph");
 }
 
 async function firstBlockTexts(page, count) {
@@ -480,5 +485,142 @@ test("keeps the unselected block when Enter is pressed on a non-contiguous selec
   await expect(row(page, "Alpha paragraph")).toHaveCount(1);
   await expect(row(page, "Bravo paragraph")).toHaveCount(1);
   await expect(row(page, "Charlie paragraph")).toHaveCount(1);
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
+});
+
+// Opens the six-dot menu from `text`'s row and checks the menu stands for that block.
+async function openBlockMenuOn(page, text) {
+  await row(page, text).hover();
+  await page.locator(".bn-side-menu [data-test='dragHandle']").click();
+  const blockMenu = page.locator(".bn-drag-handle-menu:visible");
+  await expect(blockMenu).toBeVisible();
+  const blockId = await row(page, text).evaluate((el) => el.closest(".bn-block-outer").dataset.id);
+  await expect(page.locator("style[data-block-menu-highlight]"))
+    .toHaveAttribute("data-block-menu-highlight", blockId);
+  return blockMenu;
+}
+
+async function expectOnlyBravoLeft(page) {
+  await expect(row(page, "Alpha paragraph")).toHaveCount(0);
+  await expect(row(page, "Charlie paragraph")).toHaveCount(0);
+  await expect(row(page, "Bravo paragraph")).toHaveCount(1);
+}
+
+test("turns a non-contiguous selection into headings from the block menu", async ({ page }) => {
+  await selectAlphaAndCharlie(page);
+  const blockMenu = await openBlockMenuOn(page, "Charlie paragraph");
+
+  await blockMenu.getByRole("menuitem", { name: "Turn into" }).click();
+  await page.locator(".notepane-block-menu-subpanel[data-panel='turn-into']:visible")
+    .getByRole("menuitem", { name: "Heading 1", exact: true })
+    .click();
+
+  await expect(row(page, "Alpha paragraph")).toHaveAttribute("data-content-type", "heading");
+  await expect(row(page, "Charlie paragraph")).toHaveAttribute("data-content-type", "heading");
+  await expect(row(page, "Bravo paragraph")).toHaveAttribute("data-content-type", "paragraph");
+});
+
+test("colors a non-contiguous selection from the block menu", async ({ page }) => {
+  await selectAlphaAndCharlie(page);
+  const blockMenu = await openBlockMenuOn(page, "Charlie paragraph");
+
+  await blockMenu.getByRole("menuitem", { name: "Colors" }).click();
+  // The first swatch is "default", which BlockNote renders as no attribute at all.
+  const swatch = page.locator(".notepane-block-menu-subpanel[data-panel='colors']:visible")
+    .locator("[data-color-kind='background']:not([data-color-value='default'])")
+    .first();
+  const color = await swatch.getAttribute("data-color-value");
+  await swatch.click();
+
+  await expect(row(page, "Alpha paragraph")).toHaveAttribute("data-background-color", color);
+  await expect(row(page, "Charlie paragraph")).toHaveAttribute("data-background-color", color);
+  expect(await row(page, "Bravo paragraph").getAttribute("data-background-color")).toBeNull();
+});
+
+test("deletes a non-contiguous selection from the block menu", async ({ page }) => {
+  await selectAlphaAndCharlie(page);
+  const blockMenu = await openBlockMenuOn(page, "Charlie paragraph");
+
+  await blockMenu.getByRole("menuitem", { name: "Delete" }).click();
+  await expectOnlyBravoLeft(page);
+
+  // The menu leaves focus on the body, so put the caret back in the editor to undo.
+  await row(page, "Bravo paragraph").click();
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect.poll(() => firstBlockTexts(page, 3))
+    .toEqual(["Alpha paragraph", "Bravo paragraph", "Charlie paragraph"]);
+  await selectTwoBlocks(page, "Alpha paragraph", "Charlie paragraph");
+  await openBlockMenuOn(page, "Charlie paragraph");
+
+  await page.keyboard.press("Delete");
+  await expectOnlyBravoLeft(page);
+});
+
+test("cuts a non-contiguous selection from the block menu shortcut", async ({ page }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate(() => navigator.clipboard.writeText("clipboard before the cut"));
+  await selectAlphaAndCharlie(page);
+  await openBlockMenuOn(page, "Charlie paragraph");
+
+  await page.keyboard.press(modifierShortcut("X"));
+
+  await expectClipboardHoldsAlphaAndCharlie(page);
+  await expectOnlyBravoLeft(page);
+});
+
+test("leaves the caret on the first block not cut after a block menu cut", async ({ page }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await pasteSelectionFixture(page);
+  await selectTwoBlocks(page, "Bravo paragraph", "Echo bullet");
+  await openBlockMenuOn(page, "Bravo paragraph");
+
+  await page.keyboard.press(modifierShortcut("X"));
+
+  await expect(row(page, "Bravo paragraph")).toHaveCount(0);
+  await expect(row(page, "Echo bullet")).toHaveCount(0);
+  await expectEditorFocused(page);
+  await expect.poll(() => page.evaluate(() => {
+    const node = window.getSelection().anchorNode;
+    const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+    return element?.closest(".bn-block-content")?.textContent.trim() ?? null;
+  })).toBe("Charlie paragraph");
+});
+
+test("indents and outdents each block of a non-contiguous selection", async ({ page }) => {
+  await selectAlphaAndCharlie(page);
+  const alphaDepth = await blockDepth(page, "Alpha paragraph");
+  const bravoDepth = await blockDepth(page, "Bravo paragraph");
+
+  await page.keyboard.press("Tab");
+  await expect.poll(() => blockDepth(page, "Charlie paragraph")).toBe(bravoDepth + 1);
+  expect(await blockDepth(page, "Bravo paragraph")).toBe(bravoDepth);
+  expect(await blockDepth(page, "Alpha paragraph")).toBe(alphaDepth);
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
+
+  await page.keyboard.press("Shift+Tab");
+  await expect.poll(() => blockDepth(page, "Charlie paragraph")).toBe(bravoDepth);
+  expect(await blockDepth(page, "Alpha paragraph")).toBe(alphaDepth);
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
+});
+
+test("moves each block of a non-contiguous selection past its neighbour", async ({ page }) => {
+  await pasteSelectionFixture(page);
+  const original = await topLevelTexts(page);
+  const moveUp = `Shift+${modifierShortcut("ArrowUp")}`;
+  await selectTwoBlocks(page, "Bravo paragraph", "Echo bullet");
+
+  await page.keyboard.press(moveUp);
+  await expect.poll(async () => (await topLevelTexts(page)).slice(0, 5)).toEqual([
+    "Bravo paragraph", "Alpha paragraph", "Charlie paragraph", "Echo bullet", "Delta bullet",
+  ]);
+  expect(await selectedBlockTexts(page)).toEqual(["Bravo paragraph", "Echo bullet"]);
+
+  // One undo puts both blocks back, so Alpha is at the top edge again.
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect.poll(() => topLevelTexts(page)).toEqual(original);
+  await selectTwoBlocks(page, "Alpha paragraph", "Charlie paragraph");
+
+  await page.keyboard.press(moveUp);
+  expect(await topLevelTexts(page)).toEqual(original);
   expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
 });

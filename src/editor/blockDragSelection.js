@@ -6,7 +6,9 @@ import { clamp } from "../utils/values.js";
 import {
   createBlockSetSelection,
   getBlockSetIds,
+  indentBlockSelection,
   isBlockSetSelection,
+  moveBlockSelection,
   replaceBlockSelectionWithParagraph,
 } from "./blockSelection.js";
 import { normalizeTouchedBlocks } from "./blockSelectionRules.js";
@@ -224,7 +226,7 @@ function marqueeView(editor, view) {
 }
 
 // Keys acting on a block set. Returns true when the key is handled and the editor must ignore it.
-function handleBlockSetKeyDown(view, event) {
+function handleBlockSetKeyDown(editor, view, event) {
   // An IME composes into the DOM selection, which spans the unselected blocks between the runs.
   if (event.isComposing || event.keyCode === 229) {
     replaceBlockSelectionWithParagraph(view);
@@ -234,6 +236,18 @@ function handleBlockSetKeyDown(view, event) {
   // BlockNote would split the span from the first run to the last. Keep the block set instead.
   if (event.key === "Enter" && !hasModifier) {
     event.preventDefault();
+    return true;
+  }
+  // BlockNote would nest or move that same span. Act on each selected block instead.
+  if (event.key === "Tab" && !event.altKey && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    indentBlockSelection(editor, event.shiftKey ? -1 : 1);
+    return true;
+  }
+  if ((event.key === "ArrowUp" || event.key === "ArrowDown") && event.shiftKey
+    && (event.metaKey || event.ctrlKey) && !event.altKey) {
+    event.preventDefault();
+    moveBlockSelection(editor, event.key === "ArrowUp" ? -1 : 1);
     return true;
   }
   return false;
@@ -258,7 +272,7 @@ export const BlockDragSelection = createExtension(({ editor }) => ({
           return false;
         },
         keydown(view, event) {
-          return isBlockSetSelection(view.state.selection) && handleBlockSetKeyDown(view, event);
+          return isBlockSetSelection(view.state.selection) && handleBlockSetKeyDown(editor, view, event);
         },
         // CDP and some IMEs start a composition without a 229 keydown first.
         compositionstart(view) {

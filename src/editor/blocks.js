@@ -190,9 +190,11 @@ export async function cutBlocks(editor, blocks, scheduleSave) {
   const firstTopLevelIndex = editor.document.findIndex(
     (block) => block.id === topLevelBlocks[0]?.id,
   );
+  // A block set can skip blocks, so the next block is the first one not cut.
+  const removedIds = new Set(blocks.map((block) => block.id));
   const nextCursorBlock =
     firstTopLevelIndex >= 0
-      ? editor.document[firstTopLevelIndex + topLevelBlocks.length] ||
+      ? editor.document.slice(firstTopLevelIndex).find((block) => !removedIds.has(block.id)) ||
         editor.document[firstTopLevelIndex - 1]
       : null;
 
@@ -228,8 +230,8 @@ export function resolveBlocksForCut(editor, activeImageBlockId) {
   }
 }
 
-// A six-dot menu action takes the selection only when it includes the menu's
-// block, as BlockNote's Delete item does; otherwise just the menu's block. A
+// A six-dot menu action takes the selected blocks, exactly those of a block set,
+// only when they include the menu's block; otherwise just the menu's block. A
 // block that is no longer in this editor gives nothing to act on.
 export function resolveBlocksForMenuBlock(editor, menuBlockId) {
   const menuBlock = menuBlockId ? editor.getBlock(menuBlockId) : undefined;
@@ -237,8 +239,8 @@ export function resolveBlocksForMenuBlock(editor, menuBlockId) {
     return [];
   }
 
-  const selectedBlocks = editor.getSelection()?.blocks;
-  return selectedBlocks?.some((block) => block.id === menuBlock.id)
+  const selectedBlocks = getSelectedBlocks(editor);
+  return selectedBlocks.some((block) => block.id === menuBlock.id)
     ? selectedBlocks
     : [menuBlock];
 }

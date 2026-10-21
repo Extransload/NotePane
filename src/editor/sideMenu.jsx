@@ -5,7 +5,6 @@ import {
   blockTypeSelectItems as getBlockTypeSelectItems,
   DragHandleButton,
   DragHandleMenu,
-  RemoveBlockItem,
   SideMenu,
   SideMenuController,
   useBlockNoteEditor,
@@ -14,6 +13,7 @@ import {
   useExtensionState,
 } from "@blocknote/react";
 import { ArrowRightLeft, Palette, Trash2 } from "lucide-react";
+import { resolveBlocksForMenuBlock } from "./blocks.js";
 import { EditorColorPickerSections } from "./colorFormatting.jsx";
 
 export function NotePaneSideMenuController({
@@ -171,18 +171,41 @@ function NotePaneDragHandleMenu({
           Colors
         </span>
       </Components.Generic.Menu.Item>
-      <RemoveBlockItem>
+      <RemoveSelectedBlocksItem>
         <span className="notepane-block-menu-item-content">
           <Trash2 className="notepane-block-menu-icon is-delete" aria-hidden="true" />
           Delete
         </span>
-      </RemoveBlockItem>
+      </RemoveSelectedBlocksItem>
       <BlockMenuSubpanel
         activePanel={activePanel}
         recentColors={recentColors}
         onColorUsed={onColorUsed}
       />
     </DragHandleMenu>
+  );
+}
+
+// BlockNote's RemoveBlockItem reads `editor.getSelection()`, which does not
+// give the blocks of a block set.
+function RemoveSelectedBlocksItem({ children }) {
+  const Components = useComponentsContext();
+  const editor = useBlockNoteEditor();
+  const block = useExtensionState("sideMenu", {
+    selector: (state) => state?.block,
+  });
+
+  if (!Components || block === undefined) {
+    return null;
+  }
+
+  return (
+    <Components.Generic.Menu.Item
+      className="bn-menu-item"
+      onClick={() => editor.removeBlocks(resolveBlocksForMenuBlock(editor, block.id))}
+    >
+      {children}
+    </Components.Generic.Menu.Item>
   );
 }
 
@@ -201,10 +224,7 @@ function BlockMenuSubpanel({ activePanel, recentColors, onColorUsed }) {
   const blockTypeItems = getBlockTypeSelectItems(editor.dictionary).filter(
     (item) => item.type !== "heading" || Number(item.props?.level ?? 1) <= 4,
   );
-  const selectedBlocks = editor.getSelection()?.blocks;
-  const targetBlocks = selectedBlocks?.some((selectedBlock) => selectedBlock.id === block.id)
-    ? selectedBlocks
-    : [block];
+  const targetBlocks = resolveBlocksForMenuBlock(editor, block.id);
 
   const updateSelectedBlocks = (update) => {
     editor.focus();
@@ -320,18 +340,13 @@ export function BlockMenuHighlightController() {
         return;
       }
 
-      const block = editor.getBlock(openBlockId);
-      if (!block) {
+      const blocks = resolveBlocksForMenuBlock(editor, openBlockId);
+      if (!blocks.length) {
         return;
       }
       event.preventDefault();
       event.stopPropagation();
-      const selectedBlocks = editor.getSelection()?.blocks;
-      editor.removeBlocks(
-        selectedBlocks?.some((selectedBlock) => selectedBlock.id === block.id)
-          ? selectedBlocks
-          : [block],
-      );
+      editor.removeBlocks(blocks);
       sideMenu.unfreezeMenu();
     };
     ownerDocument.addEventListener("keydown", deleteOpenBlock, true);

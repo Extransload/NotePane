@@ -1,4 +1,6 @@
+import { closeHistory } from "@tiptap/pm/history";
 import { Selection, SelectionRange, TextSelection } from "@tiptap/pm/state";
+import { planSiblingMove } from "./blockSelectionRules.js";
 
 // A selection of whole blockContainers: one range per run of adjacent siblings.
 export class BlockSetSelection extends Selection {
@@ -99,4 +101,57 @@ export function replaceBlockSelectionWithParagraph(view) {
   // Inside the new blockContainer, then inside its paragraph.
   tr.setSelection(TextSelection.create(tr.doc, start + 2));
   view.dispatch(tr.scrollIntoView());
+}
+
+// Tab and Shift+Tab on a block set: nests or unnests each selected block that can move, in one
+// undo step, and keeps the same blocks selected. Blocks without inline content are skipped.
+export function indentBlockSelection(editor, direction) {
+  return editor.transact((tr) => {
+    const ids = getBlockSetIds(tr.selection);
+    if (!ids.length) return false;
+    for (const id of ids) {
+      if (!Array.isArray(editor.getBlock(id)?.content)) continue;
+      editor.setTextCursorPosition(id, "start");
+      if (direction > 0 && editor.canNestBlock()) editor.nestBlock();
+      else if (direction < 0 && editor.canUnnestBlock()) editor.unnestBlock();
+    }
+    closeHistory(tr).setSelection(createBlockSetSelection(tr.doc, ids));
+    return true;
+  });
+}
+
+// Shift+Mod+ArrowUp/Down on a block set: every selected block passes its unselected neighbour
+// within its own blockGroup, in one undo step. Nothing moves when any group is at its edge.
+// The existing nodes move, so block ids are kept.
+export function moveBlockSelection(editor, direction) {
+  const view = editor.prosemirrorView;
+  const { state } = view;
+  const ids = getBlockSetIds(state.selection);
+  if (!ids.length) return false;
+  // Each run lies inside one blockGroup, keyed here by where that group's content starts.
+  const plans = [...new Set(state.selection.ranges.map(({ $from }) => $from.start()))].map((start) => {
+    const siblingIds = [];
+    state.doc.resolve(start).parent.forEach((child) => siblingIds.push(child.attrs.id));
+    return { start, siblingIds, order: planSiblingMove(siblingIds, ids, direction) };
+  });
+  if (plans.some(({ order }) => !order)) return true;
+
+  const tr = state.tr;
+  // Later groups first, so the earlier groups' positions need no mapping.
+  for (const { start, siblingIds, order } of plans.reverse()) {
+    const group = tr.doc.resolve(start).parent;
+    const nodesById = new Map();
+    group.forEach((child) => nodesById.set(child.attrs.id, child));
+    // Replace only the span of children whose order changed.
+    const first = order.findIndex((id, i) => id !== siblingIds[i]);
+    const last = order.findLastIndex((id, i) => id !== siblingIds[i]);
+    let from = start;
+    for (let i = 0; i < first; i += 1) from += group.child(i).nodeSize;
+    let to = from;
+    for (let i = first; i <= last; i += 1) to += group.child(i).nodeSize;
+    tr.replaceWith(from, to, order.slice(first, last + 1).map((id) => nodesById.get(id)));
+  }
+  tr.setSelection(createBlockSetSelection(tr.doc, ids));
+  view.dispatch(closeHistory(tr).scrollIntoView());
+  return true;
 }
