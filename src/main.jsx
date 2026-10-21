@@ -213,7 +213,6 @@ import {
   StickyPinButton,
   StickySettingsButton,
   StickyTrashButton,
-  TrashButton,
 } from "./ui/controls.jsx";
 import {
   SessionCloseConfirmDialog,
@@ -1895,10 +1894,6 @@ function StickyEditor({
     void onCreateNote({ template: "blank" });
   }, [onCreateNote]);
 
-  const openTrashPreferences = useCallback(() => {
-    openPreferencesPage("trash");
-  }, [openPreferencesPage]);
-
   const openStickySettings = useCallback(() => {
     setIsColorPanelOpen(false);
     setIsPreferencesWindowOpen(false);
@@ -3364,7 +3359,6 @@ function StickyEditor({
                   shortcut={getEnabledShortcut("preferences")}
                   onClick={openPreferences}
                 />
-                <TrashButton onClick={openTrashPreferences} />
                 <LayoutModeSwitch
                   mode={normalizedLayoutMode}
                   compact={isSidebarCompact}

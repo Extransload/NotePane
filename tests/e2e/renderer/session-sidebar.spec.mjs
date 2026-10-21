@@ -277,7 +277,7 @@ test("resizes and collapses the sidebar from its right edge", async ({ page }) =
       transitionArrowCount: layoutIcon.querySelectorAll(".mode-transition-arrow, .mode-transition-arrow-head").length,
     };
   });
-  expect(compactFooterMetrics.buttonRects).toHaveLength(6);
+  expect(compactFooterMetrics.buttonRects).toHaveLength(5);
   expect(compactFooterMetrics.buttonRects.every((rect) => rect.insideSidebar)).toBe(true);
   expect(compactFooterMetrics.buttonRects.every((rect) => rect.centerDelta <= 1)).toBe(true);
   expect(compactFooterMetrics.buttonRects.every((rect) => rect.width === 32)).toBe(true);
@@ -305,7 +305,7 @@ test("resizes and collapses the sidebar from its right edge", async ({ page }) =
       layoutIconFamily: layoutIcon.getAttribute("data-icon-family"),
     };
   });
-  expect(expandedFooterMetrics.layoutButtonWidth).toBe(38);
+  expect(expandedFooterMetrics.layoutButtonWidth).toBe(46);
   expect(expandedFooterMetrics.layoutIconWidth).toBe(18);
   expect(expandedFooterMetrics.layoutIconMode).toBe("expanded");
   expect(expandedFooterMetrics.layoutIconTone).toBe("sticky");
@@ -768,9 +768,10 @@ test("moves the current sticky note to trash from the sticky header", async ({ p
   await expect(page.getByRole("tablist", { name: "Note sessions" }).getByRole("tab"))
     .toHaveCount(1);
 
-  await page.getByRole("button", { name: "Trash" }).click();
+  await page.keyboard.press(modifierShortcut(","));
   const preferencesPanel = page.getByRole("dialog", { name: "Preferences window" });
   await expect(preferencesPanel).toBeVisible();
+  await preferencesPanel.getByRole("tab", { name: "Trash" }).click();
   const trashRow = preferencesPanel
     .getByRole("list", { name: "Trash notes" })
     .getByRole("listitem")

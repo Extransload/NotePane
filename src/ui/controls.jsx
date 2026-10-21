@@ -48,21 +48,6 @@ export function PreferencesButton({ shortcut, onClick }) {
   );
 }
 
-export function TrashButton({ onClick }) {
-  return (
-    <button
-      type="button"
-      className="trash-icon-button preferences-icon-button has-tooltip"
-      aria-label="Trash"
-      data-tooltip="Trash"
-      onMouseDown={preventFocusLoss}
-      onClick={onClick}
-    >
-      <TrashSidebarIcon />
-    </button>
-  );
-}
-
 export function ExportPdfButton({ shortcut, onClick }) {
   return (
     <button

@@ -80,7 +80,7 @@
   display: grid;
   align-items: center;
   width: 100%;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 4px;
   min-width: 0;
 }

@@ -728,9 +728,6 @@ export async function getActionIconColors(page) {
       preferences: readColor(
         "[data-testid='session-sidebar-footer'] .settings-icon-button .notepane-action-icon",
       ),
-      trash: readColor(
-        "[data-testid='session-sidebar-footer'] .trash-icon-button .notepane-action-icon",
-      ),
     };
   });
 }
@@ -777,7 +774,6 @@ export async function openStickyActionBar(page) {
 
 export function expectDistinctIconColors(iconColors) {
   expect(new Set(Object.values(iconColors)).size).toBe(Object.keys(iconColors).length);
-  expect(iconColors.export).not.toBe(iconColors.trash);
   expect(iconColors.preferences).not.toBe(iconColors.export);
   expect(iconColors.layout).not.toBe(iconColors.sidebar);
 }

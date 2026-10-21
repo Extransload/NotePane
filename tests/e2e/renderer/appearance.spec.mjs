@@ -36,18 +36,28 @@ test("keeps sticky chrome outside the editable BlockNote surface", async ({ page
     .toBeVisible();
   await expect(page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Preferences" }))
     .toBeVisible();
+  // Trash lives in Preferences, so the footer no longer has its own button.
   await expect(page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Trash" }))
-    .toBeVisible();
+    .toHaveCount(0);
   await expect(page.getByTestId("session-sidebar-footer").locator(".notepane-icon-export"))
     .toHaveClass(/lucide-file-down/);
   await expect(page.getByTestId("session-sidebar-footer").locator(".notepane-icon-settings"))
     .toHaveClass(/lucide-cog/);
-  await expect(page.getByTestId("session-sidebar-footer").locator(".notepane-icon-trash"))
-    .toHaveClass(/lucide-trash-2/);
+  // The remaining buttons fill the row, with no empty column left where Trash was.
+  const footerRow = await page.locator(".session-sidebar-footer-row").evaluate((row) => {
+    const rowBox = row.getBoundingClientRect();
+    const buttons = [...row.querySelectorAll(":scope > button")];
+    return {
+      count: buttons.length,
+      rightGap: Math.round(rowBox.right - buttons.at(-1).getBoundingClientRect().right),
+    };
+  });
+  expect(footerRow).toEqual({ count: 5, rightGap: 0 });
   await page.getByTestId("session-sidebar-footer")
-    .getByRole("button", { name: "Trash" })
+    .getByRole("button", { name: "Preferences" })
     .click();
   const trashPreferencesPanel = page.getByRole("dialog", { name: "Preferences window" });
+  await trashPreferencesPanel.getByRole("tab", { name: "Trash" }).click();
   await expect(trashPreferencesPanel).toBeVisible();
   await expect(trashPreferencesPanel.getByRole("tab", { name: "Trash" }))
     .toHaveAttribute("aria-selected", "true");
@@ -176,7 +186,6 @@ test("keeps light/dark mode global across sidebar sessions", async ({ page }) =>
   expect(darkIconColors.layout).not.toBe(lightIconColors.layout);
   expect(darkIconColors.sidebar).not.toBe(lightIconColors.sidebar);
   expect(darkIconColors.export).not.toBe(lightIconColors.export);
-  expect(darkIconColors.trash).not.toBe(lightIconColors.trash);
   await expect.poll(async () => {
     return await page.evaluate(() => ({
       rootThemeId: document.documentElement.dataset.themeId,
@@ -701,8 +710,8 @@ test("uses sticky pastel color and carries it back to the session tab", async ({
     };
   });
 
-  expect(tabsModeButtonMetrics.buttonWidth).toBe(28);
-  expect(tabsModeButtonMetrics.footerControlCount).toBe(6);
+  expect(tabsModeButtonMetrics.buttonWidth).toBe(34);
+  expect(tabsModeButtonMetrics.footerControlCount).toBe(5);
   expect(tabsModeButtonMetrics.headerLayoutButtonCount).toBe(0);
   expect(tabsModeButtonMetrics.iconWidth).toBe(18);
   expect(tabsModeButtonMetrics.iconTone).toBe("sticky");
