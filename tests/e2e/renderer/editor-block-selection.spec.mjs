@@ -300,3 +300,62 @@ test("focuses the editor when a marquee starts while the find bar has focus", as
   expect(copied).toContain("Bravo paragraph");
   expect(copied).not.toContain("Charlie");
 });
+
+test("adds a Shift marquee to the existing block selection without the blocks between", async ({ page }) => {
+  await pasteSelectionFixture(page);
+  await marquee(page, "Alpha paragraph", "Alpha paragraph");
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph"]);
+
+  await marquee(page, "Charlie paragraph", "Charlie paragraph", { modifier: "Shift" });
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
+
+  await marquee(page, "Foxtrot paragraph", "Foxtrot paragraph", { modifier: "Meta" });
+  expect(await selectedBlockTexts(page)).toEqual(["Foxtrot paragraph"]);
+});
+
+test("keeps one parent when a Shift marquee touches a child of a selected parent", async ({ page }) => {
+  await pasteSelectionFixture(page);
+  await marquee(page, "Delta bullet", "Delta bullet");
+  expect(await selectedBlockTexts(page)).toEqual(["Delta bullet"]);
+
+  await marquee(page, "Delta child", "Delta child", { modifier: "Shift" });
+  expect(await selectedBlockTexts(page)).toEqual(["Delta bullet"]);
+});
+
+test("auto-scrolls a marquee held at the bottom edge and keeps its start anchored", async ({ page }) => {
+  await pasteLines(page, 60);
+  const surface = page.getByTestId("sticky-editor-surface");
+  // The paste scrolls to its end, so start from the top.
+  await surface.evaluate((el) => { el.scrollTop = 0; });
+  await marquee(page, "Line 1", "Line 1", { release: false });
+  const surfaceBox = await surface.boundingBox();
+  const editorBox = await page.locator(".bn-editor").boundingBox();
+
+  await page.mouse.move(editorBox.x + editorBox.width / 2, surfaceBox.y + surfaceBox.height - 5, { steps: 5 });
+  await page.waitForTimeout(800);
+
+  expect(await surface.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  const selected = await selectedBlockTexts(page);
+  expect(selected[0]).toBe("Line 1");
+  expect(selected.length).toBeGreaterThan(20);
+  await page.mouse.up();
+});
+
+test("auto-scrolls a text drag held at the bottom edge", async ({ page }) => {
+  await pasteLines(page, 60);
+  const surface = page.getByTestId("sticky-editor-surface");
+  await surface.evaluate((el) => { el.scrollTop = 0; });
+  const surfaceBox = await surface.boundingBox();
+  const textBox = await row(page, "Line 1").locator(".bn-inline-content").boundingBox();
+  expect(textBox).not.toBeNull();
+
+  await page.mouse.move(textBox.x + 2, textBox.y + textBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(textBox.x + 40, surfaceBox.y + surfaceBox.height - 5, { steps: 10 });
+  await page.waitForTimeout(800);
+
+  expect(await surface.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  expect(await selectedBlockTexts(page)).toEqual([]);
+  expect(await selectionString(page)).toContain("Line 20");
+  await page.mouse.up();
+});

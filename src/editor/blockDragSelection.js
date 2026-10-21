@@ -8,7 +8,20 @@ import { normalizeTouchedBlocks } from "./blockSelectionRules.js";
 import { focusLastEditorBlock, isEmptyEditorSurfacePointer } from "./blocks.js";
 
 const MARQUEE_THRESHOLD = 4;
+const AUTO_SCROLL_BAND = 40;
+const AUTO_SCROLL_MAX_SPEED = 18;
 const SURFACE_SELECTOR = "[data-testid='sticky-editor-surface']";
+const BLOCK_OUTER_SELECTOR = ".bn-block-outer[data-id]";
+
+// The `{ id, ancestorIds }` record of a block's `.bn-block-outer`, ancestors outermost first.
+function blockRecord(outer) {
+  const ancestorIds = [];
+  for (let parent = outer.parentElement?.closest(BLOCK_OUTER_SELECTOR); parent;
+    parent = parent.parentElement?.closest(BLOCK_OUTER_SELECTOR)) {
+    ancestorIds.unshift(parent.dataset.id);
+  }
+  return { id: outer.dataset.id, ancestorIds };
+}
 
 // Blocks whose own row (`.bn-block-content`, not their children) overlaps `rect` on both axes, in
 // document order. `rect` is in client coordinates.
@@ -19,16 +32,39 @@ export function collectTouchedBlocks(editorDom, rect) {
     // A hidden row, such as a collapsed toggle's child, has an empty box.
     if (!box.width || !box.height) continue;
     if (box.left >= rect.right || box.right <= rect.left || box.top >= rect.bottom || box.bottom <= rect.top) continue;
-    const outer = content.closest(".bn-block-outer[data-id]");
-    if (!outer) continue;
-    const ancestorIds = [];
-    for (let parent = outer.parentElement?.closest(".bn-block-outer[data-id]"); parent;
-      parent = parent.parentElement?.closest(".bn-block-outer[data-id]")) {
-      ancestorIds.unshift(parent.dataset.id);
-    }
-    touched.push({ id: outer.dataset.id, ancestorIds });
+    const outer = content.closest(BLOCK_OUTER_SELECTOR);
+    if (outer) touched.push(blockRecord(outer));
   }
   return touched;
+}
+
+// Records for `ids`, in document order whatever order `ids` is in.
+function blockRecordsFor(editorDom, ids) {
+  const wanted = new Set(ids);
+  return [...editorDom.querySelectorAll(BLOCK_OUTER_SELECTOR)]
+    .filter((outer) => wanted.has(outer.dataset.id))
+    .map(blockRecord);
+}
+
+// Scrolls `surface` on every animation frame while the pointer (client coordinates) is within the
+// band at its top or bottom edge, even when the pointer does not move, and calls `onScroll` after
+// each step that moved it. Returns the stop function.
+function startEdgeAutoScroll(surface, getPointer, onScroll) {
+  const win = surface.ownerDocument.defaultView;
+  const speed = (distanceToEdge) =>
+    Math.ceil(((AUTO_SCROLL_BAND - Math.max(distanceToEdge, 0)) / AUTO_SCROLL_BAND) * AUTO_SCROLL_MAX_SPEED);
+  let frame = win.requestAnimationFrame(step);
+  function step() {
+    // Scheduled first, so a stop from inside `onScroll` cancels it.
+    frame = win.requestAnimationFrame(step);
+    const { y } = getPointer();
+    const box = surface.getBoundingClientRect();
+    const before = surface.scrollTop;
+    if (y - box.top < AUTO_SCROLL_BAND) surface.scrollTop -= speed(y - box.top);
+    else if (box.bottom - y < AUTO_SCROLL_BAND) surface.scrollTop += speed(box.bottom - y);
+    if (surface.scrollTop !== before) onScroll();
+  }
+  return () => win.cancelAnimationFrame(frame);
 }
 
 // A press on the empty editor surface draws a rectangle once the pointer has moved, and
@@ -66,9 +102,13 @@ function marqueeView(editor, view) {
     const box = surface.getBoundingClientRect();
     const dx = box.left - surface.scrollLeft;
     const dy = box.top - surface.scrollTop;
-    const ids = normalizeTouchedBlocks(collectTouchedBlocks(view.dom, {
+    const touched = collectTouchedBlocks(view.dom, {
       left: left + dx, top: top + dy, right: right + dx, bottom: bottom + dy,
-    }));
+    });
+    // A Shift marquee adds to the press-time block set, so the selection can skip blocks.
+    const ids = normalizeTouchedBlocks(gesture.baseIds.length
+      ? blockRecordsFor(view.dom, [...gesture.baseIds, ...touched.map(({ id }) => id)])
+      : touched);
     Object.assign(overlay.style, {
       left: `${left}px`, top: `${top}px`, width: `${right - left}px`, height: `${bottom - top}px`,
     });
@@ -93,9 +133,11 @@ function marqueeView(editor, view) {
       start: contentPoint(surface, event.clientX, event.clientY),
       press: { x: event.clientX, y: event.clientY },
       pointer: { x: event.clientX, y: event.clientY },
-      shiftKey: event.shiftKey,
+      // Empty unless Shift is held and a block set is selected. Meta replaces, like no modifier.
+      baseIds: event.shiftKey ? getBlockSetIds(view.state.selection) : [],
       selection: view.state.selection,
       overlay: null,
+      stopAutoScroll: null,
       key: null,
     };
     listen(true);
@@ -117,6 +159,9 @@ function marqueeView(editor, view) {
       // Keys must reach the blocks the marquee selects, even when the press began with focus
       // elsewhere, such as in the find bar. ProseMirror focuses without scrolling.
       if (!view.hasFocus()) view.focus();
+      // The start corner is in content coordinates, so a scroll grows the rectangle: hit-test again.
+      const current = gesture;
+      gesture.stopAutoScroll = startEdgeAutoScroll(gesture.surface, () => current.pointer, update);
     }
     update();
   }
@@ -144,6 +189,7 @@ function marqueeView(editor, view) {
   }
 
   function end() {
+    gesture?.stopAutoScroll?.();
     gesture?.overlay?.remove();
     gesture = null;
     listen(false);
