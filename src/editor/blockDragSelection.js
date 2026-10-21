@@ -1,42 +1,26 @@
 import { createExtension } from "@blocknote/core";
-import { Plugin, Selection } from "@tiptap/pm/state";
+import { Plugin } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { closeHistory } from "@tiptap/pm/history";
-
-class BlockRangeSelection extends Selection {
-  get visible() { return false; }
-  eq(other) {
-    return other instanceof BlockRangeSelection && other.from === this.from && other.to === this.to;
-  }
-  map(doc, mapping) {
-    const from = mapping.mapResult(this.from, 1);
-    const to = mapping.mapResult(this.to, -1);
-    if (from.deleted || to.deleted || from.pos >= to.pos) return Selection.near(doc.resolve(from.pos));
-    return new BlockRangeSelection(doc.resolve(from.pos), doc.resolve(to.pos));
-  }
-  toJSON() { return { type: "notepane-block-range", anchor: this.anchor, head: this.head }; }
-  static fromJSON(doc, json) {
-    return new BlockRangeSelection(doc.resolve(json.anchor), doc.resolve(json.head));
-  }
-}
-Selection.jsonID("notepane-block-range", BlockRangeSelection);
+import { createBlockSetSelection, getBlockSetIds, isBlockSetSelection } from "./blockSelection.js";
 
 export const BlockDragSelection = createExtension({
   key: "notepaneBlockDragSelection",
   prosemirrorPlugins: [new Plugin({
     props: {
       decorations(state) {
-        if (!(state.selection instanceof BlockRangeSelection)) return DecorationSet.empty;
+        if (!isBlockSetSelection(state.selection)) return DecorationSet.empty;
+        const ids = new Set(getBlockSetIds(state.selection));
         const decorations = [];
-        state.doc.nodesBetween(state.selection.from, state.selection.to, (node, pos) => {
-          if (node.type.name !== "blockContainer") return;
+        state.doc.descendants((node, pos) => {
+          if (node.type.name !== "blockContainer" || !ids.has(node.attrs.id)) return;
           decorations.push(Decoration.node(pos, pos + node.nodeSize, { "data-block-selected": "true" }));
           return false;
         });
         return DecorationSet.create(state.doc, decorations);
       },
       attributes(state) {
-        return { "data-block-selection": state.selection instanceof BlockRangeSelection ? "true" : "false" };
+        return { "data-block-selection": isBlockSetSelection(state.selection) ? "true" : "false" };
       },
     },
     view(view) {
@@ -63,7 +47,14 @@ export const BlockDragSelection = createExtension({
         if (!bounds.length) return;
         const from = Math.min(...bounds.map(([a]) => a));
         const to = Math.max(...bounds.map(([, b]) => b));
-        const selection = new BlockRangeSelection(view.state.doc.resolve(from), view.state.doc.resolve(to));
+        const rangeIds = [];
+        view.state.doc.nodesBetween(from, to, (node) => {
+          if (node.type.name !== "blockContainer") return;
+          rangeIds.push(node.attrs.id);
+          return false;
+        });
+        const selection = createBlockSetSelection(view.state.doc, rangeIds);
+        if (!selection) return;
         if (!selection.eq(view.state.selection)) {
           view.dispatch(closeHistory(view.state.tr.setSelection(selection)));
         }
@@ -100,7 +91,7 @@ export const BlockDragSelection = createExtension({
       document.addEventListener("mouseup", up, true);
       document.addEventListener("selectstart", selectStart, true);
       return { update() {
-        if (drag?.active && !(view.state.selection instanceof BlockRangeSelection)) {
+        if (drag?.active && !isBlockSetSelection(view.state.selection)) {
           queueMicrotask(() => {
             if (!view.isDestroyed && drag?.active) select(drag.end);
           });

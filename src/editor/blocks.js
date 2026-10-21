@@ -1,6 +1,7 @@
 import {
   urlsMatch,
 } from "./images.js";
+import { getSelectedBlocks, isBlockSetSelection } from "./blockSelection.js";
 import {
   clamp,
 } from "../utils/values.js";
@@ -35,16 +36,8 @@ export function getBlocksForClipboard(editor) {
     return nodeSelectedBlocks;
   }
 
-  const selection = editor.prosemirrorView?.state.selection;
-  if (selection?.toJSON().type === "notepane-block-range") {
-    const blocks = [];
-    editor.prosemirrorView.state.doc.nodesBetween(selection.from, selection.to, (node) => {
-      if (node.type.name !== "blockContainer") return;
-      const block = findBlockById(editor.document, node.attrs.id);
-      if (block) blocks.push(block);
-      return false;
-    });
-    return blocks;
+  if (isBlockSetSelection(editor.prosemirrorView?.state.selection)) {
+    return getSelectedBlocks(editor);
   }
   // Cell selections and plain text selections, even across blocks, are
   // serialised by the editor itself, so the clipboard holds exactly what is
