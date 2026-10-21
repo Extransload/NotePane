@@ -40,11 +40,11 @@ test("lays out the installer window with the app, Applications and System Settin
   const projectRoot = path.join(__dirname, "../..");
   assert.equal(config.dmg.background, "build/background.tiff");
   assert.ok(fs.existsSync(path.join(projectRoot, config.dmg.background)));
-  assert.deepEqual(config.dmg.window, { width: 600, height: 560 });
+  assert.deepEqual(config.dmg.window, { width: 600, height: 600 });
   assert.deepEqual(config.dmg.contents, [
     { x: 190, y: 150 },
     { x: 410, y: 150, type: "link", path: "/Applications" },
-    { x: 300, y: 340, type: "link", path: "/System/Applications/System Settings.app" },
+    { x: 300, y: 356, type: "link", path: "/System/Applications/System Settings.app" },
   ]);
   // The background is for the installer window only, not for the app itself.
   assert.ok(config.files.includes("!build/background.tiff"));

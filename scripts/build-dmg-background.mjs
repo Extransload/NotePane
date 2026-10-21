@@ -1,12 +1,12 @@
 // Renders the macOS installer window background into build/background.tiff
 // (1x and 2x in one file, so the window stays sharp on Retina screens). The
 // window size and the icon positions come from electron-builder.config.cjs
-// `dmg`, so the trays and the arrow always line up with the icons.
+// `dmg`, so the cards, label pills and arrow always line up with the icons.
 //
 // Finder draws the icon labels itself, black in Light Mode and white in Dark
-// Mode, and the image cannot change with the appearance. The icons and their
-// labels therefore sit on mid-tone trays that both colours read on (about 4.5:1
-// each); a step on the light area uses a fixed dark colour, a tray caption white.
+// Mode, and the image cannot change with the appearance. Each label therefore
+// sits on a small mid-tone pill that both colours read on (about 4.5:1 each);
+// everything else is a light design with dark text.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -34,17 +34,21 @@ const app = findIcon((entry) => entry.type === undefined);
 const applications = findIcon((entry) => entry.path === "/Applications");
 const settings = findIcon((entry) => entry.path?.endsWith("System Settings.app"));
 
-// Each tray holds a row of icons, its step as a caption above them and Finder's
-// labels below; the steps that need no icon follow the tray as plain lines.
+// Each card holds a step and its icons; the steps that need no icon follow the
+// card as plain lines. A label is the longest text Finder may show for that
+// icon (with the extension, for people who show all extensions).
 const rows = [
   {
-    icons: [app, applications],
     caption: "Drag NotePane to Applications",
+    icons: [
+      { entry: app, label: "NotePane.app" },
+      { entry: applications, label: "Applications" },
+    ],
     after: ["Open NotePane. The first time, macOS stops it: click <strong>Done</strong>."],
   },
   {
-    icons: [settings],
     caption: "Open System Settings",
+    icons: [{ entry: settings, label: "System Settings.app" }],
     after: [
       "In <strong>Privacy &amp; Security</strong>, scroll down to Security and click <strong>Open Anyway</strong>.",
       "Click <strong>Open Anyway</strong> again and enter your Mac password.",
@@ -52,29 +56,38 @@ const rows = [
   },
 ];
 
-// Finder centres an 80px icon on (x, y) and puts its label underneath.
+// Finder centres an 80px icon on (x, y) and centres its 12pt label about 58px
+// below that point.
 const ICON_HALF = 40;
-const LABEL_DEPTH = 64;
-const CAPTION_SPACE = 40;
+const LABEL_CENTRE = 58;
+const PILL_HEIGHT = 22;
+const CAPTION_SPACE = 34;
+const CARD_PADDING = 12;
 const STEP_GAP = 12;
 const STEP_HEIGHT = 26;
-// Title, path and status bars that Finder may draw over the bottom of the window.
-const FINDER_BARS = 85;
+// Title, path and status bars that Finder may draw over the bottom of the window
+// (about 85px, measured), plus a margin.
+const FINDER_BARS = 100;
 
 let step = 0;
 let contentBottom = 0;
 const parts = [];
 for (const row of rows) {
-  const rowY = row.icons[0].y;
-  const top = rowY - ICON_HALF - CAPTION_SPACE;
-  const bottom = rowY + LABEL_DEPTH;
-  if (top < contentBottom + STEP_GAP) {
-    throw new Error(`The tray for "${row.caption}" overlaps the step above it; move its icons down`);
+  const rowY = row.icons[0].entry.y;
+  const captionTop = rowY - ICON_HALF - CAPTION_SPACE;
+  const cardTop = captionTop - CARD_PADDING;
+  const pillTop = rowY + LABEL_CENTRE - PILL_HEIGHT / 2;
+  const cardBottom = pillTop + PILL_HEIGHT + CARD_PADDING;
+  if (cardTop < contentBottom + STEP_GAP) {
+    throw new Error(`The card for "${row.caption}" overlaps the step above it; move its icons down`);
   }
   step += 1;
-  parts.push(`<div class="tray" style="top: ${top}px; height: ${bottom - top}px"></div>`);
-  parts.push(`<div class="caption" style="top: ${top + 12}px"><span class="number">${step}</span>${row.caption}</div>`);
-  contentBottom = bottom;
+  parts.push(`<div class="card" style="top: ${cardTop}px; height: ${cardBottom - cardTop}px"></div>`);
+  parts.push(`<div class="step" style="top: ${captionTop}px"><span class="number">${step}</span><strong>${row.caption}</strong></div>`);
+  for (const { entry, label } of row.icons) {
+    parts.push(`<div class="pill" style="left: ${entry.x}px; top: ${pillTop}px">${label}</div>`);
+  }
+  contentBottom = cardBottom;
   for (const line of row.after) {
     step += 1;
     const lineTop = contentBottom + STEP_GAP;
@@ -104,24 +117,28 @@ const html = `<!doctype html>
     position: absolute; top: 16px; left: 0; right: 0;
     text-align: center; font-size: 17px; font-weight: 600; letter-spacing: -0.01em;
   }
-  .tray {
+  .card {
     position: absolute; left: 28px; right: 28px;
-    border-radius: 16px; background: #78766f;
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 1px 2px rgb(0 0 0 / 0.12);
+    border-radius: 14px; background: #ffffff;
+    border: 1px solid rgb(55 53 47 / 0.10);
+    box-shadow: 0 1px 2px rgb(55 53 47 / 0.06);
   }
-  .caption, .step {
+  .step {
     position: absolute; left: 44px; right: 40px;
-    font-size: 13px; line-height: 18px;
+    font-size: 13px; line-height: 18px; color: #37352f;
   }
-  .caption { color: #ffffff; font-weight: 600; }
-  .step { color: #37352f; }
   .number {
     display: inline-block; width: 20px; height: 20px; margin-right: 8px;
     border-radius: 50%; text-align: center; line-height: 20px;
-    font-size: 12px; font-weight: 700;
+    font-size: 12px; font-weight: 700; background: #78766f; color: #ffffff;
   }
-  .caption .number { background: #ffffff; color: #5d5b55; }
-  .step .number { background: #78766f; color: #ffffff; }
+  /* Sized by the label text, which stays invisible: Finder draws the real one. */
+  .pill {
+    position: absolute; transform: translateX(-50%);
+    height: ${PILL_HEIGHT}px; padding: 0 11px; border-radius: ${PILL_HEIGHT / 2}px;
+    background: #78766f; color: transparent;
+    font-size: 12px; line-height: ${PILL_HEIGHT}px; white-space: nowrap;
+  }
   svg { position: absolute; inset: 0; }
 </style>
 </head>
@@ -130,9 +147,9 @@ const html = `<!doctype html>
   ${parts.join("\n  ")}
   <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
     <line x1="${arrowStart}" y1="${app.y}" x2="${arrowEnd - 10}" y2="${app.y}"
-      stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 9" />
+      stroke="#9a978f" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 9" />
     <path d="M ${arrowEnd - 13} ${app.y - 8} L ${arrowEnd} ${app.y} L ${arrowEnd - 13} ${app.y + 8}"
-      fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+      fill="none" stroke="#9a978f" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
   </svg>
 </body>
 </html>`;

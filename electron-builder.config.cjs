@@ -46,15 +46,15 @@ module.exports = {
   //
   // electron-builder sizes the window from the background image, and Finder
   // counts the title bar in that height and may add a path bar and status bar,
-  // which together hide about the bottom 85px. The steps therefore end above
+  // which together hide about the bottom 85px. The steps therefore end well above
   // that, and the rest of the image is blank margin.
   dmg: {
     background: "build/background.tiff",
-    window: { width: 600, height: 560 },
+    window: { width: 600, height: 600 },
     contents: [
       { x: 190, y: 150 },
       { x: 410, y: 150, type: "link", path: "/Applications" },
-      { x: 300, y: 340, type: "link", path: "/System/Applications/System Settings.app" },
+      { x: 300, y: 356, type: "link", path: "/System/Applications/System Settings.app" },
     ],
   },
   win: {
