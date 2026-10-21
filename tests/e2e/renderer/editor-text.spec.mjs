@@ -963,45 +963,6 @@ test("highlights the active block while its six-dot menu is open", async ({ page
   expect(darkHighlight.boxShadow).not.toBe(lightHighlight.boxShadow);
 });
 
-test("promotes a cross-block text drag into a block selection", async ({ page }) => {
-  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-  await loadTemplatePreview(page);
-  await page.getByRole("button", { name: "Use this template" }).click();
-
-  const start = page.getByText("A focused workspace for persistent notes", { exact: false }).first();
-  const end = page.getByText("Create one session per meeting", { exact: false }).first();
-  const startBox = await start.boundingBox();
-  const endBox = await end.boundingBox();
-  expect(startBox).not.toBeNull();
-  expect(endBox).not.toBeNull();
-
-  await page.mouse.move(startBox.x + 8, startBox.y + startBox.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(endBox.x + endBox.width - 8, endBox.y + endBox.height / 2, { steps: 8 });
-  const selectedBlocks = page.locator('.bn-editor [data-block-selected="true"]');
-  await expect(selectedBlocks).not.toHaveCount(0);
-  const expandedCount = await selectedBlocks.count();
-  expect(expandedCount).toBeGreaterThan(1);
-  await page.mouse.move(startBox.x + 20, startBox.y + startBox.height / 2, { steps: 4 });
-  await expect(selectedBlocks).toHaveCount(1);
-  await page.mouse.move(endBox.x + 30, endBox.y + endBox.height / 2, { steps: 8 });
-  await expect(selectedBlocks).toHaveCount(expandedCount);
-  await page.mouse.up();
-  await expect(selectedBlocks).toHaveCount(expandedCount);
-  await expect(page.locator('.bn-editor')).toHaveAttribute('data-block-selection', 'true');
-  expect(await selectedBlocks.first().locator(':scope > .bn-block').evaluate(el => getComputedStyle(el).backgroundColor))
-    .not.toBe("rgba(0, 0, 0, 0)");
-  await page.keyboard.press(modifierShortcut("C"));
-
-  const copied = await page.evaluate(() => navigator.clipboard.readText());
-  expect(copied).toContain("A focused workspace for persistent notes");
-  expect(copied).toContain("Create one session per meeting");
-  expect(copied).not.toContain("Pin a sticky window");
-  expect(await start.evaluate(el => getComputedStyle(el, '::selection').backgroundColor)).toBe('rgba(0, 0, 0, 0)');
-  await start.click();
-  await expect(selectedBlocks).toHaveCount(0);
-});
-
 test("deletes the current block with Command+X when no text is selected", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   await page.keyboard.type("delete this block");

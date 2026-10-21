@@ -41,8 +41,9 @@ export function getBlocksForClipboard(editor) {
   }
   // Cell selections and plain text selections, even across blocks, are
   // serialised by the editor itself, so the clipboard holds exactly what is
-  // highlighted. Whole-block copies come from the node and block-range
-  // selections above, which a cross-block drag is promoted to.
+  // highlighted. Whole-block copies come from the node and block-set
+  // selections above; a cross-block text drag is never promoted to one, and
+  // block sets come from the marquee.
   return [];
 }
 
