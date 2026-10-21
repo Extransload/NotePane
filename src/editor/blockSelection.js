@@ -12,15 +12,12 @@ export class BlockSetSelection extends Selection {
       && other.ranges.every((range, i) => range.$from.pos === this.ranges[i].$from.pos && range.$to.pos === this.ranges[i].$to.pos);
   }
   map(doc, mapping) {
-    // Rebuild from ids so runs that become adjacent merge and partly deleted runs survive.
-    const ids = [];
-    for (const range of this.ranges) {
-      const from = mapping.map(range.$from.pos, 1);
-      const to = mapping.map(range.$to.pos, -1);
-      if (from < to) ids.push(...containerIdsIn(doc, from, to));
-    }
-    return createBlockSetSelection(doc, ids)
-      ?? Selection.near(doc.resolve(Math.min(mapping.map(this.ranges[0].$from.pos, 1), doc.content.size)));
+    return this.getBookmark().map(mapping).resolve(doc);
+  }
+  // Undo history restores a selection from its bookmark. The default bookmark is a text span from the
+  // first run to the last, which would cover the unselected blocks between them.
+  getBookmark() {
+    return new BlockSetBookmark(this.ranges.map((range) => [range.$from.pos, range.$to.pos]));
   }
   toJSON() {
     return { type: "notepane-block-set", ranges: this.ranges.map((range) => [range.$from.pos, range.$to.pos]) };
@@ -30,6 +27,21 @@ export class BlockSetSelection extends Selection {
   }
 }
 Selection.jsonID("notepane-block-set", BlockSetSelection);
+
+class BlockSetBookmark {
+  constructor(spans) {
+    this.spans = spans;
+  }
+  map(mapping) {
+    return new BlockSetBookmark(this.spans.map(([from, to]) => [mapping.map(from, 1), mapping.map(to, -1)]));
+  }
+  // Rebuilds from ids so runs that became adjacent merge and partly deleted runs survive.
+  resolve(doc) {
+    const ids = this.spans.flatMap(([from, to]) => (from < to ? containerIdsIn(doc, from, to) : []));
+    return createBlockSetSelection(doc, ids)
+      ?? Selection.near(doc.resolve(Math.min(this.spans[0][0], doc.content.size)));
+  }
+}
 
 export function createBlockSetSelection(doc, blockIds) {
   const wanted = new Set(blockIds);

@@ -6,6 +6,7 @@ const load = async () => ({
   model: await import("@tiptap/pm/model"),
   state: await import("@tiptap/pm/state"),
   transform: await import("@tiptap/pm/transform"),
+  history: await import("@tiptap/pm/history"),
 });
 
 async function setup() {
@@ -99,4 +100,28 @@ test("map falls back to a non-block selection when everything is deleted", async
   const tr = del(doc, "b");
   const mapped = s.map(tr.doc, tr.mapping);
   assert.equal(sel.isBlockSetSelection(mapped), false);
+});
+
+test("the bookmark round-trips and maps like the selection", async () => {
+  const { sel, doc, del } = await setup();
+  const s = sel.createBlockSetSelection(doc, ["a", "p"]);
+  assert.ok(s.getBookmark().resolve(doc).eq(s));
+  const tr = del(doc, "b");
+  assert.ok(s.getBookmark().map(tr.mapping).resolve(tr.doc).eq(sel.createBlockSetSelection(tr.doc, ["a", "p"])));
+  const gone = del(doc, "a");
+  const one = sel.createBlockSetSelection(doc, ["a"]);
+  assert.equal(sel.isBlockSetSelection(one.getBookmark().map(gone.mapping).resolve(gone.doc)), false);
+});
+
+test("undo after deleting a block set restores the block set", async () => {
+  const { sel, state, history, doc } = await setup();
+  let current = state.EditorState.create({ doc, plugins: [history.history()] });
+  const blockSet = sel.createBlockSetSelection(doc, ["a", "c2"]);
+  current = current.apply(current.tr.setSelection(blockSet));
+  current = current.apply(current.tr.deleteSelection());
+  assert.equal(current.doc.eq(doc), false);
+  history.undo(current, (tr) => { current = current.apply(tr); });
+  assert.ok(current.doc.eq(doc));
+  assert.ok(sel.isBlockSetSelection(current.selection));
+  assert.deepEqual(sel.getBlockSetIds(current.selection), ["a", "c2"]);
 });

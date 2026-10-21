@@ -1,3 +1,5 @@
+import { isBlockSetSelection } from "./blockSelection.js";
+
 export function isStandaloneWebUrl(text) {
   return /^https?:\/\/\S+$/i.test(String(text).trim());
 }
@@ -7,11 +9,15 @@ export function normalizeCopiedEditorPlainText(editor, clipboardText, selectedTe
 
   try {
     normalizedPlainText = editor.transact((transaction) => {
-      // A non-contiguous block selection has one range per run of blocks.
-      const { ranges } = transaction.selection;
+      // A block set has one range per run of blocks. Every other selection,
+      // a table cell selection included, is read from `from` to `to`.
+      const { selection } = transaction;
+      const spans = isBlockSetSelection(selection)
+        ? selection.ranges.map(({ $from, $to }) => [$from.pos, $to.pos])
+        : [[selection.from, selection.to]];
       let containsHardBreak = false;
-      for (const { $from, $to } of ranges) {
-        transaction.doc.nodesBetween($from.pos, $to.pos, (node) => {
+      for (const [from, to] of spans) {
+        transaction.doc.nodesBetween(from, to, (node) => {
           if (node.type.name === "hardBreak") {
             containsHardBreak = true;
           }
@@ -22,10 +28,8 @@ export function normalizeCopiedEditorPlainText(editor, clipboardText, selectedTe
         return normalizedPlainText;
       }
 
-      return ranges
-        .map(({ $from, $to }) =>
-          transaction.doc.textBetween($from.pos, $to.pos, "\n", "\n"),
-        )
+      return spans
+        .map(([from, to]) => transaction.doc.textBetween(from, to, "\n", "\n"))
         .join("\n");
     });
   } catch {

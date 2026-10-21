@@ -417,6 +417,13 @@ test("deletes a non-contiguous selection and restores it with one undo", async (
   await page.keyboard.press(modifierShortcut("Z"));
   await expect.poll(() => firstBlockTexts(page, 3))
     .toEqual(["Alpha paragraph", "Bravo paragraph", "Charlie paragraph"]);
+  // Undo restores the block set itself, not a text span over Bravo.
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
+
+  await page.keyboard.press("Backspace");
+  await expect(row(page, "Alpha paragraph")).toHaveCount(0);
+  await expect(row(page, "Charlie paragraph")).toHaveCount(0);
+  await expect(row(page, "Bravo paragraph")).toHaveCount(1);
 });
 
 test("replaces a non-contiguous selection with typed text", async ({ page }) => {
@@ -439,6 +446,26 @@ test("replaces a non-contiguous selection with Korean IME text", async ({ page }
   await expect.poll(() => firstBlockTexts(page, 2)).toEqual(["한", "Bravo paragraph"]);
   await expect(row(page, "Charlie paragraph")).toHaveCount(0);
   await expect(row(page, "Delta bullet")).toHaveCount(1);
+});
+
+test("replaces a non-contiguous selection when an IME keydown precedes composition", async ({ page }) => {
+  await selectAlphaAndCharlie(page);
+  await expectEditorFocused(page);
+
+  await page.evaluate(() => document.activeElement.dispatchEvent(new KeyboardEvent("keydown", {
+    key: "Process", keyCode: 229, isComposing: false, bubbles: true, cancelable: true,
+  })));
+  // The keydown alone replaces the set, so compositionstart is not what passes this test.
+  await expect(page.locator(".bn-editor")).toHaveAttribute("data-block-selection", "false");
+  expect(await firstBlockTexts(page, 2)).toEqual(["", "Bravo paragraph"]);
+
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.imeSetComposition", { text: "ㅎ", selectionStart: 1, selectionEnd: 1 });
+  await cdp.send("Input.imeSetComposition", { text: "하", selectionStart: 1, selectionEnd: 1 });
+  await cdp.send("Input.insertText", { text: "한" });
+
+  await expect.poll(() => firstBlockTexts(page, 2)).toEqual(["한", "Bravo paragraph"]);
+  await expect(row(page, "Charlie paragraph")).toHaveCount(0);
 });
 
 test("keeps the unselected block when Enter is pressed on a non-contiguous selection", async ({ page }) => {
