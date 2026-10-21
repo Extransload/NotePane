@@ -29,7 +29,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Directory | Owns | Notable files |
 | --- | --- | --- |
 | `src/` | entry point and shared constants | `main.jsx`, `constants.js` |
-| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `selection.js`, `blocks.js`, `clipboard.js`, `images.js` |
+| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `selection.js`, `blockSelection.js`, `blocks.js`, `clipboard.js`, `images.js` |
 | `src/model/` | normalising and deriving stored data | `notes.js`, `preferences.js`, `keyboardShortcuts.js` |
 | `src/style/` | themes, theme tokens, tone matching, colour maths and computed inline styles | `themes.js`, `themeTokens.js`, `toneMatch.js`, `applyTheme.js`, `themeStyles.js`, `colorMath.js` |
 | `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
@@ -43,6 +43,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | --- | --- |
 | Block schema, template content, custom blocks | `src/editor/schema.jsx` |
 | Text selection, table cell selection and navigation | `src/editor/selection.js` |
+| Block selection model, exactly-selected blocks, block-set indent and move | `src/editor/blockSelection.js`, `src/editor/blockSelectionRules.js` |
+| Marquee and drag selection gestures, edge auto-scroll | `src/editor/blockDragSelection.js` |
 | Block lookup, cut, table of contents extraction | `src/editor/blocks.js` |
 | Copy/paste normalisation and Markdown round-tripping | `src/editor/clipboard.js` |
 | Which element counts as an editor shortcut target | `src/editor/targets.js` |
