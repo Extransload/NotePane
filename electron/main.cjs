@@ -26,6 +26,8 @@ const {
   resolveWindowBackgroundColor,
 } = require("./windowTheme.cjs");
 const { readAssetFromUrl } = require("./assetSources.cjs");
+const { resolveUpdateMode, startAppUpdates } = require("./appUpdates.cjs");
+const packageInfo = require("../package.json");
 
 const APP_NAME = "NotePane";
 const execFileAsync = promisify(execFile);
@@ -2075,6 +2077,17 @@ app.whenReady().then(() => {
 
   syncWindowsForLayoutMode();
   reportStoreLoadIssues();
+  startAppUpdates({
+    mode: resolveUpdateMode({
+      isPackaged: app.isPackaged && !quietTestMode,
+      enabled: packageInfo.notepane?.updates === true,
+      platform: process.platform,
+      macAutoUpdate: Boolean(packageInfo.notepane?.macAutoUpdate),
+    }),
+    loadUpdater: () => require("electron-updater").autoUpdater,
+    dialog,
+    shell,
+  });
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {

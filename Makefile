@@ -9,7 +9,7 @@ help:
 	@echo "  make verify   Build and run unit/static/E2E smoke checks"
 	@echo "  make run      Build and run the NotePane desktop app"
 	@echo "  make app      Build an app package for the current OS"
-	@echo "  make app-mac  Build a macOS zip app package"
+	@echo "  make app-mac  Build macOS dmg and zip packages (arm64 and x64)"
 	@echo "  make app-win  Build a Windows NSIS app package"
 	@echo ""
 	@echo "Development:"

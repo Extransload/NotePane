@@ -16,6 +16,8 @@
 | `electron/store.cjs` | local JSON persistence |
 | `electron/assetStore.cjs` | content-addressed media files under `userData/assets`, served as `notepane-asset://local/<sha256>.<ext>` |
 | `electron/preload.cjs` | safe renderer bridge |
+| `electron/appUpdates.cjs` | update checks for a packaged app against GitHub Releases: install on quit, or offer the release page from an ad-hoc signed Mac build |
+| `electron-builder.config.cjs` | packaging, signing and publishing; `.github/workflows/release.yml` runs it on a version tag (see `docs/release.md`) |
 | `electron/themes.json` | the nine theme definitions (palette, code theme, overrides), the single source read by the renderer (`src/style/themes.js`) and the main process (`electron/windowTheme.cjs`, `electron/store.cjs`) |
 | `src/main.jsx` | composition only: the `App` shell and the `StickyEditor` component that wires everything below together |
 | `src/styles.css` | ordered `@import` list for `src/styles/` |

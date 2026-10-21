@@ -87,7 +87,25 @@ Markdown import straight from the slash menu.
 
 ## Install
 
-### Run a packaged app
+### Download
+
+Get the latest version from
+[Releases](https://github.com/Extransload/NotePane/releases/latest):
+
+- **macOS:** `NotePane-<version>-arm64.dmg` for Apple silicon, or
+  `NotePane-<version>.dmg` for Intel. Open it and drag NotePane to
+  Applications.
+- **Windows:** `NotePane Setup <version>.exe`.
+
+Until releases are code-signed, both systems ask once before the first launch.
+On macOS, open NotePane from System Settings → Privacy & Security →
+**Open Anyway**. On Windows, choose **More info → Run anyway**.
+
+NotePane checks Releases for a newer version at startup. On Windows it
+installs the update when you quit; on macOS it offers the download. No note
+data is sent.
+
+### Build a package yourself
 
 ```bash
 git clone https://github.com/Extransload/NotePane.git
@@ -96,9 +114,9 @@ make install
 make app
 ```
 
-The installer or archive lands in `release/`. `make app` builds for the
-machine you are on; `make app-mac` produces a macOS arm64 zip and
-`make app-win` a Windows x64 installer.
+The installer lands in `release/`. `make app` builds for the machine you are
+on; `make app-mac` produces macOS dmg and zip packages for Apple silicon and
+Intel, and `make app-win` a Windows x64 installer.
 
 ### Run from source
 

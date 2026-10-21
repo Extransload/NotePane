@@ -24,15 +24,21 @@ function runWindowsUnpackedFromWsl() {
   assertCommand("wslpath", ["-w", projectRoot]);
 
   console.log("[NotePane] WSL detected; launching the Windows app build.");
-  run("npx", [
-    "electron-builder",
-    "--win",
-    "dir",
-    "--config",
-    "electron-builder.yml",
-    "-c.win.signAndEditExecutable=false",
-    "-c.win.signExecutable=false",
-  ]);
+  // This is a packaged build run for development, so it must not install
+  // published releases over itself.
+  run(
+    "npx",
+    [
+      "electron-builder",
+      "--win",
+      "dir",
+      "--config",
+      "electron-builder.config.cjs",
+      "-c.win.signAndEditExecutable=false",
+      "-c.win.signExecutable=false",
+    ],
+    { env: { ...process.env, NOTEPANE_DISABLE_UPDATES: "1" } },
+  );
 
   const exePath = path.join(projectRoot, "release", "win-unpacked", "NotePane.exe");
   const sourceAppDir = convertToWindowsPath(path.dirname(exePath));
