@@ -12,15 +12,15 @@ export class BlockSetSelection extends Selection {
       && other.ranges.every((range, i) => range.$from.pos === this.ranges[i].$from.pos && range.$to.pos === this.ranges[i].$to.pos);
   }
   map(doc, mapping) {
-    const ranges = [];
+    // Rebuild from ids so runs that become adjacent merge and partly deleted runs survive.
+    const ids = [];
     for (const range of this.ranges) {
-      const from = mapping.mapResult(range.$from.pos, 1);
-      const to = mapping.mapResult(range.$to.pos, -1);
-      if (from.deleted || to.deleted || from.pos >= to.pos) continue;
-      ranges.push(new SelectionRange(doc.resolve(from.pos), doc.resolve(to.pos)));
+      const from = mapping.map(range.$from.pos, 1);
+      const to = mapping.map(range.$to.pos, -1);
+      if (from < to) ids.push(...containerIdsIn(doc, from, to));
     }
-    if (!ranges.length) return Selection.near(doc.resolve(mapping.map(this.ranges[0].$from.pos, 1)));
-    return new BlockSetSelection(ranges);
+    return createBlockSetSelection(doc, ids)
+      ?? Selection.near(doc.resolve(Math.min(mapping.map(this.ranges[0].$from.pos, 1), doc.content.size)));
   }
   toJSON() {
     return { type: "notepane-block-set", ranges: this.ranges.map((range) => [range.$from.pos, range.$to.pos]) };
@@ -50,17 +50,20 @@ export function isBlockSetSelection(selection) {
   return selection instanceof BlockSetSelection;
 }
 
-export function getBlockSetIds(selection) {
-  if (!isBlockSetSelection(selection)) return [];
+function containerIdsIn(doc, from, to) {
   const ids = [];
-  for (const { $from, $to } of selection.ranges) {
-    $from.doc.nodesBetween($from.pos, $to.pos, (node) => {
-      if (node.type.name !== "blockContainer") return;
-      ids.push(node.attrs.id);
-      return false;
-    });
+  for (let pos = from; pos < to;) {
+    const node = doc.nodeAt(pos);
+    if (!node) break;
+    if (node.type.name === "blockContainer") ids.push(node.attrs.id);
+    pos += node.nodeSize;
   }
   return ids;
+}
+
+export function getBlockSetIds(selection) {
+  if (!isBlockSetSelection(selection)) return [];
+  return selection.ranges.flatMap(({ $from, $to }) => containerIdsIn($from.doc, $from.pos, $to.pos));
 }
 
 export function getSelectedBlocks(editor) {
