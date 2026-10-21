@@ -99,7 +99,8 @@ Get the latest version from
 
 Until releases are code-signed, both systems ask once before the first launch.
 On macOS, open NotePane from System Settings → Privacy & Security →
-**Open Anyway**. On Windows, choose **More info → Run anyway**.
+**Open Anyway**; the installer window walks you through it. On Windows,
+choose **More info → Run anyway**.
 
 NotePane checks Releases for a newer version at startup. On Windows it
 installs the update when you quit; on macOS it offers the download. No note

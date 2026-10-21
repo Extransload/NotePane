@@ -11,6 +11,7 @@
     "dev:app": "cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
     "install:browsers": "playwright install chromium",
     "icons": "node scripts/build-icons.mjs",
+    "dmg-background": "node scripts/build-dmg-background.mjs",
     "build": "vite build",
     "start": "npm run build && node scripts/run-app.mjs",
     "check:refs": "node scripts/check-refs.mjs",

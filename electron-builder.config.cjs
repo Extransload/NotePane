@@ -20,7 +20,7 @@ module.exports = {
   directories: {
     output: "release",
   },
-  files: ["dist/**/*", "electron/**/*", "build/**/*", "package.json"],
+  files: ["dist/**/*", "electron/**/*", "build/**/*", "!build/background.tiff", "package.json"],
   // Read by electron/appUpdates.cjs to choose between installing an update and
   // pointing to the release page.
   extraMetadata: {
@@ -38,6 +38,24 @@ module.exports = {
       { target: "zip", arch: ["arm64", "x64"] },
     ],
     ...(hasMacCertificate ? {} : { identity: "-", hardenedRuntime: false }),
+  },
+  // The installer window walks through the steps an unsigned build needs: drag
+  // to Applications, open once and be blocked, then Open Anyway in Privacy &
+  // Security, reached from the System Settings shortcut. `npm run dmg-background`
+  // redraws the background from this window size and these icon positions.
+  //
+  // electron-builder sizes the window from the background image, and Finder
+  // counts the title bar in that height and may add a path bar and status bar,
+  // which together hide about the bottom 85px. The steps therefore end above
+  // that, and the rest of the image is blank margin.
+  dmg: {
+    background: "build/background.tiff",
+    window: { width: 600, height: 560 },
+    contents: [
+      { x: 190, y: 150 },
+      { x: 410, y: 150, type: "link", path: "/Applications" },
+      { x: 300, y: 340, type: "link", path: "/System/Applications/System Settings.app" },
+    ],
   },
   win: {
     icon: "build/icon.png",

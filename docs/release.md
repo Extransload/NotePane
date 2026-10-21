@@ -26,6 +26,15 @@ npm run app:win   # NSIS installer, x64
 
 Packages land in `release/`. The configuration is `electron-builder.config.cjs`. A local build never uploads anything.
 
+The macOS installer window walks through the steps an unsigned build needs: drag to Applications, open once and be
+blocked, then **Open Anyway** in Privacy & Security, reached from the System Settings shortcut in the window. After
+changing the window layout in `electron-builder.config.cjs` or the steps in `scripts/build-dmg-background.mjs`,
+redraw its background:
+
+```bash
+npm run dmg-background   # writes build/background.tiff, macOS only
+```
+
 ## Publishing a release
 
 Releases are built by `.github/workflows/release.yml` and published on GitHub Releases, which is where people
