@@ -1,12 +1,11 @@
 // Renders the macOS installer window background into build/background.tiff
 // (1x and 2x in one file, so the window stays sharp on Retina screens). The
 // window size and the icon positions come from electron-builder.config.cjs
-// `dmg`, so the cards, label pills and arrow always line up with the icons.
+// `dmg`, so the cards and the arrow always line up with the icons.
 //
-// Finder draws the icon labels itself, black in Light Mode and white in Dark
-// Mode, and the image cannot change with the appearance. Each label therefore
-// sits on a small mid-tone pill that both colours read on (about 4.5:1 each);
-// everything else is a light design with dark text.
+// A window with a background picture keeps its light appearance in Dark Mode:
+// Finder still draws the icon labels in black (checked on macOS 27). One light
+// design therefore reads in both modes, and the image cannot vary by mode anyway.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { createRequire } from "node:module";
@@ -35,20 +34,16 @@ const applications = findIcon((entry) => entry.path === "/Applications");
 const settings = findIcon((entry) => entry.path?.endsWith("System Settings.app"));
 
 // Each card holds a step and its icons; the steps that need no icon follow the
-// card as plain lines. A label is the longest text Finder may show for that
-// icon (with the extension, for people who show all extensions).
+// card as plain lines.
 const rows = [
   {
     caption: "Drag NotePane to Applications",
-    icons: [
-      { entry: app, label: "NotePane.app" },
-      { entry: applications, label: "Applications" },
-    ],
+    icons: [app, applications],
     after: ["Open NotePane. The first time, macOS stops it: click <strong>Done</strong>."],
   },
   {
     caption: "Open System Settings",
-    icons: [{ entry: settings, label: "System Settings.app" }],
+    icons: [settings],
     after: [
       "In <strong>Privacy &amp; Security</strong>, scroll down to Security and click <strong>Open Anyway</strong>.",
       "Click <strong>Open Anyway</strong> again and enter your Mac password.",
@@ -60,7 +55,7 @@ const rows = [
 // below that point.
 const ICON_HALF = 40;
 const LABEL_CENTRE = 58;
-const PILL_HEIGHT = 22;
+const LABEL_HALF = 11;
 const CAPTION_SPACE = 34;
 const CARD_PADDING = 12;
 const STEP_GAP = 12;
@@ -73,20 +68,16 @@ let step = 0;
 let contentBottom = 0;
 const parts = [];
 for (const row of rows) {
-  const rowY = row.icons[0].entry.y;
+  const rowY = row.icons[0].y;
   const captionTop = rowY - ICON_HALF - CAPTION_SPACE;
   const cardTop = captionTop - CARD_PADDING;
-  const pillTop = rowY + LABEL_CENTRE - PILL_HEIGHT / 2;
-  const cardBottom = pillTop + PILL_HEIGHT + CARD_PADDING;
+  const cardBottom = rowY + LABEL_CENTRE + LABEL_HALF + CARD_PADDING;
   if (cardTop < contentBottom + STEP_GAP) {
     throw new Error(`The card for "${row.caption}" overlaps the step above it; move its icons down`);
   }
   step += 1;
   parts.push(`<div class="card" style="top: ${cardTop}px; height: ${cardBottom - cardTop}px"></div>`);
   parts.push(`<div class="step" style="top: ${captionTop}px"><span class="number">${step}</span><strong>${row.caption}</strong></div>`);
-  for (const { entry, label } of row.icons) {
-    parts.push(`<div class="pill" style="left: ${entry.x}px; top: ${pillTop}px">${label}</div>`);
-  }
   contentBottom = cardBottom;
   for (const line of row.after) {
     step += 1;
@@ -131,13 +122,6 @@ const html = `<!doctype html>
     display: inline-block; width: 20px; height: 20px; margin-right: 8px;
     border-radius: 50%; text-align: center; line-height: 20px;
     font-size: 12px; font-weight: 700; background: #78766f; color: #ffffff;
-  }
-  /* Sized by the label text, which stays invisible: Finder draws the real one. */
-  .pill {
-    position: absolute; transform: translateX(-50%);
-    height: ${PILL_HEIGHT}px; padding: 0 11px; border-radius: ${PILL_HEIGHT / 2}px;
-    background: #78766f; color: transparent;
-    font-size: 12px; line-height: ${PILL_HEIGHT}px; white-space: nowrap;
   }
   svg { position: absolute; inset: 0; }
 </style>
