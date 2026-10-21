@@ -125,3 +125,22 @@ test("undo after deleting a block set restores the block set", async () => {
   assert.ok(sel.isBlockSetSelection(current.selection));
   assert.deepEqual(sel.getBlockSetIds(current.selection), ["a", "c2"]);
 });
+
+test("moves a mixed-depth block set whose nested run comes first", async () => {
+  const { sel, state, doc } = await setup();
+  const initial = state.EditorState.create({ doc });
+  const view = {
+    state: initial.apply(initial.tr.setSelection(sel.createBlockSetSelection(doc, ["c2", "f"]))),
+    dispatch(tr) { this.state = this.state.apply(tr); },
+  };
+  const outline = (group) => {
+    const ids = [];
+    group.forEach((child) => ids.push(child.childCount > 1 ? [child.attrs.id, outline(child.child(1))] : child.attrs.id));
+    return ids;
+  };
+
+  assert.equal(sel.moveBlockSelection({ prosemirrorView: view }, -1), true);
+
+  assert.deepEqual(outline(view.state.doc.firstChild), ["a", "b", "f", ["p", ["c2", "c1", "c3"]]]);
+  assert.deepEqual(sel.getBlockSetIds(view.state.selection), ["f", "c2"]);
+});

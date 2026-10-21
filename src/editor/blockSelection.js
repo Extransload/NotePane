@@ -103,15 +103,30 @@ export function replaceBlockSelectionWithParagraph(view) {
   view.dispatch(tr.scrollIntoView());
 }
 
-// Tab and Shift+Tab on a block set: nests or unnests each selected block that can move, in one
-// undo step, and keeps the same blocks selected. Blocks without inline content are skipped.
+// Runs of adjacent selected siblings, as id lists in document order. A block without inline
+// content, such as a divider, belongs to no run and ends the one before it.
+function indentRuns(selection) {
+  return selection.ranges.flatMap(({ $from, $to }) => {
+    const runs = [[]];
+    for (let pos = $from.pos; pos < $to.pos;) {
+      const node = $from.doc.nodeAt(pos);
+      if (node.firstChild.inlineContent) runs.at(-1).push(node.attrs.id);
+      else if (runs.at(-1).length) runs.push([]);
+      pos += node.nodeSize;
+    }
+    return runs.filter((run) => run.length);
+  });
+}
+
+// Tab and Shift+Tab on a block set: nests or unnests each run as one unit, as BlockNote does for
+// a text selection, in one undo step, and keeps the same blocks selected.
 export function indentBlockSelection(editor, direction) {
   return editor.transact((tr) => {
     const ids = getBlockSetIds(tr.selection);
     if (!ids.length) return false;
-    for (const id of ids) {
-      if (!Array.isArray(editor.getBlock(id)?.content)) continue;
-      editor.setTextCursorPosition(id, "start");
+    for (const run of indentRuns(tr.selection)) {
+      // Found again by id, because an earlier run's move shifts this one.
+      tr.setSelection(createBlockSetSelection(tr.doc, run));
       if (direction > 0 && editor.canNestBlock()) editor.nestBlock();
       else if (direction < 0 && editor.canUnnestBlock()) editor.unnestBlock();
     }
@@ -137,8 +152,11 @@ export function moveBlockSelection(editor, direction) {
   if (plans.some(({ order }) => !order)) return true;
 
   const tr = state.tr;
-  // Later groups first, so the earlier groups' positions need no mapping.
-  for (const { start, siblingIds, order } of plans.reverse()) {
+  // Groups that start later go first: a replacement only shifts positions after its group's
+  // start, so the starts still to be used stay valid. This is not the order of the ranges, since a
+  // nested run can come before a top-level run whose group starts earlier.
+  plans.sort((a, b) => b.start - a.start);
+  for (const { start, siblingIds, order } of plans) {
     const group = tr.doc.resolve(start).parent;
     const nodesById = new Map();
     group.forEach((child) => nodesById.set(child.attrs.id, child));

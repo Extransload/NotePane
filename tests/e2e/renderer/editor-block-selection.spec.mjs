@@ -70,10 +70,15 @@ async function clipboardText(page) {
   return await page.evaluate(() => navigator.clipboard.readText());
 }
 
+// A row given by its text, or a locator for a row without text such as a divider.
+function rowOf(page, target) {
+  return typeof target === "string" ? row(page, target) : target;
+}
+
 async function marquee(page, fromText, toText, { modifier, release = true } = {}) {
   const editorBox = await page.locator(".bn-editor").boundingBox();
-  const fromBox = await row(page, fromText).boundingBox();
-  const toBox = await row(page, toText).boundingBox();
+  const fromBox = await rowOf(page, fromText).boundingBox();
+  const toBox = await rowOf(page, toText).boundingBox();
   expect(editorBox).not.toBeNull();
   expect(fromBox).not.toBeNull();
   expect(toBox).not.toBeNull();
@@ -603,6 +608,29 @@ test("indents and outdents each block of a non-contiguous selection", async ({ p
   expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
 });
 
+test("indents a contiguous run as one unit", async ({ page }) => {
+  await pasteSelectionFixture(page);
+  const alphaDepth = await blockDepth(page, "Alpha paragraph");
+  await marquee(page, "Bravo paragraph", "Charlie paragraph");
+  expect(await selectedBlockTexts(page)).toEqual(["Bravo paragraph", "Charlie paragraph"]);
+
+  await page.keyboard.press("Tab");
+  await expect.poll(() => blockDepth(page, "Bravo paragraph")).toBe(alphaDepth + 1);
+  expect(await blockDepth(page, "Charlie paragraph")).toBe(alphaDepth + 1);
+  expect(await selectedBlockTexts(page)).toEqual(["Bravo paragraph", "Charlie paragraph"]);
+
+  await page.keyboard.press("Shift+Tab");
+  await expect.poll(() => blockDepth(page, "Bravo paragraph")).toBe(alphaDepth);
+  expect(await blockDepth(page, "Charlie paragraph")).toBe(alphaDepth);
+  expect(await selectedBlockTexts(page)).toEqual(["Bravo paragraph", "Charlie paragraph"]);
+
+  // A run that starts at the top of its group stays put whole, so Bravo never nests under Alpha.
+  await marquee(page, "Alpha paragraph", "Bravo paragraph");
+  await page.keyboard.press("Tab");
+  expect(await blockDepth(page, "Bravo paragraph")).toBe(alphaDepth);
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Bravo paragraph"]);
+});
+
 test("moves each block of a non-contiguous selection past its neighbour", async ({ page }) => {
   await pasteSelectionFixture(page);
   const original = await topLevelTexts(page);
@@ -623,4 +651,36 @@ test("moves each block of a non-contiguous selection past its neighbour", async 
   await page.keyboard.press(moveUp);
   expect(await topLevelTexts(page)).toEqual(original);
   expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
+});
+
+// The texts of the direct children of `text`'s block, in order.
+async function childTexts(page, text) {
+  return await row(page, text).evaluate((el) =>
+    [...el.closest(".bn-block-outer").querySelectorAll(
+      ":scope > .bn-block > .bn-block-group > .bn-block-outer > .bn-block > .bn-block-content",
+    )].map((child) => child.textContent.trim()));
+}
+
+test("moves a mixed-depth selection without errors", async ({ page }) => {
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await pasteSelectionFixture(page);
+  const divider = page.locator(".bn-editor .bn-block-content[data-content-type='divider']");
+  await marquee(page, "Echo bullet", divider);
+  // The divider has no text.
+  expect(await selectedBlockTexts(page)).toEqual(["Echo bullet", ""]);
+
+  // Echo nests under Delta after Delta child. The divider has no inline content and stays put.
+  await page.keyboard.press("Tab");
+  await expect.poll(() => childTexts(page, "Delta bullet")).toEqual(["Delta child", "Echo bullet"]);
+  expect((await topLevelTexts(page)).slice(3, 6)).toEqual(["Delta bullet", "", "Foxtrot paragraph"]);
+
+  // The nested run comes first in the document, but its group starts after the top-level one.
+  await page.keyboard.press(`Shift+${modifierShortcut("ArrowUp")}`);
+  await expect.poll(() => childTexts(page, "Delta bullet")).toEqual(["Echo bullet", "Delta child"]);
+  expect((await topLevelTexts(page)).slice(0, 6)).toEqual([
+    "Alpha paragraph", "Bravo paragraph", "Charlie paragraph", "", "Delta bullet", "Foxtrot paragraph",
+  ]);
+  expect(await selectedBlockTexts(page)).toEqual(["", "Echo bullet"]);
+  expect(pageErrors).toEqual([]);
 });
