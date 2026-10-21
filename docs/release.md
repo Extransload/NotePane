@@ -43,7 +43,7 @@ download NotePane and where the app looks for updates.
    generated notes, and builds on macOS and Windows runners. It uploads:
    - `NotePane-<version>-arm64.dmg` and `NotePane-<version>.dmg` (Intel), for people to download;
    - the matching `-mac.zip` files and `latest-mac.yml`, read by the updater;
-   - `NotePane Setup <version>.exe` and `latest.yml`, for Windows.
+   - `NotePane-Setup-<version>.exe` and `latest.yml`, for Windows.
 4. Check the draft on the repository's Releases page, edit the notes if needed, and press **Publish release**.
 
 A draft is invisible to visitors and to the update check, so nothing reaches users until step 4.

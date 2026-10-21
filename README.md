@@ -95,7 +95,7 @@ Get the latest version from
 - **macOS:** `NotePane-<version>-arm64.dmg` for Apple silicon, or
   `NotePane-<version>.dmg` for Intel. Open it and drag NotePane to
   Applications.
-- **Windows:** `NotePane Setup <version>.exe`.
+- **Windows:** `NotePane-Setup-<version>.exe`.
 
 Until releases are code-signed, both systems ask once before the first launch.
 On macOS, open NotePane from System Settings → Privacy & Security →

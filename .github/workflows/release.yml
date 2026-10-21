@@ -53,14 +53,29 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build and upload to the draft release
-        run: npm run release:publish
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Signing is skipped while these secrets are unset; see docs/release.md.
-          CSC_LINK: ${{ matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE || '' }}
-          CSC_KEY_PASSWORD: ${{ matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE_PASSWORD || '' }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          WIN_CSC_LINK: ${{ secrets.WIN_CERTIFICATE }}
-          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CERTIFICATE_PASSWORD }}
+          MAC_CERTIFICATE: ${{ secrets.MAC_CERTIFICATE }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          NOTARIZE_APPLE_ID: ${{ secrets.APPLE_ID }}
+          NOTARIZE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          NOTARIZE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          WIN_CERTIFICATE: ${{ secrets.WIN_CERTIFICATE }}
+          WIN_CERTIFICATE_PASSWORD: ${{ secrets.WIN_CERTIFICATE_PASSWORD }}
+        # electron-builder reads an empty CSC_LINK as a path, so each signing
+        # variable is exported only when its secret holds a value.
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ] && [ -n "$MAC_CERTIFICATE" ]; then
+            export CSC_LINK="$MAC_CERTIFICATE" CSC_KEY_PASSWORD="$MAC_CERTIFICATE_PASSWORD"
+            if [ -n "$NOTARIZE_APPLE_ID" ]; then
+              export APPLE_ID="$NOTARIZE_APPLE_ID"
+              export APPLE_APP_SPECIFIC_PASSWORD="$NOTARIZE_APP_SPECIFIC_PASSWORD"
+              export APPLE_TEAM_ID="$NOTARIZE_TEAM_ID"
+            fi
+          fi
+          if [ "$RUNNER_OS" = "Windows" ] && [ -n "$WIN_CERTIFICATE" ]; then
+            export WIN_CSC_LINK="$WIN_CERTIFICATE" WIN_CSC_KEY_PASSWORD="$WIN_CERTIFICATE_PASSWORD"
+          fi
+          npm run release:publish
