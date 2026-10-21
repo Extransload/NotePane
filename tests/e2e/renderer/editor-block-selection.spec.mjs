@@ -332,12 +332,13 @@ test("auto-scrolls a marquee held at the bottom edge and keeps its start anchore
   const editorBox = await page.locator(".bn-editor").boundingBox();
 
   await page.mouse.move(editorBox.x + editorBox.width / 2, surfaceBox.y + surfaceBox.height - 5, { steps: 5 });
-  await page.waitForTimeout(800);
 
-  expect(await surface.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
-  const selected = await selectedBlockTexts(page);
-  expect(selected[0]).toBe("Line 1");
-  expect(selected.length).toBeGreaterThan(20);
+  // The pointer stays still in the band, so only the auto-scroll can move the surface.
+  await expect.poll(() => surface.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  await expect.poll(async () => {
+    const selected = await selectedBlockTexts(page);
+    return { first: selected[0], moreThan20: selected.length > 20 };
+  }).toEqual({ first: "Line 1", moreThan20: true });
   await page.mouse.up();
 });
 
@@ -352,10 +353,11 @@ test("auto-scrolls a text drag held at the bottom edge", async ({ page }) => {
   await page.mouse.move(textBox.x + 2, textBox.y + textBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(textBox.x + 40, surfaceBox.y + surfaceBox.height - 5, { steps: 10 });
-  await page.waitForTimeout(800);
 
-  expect(await surface.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
-  expect(await selectedBlockTexts(page)).toEqual([]);
-  expect(await selectionString(page)).toContain("Line 20");
+  await expect.poll(() => surface.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  await expect.poll(async () => ({
+    blocks: await selectedBlockTexts(page),
+    reachesLine20: (await selectionString(page)).includes("Line 20"),
+  })).toEqual({ blocks: [], reachesLine20: true });
   await page.mouse.up();
 });
