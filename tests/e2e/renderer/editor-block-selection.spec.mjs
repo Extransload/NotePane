@@ -133,6 +133,9 @@ test("keeps a text drag across a table and an image as a text selection", async 
   await page.setViewportSize({ width: 1280, height: 1400 });
   await loadTemplatePreview(page);
   await page.getByRole("button", { name: "Use this template" }).click();
+  // The template image pushes "Session brief" down once it loads, so measure after that.
+  await expect.poll(() => page.locator(".bn-editor img").first()
+    .evaluate((img) => img.complete && img.naturalHeight > 0)).toBe(true);
 
   await textDrag(page, "Workspace modes", "Session brief");
 
@@ -271,4 +274,29 @@ test("ends a marquee when the window loses focus mid-drag", async ({ page }) => 
   });
   expect(caret).toEqual({ collapsed: true, block: "Bravo paragraph" });
   await expect(page.locator(".bn-editor")).toHaveAttribute("data-block-selection", "false");
+});
+
+test("focuses the editor when a marquee starts while the find bar has focus", async ({ page }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await pasteSelectionFixture(page);
+  await page.keyboard.press(modifierShortcut("F"));
+  const findInput = page.getByRole("search", { name: "Find in note" })
+    .getByRole("textbox", { name: "Find in note" });
+  await findInput.pressSequentially("Charlie");
+  await expect(findInput).toBeFocused();
+  const surface = page.getByTestId("sticky-editor-surface");
+  const scrollTop = await surface.evaluate((el) => el.scrollTop);
+
+  // The find bar floats over the right gutter of the first row, so draw the marquee upwards.
+  await marquee(page, "Bravo paragraph", "Alpha paragraph");
+
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Bravo paragraph"]);
+  await expectEditorFocused(page);
+  expect(await surface.evaluate((el) => el.scrollTop)).toBe(scrollTop);
+  await page.keyboard.press(modifierShortcut("C"));
+  await expect(findInput).toHaveValue("Charlie");
+  await expect.poll(() => clipboardText(page)).toContain("Alpha paragraph");
+  const copied = await clipboardText(page);
+  expect(copied).toContain("Bravo paragraph");
+  expect(copied).not.toContain("Charlie");
 });

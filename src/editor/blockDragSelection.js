@@ -114,6 +114,9 @@ function marqueeView(editor, view) {
       gesture.overlay.className = "notepane-marquee";
       gesture.overlay.dataset.testid = "block-marquee";
       gesture.surface.append(gesture.overlay);
+      // Keys must reach the blocks the marquee selects, even when the press began with focus
+      // elsewhere, such as in the find bar. ProseMirror focuses without scrolling.
+      if (!view.hasFocus()) view.focus();
     }
     update();
   }
