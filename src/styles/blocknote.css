@@ -405,6 +405,15 @@ body:has(.bn-editor[data-block-selection="true"]) .bn-formatting-toolbar {
   display: none;
 }
 
+.notepane-marquee {
+  position: absolute;
+  z-index: 3;
+  border: 1px solid color-mix(in srgb, var(--notepane-input-focus-border) 55%, transparent);
+  border-radius: 2px;
+  background: var(--notepane-selection-bg);
+  pointer-events: none;
+}
+
 .bn-drag-preview {
   opacity: 0.001 !important;
   padding: 0 !important;

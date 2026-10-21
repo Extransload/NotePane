@@ -67,6 +67,7 @@ export function isEmptyEditorSurfacePointer(event) {
         ".bn-formatting-toolbar",
         "[role='toolbar']",
         "[role='listbox']",
+        "[role='search']",
         "button",
         "input",
         "textarea",

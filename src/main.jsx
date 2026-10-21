@@ -87,7 +87,6 @@ import {
   getBlocksForClipboard,
   getEditorBlockElement,
   isBlankTableSurfacePointer,
-  isEmptyEditorSurfacePointer,
   isEmptyParagraphBlock,
   isEmptySessionDocument,
   scrollEditorBlockIntoView,
@@ -2976,18 +2975,6 @@ function StickyEditor({
     [isSidebarOpen, sidebarWidth],
   );
 
-  const focusLastBlockFromEmptySurface = useCallback(
-    (event) => {
-      if (!isEmptyEditorSurfacePointer(event)) {
-        return;
-      }
-
-      event.preventDefault();
-      focusLastEditorBlock(editor);
-    },
-    [editor],
-  );
-
   usePendingSaveFlush({
     appearanceTimerRef,
     isEditorDirtyRef,
@@ -3434,7 +3421,6 @@ function StickyEditor({
               window.requestAnimationFrame(() => updateFocusedTableCell(event.target));
             }
           }}
-          onMouseDown={focusLastBlockFromEmptySurface}
         >
           {findInNote.isOpen && (
             <div className="find-bar-dock">

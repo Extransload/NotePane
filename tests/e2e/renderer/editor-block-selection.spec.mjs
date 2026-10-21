@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   clickLastEmptyParagraph,
   createBlankSession,
+  expectEditorFocused,
   getBulletItemDepth,
   loadTemplatePreview,
   modifierShortcut,
@@ -155,4 +156,119 @@ test("keeps a text drag across a divider and a code block as a text selection", 
   expect(selected).toContain("const golf = 1;");
   expect(selected).toContain("Hotel");
   expect(await blocks.count()).toBe(blockCount);
+});
+
+test("selects every block a marquee touches and deselects blocks as it shrinks", async ({ page }) => {
+  await pasteSelectionFixture(page);
+
+  await marquee(page, "Alpha paragraph", "Charlie paragraph", { release: false });
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Bravo paragraph", "Charlie paragraph"]);
+  await expect(page.getByTestId("block-marquee")).toBeVisible();
+
+  const alphaBox = await row(page, "Alpha paragraph").boundingBox();
+  await page.mouse.move(alphaBox.x + alphaBox.width / 2, alphaBox.y + alphaBox.height / 2, { steps: 5 });
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph"]);
+
+  await page.mouse.up();
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph"]);
+  await expect(page.getByTestId("block-marquee")).toHaveCount(0);
+  await expect(page.locator(".bn-editor")).toHaveAttribute("data-block-selection", "true");
+});
+
+test("selects nothing while the marquee stays in the side padding", async ({ page }) => {
+  await pasteSelectionFixture(page);
+  const editorBox = await page.locator(".bn-editor").boundingBox();
+  const alphaBox = await row(page, "Alpha paragraph").boundingBox();
+  const charlieBox = await row(page, "Charlie paragraph").boundingBox();
+  const charlieY = charlieBox.y + charlieBox.height - 2;
+
+  await page.mouse.move(editorBox.x + editorBox.width - 40, alphaBox.y + 2);
+  await page.mouse.down();
+  await page.mouse.move(editorBox.x + editorBox.width - 10, charlieY, { steps: 10 });
+  await expect(page.getByTestId("block-marquee")).toBeVisible();
+  expect(await selectedBlockTexts(page)).toEqual([]);
+
+  await page.mouse.move(editorBox.x + editorBox.width / 2, charlieY, { steps: 10 });
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Bravo paragraph", "Charlie paragraph"]);
+  await page.mouse.up();
+});
+
+test("selects a nested child alone, and its parent with an outer block", async ({ page }) => {
+  await pasteSelectionFixture(page);
+
+  await marquee(page, "Delta child", "Delta child");
+  expect(await selectedBlockTexts(page)).toEqual(["Delta child"]);
+
+  await marquee(page, "Delta child", "Echo bullet");
+  expect(await selectedBlockTexts(page)).toEqual(["Delta bullet", "Echo bullet"]);
+});
+
+test("focuses the last block on a click in the empty surface and clears a block selection", async ({ page }) => {
+  await pasteSelectionFixture(page);
+  await marquee(page, "Alpha paragraph", "Alpha paragraph");
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph"]);
+
+  const lastBox = await page.locator(".bn-editor .bn-block-outer").last().boundingBox();
+  await page.mouse.click(lastBox.x + lastBox.width / 2, lastBox.y + lastBox.height + 40);
+
+  await expect(page.locator(".bn-editor")).toHaveAttribute("data-block-selection", "false");
+  await expectEditorFocused(page);
+  const lastContent = page.locator(".bn-editor .bn-block-content").last();
+  await expect(lastContent).toHaveAttribute("data-content-type", "paragraph");
+  await expect(lastContent).toHaveText("");
+});
+
+test("never starts a marquee from the side menu handle", async ({ page }) => {
+  await pasteSelectionFixture(page);
+  await row(page, "Alpha paragraph").hover();
+  const handle = page.locator(".bn-side-menu [data-test='dragHandle']");
+  await expect(handle).toBeVisible();
+  const handleBox = await handle.boundingBox();
+  // Playwright never finishes intercepting this handle's HTML5 drag, and a native drag would hide
+  // the moves from the page anyway. Cancelling it lets the marquee code see every move.
+  await page.evaluate(() => document.addEventListener("dragstart", (event) => event.preventDefault(), { capture: true, once: true }));
+
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox.x + handleBox.width / 2 + 10, handleBox.y + handleBox.height / 2, { steps: 5 });
+  await expect(page.getByTestId("block-marquee")).toHaveCount(0);
+
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  expect(await selectedBlockTexts(page)).toEqual([]);
+});
+
+test("replaces a block selection with a text selection when a drag starts in selected text", async ({ page }) => {
+  await pasteSelectionFixture(page);
+  await marquee(page, "Alpha paragraph", "Bravo paragraph");
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Bravo paragraph"]);
+
+  await textDrag(page, "Alpha paragraph", "Alpha paragraph");
+
+  expect(await selectedBlockTexts(page)).toEqual([]);
+  expect(await selectionString(page)).not.toBe("");
+});
+
+test("ends a marquee when the window loses focus mid-drag", async ({ page }) => {
+  await pasteSelectionFixture(page);
+  await marquee(page, "Alpha paragraph", "Bravo paragraph", { release: false });
+  await expect(page.getByTestId("block-marquee")).toBeVisible();
+
+  await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+  await expect(page.getByTestId("block-marquee")).toHaveCount(0);
+  await page.mouse.up();
+  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Bravo paragraph"]);
+
+  await row(page, "Bravo paragraph").click();
+  const caret = await page.evaluate(() => {
+    const selection = window.getSelection();
+    const node = selection.anchorNode;
+    const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+    return {
+      collapsed: selection.isCollapsed,
+      block: element?.closest(".bn-block-content")?.textContent.trim() ?? null,
+    };
+  });
+  expect(caret).toEqual({ collapsed: true, block: "Bravo paragraph" });
+  await expect(page.locator(".bn-editor")).toHaveAttribute("data-block-selection", "false");
 });
