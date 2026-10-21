@@ -66,24 +66,50 @@ Without signing, both systems warn on first launch:
   build is ad-hoc signed so that this works; an unsigned Apple Silicon download would instead be reported as damaged.
 - **Windows** SmartScreen shows "Windows protected your PC". The person chooses **More info → Run anyway**.
 
-Signing removes these warnings. Add these repository secrets (Settings → Secrets and variables → Actions); the
-workflow picks them up on the next tag, with no code change.
+Signing removes these warnings. The workflow reads the credentials from repository secrets (Settings → Secrets and
+variables → Actions) and picks them up on the next tag, with no code change.
 
-| Secret | Value |
-| --- | --- |
-| `MAC_CERTIFICATE` | Developer ID Application certificate exported as `.p12`, base64-encoded |
-| `MAC_CERTIFICATE_PASSWORD` | the `.p12` password |
-| `APPLE_ID` | the Apple ID of the Apple Developer Program account |
-| `APPLE_APP_SPECIFIC_PASSWORD` | an app-specific password for that Apple ID |
-| `APPLE_TEAM_ID` | the Team ID |
-| `WIN_CERTIFICATE` | Windows code signing certificate as `.pfx`, base64-encoded |
-| `WIN_CERTIFICATE_PASSWORD` | the `.pfx` password |
+### macOS: Developer ID and notarization
 
-With the macOS secrets set, electron-builder signs with the Developer ID, enables hardened runtime, notarizes with
-Apple, and marks the build so that macOS updates install themselves. The macOS secrets need an Apple Developer
-Program membership. Windows certificates come from a certificate authority, or from a cloud signing service such as
-Azure Trusted Signing, whose eligibility depends on the country; it is configured through electron-builder's
-`win.azureSignOptions` rather than these two secrets.
+1. Join the [Apple Developer Program](https://developer.apple.com/programs/) (paid yearly).
+2. Create a **Developer ID Application** certificate (Xcode → Settings → Accounts → Manage Certificates, or the
+   Certificates page of the developer site), then export it with its private key from Keychain Access as a `.p12`
+   file protected by a password.
+3. Create an app-specific password for your Apple ID at [account.apple.com](https://account.apple.com), and note
+   your Team ID from the Membership page of the developer site.
+4. Store them as secrets. Run these yourself, so the values never pass through anyone else's screen or logs:
+
+   ```bash
+   base64 -i DeveloperID.p12 | gh secret set MAC_CERTIFICATE
+   gh secret set MAC_CERTIFICATE_PASSWORD     # prompts for the .p12 password
+   gh secret set APPLE_ID                     # the Apple ID email
+   gh secret set APPLE_APP_SPECIFIC_PASSWORD  # the app-specific password
+   gh secret set APPLE_TEAM_ID                # the Team ID
+   ```
+
+5. Delete the exported `.p12` file once the secret is stored.
+
+With these set, electron-builder signs with the Developer ID, enables hardened runtime with its default Electron
+entitlements (JIT, unsigned executable memory, library validation off), notarizes with Apple, and marks the build
+so that macOS updates install themselves. Notarization adds a few minutes to the macOS job.
+
+### Windows
+
+Since mid-2023, certificate authorities issue code signing keys only on a hardware token or in a cloud signing
+service, so a new certificate cannot be exported as a `.pfx` file for a CI secret. The options are:
+
+- **A cloud signing service from a certificate authority** (for example SSL.com eSigner, DigiCert KeyLocker or
+  Certum SimplySign). Each provides a command-line tool, which the workflow calls through electron-builder's
+  `win.sign` hook; that step is added once a provider is chosen.
+- **Azure Artifact Signing** (formerly Trusted Signing), the cheapest option, configured through electron-builder's
+  `win.azureSignOptions`. It is available only to individuals in the USA and Canada and to organizations in the USA,
+  Canada, the EU and the UK.
+- **A certificate that can still be exported as `.pfx`** (issued before mid-2023): store it as
+  `base64 -i cert.pfx | gh secret set WIN_CERTIFICATE` and `gh secret set WIN_CERTIFICATE_PASSWORD`; the workflow
+  already uses these.
+
+A signed installer still builds SmartScreen reputation over its first downloads, so a new publisher may see the
+warning for a while even after signing.
 
 ## Homebrew
 
