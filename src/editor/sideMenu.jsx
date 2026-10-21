@@ -195,7 +195,7 @@ function RemoveSelectedBlocksItem({ children }) {
     selector: (state) => state?.block,
   });
 
-  if (!Components || block === undefined) {
+  if (!Components || !block) {
     return null;
   }
 

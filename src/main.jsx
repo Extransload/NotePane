@@ -3,6 +3,7 @@ import {
 } from "./editor/blockDragSelection.js";
 import {
   isBlockSetSelection,
+  replaceBlockSelectionWithParagraph,
 } from "./editor/blockSelection.js";
 import {
   useCallback,
@@ -998,10 +999,17 @@ function StickyEditor({
     pasteHandler: ({ event, editor, defaultPasteHandler }) => {
       const plainText = event.clipboardData?.getData("text/plain") ?? "";
       if (plainText && !isSelectionInsideCodeBlock(editor)) {
+        const pasteView = editor.prosemirrorView;
+        const isBlockSet = isBlockSetSelection(pasteView?.state.selection);
         if (
           isStandaloneWebUrl(plainText) &&
-          hasEditorRangeSelection(editor)
+          (isBlockSet || hasEditorRangeSelection(editor))
         ) {
+          // The default paste would link the selected blocks' text instead of replacing it,
+          // and insertInlineContent sees only the first run.
+          if (isBlockSet) {
+            replaceBlockSelectionWithParagraph(pasteView);
+          }
           editor.insertInlineContent(plainText.trim(), { updateSelection: true });
           return true;
         }
@@ -1046,6 +1054,9 @@ function StickyEditor({
     const copySelectedBlock = (event) => {
       // The editor's own cut of a block set would serialise only its first
       // run but delete every run, so a block-set cut is handled here too.
+      if (isEditableFormTarget(event.target)) {
+        return false;
+      }
       const isBlockSetCut =
         event.type === "cut" &&
         isEditorShortcutTarget(event.target) &&

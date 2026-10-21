@@ -215,7 +215,8 @@ export function revealCurrentFindMatch(editor, { expandToggles = true } = {}) {
 export function getFindSeedText(editor) {
   const view = getView(editor);
   const selection = view?.state.selection;
-  if (!selection || selection.empty || selection.$from.parent !== selection.$to.parent) {
+  if (!selection || selection.empty || selection.$from.parent !== selection.$to.parent ||
+    !selection.$from.parent.isTextblock) {
     return undefined;
   }
   const text = view.state.doc.textBetween(selection.from, selection.to).trim();

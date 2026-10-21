@@ -484,13 +484,57 @@ test("keeps the unselected block when Enter is pressed on a non-contiguous selec
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await selectAlphaAndCharlie(page);
 
-  await page.keyboard.press("Enter");
+  const blocks = page.locator(".bn-editor .bn-block-outer");
+  const blockCount = await blocks.count();
+  // Mod+Enter is the app-level focusEditor shortcut, which acts before the editor sees it.
+  for (const key of ["Enter", "Shift+Enter"]) {
+    await page.keyboard.press(key);
+    await expect(row(page, "Alpha paragraph")).toHaveCount(1);
+    await expect(row(page, "Bravo paragraph")).toHaveCount(1);
+    await expect(row(page, "Charlie paragraph")).toHaveCount(1);
+    await expect(blocks).toHaveCount(blockCount);
+    expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
+  }
   expect(pageErrors).toEqual([]);
+});
 
-  await expect(row(page, "Alpha paragraph")).toHaveCount(1);
+test("replaces a non-contiguous selection with a pasted standalone URL", async ({ page }) => {
+  await selectAlphaAndCharlie(page);
+
+  await pastePlainText(page, "https://example.com/page");
+
+  await expect(row(page, "Alpha paragraph")).toHaveCount(0);
+  await expect(row(page, "Charlie paragraph")).toHaveCount(0);
   await expect(row(page, "Bravo paragraph")).toHaveCount(1);
-  await expect(row(page, "Charlie paragraph")).toHaveCount(1);
-  expect(await selectedBlockTexts(page)).toEqual(["Alpha paragraph", "Charlie paragraph"]);
+  await expect(page.locator(".bn-editor .bn-block-content")
+    .filter({ hasText: "https://example.com/page" })).toHaveCount(1);
+});
+
+test("does not seed the find bar from a block selection", async ({ page }) => {
+  await selectAlphaAndCharlie(page);
+
+  await page.keyboard.press(modifierShortcut("F"));
+
+  const input = page.getByRole("search", { name: "Find in note" })
+    .getByRole("textbox", { name: "Find in note" });
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("");
+});
+
+test("copies the find input text instead of a block selection", async ({ page }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await selectAlphaAndCharlie(page);
+  await page.keyboard.press(modifierShortcut("F"));
+  const input = page.getByRole("search", { name: "Find in note" })
+    .getByRole("textbox", { name: "Find in note" });
+  await input.fill("needle query");
+  await input.selectText();
+  await page.evaluate(() => navigator.clipboard.writeText("sentinel"));
+
+  await page.keyboard.press(modifierShortcut("C"));
+
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("needle query");
 });
 
 // Opens the six-dot menu from `text`'s row and checks the menu stands for that block.

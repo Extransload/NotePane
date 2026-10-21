@@ -145,7 +145,9 @@ selection or move the caret.
 A non-contiguous selection is a set of blocks at one nesting level after normalisation, such as {A, C} with B
 unselected between them. The builder check found that several existing features find "the selected blocks" through
 BlockNote's `editor.getSelection()`, and that function reads only `selection.from` and `selection.to`
-(`@blocknote/core/src/api/blockManipulation/selections/selection.ts:30-35`). Spanning A to C would include B, so each
+(`@blocknote/core/src/api/blockManipulation/selections/selection.ts:30-35`). For a block set those bounds
+are the first range's, so BlockNote sees only the first run (plus, through `getNearestBlockPos` on `to`, possibly the
+block after it). Either way it is not the exact set, which is why call sites use `getSelectedBlocks(editor)`. Each
 feature below must act on exactly the set:
 
 | Feature | Where it lives today | Behaviour with {A, C} |
@@ -157,7 +159,7 @@ feature below must act on exactly the set:
 | ⋮⋮ menu Turn into and Colors | `src/editor/sideMenu.jsx:204` | If the handle's block is in the set, the change applies to A and C. Otherwise it applies to the handle's block alone, as today |
 | ⋮⋮ menu Delete key | `sideMenu.jsx:329` | Same rule as Turn into |
 | Cmd+X from the menu | `resolveBlocksForMenuBlock`, `src/hooks/useEditorSurfaceShortcuts.js:140` | Same rule as Turn into |
-| Tab and Shift+Tab | BlockNote `sinkItem` and `liftItem`, through `tabBehavior: "prefer-indent"` | A and C are each indented or outdented where that is possible. A block that cannot move stays put, and the others still move (my call) |
+| Tab and Shift+Tab | BlockNote `sinkItem` and `liftItem`, through `tabBehavior: "prefer-indent"` | Each run of adjacent selected siblings is indented or outdented as one unit, matching BlockNote today, and separate runs move independently. A run that cannot move stays put, and the others still move (my call) |
 | Shift+Cmd+Arrow | BlockNote `moveBlocksUp` and `moveBlocksDown` (`moveBlocks.ts:334`) | Each selected block moves one position past its unselected neighbour in that direction. If any selected block is already at the edge, nothing moves. The same rule as moving multiple lines in a code editor (my call) |
 
 After each action, the selection covers the same blocks, or is cleared if they were removed, so the halo and the

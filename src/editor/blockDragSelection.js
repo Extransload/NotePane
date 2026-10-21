@@ -232,9 +232,9 @@ function handleBlockSetKeyDown(editor, view, event) {
     replaceBlockSelectionWithParagraph(view);
     return false;
   }
-  const hasModifier = event.shiftKey || event.altKey || event.ctrlKey || event.metaKey;
-  // BlockNote would split the span from the first run to the last. Keep the block set instead.
-  if (event.key === "Enter" && !hasModifier) {
+  // BlockNote would split the span from the first run to the last, or insert a hard break at the
+  // blockGroup. Keep the block set instead. Shift and Mod variants are swallowed too.
+  if (event.key === "Enter" && !event.altKey) {
     event.preventDefault();
     return true;
   }
