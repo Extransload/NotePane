@@ -16,7 +16,6 @@ for Option. Configurable shortcuts can be changed in Preferences.
 | `⌘W` | Close the current session tab |
 | `⌘⇧[` / `⌘⇧]` | Move the current session along the sidebar |
 | `⌘⇧B` | Show or hide the sidebar |
-| `⌘⇧D` | Dock a detached note back into the sidebar |
 | `⌘⇧T` | Switch between Tab sessions mode and Sticky windows mode |
 | `⌘⇧0` | Show every sticky window again |
 | `` ⌘` `` | Cycle sticky windows |

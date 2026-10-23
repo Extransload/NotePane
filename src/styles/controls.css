@@ -30,7 +30,7 @@
   border-radius: 7px;
   background: transparent;
   color: var(--sticky-panel-text);
-  font: 680 11px/1 var(--notepane-ui-font);
+  font: 680 calc(11px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
   text-align: left;
   cursor: pointer;
 }
@@ -57,12 +57,12 @@
 }
 
 .export-format-menu-copy strong {
-  font: 700 11px/1 var(--notepane-ui-font);
+  font: 700 calc(11px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
 }
 
 .export-format-menu-copy small {
   color: color-mix(in srgb, var(--sticky-panel-text) 60%, transparent);
-  font: 500 10px/1.1 var(--notepane-ui-font);
+  font: 500 calc(10px * var(--notepane-ui-scale))/1.1 var(--notepane-ui-font);
 }
 
 .session-tab-menu-color-swatch {
@@ -187,7 +187,7 @@
   gap: 5px 9px;
   align-items: center;
   color: var(--sticky-panel-muted);
-  font: 620 10px/1 var(--notepane-ui-font);
+  font: 620 calc(10px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
 }
 
 .color-opacity-row input {
@@ -238,7 +238,7 @@
   border-radius: 7px;
   background: var(--sticky-control-bg);
   color: var(--sticky-panel-text);
-  font: 660 10.5px/1 var(--notepane-ui-font);
+  font: 660 calc(10.5px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
 }
 
 .color-action-row button:disabled {

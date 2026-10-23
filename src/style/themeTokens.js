@@ -242,7 +242,6 @@ export function buildThemeTokens(theme) {
     "--sticky-scrollbar-thumb-hover": `color-mix(in srgb, var(--sticky-text-color) ${s("scrollbarThumbHover")}%, transparent)`,
     "--icon-tone-copy": palette.blue,
     "--icon-tone-delete": palette.red,
-    "--icon-tone-dock": palette.blue,
     "--icon-tone-export": palette.success,
     "--icon-tone-palette": palette.purple,
     "--icon-tone-pin": palette.orange,

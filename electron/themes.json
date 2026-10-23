@@ -53,7 +53,6 @@
       "--icon-chrome-active-color": "#2f3437",
       "--icon-tone-copy": "#5c70c6",
       "--icon-tone-delete": "#c14a4a",
-      "--icon-tone-dock": "#4b7faa",
       "--icon-tone-palette": "#a45bb9",
       "--icon-tone-pin": "#c87535",
       "--icon-tone-pin-active": "#d83b3b",
@@ -156,7 +155,6 @@
         "tokens": [
           "--icon-tone-copy",
           "--icon-tone-delete",
-          "--icon-tone-dock",
           "--icon-tone-palette",
           "--icon-tone-pin",
           "--icon-tone-pin-active",
@@ -431,7 +429,6 @@
       "--icon-chrome-color": "#b8beb9",
       "--icon-tone-copy": "#a8bcff",
       "--icon-tone-delete": "#ff8585",
-      "--icon-tone-dock": "#8fc7ff",
       "--icon-tone-palette": "#eda6ff",
       "--icon-tone-pin": "#ffb16f",
       "--icon-tone-pin-active": "#ff6f6f",
@@ -544,7 +541,6 @@
         "tokens": [
           "--icon-tone-copy",
           "--icon-tone-delete",
-          "--icon-tone-dock",
           "--icon-tone-palette",
           "--icon-tone-pin",
           "--icon-tone-pin-active",

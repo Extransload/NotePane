@@ -12,16 +12,13 @@ import {
   useRef,
 } from "react";
 /**
- * Drag and drop for the session tab strip: reordering tabs within the strip,
- * previewing the drop position, and accepting a session dragged in from
- * another window. The drag bookkeeping refs live here because nothing
- * outside this interaction reads them.
+ * Drag and drop for the session tab strip: reordering tabs within the strip
+ * and previewing the drop position. The drag bookkeeping refs live here
+ * because nothing outside this interaction reads them.
  */
 export function useSessionTabDrag({
-  detachSessionNote,
   draggingSessionNoteId,
   normalizedLayoutMode,
-  onAttachNote,
   reorderSessionNotes,
   sessionTabRowsRef,
   setDraggingSessionNoteId,
@@ -34,7 +31,7 @@ export function useSessionTabDrag({
 
   const startSessionTabDrag = useCallback(
     (sessionNote, event) => {
-      if (normalizedLayoutMode !== "tabs" || sessionNote.detached) {
+      if (normalizedLayoutMode !== "tabs") {
         return;
       }
 
@@ -43,7 +40,6 @@ export function useSessionTabDrag({
       dragHasReorderedRef.current = false;
       dragDroppedInsideRef.current = false;
       setDraggingSessionNoteId(sessionNote.id);
-      event.dataTransfer?.setData("application/x-notepane-note", sessionNote.id);
       event.dataTransfer?.setData("application/x-notepane-session-reorder", sessionNote.id);
       event.dataTransfer.effectAllowed = "move";
     },
@@ -143,7 +139,7 @@ export function useSessionTabDrag({
   );
 
   const endSessionTabDrag = useCallback(
-    async (sessionNote, event) => {
+    async (event) => {
       const droppedInside = dragDroppedInsideRef.current;
       const originalOrder = dragOriginalSessionOrderRef.current;
       const previewOrder = dragPreviewSessionOrderRef.current;
@@ -165,33 +161,11 @@ export function useSessionTabDrag({
           await reorderSessionNotes(originalOrder, { persist: false });
         }
       }
-
-      if (!droppedInside && !endedInsideSessionTabs) {
-        await detachSessionNote(sessionNote, event);
-      }
     },
-    [detachSessionNote, reorderSessionNotes],
-  );
-
-  const attachDraggedNote = useCallback(
-    async (event) => {
-      if (event.dataTransfer?.types.includes("application/x-notepane-session-reorder")) {
-        return;
-      }
-
-      const noteId = event.dataTransfer?.getData("application/x-notepane-note");
-      if (!noteId) {
-        return;
-      }
-
-      event.preventDefault();
-      await onAttachNote(noteId);
-    },
-    [onAttachNote],
+    [reorderSessionNotes],
   );
 
   return {
-    attachDraggedNote,
     dropSessionTab,
     endSessionTabDrag,
     handleSessionTabDragOver,

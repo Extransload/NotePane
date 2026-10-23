@@ -13,6 +13,7 @@ import {
   readComputedStyleWhileExporting,
   selectAppTheme,
   selectAppThemeThroughTestHook,
+  waitForEditorSelection,
 } from "../support/renderer-helpers.mjs";
 
 // Tests tagged OPENS_OWN_PAGE open the page themselves (with the dev-only theme hook, or a stub
@@ -175,7 +176,6 @@ function stubVersionHistoryBridge() {
     seedDemoContent: false,
     editorFontScale: 1,
     editorFontFamily: "Inter",
-    detached: false,
     trashedAt: null,
     createdAt: now,
     updatedAt: now,
@@ -255,6 +255,7 @@ test("selects only the current code block with Command+A", async ({ page }) => {
 
   const code = page.locator("[data-content-type='codeBlock'] code").first();
   await code.click();
+  await waitForEditorSelection(page);
   await page.keyboard.press(modifierShortcut("A"));
 
   const selectedText = await page.evaluate(
@@ -1050,6 +1051,7 @@ test("copies only the highlighted text of a keyboard selection across blocks", a
     await page.keyboard.press("Shift+ArrowLeft");
   }
   expect(await page.evaluate(() => String(window.getSelection()))).toMatch(/gamma del$/);
+  await waitForEditorSelection(page);
 
   const copied = await copyFromEditor(page);
 

@@ -12,7 +12,7 @@
 
 | Layer | Responsibility |
 | --- | --- |
-| `electron/main.cjs` | app lifecycle, tab/sticky window orchestration, native menu, note/session create/activate/delete/detach/attach IPC, export/download IPC |
+| `electron/main.cjs` | app lifecycle, tab/sticky window orchestration, native menu, note/session create/activate/delete IPC, export/download IPC |
 | `electron/store.cjs` | local JSON persistence |
 | `electron/assetStore.cjs` | content-addressed media files under `userData/assets`, served as `notepane-asset://local/<sha256>.<ext>` |
 | `electron/preload.cjs` | safe renderer bridge |
@@ -142,8 +142,10 @@ without copying font files into the app.
 
 Editor defaults are app-wide preferences stored at `editorPreferences` in `notes.json`. New sessions copy those defaults
 into their own per-note typography fields at creation time; changing defaults does not mutate existing sessions.
+App font family and app font scale (80–130%) are also stored there, but apply immediately to interface text in every
+open window. The editor text keeps its separate per-note font scale.
 
-Sidebar session changes use note list/create/activate/delete/detach/attach IPC calls. Activating a session changes the note bound to
+Sidebar session changes use note list/create/activate/delete IPC calls. Activating a session changes the note bound to
 the current window, then remounts the BlockNote editor with that note's stored document. Deleting the active session
 switches the current window to the next remaining session. The final remaining session cannot be deleted.
 
@@ -156,15 +158,13 @@ The app supports two layout modes.
 - `alwaysOnTop` defaults to `false`
 - transparent window background for native note transparency
 - Bounds are saved on move/resize/close
-- Tab session mode keeps one primary tabs window for docked sessions
+- Tab session mode keeps every session in one primary tabs window
 - Sticky mode opens every session as its own compact sticky-note window when entering the mode
 - Sticky mode arranges note windows in a small grid using the current primary display work area
 - Closing an individual sticky window records it as manually closed and does not immediately recreate it
 - Show All NotePanes clears manually closed sticky windows and opens every note window again
 - `Command/Ctrl + T` creates a new sidebar session tab; `Command/Ctrl + N` remains available for new note/session
 - The dashed `+` directly under the last sidebar session tab creates a new note/session in the current tabs window
-- Dragging a sidebar tab outside the sidebar detaches it into a separate window
-- A detached sticky window can be docked back into the tabs window
 - Sidebar tab close appears only on row hover and deletes a note/session when more than one session exists
 - `Command/Ctrl + 1` through `Command/Ctrl + 9` activates the matching sidebar session
 - `Command/Ctrl + Option/Alt + Left/Right` activates the previous/next sidebar session and wraps at the ends
@@ -259,6 +259,9 @@ The Preferences panel is opened from the sidebar footer button, native app menu,
 - app theme
 - default editor font family and size for newly created sessions
 - keyboard shortcut reference
+
+Preferences opens in the tabs window only, because a sticky window is too small for it. The menu item is disabled in the
+sticky layout, a window that turns sticky closes Preferences, and the shortcut does nothing in a sticky window.
 
 Session tab color is a per-session setting opened from each session tab's right-click context menu:
 

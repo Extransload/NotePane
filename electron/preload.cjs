@@ -35,8 +35,6 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
   restoreNoteVersion: (payload) => ipcRenderer.invoke("notes:versions:restore", payload),
   updateAppearance: (payload) =>
     ipcRenderer.invoke("notes:update-appearance", payload),
-  detachNote: (noteId) => ipcRenderer.invoke("notes:detach", noteId),
-  attachNote: (noteId) => ipcRenderer.invoke("notes:attach", noteId),
   revealNote: (payload) => ipcRenderer.invoke("notes:reveal", payload),
   takePendingFind: () => ipcRenderer.invoke("find:take-pending"),
   onFlushRequested: (callback) => {

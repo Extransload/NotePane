@@ -9,8 +9,6 @@
 - Closing an individual sticky window keeps it closed until Show All NotePanes or another Sticky-mode entry
 - Sticky mode windows have per-session pastel color, opacity, pinning, layout, and editor controls in a header settings modal
 - Sticky color/opacity carries back to the sidebar session tab color when returning to Tab session mode
-- Drag a session tab outside the sidebar to detach it into a separate window
-- Dock a detached sticky window back into tab sessions
 - Custom NotePane shell
 - Padded draggable header with no visible title in tab session mode
 - Editable title in sticky mode header
@@ -102,7 +100,6 @@ Stored fields:
 - markdown fallback
 - window bounds
 - always-on-top flag
-- detached/docked state
 - note title
 - app-wide theme: `appTheme.themeId`, one of the nine theme ids, with `appTheme.mode` (`light` or `dark`, the theme's
   scheme) kept so older versions fall back to the matching NotePane theme

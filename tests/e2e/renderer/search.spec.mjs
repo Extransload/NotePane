@@ -3,6 +3,7 @@ import {
   clickLastEmptyParagraph,
   expectEditorToBeFocused,
   modifierShortcut,
+  waitForEditorSelection,
 } from "../support/renderer-helpers.mjs";
 
 test.beforeEach(async ({ page }) => {
@@ -124,6 +125,7 @@ test("updates the match count while the note is edited", async ({ page }) => {
 test("seeds the find input from a single-block text selection", async ({ page }) => {
   await typeParagraphs(page, ["select this word"]);
   await editorText(page, "select this word").dblclick();
+  await waitForEditorSelection(page);
   const selected = await page.evaluate(() => String(window.getSelection()).trim());
 
   await page.keyboard.press(modifierShortcut("F"));
@@ -288,7 +290,6 @@ function stubTwoNoteBridge() {
     seedDemoContent: false,
     editorFontScale: 1,
     editorFontFamily: "Inter",
-    detached: false,
     trashedAt: null,
     sortOrder: index + 1,
     createdAt: now + index,

@@ -105,7 +105,6 @@ function stubExportBridge() {
     seedDemoContent: false,
     editorFontScale: 1,
     editorFontFamily: "Inter",
-    detached: false,
     trashedAt: null,
     createdAt: now,
     updatedAt: now,
@@ -182,13 +181,14 @@ for (const { themeId, label, ownCodeTheme, layoutMode } of [
     // shell with its note's colour.
     const lightColours = await readSettledColours();
 
+    // Preferences does not open in the sticky layout, so the theme is chosen before switching.
+    await selectAppTheme(page, themeId);
     if (layoutMode === "sticky") {
       await page.getByTestId("session-sidebar-footer")
         .getByRole("button", { name: "Switch to Sticky windows mode" })
         .click();
       await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
     }
-    await selectAppTheme(page, themeId);
     const themedColours = await readSettledColours();
     // The selected theme paints these differently, so the export check below means something.
     expect(themedColours.shellText).not.toBe(lightColours.shellText);

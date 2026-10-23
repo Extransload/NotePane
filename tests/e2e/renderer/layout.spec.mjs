@@ -283,7 +283,6 @@ test("shows a blocking loading state while sticky windows are prepared", async (
       seedDemoContent: index === 0,
       editorFontScale: 1,
       editorFontFamily: "Inter",
-      detached: false,
       trashedAt: null,
       createdAt: now + index,
       updatedAt: now + index,
@@ -475,4 +474,44 @@ test("lets Tab move focus between controls inside the preferences dialog", async
 
   await page.keyboard.press("Shift+Tab");
   await expect(closeButton).toBeFocused();
+});
+
+// A sticky window is too small for Preferences. The shortcut is left unhandled so that in
+// Electron the app menu decides where Preferences opens.
+test("keeps preferences closed in the sticky layout", async ({ page }) => {
+  const preferencesPanel = page.getByRole("dialog", { name: "Preferences window" });
+  await page.getByRole("button", { name: "Switch to Sticky windows mode" }).click();
+  await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
+  await page.evaluate(() => {
+    window.addEventListener("keydown", (event) => {
+      if (event.key === ",") window.preferencesShortcutPrevented = event.defaultPrevented;
+    });
+  });
+
+  await page.keyboard.press(modifierShortcut(","));
+  await expect.poll(() => page.evaluate(() => window.preferencesShortcutPrevented)).toBe(false);
+  await expect(preferencesPanel).toHaveCount(0);
+
+  await openStickyActionBar(page);
+  await page.getByRole("button", { name: "Switch to Tab sessions mode" }).click();
+  await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "tabs");
+  await page.keyboard.press(modifierShortcut(","));
+  await expect(preferencesPanel).toBeVisible();
+});
+
+// The table of contents refreshes on every editor change. A refresh that replaced unchanged
+// state with new arrays chained synchronous renders until fast typing hit React's nested
+// update limit, which threw inside the editor transaction and could drop the keystroke's work.
+test("keeps fast typing inside React's nested update limit", async ({ page }) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await clickLastEmptyParagraph(page);
+  for (let line = 0; line < 60; line += 1) {
+    await page.keyboard.type(line % 4 === 0 ? `# heading ${line}` : `line ${line}`);
+    await page.keyboard.press("Enter");
+  }
+
+  await expect(page.getByTestId("sticky-editor-surface").getByText("line 59", { exact: true }))
+    .toBeVisible();
+  expect(errors).toEqual([]);
 });

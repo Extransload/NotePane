@@ -67,7 +67,6 @@ function stubThemeRecordingBridge() {
     seedDemoContent: false,
     editorFontScale: 1,
     editorFontFamily: "Inter",
-    detached: false,
     trashedAt: null,
     createdAt: 1,
     updatedAt: 1,

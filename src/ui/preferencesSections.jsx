@@ -415,7 +415,6 @@ export const PREFERENCE_SHORTCUT_COMMANDS = [
   { id: "preferences", label: "Preferences" },
   { id: "increaseEditorFontSize", label: "Editor font up" },
   { id: "decreaseEditorFontSize", label: "Editor font down" },
-  { id: "attachDetachedNote", label: "Dock detached note" },
   { id: "toggleAlwaysOnTop", label: "Toggle always on top" },
 ];
 

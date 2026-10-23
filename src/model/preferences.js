@@ -1,6 +1,7 @@
 import {
   BASE_EDITOR_FONT_SIZE_PX,
   DEFAULT_APP_FONT_FAMILY,
+  DEFAULT_APP_FONT_SCALE,
   DEFAULT_APP_THEME,
   DEFAULT_EDITOR_FONT_FAMILY,
   DEFAULT_EDITOR_FONT_SCALE,
@@ -10,8 +11,10 @@ import {
   EDITOR_BUILTIN_FONT_FAMILY_OPTIONS,
   LOCAL_FONT_VALUE_PREFIX,
   MAX_EDITOR_FONT_SCALE,
+  MAX_APP_FONT_SCALE,
   MAX_EDITOR_FONT_SIZE_PX,
   MIN_EDITOR_FONT_SCALE,
+  MIN_APP_FONT_SCALE,
   MIN_EDITOR_FONT_SIZE_PX,
 } from "../constants.js";
 import {
@@ -84,6 +87,10 @@ export function normalizeEditorPreferences(
       source.appFontFamily,
       fallbackSource.appFontFamily,
     ),
+    appFontScale: normalizeAppFontScale(
+      source.appFontScale,
+      fallbackSource.appFontScale,
+    ),
     showTableOfContents:
       typeof source.showTableOfContents === "boolean"
         ? source.showTableOfContents
@@ -152,6 +159,18 @@ export function normalizeEditorFontScale(value, fallback = DEFAULT_EDITOR_FONT_S
   return Math.round(
     clamp(resolvedValue, MIN_EDITOR_FONT_SCALE, MAX_EDITOR_FONT_SCALE) * 100,
   ) / 100;
+}
+
+export function normalizeAppFontScale(value, fallback = DEFAULT_APP_FONT_SCALE) {
+  const numericValue = Number(value);
+  const fallbackValue = Number(fallback);
+  const resolvedValue = Number.isFinite(numericValue)
+    ? numericValue
+    : Number.isFinite(fallbackValue)
+      ? fallbackValue
+      : DEFAULT_APP_FONT_SCALE;
+
+  return Math.round(clamp(resolvedValue, MIN_APP_FONT_SCALE, MAX_APP_FONT_SCALE) * 100) / 100;
 }
 
 export function normalizeEditorFontSize(value, fallback = BASE_EDITOR_FONT_SIZE_PX) {

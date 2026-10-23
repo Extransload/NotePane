@@ -53,7 +53,6 @@ test("creates, saves, and reloads a local note", () => {
   });
   assert.equal(reloadedStore.getLayoutMode(), "tabs");
   assert.equal(reloaded.alwaysOnTop, false);
-  assert.equal(reloaded.detached, false);
   assert.equal(reloaded.seedDemoContent, false);
 });
 
@@ -449,15 +448,24 @@ test("updates and persists the global layout mode", () => {
   assert.equal(reloadedStore.getLayoutMode(), "tabs");
 });
 
-test("detaches and reattaches notes for tab/window workflows", () => {
+// Notes no longer detach into their own window; one detached by an older version opens as a tab.
+test("drops the detached flag that older versions stored on notes", () => {
   const directory = createTemporaryDirectory();
-  const store = new StickyStore(directory);
-  const note = store.createNote({ width: 900, height: 700 });
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({
+      version: 11,
+      layoutMode: "tabs",
+      notes: [{ id: "old-detached", title: "Old", detached: true, createdAt: 1, updatedAt: 1 }],
+    }),
+    "utf8",
+  );
 
-  assert.equal(note.detached, false);
-  assert.equal(store.setDetached(note.id, true).detached, true);
-  assert.equal(new StickyStore(directory).getNote(note.id).detached, true);
-  assert.equal(store.setDetached(note.id, false).detached, false);
+  const note = new StickyStore(directory).getNote("old-detached");
+
+  assert.equal(note.title, "Old");
+  assert.equal(Object.hasOwn(note, "detached"), false);
 });
 
 test("keeps editor typography global instead of updating per note appearance", () => {
@@ -496,6 +504,7 @@ test("updates editor preferences and applies them to new notes", () => {
     editorFontScale: 1,
     editorFontFamily: "system",
     appFontFamily: "inter",
+    appFontScale: 1,
     showTableOfContents: false,
     keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
     keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
@@ -516,6 +525,7 @@ test("updates editor preferences and applies them to new notes", () => {
     editorFontScale: 1.5,
     editorFontFamily: "local:Pretendard",
     appFontFamily: "garamond",
+    appFontScale: 1.2,
     showTableOfContents: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
@@ -523,6 +533,7 @@ test("updates editor preferences and applies them to new notes", () => {
     editorFontScale: 1.5,
     editorFontFamily: "local:Pretendard",
     appFontFamily: "garamond",
+    appFontScale: 1.2,
     showTableOfContents: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
@@ -537,6 +548,7 @@ test("updates editor preferences and applies them to new notes", () => {
     editorFontScale: 1.5,
     editorFontFamily: "local:Pretendard",
     appFontFamily: "garamond",
+    appFontScale: 1.2,
     showTableOfContents: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,

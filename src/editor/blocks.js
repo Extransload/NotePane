@@ -268,6 +268,13 @@ export function extractTableOfContentsEntries(blocks) {
   return entries;
 }
 
+export function areTableOfContentsEntriesEqual(first, second) {
+  return first.length === second.length && first.every((entry, index) =>
+    entry.id === second[index].id &&
+    entry.title === second[index].title &&
+    entry.level === second[index].level);
+}
+
 export function extractBlockPlainText(content) {
   if (typeof content === "string") {
     return content;

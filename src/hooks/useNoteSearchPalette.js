@@ -24,7 +24,7 @@ import {
  */
 export function useNoteSearchPalette({
   editor,
-  effectiveLayoutMode,
+  normalizedLayoutMode,
   note,
   notes,
   onFindRequested,
@@ -91,8 +91,7 @@ export function useNoteSearchPalette({
       }
       return;
     }
-    const isTabsWindow = effectiveLayoutMode === "tabs" && !note.detached;
-    if (isTabsWindow && !result.note.detached) {
+    if (normalizedLayoutMode === "tabs") {
       if (findQuery) {
         onFindRequested({ noteId: targetId, query: findQuery });
       }
@@ -108,8 +107,7 @@ export function useNoteSearchPalette({
   }, [
     dismissPalette,
     editor,
-    effectiveLayoutMode,
-    note.detached,
+    normalizedLayoutMode,
     note.id,
     onFindRequested,
     onPendingFindHandled,

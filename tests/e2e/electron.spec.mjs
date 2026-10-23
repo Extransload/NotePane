@@ -186,9 +186,10 @@ test("a TablePeek theme persists across a restart", async () => {
   }
 });
 
-// Review Focus 5: the other window follows without a reload, the formatting toolbar that
-// BlockNote portals into its body included.
-test("changing the theme updates an already-open window", async () => {
+// Review Focus 5: the open window follows without a reload, the formatting toolbar that
+// BlockNote portals into its body included. Preferences opens in the tabs window only, so that
+// is the window open while the theme changes.
+test("changing the theme updates the open window", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-theme-");
   writeInitialNotes(userDataDirectory, [
     {
@@ -199,45 +200,96 @@ test("changing the theme updates an already-open window", async () => {
       createdAt: 1,
       updatedAt: 1,
     },
-    {
-      id: "second-note",
-      title: "Second note",
-      markdown: "Second window words",
-      theme: { tabTextColor: "#d9efff", tabTextOpacity: 1 },
-      createdAt: 2,
-      updatedAt: 2,
-    },
   ]);
   const electronApp = await launchApp(userDataDirectory);
 
   try {
     const page = await electronApp.firstWindow();
     await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
-    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
-    await expect.poll(() =>
-      electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length),
-    ).toBe(2);
-    const firstPage = await getStickyPageByNoteId(electronApp, "first-note");
-    const secondPage = await getStickyPageByNoteId(electronApp, "second-note");
-    await expect(secondPage.getByTestId("sticky-editor-surface")).toBeVisible();
-    await expectStartupCaretPlaced(secondPage);
+    await expectStartupCaretPlaced(page);
 
     // Shown once before the change, so its portal root already exists when the theme changes.
-    const lightToolbar = await readFormattingToolbar(secondPage, "Second window words");
+    const lightToolbar = await readFormattingToolbar(page, "First window words");
     expect(lightToolbar).toMatchObject({ portalled: true, colorScheme: "light" });
 
-    await chooseAppTheme(firstPage, "dracula");
+    await chooseAppTheme(page, "dracula");
 
-    await expect(secondPage.locator("html")).toHaveAttribute("data-theme-id", "dracula");
-    const liveToolbar = await readFormattingToolbar(secondPage, "Second window words");
+    const liveToolbar = await readFormattingToolbar(page, "First window words");
     expect(liveToolbar).toMatchObject({ portalled: true, colorScheme: "dark" });
     expect(liveToolbar.background).not.toBe(lightToolbar.background);
-    // In the sticky layout the toolbar takes its colour from the note tone-matched to the theme,
-    // not from the palette directly, so the reference is the same window loaded under Dracula.
-    await secondPage.reload();
+    // The reference is the same window loaded under Dracula.
+    await page.reload();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    await expectStartupCaretPlaced(page);
+    expect(await readFormattingToolbar(page, "First window words")).toEqual(liveToolbar);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("app font size applies to every window and persists", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-app-font-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+  const readBodyFontSize = (page) => page.evaluate(() =>
+    Number.parseFloat(getComputedStyle(document.body).fontSize));
+
+  try {
+    const tabsPage = await electronApp.firstWindow();
+    await expect(tabsPage.getByTestId("sticky-editor-surface")).toBeVisible();
+    await tabsPage.keyboard.press(modifierShortcut(","));
+    const preferences = tabsPage.getByRole("dialog", { name: "Preferences window" });
+    await expect(preferences).toBeVisible();
+    await preferences.getByRole("tab", { name: "General" }).click();
+    const slider = preferences.getByRole("slider", { name: "App font size" });
+    await slider.scrollIntoViewIfNeeded();
+    await slider.focus();
+    await tabsPage.keyboard.press("End");
+    await expect(slider).toHaveValue("130");
+
+    await expect.poll(() => readBodyFontSize(tabsPage)).toBe(20.8);
+    await expect.poll(() => JSON.parse(fs.readFileSync(
+      path.join(userDataDirectory, "notes.json"), "utf8",
+    )).editorPreferences.appFontScale).toBe(1.3);
+
+    // The sticky windows that open next use the stored size.
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    const secondPage = await getStickyPageByNoteId(electronApp, "second-note");
     await expect(secondPage.getByTestId("sticky-editor-surface")).toBeVisible();
-    await expectStartupCaretPlaced(secondPage);
-    expect(await readFormattingToolbar(secondPage, "Second window words")).toEqual(liveToolbar);
+    await expect.poll(() => readBodyFontSize(secondPage)).toBe(20.8);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Preferences opens in the tabs window and never in the sticky layout", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-preferences-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const tabsPage = await electronApp.firstWindow();
+    await expect(tabsPage.getByTestId("sticky-editor-surface")).toBeVisible();
+    const preferences = tabsPage.getByRole("dialog", { name: "Preferences window" });
+
+    expect(await isMenuItemEnabled(electronApp, "Preferences")).toBe(true);
+    await clickMenuItem(electronApp, "Preferences");
+    await expect(preferences).toBeVisible();
+
+    // The sticky layout has no tabs window to open it in. Outside Windows the tabs window turns
+    // into a sticky window in place, so Preferences left open there closes.
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(() => isMenuItemEnabled(electronApp, "Preferences")).toBe(false);
+    if (process.platform !== "win32") {
+      await expect(tabsPage.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
+      await expect(preferences).toHaveCount(0);
+    }
   } finally {
     await electronApp.close();
   }
@@ -347,7 +399,6 @@ test("Electron exports and imports a complete portable workspace backup", async 
         bounds: { x: 90, y: 90, width: 960, height: 720 },
         theme: { tabTextColor: "#2563eb", tabTextOpacity: 0.8 },
         alwaysOnTop: false,
-        detached: false,
         seedDemoContent: false,
         trashedAt: null,
         sortOrder: 1,
@@ -363,7 +414,6 @@ test("Electron exports and imports a complete portable workspace backup", async 
         bounds: { x: 110, y: 110, width: 720, height: 640 },
         theme: { tabTextColor: null, tabTextOpacity: 1 },
         alwaysOnTop: false,
-        detached: false,
         seedDemoContent: false,
         trashedAt: 20,
         sortOrder: 2,
@@ -600,115 +650,6 @@ test("Electron keeps sticky windows bound to their original sessions during new-
     });
     await expect(firstStickyPage.getByTestId("sticky-editor-surface"))
       .toContainText("first sticky body");
-  } finally {
-    await electronApp.close();
-  }
-});
-
-test("Electron opens a detached note beside the tabs window instead of on top of it", async () => {
-  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
-  writeInitialNotes(userDataDirectory, [
-    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
-    { id: "second-note", title: "Second note", markdown: "second body", createdAt: 2, updatedAt: 2 },
-  ]);
-  const electronApp = await launchApp(userDataDirectory);
-
-  try {
-    const tabsPage = await electronApp.firstWindow();
-    const tabsEditor = tabsPage.getByTestId("sticky-editor-surface");
-    await expect(tabsEditor).toContainText("first body");
-
-    // The tabs window saves its bounds into the note it shows, so after moving
-    // the window on the second session that note stores the tabs window bounds.
-    await tabsPage.getByRole("tab", { name: /Second note/ }).click();
-    await expect(tabsEditor).toContainText("second body");
-    await expect.poll(() => getCurrentPageNoteId(tabsPage)).toBe("second-note");
-    const tabsBounds = await electronApp.evaluate(({ BrowserWindow }) => {
-      const [window] = BrowserWindow.getAllWindows();
-      window.setBounds({ x: 160, y: 120, width: 960, height: 720 });
-      // A programmatic move does not end a user drag, so signal it as one.
-      window.emit("moved");
-      return window.getBounds();
-    });
-    await expect.poll(async () => {
-      const notes = await tabsPage.evaluate(() => window.blocknoteSticky.listNotes());
-      const bounds = notes.find((note) => note.id === "second-note")?.bounds;
-      return bounds && { x: bounds.x, y: bounds.y };
-    }).toEqual({ x: tabsBounds.x, y: tabsBounds.y });
-
-    await tabsPage.evaluate(() => window.blocknoteSticky.detachNote("second-note"));
-    const detachedPage = await getStickyPageByNoteId(electronApp, "second-note");
-    await expect(detachedPage.getByTestId("sticky-editor-surface")).toContainText("second body");
-
-    const placement = await electronApp.evaluate(({ BrowserWindow, screen }) => {
-      const detachedWindow = BrowserWindow.getAllWindows().find((window) =>
-        window.webContents.getURL().includes("noteId=second-note"),
-      );
-      const bounds = detachedWindow.getBounds();
-      const workArea = screen.getDisplayMatching(bounds).workArea;
-      return {
-        bounds,
-        insideWorkArea:
-          bounds.x >= workArea.x &&
-          bounds.y >= workArea.y &&
-          bounds.x + bounds.width <= workArea.x + workArea.width &&
-          bounds.y + bounds.height <= workArea.y + workArea.height,
-      };
-    });
-    expect(placement.bounds.x).not.toBe(tabsBounds.x);
-    expect(placement.bounds.y).not.toBe(tabsBounds.y);
-    expect(placement.bounds.width).toBeLessThan(tabsBounds.width);
-    expect(placement.insideWorkArea).toBe(true);
-  } finally {
-    await electronApp.close();
-  }
-});
-
-test("Electron keeps the tabs window on its session while a detached note is edited", async () => {
-  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
-  writeInitialNotes(userDataDirectory, [
-    {
-      id: "first-note",
-      title: "First note",
-      markdown: "first docked body",
-      createdAt: 1,
-      updatedAt: 1,
-    },
-    {
-      id: "second-note",
-      // The default title keeps the title derived from the first line.
-      title: "Untitled",
-      markdown: "second detached body",
-      createdAt: 2,
-      updatedAt: 2,
-    },
-  ]);
-  const electronApp = await launchApp(userDataDirectory);
-
-  try {
-    const tabsPage = await electronApp.firstWindow();
-    const tabsEditor = tabsPage.getByTestId("sticky-editor-surface");
-    await expect(tabsEditor).toContainText("first docked body");
-
-    await tabsPage.evaluate(() => window.blocknoteSticky.detachNote("second-note"));
-    const detachedPage = await getStickyPageByNoteId(electronApp, "second-note");
-    const detachedEditor = detachedPage.getByTestId("sticky-editor-surface");
-    await expect(detachedEditor).toContainText("second detached body");
-
-    // Editing the first line renames the detached note, which broadcasts the
-    // updated note to every window.
-    await detachedPage.bringToFront();
-    await detachedEditor.getByText("second detached body").click();
-    await detachedPage.keyboard.press("End");
-    await detachedPage.keyboard.insertText(" edited");
-    await expect.poll(async () => {
-      const notes = await tabsPage.evaluate(() => window.blocknoteSticky.listNotes());
-      return notes.find((note) => note.id === "second-note")?.title;
-    }).toBe("second detached body edited");
-
-    await expect.poll(() => getCurrentPageNoteId(tabsPage)).toBe("first-note");
-    await expect(tabsEditor).toContainText("first docked body");
-    await expect(tabsEditor).not.toContainText("second detached body");
   } finally {
     await electronApp.close();
   }
@@ -2048,6 +1989,8 @@ test("Electron returns to tab session mode after every sticky window is closed",
         );
       });
     }, { timeout: 20_000 }).toBe("tabs");
+    // The menu follows the layout back, so Preferences opens again.
+    expect(await isMenuItemEnabled(electronApp, "Preferences")).toBe(true);
   } finally {
     await electronApp.close();
   }
@@ -2268,7 +2211,6 @@ function writeInitialNotes(userDataDirectory, notes) {
           theme: note.theme,
           seedDemoContent: Boolean(note.seedDemoContent),
           alwaysOnTop: false,
-          detached: false,
           createdAt: note.createdAt,
           updatedAt: note.updatedAt,
         })),
@@ -2412,6 +2354,28 @@ async function clickMenuItem(electronApp, label) {
   }, label);
 }
 
+async function isMenuItemEnabled(electronApp, label) {
+  return electronApp.evaluate(({ Menu }, targetLabel) => {
+    const findMenuItem = (menu) => {
+      for (const item of menu.items) {
+        if (item.label === targetLabel) {
+          return item;
+        }
+        const nested = item.submenu ? findMenuItem(item.submenu) : null;
+        if (nested) {
+          return nested;
+        }
+      }
+      return null;
+    };
+    const item = findMenuItem(Menu.getApplicationMenu());
+    if (!item) {
+      throw new Error(`Menu item not found: ${targetLabel}`);
+    }
+    return item.enabled;
+  }, label);
+}
+
 async function chooseBlankSessionTemplate(page) {
   const templateDialog = page.getByRole("dialog", { name: "Create new session" });
   await expect(templateDialog).toHaveCount(0);
@@ -2421,8 +2385,8 @@ function modifierShortcut(key) {
   return `${process.platform === "darwin" ? "Meta" : "Control"}+${key}`;
 }
 
-// Chooses a theme as a user does: Preferences through its shortcut (every layout has it), the
-// theme's card in General, then Close.
+// Chooses a theme as a user does: Preferences through its shortcut in a tabs window (a sticky
+// window does not open it), the theme's card in General, then Close.
 async function chooseAppTheme(page, themeId) {
   await page.bringToFront();
   await page.keyboard.press(modifierShortcut(","));

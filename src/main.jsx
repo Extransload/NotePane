@@ -83,6 +83,7 @@ import {
   electronApi,
 } from "./constants.js";
 import {
+  areTableOfContentsEntriesEqual,
   cutCurrentBlocks,
   extractTableOfContentsEntries,
   findBlockById,
@@ -224,7 +225,6 @@ import {
   StickyTrashConfirmDialog,
 } from "./ui/dialogs.jsx";
 import {
-  DockIcon,
   EllipsisIcon,
   NotePaneWordmark,
   SidebarToggleIcon,
@@ -392,7 +392,6 @@ function App({ bindTestThemeSetter }) {
             .get("template") === "1",
           editorFontScale: DEFAULT_EDITOR_FONT_SCALE,
           editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
-	          detached: false,
 	          trashedAt: null,
 	          sortOrder: notes.length + 1,
 	          createdAt: Date.now(),
@@ -439,7 +438,6 @@ function App({ bindTestThemeSetter }) {
             seedDemoContent: false,
             editorFontScale: DEFAULT_EDITOR_FONT_SCALE,
             editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
-            detached: false,
             trashedAt: null,
             createdAt: Date.now(),
             updatedAt: Date.now(),
@@ -575,7 +573,6 @@ function App({ bindTestThemeSetter }) {
           seedDemoContent: false,
           editorFontScale: editorPreferences.editorFontScale,
           editorFontFamily: editorPreferences.editorFontFamily,
-          detached: false,
           trashedAt: null,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -665,7 +662,6 @@ function App({ bindTestThemeSetter }) {
       const trashedNote = {
         ...deletedNote,
         alwaysOnTop: false,
-        detached: false,
         trashedAt: now,
         updatedAt: now,
       };
@@ -732,7 +728,6 @@ function App({ bindTestThemeSetter }) {
       const activeNote = {
         ...restoredNote,
         alwaysOnTop: false,
-        detached: false,
         trashedAt: null,
         updatedAt: Date.now(),
       };
@@ -844,34 +839,6 @@ function App({ bindTestThemeSetter }) {
     await electronApi?.updateEditorPreferences?.(normalizedEditorPreferences);
   }, []);
 
-  const detachNote = useCallback(async (noteId) => {
-    const result = await electronApi?.detachNote?.(noteId);
-    if (!result) {
-      return;
-    }
-
-    if (Array.isArray(result.notes)) {
-      setNotes(result.notes);
-    }
-    if (result.activeNote) {
-      setNote(result.activeNote);
-    }
-  }, []);
-
-  const attachNote = useCallback(async (noteId) => {
-    const result = await electronApi?.attachNote?.(noteId);
-    if (!result) {
-      return;
-    }
-
-    if (Array.isArray(result.notes)) {
-      setNotes(result.notes);
-    }
-    if (result.activeNote) {
-      setNote(result.activeNote);
-    }
-  }, []);
-
   if (!note) {
     return <div className="loading">Loading BlockNote…</div>;
   }
@@ -899,8 +866,6 @@ function App({ bindTestThemeSetter }) {
         onNoteChanged={updateNoteInList}
         onAppThemeChanged={updateAppTheme}
         onLayoutModeChanged={updateLayoutMode}
-        onDetachNote={detachNote}
-        onAttachNote={attachNote}
         onReorderNotes={reorderNotes}
         onSessionMovedToTrash={showSessionMovedToTrashToast}
         installedFontFamilies={installedFontFamilies}
@@ -952,8 +917,6 @@ function StickyEditor({
   onNoteChanged,
   onAppThemeChanged,
   onLayoutModeChanged,
-  onDetachNote,
-  onAttachNote,
   onReorderNotes,
   onSessionMovedToTrash,
   installedFontFamilies,
@@ -1299,17 +1262,12 @@ function StickyEditor({
     return {
       "--notepane-ui-font": appFontFamilyCss,
       "--notepane-display-font": appFontFamilyCss,
+      "--notepane-ui-scale": String(normalizedEditorPreferences.appFontScale),
     };
-  }, [appFontFamily, appFontOptions]);
+  }, [appFontFamily, appFontOptions, normalizedEditorPreferences.appFontScale]);
   const activeTheme = useAppliedTheme(normalizeAppTheme(appTheme).themeId);
   const normalizedLayoutMode = normalizeLayoutMode(layoutMode);
-  const effectiveLayoutMode =
-    normalizedLayoutMode === "sticky" || note.detached ? "sticky" : "tabs";
-  const dockedNotes = useMemo(
-    () => notes.filter((candidate) => !candidate.detached),
-    [notes],
-  );
-  const visibleSessionNotes = dockedNotes.length > 0 ? dockedNotes : notes;
+  const visibleSessionNotes = notes;
   const visibleSessionNoteIds = useMemo(
     () => visibleSessionNotes.map((sessionNote) => sessionNote.id),
     [visibleSessionNotes],
@@ -1319,10 +1277,10 @@ function StickyEditor({
   const stickyAccentColor = resolveStickyAccentColor(theme, noteIndex);
   const stickyChromeStyle = useMemo(
     () =>
-      effectiveLayoutMode === "sticky"
+      normalizedLayoutMode === "sticky"
         ? getStickyShellStyle(theme, stickyAccentColor, activeTheme)
         : {},
-    [activeTheme, effectiveLayoutMode, stickyAccentColor, theme],
+    [activeTheme, normalizedLayoutMode, stickyAccentColor, theme],
   );
   const shellStyle = {
     ...stickyChromeStyle,
@@ -1342,7 +1300,7 @@ function StickyEditor({
   const [isDefaultTemplateSuggestionVisible, setIsDefaultTemplateSuggestionVisible] =
     useState(
       () =>
-        effectiveLayoutMode === "tabs" &&
+        normalizedLayoutMode === "tabs" &&
         isEmptySessionDocument(initialEditorContent),
     );
   const [pendingSessionTrashNote, setPendingSessionTrashNote] = useState(null);
@@ -1387,7 +1345,7 @@ function StickyEditor({
   const sessionTabRowsRef = useRef(new Map());
   const previousSessionTabRectsRef = useRef(null);
   const lastSavedBlocksRef = useRef("");
-  const isSidebarCompact = effectiveLayoutMode === "tabs" && !isSidebarOpen;
+  const isSidebarCompact = normalizedLayoutMode === "tabs" && !isSidebarOpen;
   const sidebarState = isSidebarCompact ? "compact" : "expanded";
   const sidebarStyle = {
     "--session-sidebar-width": `${
@@ -1395,11 +1353,11 @@ function StickyEditor({
     }px`,
   };
   const isTableOfContentsVisible =
-    effectiveLayoutMode === "tabs" &&
+    normalizedLayoutMode === "tabs" &&
     showTableOfContents &&
     tableOfContentsEntries.length > 0;
   const shouldRenderChromeHeader =
-    effectiveLayoutMode === "sticky" || !isWindowsRuntime();
+    normalizedLayoutMode === "sticky" || !isWindowsRuntime();
 
   useEffect(() => {
     const portalStyleEntries = Object.entries({
@@ -1434,16 +1392,17 @@ function StickyEditor({
   ]);
 
   useEffect(() => {
-    if (effectiveLayoutMode !== "sticky") {
+    if (normalizedLayoutMode !== "sticky") {
       setIsStickySettingsOpen(false);
       setIsStickyTrashConfirmOpen(false);
       setIsStickyActionBarOpen(false);
     }
-    if (effectiveLayoutMode !== "tabs") {
+    if (normalizedLayoutMode !== "tabs") {
       setPendingSessionTrashNote(null);
       setPendingSessionCloseNote(null);
+      setIsPreferencesWindowOpen(false);
     }
-  }, [effectiveLayoutMode, note.id]);
+  }, [normalizedLayoutMode, note.id]);
 
   useEffect(() => {
     if (!pendingSessionTrashNote) {
@@ -1536,14 +1495,21 @@ function StickyEditor({
     setTitle,
   });
 
+  // Runs on every editor change. Unchanged entries and an already empty active list keep their
+  // arrays, so React skips the renders: a new array each keystroke chained synchronous renders
+  // until fast typing hit React's nested-update limit, which threw inside the editor's
+  // transaction.
   const refreshTableOfContents = useCallback(() => {
-    setTableOfContentsEntries(extractTableOfContentsEntries(editor.document));
+    const entries = extractTableOfContentsEntries(editor.document);
+    setTableOfContentsEntries((previous) => (
+      areTableOfContentsEntriesEqual(previous, entries) ? previous : entries
+    ));
   }, [editor]);
 
   useEffect(() => {
     const surface = editorSurfaceRef.current;
     if (!surface || !isTableOfContentsVisible || tableOfContentsEntries.length === 0) {
-      setActiveTableOfContentsEntryIds([]);
+      setActiveTableOfContentsEntryIds((previous) => (previous.length === 0 ? previous : []));
       return undefined;
     }
 
@@ -1893,7 +1859,13 @@ function StickyEditor({
     focusEditor();
   }, [editor, focusEditor, note, onNoteChanged]);
 
+  // A sticky window is too small for Preferences; it opens from the tabs window only.
+  const canOpenPreferences = normalizedLayoutMode !== "sticky";
+
   const openPreferencesPage = useCallback((pageId = "general") => {
+    if (!canOpenPreferences) {
+      return;
+    }
     setPreferencesInitialPage(normalizePreferencePageId(pageId));
     setIsColorPanelOpen(false);
     setIsStickySettingsOpen(false);
@@ -1902,7 +1874,7 @@ function StickyEditor({
     setSessionTabMenu(null);
     setSessionColorPanelNoteId(null);
     setIsPreferencesWindowOpen(true);
-  }, []);
+  }, [canOpenPreferences]);
 
   const openPreferences = useCallback(() => {
     openPreferencesPage("general");
@@ -2136,7 +2108,9 @@ function StickyEditor({
 
   useEffect(() => {
     const handlePreferencesShortcut = (event) => {
+      // Left unhandled in a sticky window, where the app menu item is disabled too.
       if (
+        !canOpenPreferences ||
         isShortcutRecorderTarget(event.target) ||
         !matchesEnabledKeyboardShortcut(event, "preferences")
       ) {
@@ -2151,7 +2125,7 @@ function StickyEditor({
     return () => {
       document.removeEventListener("keydown", handlePreferencesShortcut, true);
     };
-  }, [matchesEnabledKeyboardShortcut, openPreferences]);
+  }, [canOpenPreferences, matchesEnabledKeyboardShortcut, openPreferences]);
 
   // Resolves to the id of the note the window landed on, or null when the
   // switch failed.
@@ -2170,7 +2144,7 @@ function StickyEditor({
 
   const notePalette = useNoteSearchPalette({
     editor,
-    effectiveLayoutMode,
+    normalizedLayoutMode,
     note,
     notes,
     onFindRequested,
@@ -2184,12 +2158,10 @@ function StickyEditor({
     adjustEditorFontScale,
     openFindInNote,
     openSearchPalette: notePalette.openPalette,
-    effectiveLayoutMode,
+    normalizedLayoutMode,
     exportNote,
     focusEditor,
     matchesEnabledKeyboardShortcut,
-    note,
-    onAttachNote,
     onEditorWidthChange,
     requestNewSession,
     saveVersionNow,
@@ -2375,7 +2347,7 @@ function StickyEditor({
 
       if (
         event.button !== 0 ||
-        effectiveLayoutMode !== "sticky" ||
+        normalizedLayoutMode !== "sticky" ||
         !electronApi?.moveWindowBy
       ) {
         return;
@@ -2408,7 +2380,7 @@ function StickyEditor({
       window.addEventListener("pointerup", stopWindowDrag);
       window.addEventListener("pointercancel", stopWindowDrag);
     },
-    [effectiveLayoutMode],
+    [normalizedLayoutMode],
   );
 
   const applyCrop = useCallback(
@@ -2679,7 +2651,7 @@ function StickyEditor({
   );
 
   const requestCloseCurrentTab = useCallback(() => {
-    if (effectiveLayoutMode !== "tabs") {
+    if (normalizedLayoutMode !== "tabs") {
       closeCurrentWindow();
       return;
     }
@@ -2700,7 +2672,7 @@ function StickyEditor({
   }, [
     closeCurrentWindow,
     deleteSessionNote,
-    effectiveLayoutMode,
+    normalizedLayoutMode,
     hasSessionContent,
     note.id,
     removingSessionIds,
@@ -2788,7 +2760,7 @@ function StickyEditor({
 
   const reorderSessionNotes = useCallback(
     async (orderedNoteIds, options = {}) => {
-      if (effectiveLayoutMode !== "tabs") {
+      if (normalizedLayoutMode !== "tabs") {
         return null;
       }
 
@@ -2800,12 +2772,12 @@ function StickyEditor({
       captureSessionTabRects();
       return await onReorderNotes?.(normalizedOrderedNoteIds, options);
     },
-    [captureSessionTabRects, effectiveLayoutMode, onReorderNotes],
+    [captureSessionTabRects, normalizedLayoutMode, onReorderNotes],
   );
 
   const moveCurrentSessionNote = useCallback(
     async (direction) => {
-      if (effectiveLayoutMode !== "tabs" || visibleSessionNoteIds.length <= 1) {
+      if (normalizedLayoutMode !== "tabs" || visibleSessionNoteIds.length <= 1) {
         return;
       }
 
@@ -2830,7 +2802,7 @@ function StickyEditor({
       );
     },
     [
-      effectiveLayoutMode,
+      normalizedLayoutMode,
       note.id,
       reorderSessionNotes,
       visibleSessionNoteIds,
@@ -2849,7 +2821,7 @@ function StickyEditor({
 
   const selectRelativeSessionNote = useCallback(
     async (direction) => {
-      if (effectiveLayoutMode !== "tabs" || visibleSessionNotes.length <= 1) {
+      if (normalizedLayoutMode !== "tabs" || visibleSessionNotes.length <= 1) {
         return;
       }
 
@@ -2870,7 +2842,7 @@ function StickyEditor({
 
       await selectSidebarNote(nextSessionNote.id);
     },
-    [effectiveLayoutMode, note.id, selectSidebarNote, visibleSessionNotes],
+    [normalizedLayoutMode, note.id, selectSidebarNote, visibleSessionNotes],
   );
 
   const requestMoveCurrentStickyNoteToTrash = useCallback(() => {
@@ -2920,40 +2892,14 @@ function StickyEditor({
   });
 
   useTabModeShortcuts({
-    effectiveLayoutMode,
+    normalizedLayoutMode,
     matchesEnabledKeyboardShortcut,
     moveCurrentSessionNote,
     selectRelativeSessionNote,
     visibleSessionNotes,
   });
 
-  const detachSessionNote = useCallback(
-    async (sessionNote, event) => {
-      if (normalizedLayoutMode !== "tabs" || sessionNote.detached) {
-        return;
-      }
-
-      const sidebar = document.querySelector(".session-sidebar");
-      const bounds = sidebar?.getBoundingClientRect();
-      const isOutsideSidebar =
-        bounds &&
-        (event.clientX < bounds.left ||
-          event.clientX > bounds.right ||
-          event.clientY < bounds.top ||
-          event.clientY > bounds.bottom);
-
-      if (!isOutsideSidebar) {
-        return;
-      }
-
-      await saveNow();
-      await onDetachNote(sessionNote.id);
-    },
-    [normalizedLayoutMode, onDetachNote, saveNow],
-  );
-
   const {
-    attachDraggedNote,
     dropSessionTab,
     endSessionTabDrag,
     handleSessionTabDragOver,
@@ -2961,10 +2907,8 @@ function StickyEditor({
     previewSessionTabReorder,
     startSessionTabDrag,
   } = useSessionTabDrag({
-    detachSessionNote,
     draggingSessionNoteId,
     normalizedLayoutMode,
-    onAttachNote,
     reorderSessionNotes,
     sessionTabRowsRef,
     setDraggingSessionNoteId,
@@ -3014,17 +2958,17 @@ function StickyEditor({
 
   return (
     <main
-      className={`sticky-shell layout-${effectiveLayoutMode} sidebar-${sidebarState}`}
+      className={`sticky-shell layout-${normalizedLayoutMode} sidebar-${sidebarState}`}
       style={shellStyle}
       data-testid="sticky-shell"
       data-theme-mode={activeTheme.scheme}
-      data-layout-mode={effectiveLayoutMode}
+      data-layout-mode={normalizedLayoutMode}
     >
       {shouldRenderChromeHeader && (
         <header
           className="sticky-header"
           data-testid="sticky-header"
-          data-window-drag-handle={effectiveLayoutMode === "sticky" ? "true" : undefined}
+          data-window-drag-handle={normalizedLayoutMode === "sticky" ? "true" : undefined}
           onPointerDown={startHeaderWindowDrag}
         >
         <div className="sticky-drag-strip" aria-hidden="true" />
@@ -3034,7 +2978,7 @@ function StickyEditor({
           }`}
           aria-label="Sticky controls"
         >
-          {effectiveLayoutMode === "sticky" && (
+          {normalizedLayoutMode === "sticky" && (
             <>
               <div className="sticky-header-action-list">
                 <StickyPinButton
@@ -3099,37 +3043,16 @@ function StickyEditor({
               </button>
             </>
           )}
-          {note.detached && normalizedLayoutMode === "tabs" && (
-            <button
-              type="button"
-              className="dock-note-button has-tooltip"
-              aria-label="Dock note into tabs"
-              data-tooltip={formatShortcutTooltip(
-                "Dock to tabs",
-                getEnabledShortcut("attachDetachedNote"),
-              )}
-              onMouseDown={preventFocusLoss}
-              onClick={() => void onAttachNote(note.id)}
-            >
-              <DockIcon />
-            </button>
-          )}
         </div>
         </header>
       )}
       <div className="sticky-body">
-        {effectiveLayoutMode === "tabs" && (
+        {normalizedLayoutMode === "tabs" && (
           <aside
             className={`session-sidebar ${isSidebarCompact ? "is-compact" : ""}`}
             data-testid="session-sidebar"
             data-sidebar-state={sidebarState}
             style={sidebarStyle}
-            onDragOver={(event) => {
-              if (event.dataTransfer?.types.includes("application/x-notepane-note")) {
-                event.preventDefault();
-              }
-            }}
-            onDrop={(event) => void attachDraggedNote(event)}
           >
             <div className="session-sidebar-topbar">
               <NotePaneWordmark />
@@ -3225,7 +3148,7 @@ function StickyEditor({
                       onDragStart={(event) => startSessionTabDrag(sessionNote, event)}
                       onDragOver={(event) => handleSessionTabDragOver(sessionNote, event)}
                       onDrop={(event) => void dropSessionTab(event)}
-                      onDragEnd={(event) => void endSessionTabDrag(sessionNote, event)}
+                      onDragEnd={(event) => void endSessionTabDrag(event)}
                     >
                       {isSidebarCompact ? (
                         <button
@@ -3588,7 +3511,7 @@ function StickyEditor({
           activeTheme={activeTheme}
           variant="sticky"
           defaultColor={
-            effectiveLayoutMode === "sticky" ? stickyAccentColor : undefined
+            normalizedLayoutMode === "sticky" ? stickyAccentColor : undefined
           }
           onChange={updateTheme}
           onClose={() => setIsColorPanelOpen(false)}

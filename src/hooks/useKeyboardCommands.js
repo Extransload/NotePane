@@ -15,12 +15,10 @@ import {
  */
 export function useChromeShortcuts({
   adjustEditorFontScale,
-  effectiveLayoutMode,
+  normalizedLayoutMode,
   exportNote,
   focusEditor,
   matchesEnabledKeyboardShortcut,
-  note,
-  onAttachNote,
   onEditorWidthChange,
   openFindInNote,
   openSearchPalette,
@@ -117,15 +115,6 @@ export function useChromeShortcuts({
         return;
       }
 
-      if (
-        matchesEnabledKeyboardShortcut(event, "attachDetachedNote") &&
-        note.detached
-      ) {
-        event.preventDefault();
-        void onAttachNote(note.id);
-        return;
-      }
-
       if (matchesEnabledKeyboardShortcut(event, "toggleSidebar")) {
         event.preventDefault();
         setIsSidebarOpen((value) => !value);
@@ -143,7 +132,7 @@ export function useChromeShortcuts({
           matchesEnabledKeyboardShortcut(event, "newSession") ||
           matchesEnabledKeyboardShortcut(event, "newNote")
         ) &&
-        effectiveLayoutMode === "tabs"
+        normalizedLayoutMode === "tabs"
       ) {
         event.preventDefault();
         requestNewSession();
@@ -155,11 +144,8 @@ export function useChromeShortcuts({
       document.removeEventListener("keydown", handleChromeShortcut, true);
     };
   }, [
-    effectiveLayoutMode,
+    normalizedLayoutMode,
     matchesEnabledKeyboardShortcut,
-    note.detached,
-    note.id,
-    onAttachNote,
     adjustEditorFontScale,
     exportNote,
     focusEditor,
@@ -230,7 +216,7 @@ export function useSessionNumberShortcuts({
  * neighbouring sessions.
  */
 export function useTabModeShortcuts({
-  effectiveLayoutMode,
+  normalizedLayoutMode,
   matchesEnabledKeyboardShortcut,
   moveCurrentSessionNote,
   selectRelativeSessionNote,
@@ -246,7 +232,7 @@ export function useTabModeShortcuts({
         return;
       }
 
-      if (effectiveLayoutMode !== "tabs" || visibleSessionNotes.length <= 1) {
+      if (normalizedLayoutMode !== "tabs" || visibleSessionNotes.length <= 1) {
         return;
       }
 
@@ -283,7 +269,7 @@ export function useTabModeShortcuts({
       document.removeEventListener("keydown", handleTabModeShortcut, true);
     };
   }, [
-    effectiveLayoutMode,
+    normalizedLayoutMode,
     matchesEnabledKeyboardShortcut,
     moveCurrentSessionNote,
     selectRelativeSessionNote,

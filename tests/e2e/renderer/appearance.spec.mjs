@@ -398,6 +398,28 @@ test("changes editor typography globally from preferences", async ({ page }) => 
   });
 });
 
+test("changes app font size without changing editor text size", async ({ page }) => {
+  const readSizes = () => page.evaluate(() => ({
+    sidebar: Math.round(Number.parseFloat(getComputedStyle(document.querySelector(".session-tab-button")).fontSize) * 10),
+    editor: Math.round(Number.parseFloat(getComputedStyle(document.querySelector(".bn-editor")).fontSize) * 10),
+  }));
+  const before = await readSizes();
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  const slider = preferences.getByRole("slider", { name: "App font size" });
+  await expect(slider).toHaveValue("100");
+
+  await slider.focus();
+  await page.keyboard.press("End");
+  await expect(slider).toHaveValue("130");
+  await expect(preferences.locator(".app-font-size-control output")).toHaveText("130%");
+  await expect.poll(readSizes).toEqual({ sidebar: Math.round(before.sidebar * 1.3), editor: before.editor });
+
+  await page.keyboard.press("Home");
+  await expect(slider).toHaveValue("80");
+  await expect.poll(readSizes).toEqual({ sidebar: Math.round(before.sidebar * 0.8), editor: before.editor });
+});
+
 test("supports light/dark mode and readable sidebar tab background customization", async ({ page }) => {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.evaluate(() => {
@@ -1040,7 +1062,15 @@ test("keeps sticky editor chrome readable against dark custom backgrounds", asyn
   await expectStickyTableChromeReadable(page);
   await expectStickyPlaceholderReadable(page);
 
+  // Preferences does not open in the sticky layout, so the theme changes in the tabs layout.
+  await openStickyActionBar(page);
+  await page.getByRole("button", { name: "Switch to Tab sessions mode" }).click();
+  await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "tabs");
   await selectAppTheme(page, "notepane-dark");
+  await page.getByTestId("session-sidebar-footer")
+    .getByRole("button", { name: "Switch to Sticky windows mode" })
+    .click();
+  await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
   await openStickyActionBar(page);
   await page.getByRole("button", { name: "Sticky settings" }).click();
   await page.getByLabel("HEX sticky color value").fill("ffffff");
@@ -1065,12 +1095,12 @@ test("keeps sticky editor chrome readable against dark custom backgrounds", asyn
 });
 
 test("keeps sticky dark-mode icon tooltips readable", async ({ page }) => {
+  await selectAppTheme(page, "notepane-dark");
   await page.getByRole("button", { name: "Switch to Sticky windows mode" }).click();
   await expect(page.getByTestId("sticky-shell")).toHaveAttribute(
     "data-layout-mode",
     "sticky",
   );
-  await selectAppTheme(page, "notepane-dark");
 
   await openStickyActionBar(page);
   await page.getByRole("button", { name: "Sticky settings" }).hover();
@@ -1104,12 +1134,12 @@ test("keeps sticky dark-mode icon tooltips readable", async ({ page }) => {
 });
 
 test("portalled menu scrollbars follow the sticky note colour", async ({ page }) => {
+  await selectAppTheme(page, "notepane-dark");
   await page.getByRole("button", { name: "Switch to Sticky windows mode" }).click();
   await expect(page.getByTestId("sticky-shell")).toHaveAttribute(
     "data-layout-mode",
     "sticky",
   );
-  await selectAppTheme(page, "notepane-dark");
   await clickLastEmptyParagraph(page);
   await page.keyboard.type("/");
   const slashMenu = page.locator(".bn-suggestion-menu");

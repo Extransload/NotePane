@@ -631,6 +631,27 @@ export async function clickLastEmptyParagraph(page) {
   const emptyParagraphs = page.getByRole("paragraph").filter({ hasText: /^$/ });
   await emptyParagraphs.last().scrollIntoViewIfNeeded();
   await emptyParagraphs.last().click();
+  await waitForEditorSelection(page);
+}
+
+// ProseMirror adopts the selection a click leaves in the DOM on the next `selectionchange`, a
+// task that a key or paste sent right after the click can overtake, which then acts on the old
+// selection. Waits until the editor's selection is the DOM selection; a DOM selection outside
+// the editor has nothing to adopt.
+export async function waitForEditorSelection(page) {
+  await page.waitForFunction(() => {
+    const view = document.querySelector(".bn-editor")?.editor?.view;
+    const selection = window.getSelection();
+    if (!view) {
+      return false;
+    }
+    if (!selection?.anchorNode || !view.dom.contains(selection.anchorNode)) {
+      return true;
+    }
+    const { anchor, head } = view.state.selection;
+    return anchor === view.posAtDOM(selection.anchorNode, selection.anchorOffset)
+      && head === view.posAtDOM(selection.focusNode, selection.focusOffset);
+  });
 }
 
 export async function expectEditorFocused(page) {
@@ -938,9 +959,10 @@ export function modifierOptionShortcut(key) {
   return `${process.platform === "darwin" ? "Meta" : "Control"}+Alt+${key}`;
 }
 
-// Selects a theme as a user does: Preferences from the sidebar footer (or its shortcut in the
-// sticky layout, which has no sidebar), the theme's card, then Close. Does nothing when the theme
-// is applied. None of these clicks takes focus, so the editor keeps its focus and selection.
+// Selects a theme as a user does: Preferences from the sidebar footer (or its shortcut when the
+// sidebar is hidden), the theme's card, then Close. Does nothing when the theme is applied. None
+// of these clicks takes focus, so the editor keeps its focus and selection. The sticky layout does
+// not open Preferences, so a caller selects the theme before switching to it.
 // Side effects a caller may need to undo:
 //   - opening Preferences closes the colour panel, sticky settings, the trash confirmation and
 //     the session tab menus (openPreferencesPage in src/main.jsx);
@@ -949,6 +971,9 @@ export async function selectAppTheme(page, themeId) {
   const root = page.locator("html");
   if ((await root.getAttribute("data-theme-id")) === themeId) {
     return;
+  }
+  if ((await page.getByTestId("sticky-shell").getAttribute("data-layout-mode")) === "sticky") {
+    throw new Error("Preferences does not open in the sticky layout; select the theme in tabs.");
   }
   const preferencesButton = page.getByTestId("session-sidebar-footer")
     .getByRole("button", { name: "Preferences" });

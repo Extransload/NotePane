@@ -19,7 +19,7 @@ const {
   StickyStore,
   DEFAULT_KEYBOARD_SHORTCUTS,
 } = require("./store.cjs");
-const { fitBoundsToWorkAreas, getDetachedWindowBounds } = require("./windowBounds.cjs");
+const { fitBoundsToWorkAreas } = require("./windowBounds.cjs");
 const {
   hasOpaqueWindows,
   repaintWindowBackgrounds,
@@ -40,7 +40,6 @@ const STICKY_MIN_WIDTH = 320;
 const STICKY_MIN_HEIGHT = 260;
 const STICKY_WINDOW_GAP = 18;
 const STICKY_WINDOW_MARGIN = 28;
-const DETACHED_WINDOW_OFFSET = 40;
 const TRAFFIC_LIGHT_X = 14;
 const TABS_TRAFFIC_LIGHT_Y = 15;
 const STICKY_TRAFFIC_LIGHT_Y = 10;
@@ -353,18 +352,14 @@ function closeFocusedTabOrWindow() {
 }
 
 function closeTabSession(noteId) {
-  const dockedNotes = store.listNotes().filter((note) => !note.detached);
-  if (dockedNotes.length === 0) {
-    return;
-  }
-
-  const currentIndex = dockedNotes.findIndex((note) => note.id === noteId);
+  const notes = store.listNotes();
+  const currentIndex = notes.findIndex((note) => note.id === noteId);
   if (currentIndex < 0) {
     return;
   }
 
   const fallbackNote =
-    dockedNotes[currentIndex + 1] ?? dockedNotes[currentIndex - 1] ?? null;
+    notes[currentIndex + 1] ?? notes[currentIndex - 1] ?? null;
   const result = store.deleteNote(noteId);
   const nextActiveNote =
     (fallbackNote ? store.getNote(fallbackNote.id) : null) ??
@@ -403,8 +398,9 @@ function toggleFocusedAlwaysOnTop() {
   }
 }
 
+// Preferences opens in the tabs window only; the sticky layout has none, so it does not open there.
 function openPreferences() {
-  const window = getCommandTargetWindow();
+  const window = getPrimaryEntry()?.window;
 
   if (!window || window.isDestroyed()) {
     return;
@@ -483,7 +479,7 @@ function resolveActiveNoteForWindow(entry, activeNote) {
 
   // Navigation updates `entry.noteId` before broadcasting, so a window only
   // adopts the note it is already bound to. Forwarding any other note would
-  // remount the tabs window onto a note open in a detached window.
+  // remount the window onto a note that another window shows.
   if (entry.noteId === activeNote.id) {
     return activeNote;
   }
@@ -505,13 +501,7 @@ function getEntriesForNote(noteId) {
 
 function getMainTabsNote(fallbackNoteId) {
   const notes = store.listNotes();
-  const dockedNotes = notes.filter((note) => !note.detached);
-  return (
-    dockedNotes.find((note) => note.id === fallbackNoteId) ??
-    dockedNotes[0] ??
-    notes[0] ??
-    null
-  );
+  return notes.find((note) => note.id === fallbackNoteId) ?? notes[0] ?? null;
 }
 
 function ensureTabsWindow(activeNoteId) {
@@ -647,6 +637,7 @@ function restoreTabsModeAfterLastStickyWindowClosed(activeNoteId) {
 
   store.updateLayoutMode("tabs");
   manuallyClosedStickyNoteIds.clear();
+  buildMenu();
   syncWindowsForLayoutMode(activeNote?.id);
   broadcastLayoutMode("tabs");
   broadcastNotesChanged({ activeNote });
@@ -685,12 +676,6 @@ async function recreateWindowsForLayoutMode(activeNoteId, options = {}) {
     const primaryNote = getMainTabsNote(activeNoteId);
     if (primaryNote) {
       nextWindows.push(createWindow(primaryNote, { primary: true }));
-    }
-
-    for (const note of notes) {
-      if (note.detached && note.id !== primaryNote?.id) {
-        nextWindows.push(createWindow(note));
-      }
     }
   }
 
@@ -750,16 +735,6 @@ function syncWindowsForLayoutMode(activeNoteId, options = {}) {
   if (primaryWindow) {
     targetWindows.add(primaryWindow);
   }
-  const detachedIds = new Set(notes.filter((note) => note.detached).map((note) => note.id));
-
-  for (const note of notes) {
-    if (note.detached) {
-      const window = ensureWindowForNote(note);
-      if (window) {
-        targetWindows.add(window);
-      }
-    }
-  }
 
   for (const entry of [...windows.values()]) {
     if (entry.window.id === primaryId) {
@@ -768,11 +743,7 @@ function syncWindowsForLayoutMode(activeNoteId, options = {}) {
       continue;
     }
 
-    const note = store.getNote(entry.noteId);
-    const shouldRemainDetached = note && detachedIds.has(note.id);
-    if (!shouldRemainDetached) {
-      closeWindowEntry(entry);
-    }
+    closeWindowEntry(entry);
   }
 
   return [...targetWindows];
@@ -884,6 +855,7 @@ function buildMenu() {
             process.platform === "win32"
               ? undefined
               : getMenuAccelerator("preferences"),
+          enabled: isTabsMode,
           click: openPreferences,
         },
         { type: "separator" },
@@ -1293,71 +1265,6 @@ function installIpcHandlers() {
     return note;
   });
 
-  ipcMain.handle("notes:detach", (event, noteId) => {
-    const note = typeof noteId === "string" ? store.setDetached(noteId, true) : null;
-    if (!note) {
-      return {
-        notes: store.listNotes(),
-        activeNote: null,
-      };
-    }
-
-    const currentWindow = BrowserWindow.fromWebContents(event.sender);
-    const tabsWindow = getPrimaryEntry()?.window ?? currentWindow;
-    const detachedBounds = getDetachedWindowBounds(
-      note.bounds,
-      tabsWindow && !tabsWindow.isDestroyed() ? tabsWindow.getBounds() : null,
-      getDisplayWorkAreas(),
-      { offset: DETACHED_WINDOW_OFFSET, width: STICKY_WINDOW_WIDTH, height: STICKY_WINDOW_HEIGHT },
-    );
-    createWindow(
-      detachedBounds === note.bounds ? note : store.updateBounds(note.id, detachedBounds) ?? note,
-    );
-
-    const currentEntry = currentWindow ? windows.get(currentWindow.id) : null;
-    const nextActiveNote = getMainTabsNote(currentEntry?.noteId);
-    if (currentEntry?.primary && nextActiveNote) {
-      currentEntry.noteId = nextActiveNote.id;
-      currentWindow.setTitle(nextActiveNote.title);
-    }
-
-    broadcastNotesChanged({ activeNote: nextActiveNote });
-
-    return {
-      notes: store.listNotes(),
-      activeNote: nextActiveNote,
-    };
-  });
-
-  ipcMain.handle("notes:attach", (event, noteId) => {
-    const note = typeof noteId === "string" ? store.setDetached(noteId, false) : null;
-    if (!note) {
-      return {
-        notes: store.listNotes(),
-        activeNote: null,
-      };
-    }
-
-    const sourceWindow = BrowserWindow.fromWebContents(event.sender);
-    const sourceEntry = sourceWindow ? windows.get(sourceWindow.id) : null;
-    const primaryWindow = ensureTabsWindow(note.id);
-    syncWindowsForLayoutMode(note.id);
-    broadcastNotesChanged({ activeNote: note });
-
-    if (sourceEntry && !sourceEntry.primary && sourceWindow && sourceWindow.id !== primaryWindow?.id) {
-      closeWindowEntry(sourceEntry);
-    }
-
-    if (!quietTestMode) {
-      primaryWindow?.focus();
-    }
-
-    return {
-      notes: store.listNotes(),
-      activeNote: note,
-    };
-  });
-
   ipcMain.handle("notes:reveal", (_event, payload) => {
     const note = typeof payload?.noteId === "string" ? store.getNote(payload.noteId) : null;
     if (!note) {
@@ -1365,7 +1272,7 @@ function installIpcHandlers() {
     }
 
     let window;
-    if (store.getLayoutMode() === "sticky" || note.detached) {
+    if (store.getLayoutMode() === "sticky") {
       manuallyClosedStickyNoteIds.delete(note.id);
       window = ensureWindowForNote(note);
     } else {

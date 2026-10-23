@@ -12,6 +12,7 @@ body,
 :root {
   --notepane-ui-font: Inter, "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   --notepane-display-font: Inter, "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --notepane-ui-scale: 1;
   --icon-chrome-size: 20px;
   --chrome-icon-button-width: 32px;
   --chrome-icon-button-height: 30px;
@@ -47,6 +48,7 @@ body {
   background: transparent;
   color: var(--sticky-text-color);
   font-family: var(--notepane-ui-font);
+  font-size: calc(16px * var(--notepane-ui-scale));
 }
 
 * {

@@ -64,6 +64,9 @@ export const EDITOR_FONT_SIZE_PRESETS = [
 export const DEFAULT_EDITOR_FONT_FAMILY = "system";
 
 export const DEFAULT_APP_FONT_FAMILY = "inter";
+export const DEFAULT_APP_FONT_SCALE = 1;
+export const MIN_APP_FONT_SCALE = 0.8;
+export const MAX_APP_FONT_SCALE = 1.3;
 
 export const DEFAULT_KEYBOARD_SHORTCUTS = {
   newSession: "Mod+T",
@@ -84,7 +87,6 @@ export const DEFAULT_KEYBOARD_SHORTCUTS = {
   preferences: "Mod+,",
   increaseEditorFontSize: "Mod+=",
   decreaseEditorFontSize: "Mod+-",
-  attachDetachedNote: "Mod+Shift+D",
   toggleAlwaysOnTop: "Mod+Shift+P",
 };
 
@@ -103,6 +105,7 @@ export const DEFAULT_EDITOR_PREFERENCES = {
   editorFontScale: DEFAULT_EDITOR_FONT_SCALE,
   editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
   appFontFamily: DEFAULT_APP_FONT_FAMILY,
+  appFontScale: DEFAULT_APP_FONT_SCALE,
   showTableOfContents: false,
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,

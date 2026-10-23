@@ -158,6 +158,9 @@ const MIN_EDITOR_FONT_SCALE = 0.38;
 const MAX_EDITOR_FONT_SCALE = 9;
 const DEFAULT_EDITOR_FONT_FAMILY = "system";
 const DEFAULT_APP_FONT_FAMILY = "inter";
+const DEFAULT_APP_FONT_SCALE = 1;
+const MIN_APP_FONT_SCALE = 0.8;
+const MAX_APP_FONT_SCALE = 1.3;
 const DEFAULT_KEYBOARD_SHORTCUTS = Object.freeze({
   newSession: "Mod+T",
   newNote: "Mod+N",
@@ -176,7 +179,6 @@ const DEFAULT_KEYBOARD_SHORTCUTS = Object.freeze({
   preferences: "Mod+,",
   increaseEditorFontSize: "Mod+=",
   decreaseEditorFontSize: "Mod+-",
-  attachDetachedNote: "Mod+Shift+D",
   toggleAlwaysOnTop: "Mod+Shift+P",
 });
 const KEYBOARD_SHORTCUT_COMMAND_IDS = Object.keys(DEFAULT_KEYBOARD_SHORTCUTS);
@@ -197,6 +199,7 @@ const DEFAULT_EDITOR_PREFERENCES = Object.freeze({
   editorFontScale: DEFAULT_EDITOR_FONT_SCALE,
   editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
   appFontFamily: DEFAULT_APP_FONT_FAMILY,
+  appFontScale: DEFAULT_APP_FONT_SCALE,
   showTableOfContents: false,
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
@@ -518,7 +521,6 @@ class StickyStore {
       bounds,
       theme: options?.theme ?? DEFAULT_NOTE_THEME,
       alwaysOnTop: false,
-      detached: false,
       seedDemoContent,
       editorFontScale: Object.hasOwn(options, "editorFontScale")
         ? options.editorFontScale
@@ -556,7 +558,6 @@ class StickyStore {
 
     const now = Date.now();
     note.trashedAt = now;
-    note.detached = false;
     note.alwaysOnTop = false;
     note.updatedAt = now;
     const templateNote =
@@ -588,7 +589,6 @@ class StickyStore {
       bounds: sourceNote.bounds,
       theme: DEFAULT_NOTE_THEME,
       alwaysOnTop: false,
-      detached: false,
       seedDemoContent: true,
       editorFontScale: sourceNote.editorFontScale ?? editorPreferences.editorFontScale,
       editorFontFamily:
@@ -616,7 +616,6 @@ class StickyStore {
     }
 
     note.trashedAt = null;
-    note.detached = false;
     note.alwaysOnTop = false;
     note.updatedAt = Date.now();
     this.save();
@@ -770,18 +769,6 @@ class StickyStore {
     }
 
     note.alwaysOnTop = Boolean(alwaysOnTop);
-    note.updatedAt = Date.now();
-    this.save();
-    return note;
-  }
-
-  setDetached(noteId, detached) {
-    const note = this.getNote(noteId);
-    if (!note) {
-      return null;
-    }
-
-    note.detached = Boolean(detached);
     note.updatedAt = Date.now();
     this.save();
     return note;
@@ -1007,7 +994,6 @@ function normalizeNote(value, options = {}) {
       : typeof source.alwaysOnTop === "boolean"
         ? source.alwaysOnTop
         : false,
-    detached: typeof source.detached === "boolean" ? source.detached : false,
     seedDemoContent: typeof source.seedDemoContent === "boolean"
       ? source.seedDemoContent
       : false,
@@ -1347,6 +1333,10 @@ function normalizeEditorPreferences(
       source.appFontFamily,
       fallbackSource.appFontFamily,
     ),
+    appFontScale: normalizeAppFontScale(
+      source.appFontScale,
+      fallbackSource.appFontScale,
+    ),
     showTableOfContents:
       typeof source.showTableOfContents === "boolean"
         ? source.showTableOfContents
@@ -1648,6 +1638,20 @@ function normalizeEditorFontScale(value, fallback = DEFAULT_EDITOR_FONT_SCALE) {
 
   return Math.round(
     clamp(resolvedValue, MIN_EDITOR_FONT_SCALE, MAX_EDITOR_FONT_SCALE) * 100,
+  ) / 100;
+}
+
+function normalizeAppFontScale(value, fallback = DEFAULT_APP_FONT_SCALE) {
+  const numericValue = Number(value);
+  const fallbackValue = Number(fallback);
+  const resolvedValue = Number.isFinite(numericValue)
+    ? numericValue
+    : Number.isFinite(fallbackValue)
+      ? fallbackValue
+      : DEFAULT_APP_FONT_SCALE;
+
+  return Math.round(
+    clamp(resolvedValue, MIN_APP_FONT_SCALE, MAX_APP_FONT_SCALE) * 100,
   ) / 100;
 }
 

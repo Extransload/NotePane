@@ -17,6 +17,7 @@ import {
 } from "../model/keyboardShortcuts.js";
 import {
   normalizeAppFontFamily,
+  normalizeAppFontScale,
   normalizeEditorPreferences,
 } from "../model/preferences.js";
 import {
@@ -86,6 +87,16 @@ export function PreferencesWindow({
       onEditorPreferencesChange?.({
         ...normalizedEditorPreferences,
         appFontFamily: normalizeAppFontFamily(nextAppFontFamily),
+      });
+    },
+    [normalizedEditorPreferences, onEditorPreferencesChange],
+  );
+
+  const updateAppFontScale = useCallback(
+    (nextAppFontScale) => {
+      onEditorPreferencesChange?.({
+        ...normalizedEditorPreferences,
+        appFontScale: normalizeAppFontScale(nextAppFontScale),
       });
     },
     [normalizedEditorPreferences, onEditorPreferencesChange],
@@ -217,6 +228,27 @@ export function PreferencesWindow({
             optionsAriaLabel="App font family options"
             onFontFamilyChange={updateAppFontFamily}
           />
+        </div>
+        <div className="preference-setting-row app-font-size-setting">
+          <div>
+            <div className="preference-setting-title">App font size</div>
+            <div className="preferences-section-description">
+              Interface text size in every window. Editor text stays separate.
+            </div>
+          </div>
+          <div className="app-font-size-control">
+            <input
+              type="range"
+              min="80"
+              max="130"
+              step="5"
+              value={Math.round(normalizedEditorPreferences.appFontScale * 100)}
+              aria-label="App font size"
+              aria-valuetext={`${Math.round(normalizedEditorPreferences.appFontScale * 100)}%`}
+              onChange={(event) => updateAppFontScale(Number(event.target.value) / 100)}
+            />
+            <output>{Math.round(normalizedEditorPreferences.appFontScale * 100)}%</output>
+          </div>
         </div>
         <div className="preferences-data-section">
           <div className="preferences-section-title">Data</div>

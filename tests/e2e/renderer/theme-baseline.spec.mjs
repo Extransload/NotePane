@@ -5,6 +5,7 @@ import {
   clickLastEmptyParagraph,
   modifierShortcut,
   selectAppTheme,
+  waitForEditorSelection,
 } from "../support/renderer-helpers.mjs";
 
 // Computed colours of elements whose colour already comes from NotePane tokens, in
@@ -42,7 +43,8 @@ const styledWord = (page, styleType, color, word) =>
 const editorWord = (page, word) => page.locator(".bn-editor").getByText(word, { exact: true });
 
 // Selects exactly one word through the DOM selection, which ProseMirror adopts. A
-// double click can spill into the neighbouring paragraph while a menu is animating.
+// double click can spill into the neighbouring paragraph while a menu is animating. The
+// toolbar alone does not prove the adoption: a table cell selected before shows it too.
 async function selectWord(page, word) {
   await editorWord(page, word).evaluate((element) => {
     element.closest("[contenteditable]")?.focus();
@@ -52,6 +54,7 @@ async function selectWord(page, word) {
     selection.removeAllRanges();
     selection.addRange(range);
   });
+  await waitForEditorSelection(page);
   await expect(formattingToolbar(page)).toBeVisible();
 }
 

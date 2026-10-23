@@ -69,7 +69,6 @@ export function createTemplateSessionNote(sourceNote = {}, timestamp = Date.now(
     bounds: sourceNote.bounds,
     theme: DEFAULT_THEME,
     alwaysOnTop: false,
-    detached: false,
     seedDemoContent: true,
     editorFontScale: sourceNote.editorFontScale ?? DEFAULT_EDITOR_FONT_SCALE,
     editorFontFamily: sourceNote.editorFontFamily ?? DEFAULT_EDITOR_FONT_FAMILY,

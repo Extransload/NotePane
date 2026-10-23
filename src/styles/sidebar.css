@@ -177,14 +177,13 @@
 .sticky-pin-button,
 .sticky-trash-button,
 .sidebar-reopen-button,
-.dock-note-button,
 .image-tools button,
 .crop-actions button {
   border: 1px solid var(--sticky-border-color);
   border-radius: 7px;
   background: var(--sticky-control-bg);
   color: var(--sticky-text-color);
-  font: 700 11px/1 var(--notepane-ui-font);
+  font: 700 calc(11px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
   cursor: pointer;
   transition:
     transform 130ms ease,
@@ -374,7 +373,7 @@
   border-radius: 0;
   background: transparent;
   color: var(--session-tab-dot-text-color);
-  font-size: 10px;
+  font-size: calc(10px * var(--notepane-ui-scale));
   font-weight: 800;
 }
 
@@ -390,7 +389,7 @@
 .session-sidebar.is-compact .session-dot {
   width: 24px;
   height: 24px;
-  font-size: 10px;
+  font-size: calc(10px * var(--notepane-ui-scale));
   font-weight: 800;
 }
 
@@ -407,7 +406,7 @@
   outline: none;
   background: transparent;
   color: inherit;
-  font: 650 12px/1 var(--notepane-ui-font);
+  font: 650 calc(12px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
 }
 
 .session-tab-trailing {
@@ -428,7 +427,7 @@
   border-radius: 0;
   background: transparent;
   color: color-mix(in srgb, currentColor 76%, transparent);
-  font: 800 10px/1 var(--notepane-ui-font);
+  font: 800 calc(10px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
   line-height: 1;
   -webkit-app-region: no-drag;
   transition:
@@ -496,7 +495,7 @@
   border-radius: 0;
   background: transparent;
   color: color-mix(in srgb, currentColor 70%, transparent);
-  font: 750 9px/1 var(--notepane-ui-font);
+  font: 750 calc(9px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
   text-align: center;
   white-space: nowrap;
   transition: opacity 120ms ease;
@@ -614,7 +613,7 @@
   border-radius: 10px;
   color: var(--sticky-text-color);
   cursor: default;
-  font: 760 13px/1 var(--notepane-ui-font);
+  font: 760 calc(13px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
   letter-spacing: 0;
   text-overflow: ellipsis;
   white-space: nowrap;

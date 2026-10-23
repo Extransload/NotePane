@@ -9,7 +9,6 @@ import {
   Palette,
   PanelLeftClose,
   PanelLeftOpen,
-  PanelTopClose,
   Pin,
   RotateCcw,
   Trash2,
@@ -259,19 +258,5 @@ export function InlineStickyGlyph({ x }) {
       <path d="M2 4.5h15v10.2L12.3 20H2V4.5Z" />
       <path d="M17 14.7h-4.7V20" />
     </g>
-  );
-}
-
-export function DockIcon() {
-  return (
-    <PanelTopClose
-      className="notepane-action-icon notepane-icon-dock"
-      data-icon-family="system-symbol"
-      data-icon-pack="lucide"
-      data-icon-tone="dock"
-      size={24}
-      strokeWidth={1.9}
-      aria-hidden="true"
-    />
   );
 }

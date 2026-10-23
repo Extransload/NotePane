@@ -60,8 +60,7 @@ working elsewhere.
   <img src="docs/images/scatter.png" alt="Three pastel sticky note windows spread across the desktop" width="820">
 </div>
 
-Press `⌘⇧T` to move between them. Drag a sidebar tab out of the window to
-detach a single note; drop a detached note back to dock it again.
+Press `⌘⇧T` to move between them.
 
 ---
 
