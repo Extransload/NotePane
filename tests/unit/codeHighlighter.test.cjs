@@ -85,7 +85,7 @@ test("the highlighter loads every code theme and highlights with the active one"
   assert.equal(keywordColour(), "#cba6f7");
   assert.equal(new Set(highlighter.getLoadedThemes()).size, CODE_THEME_IDS.length);
   // A code theme the highlighter never loaded would make Shiki throw on every highlight.
-  setActiveCodeTheme("solarized-dark");
+  setActiveCodeTheme("not-a-code-theme");
   assert.equal(getActiveCodeTheme(), "github-dark");
   assert.equal(keywordColour(), "#f97583");
 });

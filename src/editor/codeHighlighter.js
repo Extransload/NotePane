@@ -13,13 +13,39 @@ export const DEFAULT_CODE_THEME = "github-dark";
 
 // The code themes BlockNote's bundle does not load. Each is its own chunk in the build.
 const CODE_THEME_LOADERS = {
-  "catppuccin-latte": () => import("@shikijs/themes/catppuccin-latte"),
+  "ayu-dark": () => import("@shikijs/themes/ayu-dark"),
+  "ayu-light": () => import("@shikijs/themes/ayu-light"),
+  "ayu-mirage": () => import("@shikijs/themes/ayu-mirage"),
   "catppuccin-frappe": () => import("@shikijs/themes/catppuccin-frappe"),
+  "catppuccin-latte": () => import("@shikijs/themes/catppuccin-latte"),
   "catppuccin-macchiato": () => import("@shikijs/themes/catppuccin-macchiato"),
   "catppuccin-mocha": () => import("@shikijs/themes/catppuccin-mocha"),
-  nord: () => import("@shikijs/themes/nord"),
-  dracula: () => import("@shikijs/themes/dracula"),
+  "dark-plus": () => import("@shikijs/themes/dark-plus"),
+  "dracula": () => import("@shikijs/themes/dracula"),
+  "everforest-dark": () => import("@shikijs/themes/everforest-dark"),
+  "everforest-light": () => import("@shikijs/themes/everforest-light"),
+  "light-plus": () => import("@shikijs/themes/light-plus"),
+  "material-theme": () => import("@shikijs/themes/material-theme"),
+  "material-theme-darker": () => import("@shikijs/themes/material-theme-darker"),
+  "material-theme-lighter": () => import("@shikijs/themes/material-theme-lighter"),
+  "material-theme-ocean": () => import("@shikijs/themes/material-theme-ocean"),
+  "material-theme-palenight": () => import("@shikijs/themes/material-theme-palenight"),
+  "monokai": () => import("@shikijs/themes/monokai"),
+  "night-owl": () => import("@shikijs/themes/night-owl"),
+  "night-owl-light": () => import("@shikijs/themes/night-owl-light"),
+  "nord": () => import("@shikijs/themes/nord"),
+  "one-dark-pro": () => import("@shikijs/themes/one-dark-pro"),
+  "one-light": () => import("@shikijs/themes/one-light"),
+  "rose-pine": () => import("@shikijs/themes/rose-pine"),
+  "rose-pine-dawn": () => import("@shikijs/themes/rose-pine-dawn"),
+  "rose-pine-moon": () => import("@shikijs/themes/rose-pine-moon"),
+  "snazzy-light": () => import("@shikijs/themes/snazzy-light"),
+  "solarized-dark": () => import("@shikijs/themes/solarized-dark"),
+  "solarized-light": () => import("@shikijs/themes/solarized-light"),
   "tokyo-night": () => import("@shikijs/themes/tokyo-night"),
+  "vitesse-dark": () => import("@shikijs/themes/vitesse-dark"),
+  "vitesse-light": () => import("@shikijs/themes/vitesse-light"),
+
 };
 
 // Every code theme the highlighter holds: BlockNote's own two, then the loaded ones.

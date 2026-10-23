@@ -198,17 +198,35 @@ export function getStickyShellStyle(noteTheme, accentColor, theme) {
     baseBackground,
     Math.max(opacity, 0.96),
   );
-  const panelColor = mixHexColors(
+  let panelColor = mixHexColors(
     noteColor,
     forBackground("panelColor"),
     isLightBackground ? 0.34 : 0.08,
   );
   const panelOpacity = Math.min(opacity + 0.04, 1);
-  const panelEffectiveBackground = blendHexOverHex(
+  let panelEffectiveBackground = blendHexOverHex(
     panelColor,
     baseBackground,
     panelOpacity,
   );
+  // A tinted panel can land across the contrast boundary from the note surface,
+  // leaving no text colour readable on both. Bring it just close enough to share one.
+  if (![BLACK, WHITE].some((ink) =>
+    [effectiveBackground, panelEffectiveBackground].every((background) =>
+      getContrastRatio(ink, background) >= READABLE_CONTRAST))) {
+    const originalPanelColor = panelColor;
+    for (let step = 1; step <= 20; step += 1) {
+      const candidate = mixHexColors(originalPanelColor, effectiveBackground, step / 20);
+      const candidateBackground = blendHexOverHex(candidate, baseBackground, panelOpacity);
+      if ([BLACK, WHITE].some((ink) =>
+        [effectiveBackground, candidateBackground].every((background) =>
+          getContrastRatio(ink, background) >= READABLE_CONTRAST))) {
+        panelColor = candidate;
+        panelEffectiveBackground = candidateBackground;
+        break;
+      }
+    }
+  }
   const panelTextColor = pickReadableText(panelEffectiveBackground, inks);
   const isLightPanelBackground =
     getRelativeLuminance(panelTextColor) < getRelativeLuminance(panelEffectiveBackground);

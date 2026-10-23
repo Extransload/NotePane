@@ -9,17 +9,7 @@ import {
 // The theme picker in Preferences > General, and the light/dark switch and shortcut it replaces.
 const THEMES = JSON.parse(fs.readFileSync(path.resolve("electron/themes.json"), "utf8"));
 const themeById = (themeId) => THEMES.find((theme) => theme.id === themeId);
-const PICKER_LABELS = [
-  "NotePane Light",
-  "NotePane Dark",
-  "Catppuccin Latte",
-  "Catppuccin Frappé",
-  "Catppuccin Macchiato",
-  "Catppuccin Mocha",
-  "Nord",
-  "Dracula",
-  "Tokyo Night",
-];
+const PICKER_LABELS = THEMES.map((theme) => theme.label);
 
 function hexToRgb(hex) {
   const [red, green, blue] = [1, 3, 5].map((start) => Number.parseInt(hex.slice(start, start + 2), 16));
@@ -102,7 +92,7 @@ function stubThemeRecordingBridge() {
   };
 }
 
-test("picker lists the nine themes and marks the active one", async ({ page }) => {
+test("picker lists all themes and marks the active one", async ({ page }) => {
   // With the leak detector's sentinel themes registered, which the picker must never offer.
   await page.goto("/?sentinelThemes=1");
   await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
@@ -141,6 +131,18 @@ test("choosing a card applies the theme immediately", async ({ page }) => {
   await expect(picker.getByTestId("theme-card-notepane-light")).toHaveAttribute("aria-checked", "false");
   const mochaAccent = await expectMarkedInAccent(picker.getByTestId("theme-card-catppuccin-mocha"));
   expect(mochaAccent, "the two themes' accents differ, so the marks followed the theme").not.toBe(lightAccent);
+});
+
+test("TablePeek Dark paints the app with its palette", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  const preferences = await openPreferences(page);
+  await preferences.getByTestId("theme-card-tablepeek-dark").click();
+
+  await expectAppliedTheme(page, "tablepeek-dark");
+  expect(await rootToken(page, "--sticky-shell-bg")).toBe("#1c1c1f");
+  await expect(preferences.getByTestId("theme-card-tablepeek-dark"))
+    .toHaveAttribute("aria-checked", "true");
 });
 
 test("each card previews its own theme", async ({ page }) => {
@@ -202,7 +204,7 @@ test("arrow keys move the selection", async ({ page }) => {
   await expectSelected("notepane-light");
   // Both ends wrap.
   await page.keyboard.press("ArrowLeft");
-  await expectSelected("tokyo-night");
+  await expectSelected("xcode-light");
   await page.keyboard.press("ArrowRight");
   await expectSelected("notepane-light");
 });

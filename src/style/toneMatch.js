@@ -52,7 +52,7 @@ function toneTargets(theme) {
   const step = Math.max(Math.abs(hexToOklch(palette.header).l - windowLightness), MIN_TINT_STEP);
   const tint = {
     l: scheme === "dark" ? windowLightness + step : windowLightness - step,
-    c: accentTone.c * TINT_CHROMA_SHARE,
+    c: accentTone.c * (theme.tintChromaShare ?? TINT_CHROMA_SHARE),
   };
   return scheme === "dark"
     ? { fill: accentTone, surface: tint, mark: accentTone }

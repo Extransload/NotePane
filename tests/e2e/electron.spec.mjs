@@ -161,15 +161,15 @@ test("a reloaded window starts with the theme chosen after it opened", async () 
   }
 });
 
-test("the chosen theme persists across a restart", async () => {
+test("a TablePeek theme persists across a restart", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-theme-");
   const firstRun = await launchApp(userDataDirectory);
   try {
     const page = await firstRun.firstWindow();
     await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
-    await chooseAppTheme(page, "dracula");
+    await chooseAppTheme(page, "tablepeek-dark");
     await expect.poll(() => readStoredAppTheme(userDataDirectory))
-      .toEqual({ themeId: "dracula", mode: "dark" });
+      .toEqual({ themeId: "tablepeek-dark", mode: "dark" });
   } finally {
     await firstRun.close();
   }
@@ -178,9 +178,9 @@ test("the chosen theme persists across a restart", async () => {
   try {
     const page = await secondRun.firstWindow();
     await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
-    expect(readStoredAppTheme(userDataDirectory)).toEqual({ themeId: "dracula", mode: "dark" });
-    await expect(page.locator("html")).toHaveAttribute("data-theme-id", "dracula");
-    expect(await readRootToken(page, "--sticky-shell-bg")).toBe(themePalette("dracula").window);
+    expect(readStoredAppTheme(userDataDirectory)).toEqual({ themeId: "tablepeek-dark", mode: "dark" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme-id", "tablepeek-dark");
+    expect(await readRootToken(page, "--sticky-shell-bg")).toBe(themePalette("tablepeek-dark").window);
   } finally {
     await secondRun.close();
   }

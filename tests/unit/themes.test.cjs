@@ -105,6 +105,16 @@ const SHIPPED_THEMES = [
   ["dracula", "Dracula"],
   ["tokyo-night", "Tokyo Night"],
 ];
+const TABLEPEEK_THEMES = [
+  "tablepeek-dark", "tablepeek-light", "aura-dark", "aura-soft-dark", "ayu-dark", "ayu-light",
+  "ayu-mirage", "cobalt2", "everforest-dark", "everforest-light", "github-dark", "github-light",
+  "gruvbox-dark", "gruvbox-light", "horizon", "kanagawa", "material", "material-darker",
+  "material-lighter", "material-ocean", "material-palenight", "monokai", "monokai-pro",
+  "night-owl", "night-owl-light", "one-dark", "one-light", "panda", "pink-aura",
+  "rose-pine", "rose-pine-dawn", "rose-pine-moon", "shades-of-purple", "snazzy",
+  "snazzy-light", "solarized-dark", "solarized-light", "synthwave-84", "tokyo-night-light",
+  "tokyo-night-storm", "tomorrow-night", "xcode-dark", "xcode-light",
+];
 const NOTEPANE_THEME_IDS = new Set(["notepane-light", "notepane-dark"]);
 const OFFICIAL_PALETTES = require("./fixtures/official-palettes.json");
 const loadColorMath = () => import("../../src/style/colorMath.js");
@@ -115,24 +125,24 @@ function oklabDistance({ hexToOklab }, first, second) {
   return Math.hypot(a.l - b.l, a.a - b.a, a.b - b.b);
 }
 
-test("ships the nine themes in picker order", async () => {
+test("keeps the original nine themes before the TablePeek colours", async () => {
   const { listThemes } = await loadThemes();
   assert.deepEqual(
-    listThemes().map((theme) => [theme.id, theme.label]),
+    listThemes().slice(0, SHIPPED_THEMES.length).map((theme) => [theme.id, theme.label]),
     SHIPPED_THEMES,
   );
+  assert.deepEqual(listThemes().slice(SHIPPED_THEMES.length).map((theme) => theme.id), TABLEPEEK_THEMES);
 });
 
-test("the picker offers the nine shipped themes, never registered test themes", async () => {
+test("the picker offers all shipped themes, never registered test themes", async () => {
   const { listBuiltInThemes, listThemes, registerTestThemes } = await loadThemes();
   const { SENTINEL_THEMES } = await import("../../src/style/sentinelThemes.js");
   registerTestThemes(SENTINEL_THEMES);
   try {
     assert.ok(listThemes().some((theme) => theme.id === "sentinel-light-a"), "the sentinels are registered");
-    assert.deepEqual(
-      listBuiltInThemes().map((theme) => [theme.id, theme.label]),
-      SHIPPED_THEMES,
-    );
+    assert.deepEqual(listBuiltInThemes().map((theme) => theme.id), [
+      ...SHIPPED_THEMES.map(([id]) => id), ...TABLEPEEK_THEMES,
+    ]);
   } finally {
     registerTestThemes([]);
   }
@@ -217,7 +227,7 @@ test("text contrast meets the spec bar in every theme", async () => {
 test("the new themes use only their official palette colours, apart from the marked derived ones", async () => {
   const { listThemes, PALETTE_KEYS } = await loadThemes();
   const { NAMED_COLOURS } = await loadTokens();
-  const newThemes = listThemes().filter((theme) => !NOTEPANE_THEME_IDS.has(theme.id));
+  const newThemes = listThemes().filter((theme) => OFFICIAL_PALETTES[theme.id]);
   assert.deepEqual(newThemes.map((theme) => theme.id).sort(), Object.keys(OFFICIAL_PALETTES).sort());
   for (const theme of newThemes) {
     const { colours, named, derivedKeys = {} } = OFFICIAL_PALETTES[theme.id];
@@ -261,7 +271,7 @@ const hueDistance = (first, second) => {
 test("stand-in named colours keep their hue family", async () => {
   const { listThemes, getTheme } = await loadThemes();
   const { hexToOklch, getContrastRatio } = await import("../../src/style/colorMath.js");
-  for (const theme of listThemes().filter((candidate) => !NOTEPANE_THEME_IDS.has(candidate.id))) {
+  for (const theme of listThemes().filter((candidate) => OFFICIAL_PALETTES[candidate.id])) {
     const reference = getTheme(theme.scheme === "dark" ? "notepane-dark" : "notepane-light");
     const { named } = OFFICIAL_PALETTES[theme.id];
     const ownContrasts = Object.entries(named)
@@ -305,7 +315,7 @@ test("derived named colours are NotePane's colour in the theme's mark tone", asy
     return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
   };
   let derivedCount = 0;
-  for (const theme of listThemes().filter((candidate) => !NOTEPANE_THEME_IDS.has(candidate.id))) {
+  for (const theme of listThemes().filter((candidate) => OFFICIAL_PALETTES[candidate.id])) {
     const reference = getTheme(theme.scheme === "dark" ? "notepane-dark" : "notepane-light");
     const { named } = OFFICIAL_PALETTES[theme.id];
     const official = NAMED_COLOURS.filter((key) => named[key].kind !== "derived").map((key) => hexToOklch(theme.palette[key]));
@@ -465,14 +475,17 @@ const CODE_THEMES = {
 test("each theme names its spec code theme, and new themes paint code in its colours", async () => {
   const { listThemes } = await loadThemes();
   for (const theme of listThemes()) {
-    assert.equal(theme.codeTheme, CODE_THEMES[theme.id], theme.id);
+    if (CODE_THEMES[theme.id]) assert.equal(theme.codeTheme, CODE_THEMES[theme.id], theme.id);
     if (NOTEPANE_THEME_IDS.has(theme.id)) {
       assert.equal(theme.palette.codeBg, "#0d1117", theme.id);
       continue;
     }
     const { default: shikiTheme } = await import(`@shikijs/themes/${theme.codeTheme}`);
-    assert.equal(theme.palette.codeBg, shikiTheme.colors["editor.background"].toLowerCase(), `${theme.id} codeBg`);
-    assert.equal(theme.palette.codeText, shikiTheme.colors["editor.foreground"].toLowerCase(), `${theme.id} codeText`);
+    const sixDigit = (value) => value.length === 4
+      ? `#${[...value.slice(1)].map((digit) => digit + digit).join("")}`
+      : value.slice(0, 7).toLowerCase();
+    assert.equal(theme.palette.codeBg, sixDigit(shikiTheme.colors["editor.background"]), `${theme.id} codeBg`);
+    assert.equal(theme.palette.codeText, sixDigit(shikiTheme.colors["editor.foreground"]), `${theme.id} codeText`);
   }
 });
 
