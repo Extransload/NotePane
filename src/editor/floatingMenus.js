@@ -20,6 +20,9 @@ export const BLOCKNOTE_NESTED_COLOR_ITEM_SELECTOR = [
   ".bn-color-picker-dropdown [data-test^='background-color-']",
 ].join(", ");
 
+// A block menu's Turn into and Colors panel, which opens beside the menu inside it.
+const BLOCK_MENU_SUBPANEL_SELECTOR = ".notepane-block-menu-subpanel";
+
 export const BLOCKNOTE_VISIBLE_OVERFLOW_MENU_SELECTOR = [
   ".bn-drag-handle-menu",
   ".bn-table-handle-menu",
@@ -134,6 +137,22 @@ export function repositionBlockNoteFloatingMenus() {
 
     keepElementInsideViewport(element);
   }
+
+  for (const subpanel of document.querySelectorAll(BLOCK_MENU_SUBPANEL_SELECTOR)) {
+    keepSubpanelInsideViewport(subpanel);
+  }
+}
+
+// The subpanel moves up on its own until it fits the window, so its menu, and the item under the
+// pointer, stay where they are.
+export function keepSubpanelInsideViewport(element) {
+  element.style.removeProperty("top");
+  const rect = element.getBoundingClientRect();
+  const margin = FLOATING_EDITOR_MENU_MARGIN;
+  const overflow = rect.bottom - (window.innerHeight - margin);
+  if (overflow > 0) {
+    element.style.top = `${-Math.max(0, Math.min(overflow, rect.top - margin))}px`;
+  }
 }
 
 export function isNestedBlockNoteFloatingMenu(element) {
@@ -161,9 +180,11 @@ export function keepElementInsideViewport(element) {
   const viewportHeight = window.innerHeight;
   const maxWidth = Math.max(1, viewportWidth - margin * 2);
   const maxHeight = Math.max(80, viewportHeight - margin * 2);
+  // A nested menu or subpanel overflows its menu on purpose and keeps itself inside the window,
+  // so it does not count toward the menu's own size.
   const hasNestedFloatingMenu = Boolean(
     element.querySelector(
-      ".bn-menu-dropdown, .mantine-Menu-dropdown, .mantine-Popover-dropdown",
+      `.bn-menu-dropdown, .mantine-Menu-dropdown, .mantine-Popover-dropdown, ${BLOCK_MENU_SUBPANEL_SELECTOR}`,
     ),
   );
   const measuredWidth = hasNestedFloatingMenu

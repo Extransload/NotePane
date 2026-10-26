@@ -63,6 +63,56 @@ export function getCodeBlockText(block) {
     .join("");
 }
 
+const CODE_INDENT = "  ";
+
+/**
+ * Tab and Shift+Tab inside a code block. A caret Tab types two spaces; Tab with a selection
+ * indents every line the selection touches; Shift+Tab takes up to two leading spaces, or a
+ * leading tab, from those lines or from the caret's line. Both keys stay in the code block even
+ * with nothing to dedent, so Shift+Tab never lifts the block out of its parent.
+ */
+export function indentCodeBlockLines(editor, direction) {
+  return editor.transact((tr) => {
+    const { selection } = tr;
+    const { $from, $to } = selection;
+    if (!$from.parent.type.spec.code || !$from.sameParent($to)) {
+      return false;
+    }
+    if (direction > 0 && selection.empty) {
+      tr.insertText(CODE_INDENT);
+      return true;
+    }
+
+    // Code is plain text, so a text offset in the block is a position offset too. A line that
+    // starts where a selection ends is not part of it.
+    const text = $from.parent.textContent;
+    const lineStarts = [
+      $from.parentOffset === 0 ? 0 : text.lastIndexOf("\n", $from.parentOffset - 1) + 1,
+    ];
+    for (
+      let index = text.indexOf("\n", lineStarts[0]);
+      index !== -1 && index + 1 < $to.parentOffset;
+      index = text.indexOf("\n", index + 1)
+    ) {
+      lineStarts.push(index + 1);
+    }
+
+    // Later lines first, so the earlier offsets stay valid.
+    const blockStart = $from.start();
+    for (const lineStart of lineStarts.reverse()) {
+      if (direction > 0) {
+        tr.insertText(CODE_INDENT, blockStart + lineStart);
+        continue;
+      }
+      const indent = text.slice(lineStart).match(/^(?:\t| {1,2})/)?.[0].length ?? 0;
+      if (indent > 0) {
+        tr.delete(blockStart + lineStart, blockStart + lineStart + indent);
+      }
+    }
+    return true;
+  });
+}
+
 export function getCodeLanguageLabel(language) {
   return codeBlockOptions.supportedLanguages?.[language]?.name || language || "Plain Text";
 }

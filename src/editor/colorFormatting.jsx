@@ -157,6 +157,22 @@ function RecentColorFormattingToolbar({
         : null;
     },
   });
+  // A clicked divider is node-selected and has nothing to format, so the toolbar would be an
+  // empty frame over its six-dot handle. File blocks have no text either but keep their actions.
+  const isBlockWithoutToolsSelected = useEditorState({
+    editor,
+    selector: ({ editor: currentEditor }) => {
+      const selectedNode = currentEditor.prosemirrorState.selection.node;
+      const blockType = selectedNode?.type.name === "blockContainer"
+        ? selectedNode.firstChild?.type.name
+        : selectedNode?.type.name;
+      const blockSpec = blockType ? currentEditor.schema.blockSpecs[blockType] : undefined;
+      return Boolean(
+        blockSpec?.config.content === "none" &&
+          !blockSpec.implementation?.meta?.fileBlockAccept,
+      );
+    },
+  });
   const isFileContext = Boolean(selectedFileBlock);
   const supportedBlockTypeSelectItems = (
     blockTypeSelectItems ?? getBlockTypeSelectItems(editor.dictionary)
@@ -171,7 +187,7 @@ function RecentColorFormattingToolbar({
     ? imageBlock
     : selectedFileBlock;
 
-  if (!Components) {
+  if (!Components || isBlockWithoutToolsSelected) {
     return null;
   }
 

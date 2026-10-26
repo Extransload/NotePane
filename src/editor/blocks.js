@@ -2,6 +2,7 @@ import {
   urlsMatch,
 } from "./images.js";
 import { getSelectedBlocks, isBlockSetSelection } from "./blockSelection.js";
+import { writeBlocksToClipboard } from "./clipboard.js";
 import {
   clamp,
 } from "../utils/values.js";
@@ -167,11 +168,20 @@ export async function cutBlocks(editor, blocks, scheduleSave) {
     return;
   }
 
+  // The cut writes what a copy of the blocks would, so a paste brings back the same blocks.
+  // Plain Markdown is the fallback when the copy command is unavailable.
+  let isWritten = false;
   try {
-    const markdown = await editor.blocksToMarkdownLossy(blocks);
-    await navigator.clipboard?.writeText(markdown);
+    isWritten = writeBlocksToClipboard(editor, blocks);
   } catch {
-    // Clipboard write is best-effort; the block removal should still happen.
+    // Fall back to plain text below.
+  }
+  if (!isWritten) {
+    try {
+      await navigator.clipboard?.writeText(editor.blocksToMarkdownLossy(blocks));
+    } catch {
+      // Clipboard write is best-effort; the block removal should still happen.
+    }
   }
 
   const topLevelIds = new Set(editor.document.map((block) => block.id));

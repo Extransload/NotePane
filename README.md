@@ -74,7 +74,7 @@ Type `/` anywhere to insert a block. Available blocks:
 
 | | |
 | --- | --- |
-| **Text** | Paragraph, Heading 1–3, Toggle Heading, Quote |
+| **Text** | Paragraph, Heading 1–3, Toggle Heading, Quote, Callout |
 | **Lists** | Bullet, Numbered, Check, Toggle |
 | **Structure** | Table with advanced handles, Code block with syntax highlighting and a prettifier |
 | **Media** | Image with download and crop, File, Video, Audio |
@@ -153,7 +153,7 @@ their first line until you rename one by double-clicking its tab.
 | `⌘⇧T` | Switch between Tab sessions mode and Sticky windows mode |
 | `/` | Open the block palette |
 | `⌘,` | Preferences |
-| `⌘⇧E` | Export as PNG or PDF |
+| `⌘⇧E` | Export as PDF or Markdown |
 
 These are the default macOS shortcuts (`⌘` = Command, `⇧` = Shift).
 On Windows, use Ctrl instead of Command.

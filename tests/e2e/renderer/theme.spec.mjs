@@ -65,7 +65,6 @@ function stubThemeRecordingBridge() {
     markdown: "",
     theme: {},
     seedDemoContent: false,
-    editorFontScale: 1,
     editorFontFamily: "Inter",
     trashedAt: null,
     createdAt: 1,

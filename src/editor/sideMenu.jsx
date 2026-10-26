@@ -12,8 +12,10 @@ import {
   useExtension,
   useExtensionState,
 } from "@blocknote/react";
-import { ArrowRightLeft, Palette, Trash2 } from "lucide-react";
+import { ArrowRightLeft, Palette, SmilePlus, Trash2 } from "lucide-react";
 import { resolveBlocksForMenuBlock } from "./blocks.js";
+import { editCalloutIcon } from "./callout.jsx";
+import { getCodeBlockText } from "./codeFormatting.js";
 import { EditorColorPickerSections } from "./colorFormatting.jsx";
 
 export function NotePaneSideMenuController({
@@ -64,6 +66,19 @@ export function NotePaneSideMenuController({
         "--notepane-drag-preview-width",
       );
     };
+    // BlockNote blurs the editor when a six-dot drag ends, so Cmd+Z would do nothing until the
+    // user clicked back in. The editor takes focus back with the selection the drop left on the
+    // dropped block, as in Notion. This listens after BlockNote's own dragend handler, which React
+    // runs on its root.
+    const refocusAfterBlockDrag = (event) => {
+      if (
+        event.target instanceof Element &&
+        event.target.closest(".bn-side-menu") &&
+        editor.isEditable
+      ) {
+        editor.focus();
+      }
+    };
     const clearHandleSelectionHint = () => {
       editor.domElement?.removeAttribute("data-notepane-handle-block-id");
     };
@@ -95,12 +110,14 @@ export function NotePaneSideMenuController({
     };
     ownerDocument.addEventListener("dragstart", preserveDragPreviewWidth, true);
     ownerDocument.addEventListener("dragend", clearDragPreviewWidth, true);
+    ownerDocument.addEventListener("dragend", refocusAfterBlockDrag);
     ownerDocument.addEventListener("mousedown", clearHandleSelectionHint, true);
     ownerDocument.addEventListener("keydown", clearHandleSelectionHintOnKey, true);
     ownerDocument.addEventListener("click", rememberBlockFromDragHandle, true);
     return () => {
       ownerDocument.removeEventListener("dragstart", preserveDragPreviewWidth, true);
       ownerDocument.removeEventListener("dragend", clearDragPreviewWidth, true);
+      ownerDocument.removeEventListener("dragend", refocusAfterBlockDrag);
       ownerDocument.removeEventListener("mousedown", clearHandleSelectionHint, true);
       ownerDocument.removeEventListener("keydown", clearHandleSelectionHintOnKey, true);
       ownerDocument.removeEventListener("click", rememberBlockFromDragHandle, true);
@@ -141,6 +158,10 @@ function NotePaneDragHandleMenu({
   onColorUsed,
 }) {
   const Components = useComponentsContext();
+  const editor = useBlockNoteEditor();
+  const block = useExtensionState("sideMenu", {
+    selector: (state) => state?.block,
+  });
   const [activePanel, setActivePanel] = useState(null);
 
   if (!Components) {
@@ -149,17 +170,19 @@ function NotePaneDragHandleMenu({
 
   return (
     <DragHandleMenu>
-      <Components.Generic.Menu.Item
-        className="bn-menu-item"
-        closeMenuOnClick={false}
-        onClick={() => setActivePanel("turn-into")}
-        onPointerEnter={() => setActivePanel("turn-into")}
-      >
-        <span className="notepane-block-menu-item-content">
-          <ArrowRightLeft className="notepane-block-menu-icon is-turn-into" aria-hidden="true" />
-          Turn into
-        </span>
-      </Components.Generic.Menu.Item>
+      {block && canTurnIntoText(editor, block) && (
+        <Components.Generic.Menu.Item
+          className="bn-menu-item"
+          closeMenuOnClick={false}
+          onClick={() => setActivePanel("turn-into")}
+          onPointerEnter={() => setActivePanel("turn-into")}
+        >
+          <span className="notepane-block-menu-item-content">
+            <ArrowRightLeft className="notepane-block-menu-icon is-turn-into" aria-hidden="true" />
+            Turn into
+          </span>
+        </Components.Generic.Menu.Item>
+      )}
       <Components.Generic.Menu.Item
         className="bn-menu-item"
         closeMenuOnClick={false}
@@ -171,6 +194,7 @@ function NotePaneDragHandleMenu({
           Colors
         </span>
       </Components.Generic.Menu.Item>
+      <EditCalloutIconItem />
       <RemoveSelectedBlocksItem>
         <span className="notepane-block-menu-item-content">
           <Trash2 className="notepane-block-menu-icon is-delete" aria-hidden="true" />
@@ -183,6 +207,30 @@ function NotePaneDragHandleMenu({
         onColorUsed={onColorUsed}
       />
     </DragHandleMenu>
+  );
+}
+
+// A callout's icon, added, changed or removed in the callout's own icon picker.
+function EditCalloutIconItem() {
+  const Components = useComponentsContext();
+  const block = useExtensionState("sideMenu", {
+    selector: (state) => state?.block,
+  });
+
+  if (!Components || block?.type !== "callout") {
+    return null;
+  }
+
+  return (
+    <Components.Generic.Menu.Item
+      className="bn-menu-item"
+      onClick={() => editCalloutIcon(block.id)}
+    >
+      <span className="notepane-block-menu-item-content">
+        <SmilePlus className="notepane-block-menu-icon" aria-hidden="true" />
+        Edit icon
+      </span>
+    </Components.Generic.Menu.Item>
   );
 }
 
@@ -226,11 +274,15 @@ function BlockMenuSubpanel({ activePanel, recentColors, onColorUsed }) {
   );
   const targetBlocks = resolveBlocksForMenuBlock(editor, block.id);
 
+  // `update` gives null for a block it leaves as it is.
   const updateSelectedBlocks = (update) => {
     editor.focus();
     editor.transact(() => {
       for (const targetBlock of targetBlocks) {
-        editor.updateBlock(targetBlock, update(targetBlock));
+        const blockUpdate = update(targetBlock);
+        if (blockUpdate) {
+          editor.updateBlock(targetBlock, blockUpdate);
+        }
       }
     });
   };
@@ -252,7 +304,7 @@ function BlockMenuSubpanel({ activePanel, recentColors, onColorUsed }) {
               checked={isCurrentType}
               key={`${item.type}-${JSON.stringify(item.props || {})}`}
               onClick={() => {
-                updateSelectedBlocks(() => ({ type: item.type, props: item.props }));
+                updateSelectedBlocks((targetBlock) => getTurnIntoUpdate(editor, targetBlock, item));
                 sideMenu.unfreezeMenu();
               }}
             >
@@ -374,6 +426,27 @@ export function BlockMenuHighlightController() {
       }`}
     </style>
   );
+}
+
+// Turn into keeps a block's text, so it is offered only for a block with text: inline content,
+// or the plain text of a code block. A table, image or divider has none to keep.
+function canTurnIntoText(editor, block) {
+  const content = editor.schema.blockSchema[block.type]?.content;
+  return content === "inline" || content === "plain";
+}
+
+// Inline content carries over by itself. A code block's text is given as text, so its lines
+// become line breaks in the one block, as in Notion; otherwise the new type would drop it. A
+// block without text in a block set is left as it is.
+function getTurnIntoUpdate(editor, block, item) {
+  if (!canTurnIntoText(editor, block)) {
+    return null;
+  }
+  const update = { type: item.type, props: item.props };
+  if (editor.schema.blockSchema[block.type].content === "plain") {
+    update.content = getCodeBlockText(block);
+  }
+  return update;
 }
 
 function escapeCssAttribute(value) {

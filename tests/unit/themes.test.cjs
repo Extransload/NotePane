@@ -597,6 +597,12 @@ const DELETED_TOKENS = new Set([
   "--icon-muted-fill",
 ]);
 
+// Tokens added for new UI after the tokens.css capture, which pin today's derived value in
+// [NotePane Light, NotePane Dark].
+const ADDED_TOKENS = {
+  "--sticky-callout-bg": ["rgb(55 53 47 / 0.05)", "rgb(241 241 239 / 0.08)"],
+};
+
 // BlockNote variables whose tokens.css value never painted: BlockNote reads them only inside
 // .bn-root, where the bridge in blocknote.css points each at a NotePane token, so the root's
 // value is never read. Their overrides are gone, and each now holds the derived value, the
@@ -616,7 +622,12 @@ async function assertNotePaneTokens(themeId, scheme) {
   const expected = {
     ...Object.fromEntries(Object.entries(baseline.tokens[scheme]).filter(([name]) => !DELETED_TOKENS.has(name))),
     ...Object.fromEntries(
-      Object.entries({ ...STYLESHEET_LITERAL_TOKENS, ...LIBRARY_COLOUR_TOKENS, ...BRIDGE_SHADOWED_TOKENS }).map(
+      Object.entries({
+        ...STYLESHEET_LITERAL_TOKENS,
+        ...LIBRARY_COLOUR_TOKENS,
+        ...BRIDGE_SHADOWED_TOKENS,
+        ...ADDED_TOKENS,
+      }).map(
         ([name, values]) => [name, values[literalIndex]],
       ),
     ),

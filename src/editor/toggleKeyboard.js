@@ -1,3 +1,4 @@
+import { SuggestionMenu } from "@blocknote/core/extensions";
 import { closeHistory } from "@tiptap/pm/history";
 
 export function handleToggleSpace(editor, event) {
@@ -51,7 +52,9 @@ export function handleToggleEnter(editor, event) {
     event.metaKey ||
     event.ctrlKey ||
     event.altKey ||
-    !selection?.empty
+    !selection?.empty ||
+    // Enter picks the highlighted item of an open `/` or `:` menu instead.
+    editor.getExtension(SuggestionMenu)?.shown()
   ) {
     return false;
   }
@@ -82,7 +85,14 @@ export function handleToggleEnter(editor, event) {
     return true;
   }
 
-  if (selection.$from.parentOffset !== selection.$from.parent.content.size) {
+  const caretOffset = selection.$from.parentOffset;
+  if (caretOffset !== selection.$from.parent.content.size) {
+    // BlockNote splits the title at the caret and moves the toggle's lines to the second half, a new
+    // block whose toggle starts closed, so the lines of an open toggle would drop out of sight. The
+    // second half stays open instead, once the editor has handled this Enter.
+    if (caretOffset > 0 && currentBlock.children?.length && isToggleShown(editor, currentBlock.id)) {
+      window.setTimeout(() => showSecondHalfOfSplitToggle(editor, currentBlock.id));
+    }
     return false;
   }
 
@@ -141,6 +151,26 @@ export function handleToggleBackspace(editor, event) {
   });
   editor.setTextCursorPosition(heading, "start");
   return true;
+}
+
+function toggleWrapperOf(editor, blockId) {
+  return editor.domElement?.querySelector(
+    `.bn-block-outer[data-id="${CSS.escape(blockId)}"] .bn-toggle-wrapper`,
+  );
+}
+
+function isToggleShown(editor, blockId) {
+  return toggleWrapperOf(editor, blockId)?.getAttribute("data-show-children") === "true";
+}
+
+// The open state BlockNote keeps per block, which the new block's toggle reads when it renders again.
+function showSecondHalfOfSplitToggle(editor, blockId) {
+  const secondHalf = editor.getNextBlock(blockId);
+  if (!isToggleBlock(secondHalf) || !secondHalf.children.length) {
+    return;
+  }
+  window.localStorage.setItem(`toggle-${secondHalf.id}`, "true");
+  toggleWrapperOf(editor, secondHalf.id)?.setAttribute("data-show-children", "true");
 }
 
 function clearStoredToggleState(blockId) {

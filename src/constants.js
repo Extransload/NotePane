@@ -16,57 +16,13 @@ export const DEFAULT_THEME = {
   tabTextOpacity: 1,
 };
 
-export const DEFAULT_EDITOR_FONT_SCALE = 1;
-
-export const EDITOR_FONT_SCALE_STEP = 0.08;
-
-export const MIN_EDITOR_FONT_SCALE = 0.38;
-
-export const MAX_EDITOR_FONT_SCALE = 9;
-
-export const BASE_EDITOR_FONT_SIZE_PX = 16;
-
-export const MIN_EDITOR_FONT_SIZE_PX = 6;
-
-export const MAX_EDITOR_FONT_SIZE_PX = 144;
-
-export const EDITOR_FONT_SIZE_PRESETS = [
-  6,
-  7,
-  8,
-  9,
-  10,
-  11,
-  12,
-  13,
-  14,
-  15,
-  16,
-  18,
-  20,
-  22,
-  24,
-  26,
-  28,
-  32,
-  36,
-  40,
-  48,
-  56,
-  64,
-  72,
-  84,
-  96,
-  120,
-  144,
-];
-
 export const DEFAULT_EDITOR_FONT_FAMILY = "system";
 
 export const DEFAULT_APP_FONT_FAMILY = "inter";
-export const DEFAULT_APP_FONT_SCALE = 1;
-export const MIN_APP_FONT_SCALE = 0.8;
-export const MAX_APP_FONT_SCALE = 1.3;
+
+// Page zoom steps for the whole app, as browsers offer them. Cmd/Ctrl+= and Cmd/Ctrl+- move one step.
+export const APP_ZOOM_LEVELS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+export const DEFAULT_APP_ZOOM = 1;
 
 export const DEFAULT_KEYBOARD_SHORTCUTS = {
   newSession: "Mod+T",
@@ -85,8 +41,9 @@ export const DEFAULT_KEYBOARD_SHORTCUTS = {
   toggleTableOfContents: "Mod+Shift+O",
   exportPdf: "Mod+Shift+E",
   preferences: "Mod+,",
-  increaseEditorFontSize: "Mod+=",
-  decreaseEditorFontSize: "Mod+-",
+  zoomIn: "Mod+=",
+  zoomOut: "Mod+-",
+  resetZoom: "Mod+0",
   toggleAlwaysOnTop: "Mod+Shift+P",
 };
 
@@ -102,10 +59,9 @@ export const DEFAULT_KEYBOARD_SHORTCUT_ENABLED = Object.fromEntries(
 );
 
 export const DEFAULT_EDITOR_PREFERENCES = {
-  editorFontScale: DEFAULT_EDITOR_FONT_SCALE,
   editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
   appFontFamily: DEFAULT_APP_FONT_FAMILY,
-  appFontScale: DEFAULT_APP_FONT_SCALE,
+  appZoom: DEFAULT_APP_ZOOM,
   showTableOfContents: false,
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
@@ -247,7 +203,10 @@ export const EXPORT_TOAST_TIMEOUT_MS = 2600;
 
 export const TRASH_UNDO_TOAST_TIMEOUT_MS = 5200;
 
-export const FONT_SIZE_TOAST_TIMEOUT_MS = 1400;
+export const ZOOM_GAUGE_TIMEOUT_MS = 1400;
+
+// How long a rename asked for by a double click on another tab waits for that tab to open.
+export const PENDING_RENAME_TIMEOUT_MS = 1500;
 
 export const SLASH_MENU_MAX_HEIGHT = 400;
 

@@ -15,6 +15,12 @@ const {
   protocol,
   screen,
 } = require("electron");
+
+// Test runs (see quietTestMode) start as an app without a Dock icon. This runs before anything
+// else loads, because macOS lists the app in the Dock as soon as it finishes launching.
+if (process.env.BLOCKNOTE_STICKY_QUIET === "1") {
+  app.setActivationPolicy?.("accessory");
+}
 const {
   StickyStore,
   DEFAULT_KEYBOARD_SHORTCUTS,
@@ -43,6 +49,12 @@ const STICKY_WINDOW_MARGIN = 28;
 const TRAFFIC_LIGHT_X = 14;
 const TABS_TRAFFIC_LIGHT_Y = 15;
 const STICKY_TRAFFIC_LIGHT_Y = 10;
+// CSS heights of `.sticky-header` in src/styles/chrome.css. Page zoom scales them, and the native
+// window buttons must follow the header's centre.
+const TABS_HEADER_HEIGHT = 42;
+const STICKY_HEADER_HEIGHT = 30;
+// The native window buttons' frame is about 14px tall, at any zoom.
+const TRAFFIC_LIGHT_HEIGHT = 14;
 const LAYOUT_MODE_TRANSITION_READY_TIMEOUT_MS = 4500;
 const STICKY_PASTEL_PALETTE = [
   "#fff2b8",
@@ -61,6 +73,10 @@ const backupImportConfirmOverride = process.env.BLOCKNOTE_STICKY_IMPORT_CONFIRM;
 // Test runs set this so the suite never pulls the foreground away from
 // whatever else is on screen. Windows still open; they just do not focus.
 const quietTestMode = process.env.BLOCKNOTE_STICKY_QUIET === "1";
+// Test windows are also see-through and let clicks pass, so a suite running in the background
+// never flashes notes on screen. Their size, position and focus behave as on screen.
+// NOTEPANE_SHOW_TEST_WINDOWS=1 shows them, to watch a run.
+const hiddenTestWindows = quietTestMode && process.env.NOTEPANE_SHOW_TEST_WINDOWS !== "1";
 const MAX_BACKUP_FILE_SIZE = 512 * 1024 * 1024;
 
 let store;
@@ -123,7 +139,10 @@ function isWsl() {
 function createWindow(note, options = {}) {
   const isPrimary = Boolean(options.primary);
   const trafficLightPosition = resolveTrafficLightPosition(isPrimary);
-  const visibleBounds = normalizeWindowBounds(note.bounds, {
+  // The tabs window keeps its own pin and bounds whichever note it opens on. Until it has saved
+  // bounds, it opens at its note's.
+  const tabsWindow = isPrimary ? store.getTabsWindow() : null;
+  const visibleBounds = normalizeWindowBounds(tabsWindow?.bounds ?? note.bounds, {
     minWidth: isPrimary ? TABS_MIN_WIDTH : STICKY_MIN_WIDTH,
     minHeight: isPrimary ? TABS_MIN_HEIGHT : STICKY_MIN_HEIGHT,
   });
@@ -131,10 +150,12 @@ function createWindow(note, options = {}) {
     ...visibleBounds,
     minWidth: isPrimary ? TABS_MIN_WIDTH : STICKY_MIN_WIDTH,
     minHeight: isPrimary ? TABS_MIN_HEIGHT : STICKY_MIN_HEIGHT,
+    // Until the page loads. The renderer then owns the title: it sets the page title to the
+    // display title of the note the window shows, and the window follows the page title.
     title: note.title,
     ...getWindowChromeOptions(isPrimary, trafficLightPosition),
     hasShadow: true,
-    alwaysOnTop: note.alwaysOnTop,
+    alwaysOnTop: tabsWindow ? tabsWindow.alwaysOnTop : note.alwaysOnTop,
     icon: ICON_PNG_PATH,
     show: false,
     webPreferences: {
@@ -144,8 +165,15 @@ function createWindow(note, options = {}) {
       // The preload only uses contextBridge, ipcRenderer and process.platform,
       // all of which a sandboxed preload provides.
       sandbox: true,
+      // macOS can count a see-through test window as hidden; it must keep rendering and running
+      // timers as a window on screen does.
+      backgroundThrottling: !hiddenTestWindows,
     },
   });
+  if (hiddenTestWindows) {
+    window.setOpacity(0);
+    window.setIgnoreMouseEvents(true);
+  }
   window.setWindowButtonVisibility?.(true);
   if (process.platform === "win32") {
     window.setMenuBarVisibility(isPrimary);
@@ -156,6 +184,12 @@ function createWindow(note, options = {}) {
     window,
     noteId: note.id,
     primary: Boolean(options.primary),
+  });
+
+  // Chromium remembers a zoom per page URL for this run, so a note window reopened after a zoom
+  // change would come back at its old zoom. Each load starts from the stored app zoom instead.
+  window.webContents.on("did-navigate", () => {
+    window.webContents.setZoomFactor(getAppZoom());
   });
 
   window.__notepaneReadyToShow = false;
@@ -237,10 +271,20 @@ function getWindowChromeOptions(isPrimary, trafficLightPosition) {
 }
 
 function resolveTrafficLightPosition(isPrimary) {
+  const y = isPrimary ? TABS_TRAFFIC_LIGHT_Y : STICKY_TRAFFIC_LIGHT_Y;
+  const headerHeight = isPrimary ? TABS_HEADER_HEIGHT : STICKY_HEADER_HEIGHT;
+  const zoom = getAppZoom();
+  // Following the header's centre would push the buttons below a header zoomed out to about their
+  // own height (a sticky window at 50%), so they stop at its bottom edge.
+  const lowestY = Math.max(0, Math.floor(headerHeight * zoom - TRAFFIC_LIGHT_HEIGHT));
   return {
     x: TRAFFIC_LIGHT_X,
-    y: isPrimary ? TABS_TRAFFIC_LIGHT_Y : STICKY_TRAFFIC_LIGHT_Y,
+    y: Math.min(Math.round(y + (headerHeight * (zoom - 1)) / 2), lowestY),
   };
+}
+
+function getAppZoom() {
+  return store?.getEditorPreferences?.().appZoom ?? 1;
 }
 
 function applyTrafficLightPosition(window, isPrimary) {
@@ -369,7 +413,6 @@ function closeTabSession(noteId) {
   const primaryEntry = getPrimaryEntry();
   if (primaryEntry && nextActiveNote) {
     primaryEntry.noteId = nextActiveNote.id;
-    primaryEntry.window.setTitle(nextActiveNote.title);
   }
 
   for (const entry of getEntriesForNote(noteId)) {
@@ -391,10 +434,20 @@ function toggleFocusedAlwaysOnTop() {
 
   const entry = windows.get(window.id);
   if (entry) {
-    const updatedNote = store.setAlwaysOnTop(entry.noteId, nextValue);
-    if (updatedNote) {
-      broadcastNotesChanged({ activeNote: updatedNote });
-    }
+    saveAlwaysOnTop(entry, nextValue);
+  }
+}
+
+// The tabs window's pin is the app's; a sticky window's pin is its note's.
+function saveAlwaysOnTop(entry, alwaysOnTop) {
+  if (entry.primary) {
+    store.setTabsWindowAlwaysOnTop(alwaysOnTop);
+    return;
+  }
+
+  const updatedNote = store.setAlwaysOnTop(entry.noteId, alwaysOnTop);
+  if (updatedNote) {
+    broadcastNotesChanged({ activeNote: updatedNote });
   }
 }
 
@@ -449,8 +502,13 @@ function broadcastLayoutModeTransition(payload) {
 }
 
 function broadcastEditorPreferences(editorPreferences) {
-  for (const { window } of windows.values()) {
+  for (const { window, primary } of windows.values()) {
     if (!window.isDestroyed()) {
+      // App zoom is page zoom for every window, so it is applied here rather than in the renderer.
+      window.webContents.setZoomFactor(editorPreferences.appZoom);
+      if (process.platform === "darwin") {
+        applyTrafficLightPosition(window, primary);
+      }
       window.webContents.send("editor-preferences:changed", editorPreferences);
     }
   }
@@ -514,7 +572,6 @@ function ensureTabsWindow(activeNoteId) {
   if (primaryEntry) {
     primaryEntry.noteId = note.id;
     primaryEntry.window.setMinimumSize(TABS_MIN_WIDTH, TABS_MIN_HEIGHT);
-    primaryEntry.window.setTitle(note.title);
     primaryEntry.window.webContents.send("notes:changed", {
       notes: store.listNotes(),
       trash: store.listTrash(),
@@ -571,7 +628,6 @@ function ensureWindowForNote(note) {
     .find((entry) => !entry.primary);
   if (existing) {
     existing.window.setMinimumSize(STICKY_MIN_WIDTH, STICKY_MIN_HEIGHT);
-    existing.window.setTitle(note.title);
     revealWindow(existing.window);
     return existing.window;
   }
@@ -659,10 +715,11 @@ async function recreateWindowsForLayoutMode(activeNoteId, options = {}) {
   // the old windows so Windows does not treat a layout transition as app exit.
   for (const entry of previousEntries) {
     entry.closingProgrammatically = true;
-    entry.primary = false;
+    // Saved while still marked primary, so the tabs window's bounds are kept as its own.
     if (options.persistExistingBounds !== false) {
       persistWindowBounds(entry.window);
     }
+    entry.primary = false;
   }
 
   if (layoutMode === "sticky") {
@@ -707,7 +764,13 @@ function syncWindowsForLayoutMode(activeNoteId, options = {}) {
 
   if (layoutMode === "sticky") {
     for (const entry of windows.values()) {
+      // The tabs window stays open as its note's sticky window. It saves its bounds as the tabs
+      // window's before it moves into the sticky grid, and it takes its note's pin.
+      if (entry.primary) {
+        persistWindowBounds(entry.window);
+      }
       entry.primary = false;
+      entry.window.setAlwaysOnTop(Boolean(store.getNote(entry.noteId)?.alwaysOnTop));
       entry.window.setMinimumSize(STICKY_MIN_WIDTH, STICKY_MIN_HEIGHT);
       applyWindowChrome(entry.window, false);
       targetWindows.add(entry.window);
@@ -1049,7 +1112,11 @@ function persistWindowBounds(window) {
   // Runs from window and app event handlers, where an exception would surface
   // as Electron's uncaught-exception dialog. Losing one bounds update is fine.
   try {
-    store.updateBounds(entry.noteId, window.getBounds());
+    if (entry.primary) {
+      store.updateTabsWindowBounds(window.getBounds());
+    } else {
+      store.updateBounds(entry.noteId, window.getBounds());
+    }
   } catch (error) {
     console.error("[NotePane] Failed to save window bounds:", error);
   }
@@ -1164,14 +1231,9 @@ function installIpcHandlers() {
         : currentNoteBeforeDelete ?? result.activeNote;
 
     const window = BrowserWindow.fromWebContents(event.sender);
-    if (window && nextActiveNote) {
-      const entry = windows.get(window.id);
-      if (entry?.primary && noteId === currentNoteId) {
-        entry.noteId = nextActiveNote.id;
-        window.setTitle(nextActiveNote.title);
-      } else if (entry?.noteId !== noteId) {
-        window.setTitle(nextActiveNote.title);
-      }
+    const senderEntry = window ? windows.get(window.id) : null;
+    if (nextActiveNote && senderEntry?.primary && noteId === currentNoteId) {
+      senderEntry.noteId = nextActiveNote.id;
     }
 
     for (const entry of getEntriesForNote(noteId)) {
@@ -1257,11 +1319,10 @@ function installIpcHandlers() {
     }
 
     if (entry?.noteId) {
-      store.updateBounds(entry.noteId, window.getBounds());
+      persistWindowBounds(window);
       entry.noteId = note.id;
     }
 
-    window.setTitle(note.title);
     return note;
   });
 
@@ -1327,10 +1388,6 @@ function installIpcHandlers() {
     });
 
     if (note && (note.title !== previousTitle || wasTemplateSeed)) {
-      const window = BrowserWindow.fromWebContents(event.sender);
-      if (window && note.title) {
-        window.setTitle(note.title);
-      }
       broadcastNotesChanged({ activeNote: note });
     }
 
@@ -1344,16 +1401,9 @@ function installIpcHandlers() {
       return null;
     }
 
-    const note = store.updateAppearance(resolvedNoteId, {
-      title: payload?.title,
-      titleManuallyEdited: payload?.titleManuallyEdited,
-      theme: payload?.theme,
-    });
-
-    const window = BrowserWindow.fromWebContents(event.sender);
-    if (window && note?.title) {
-      window.setTitle(note.title);
-    }
+    // The store changes only the fields the payload carries. A colour change sends no
+    // `titleManuallyEdited`, and passing it as undefined would clear a title named by hand.
+    const note = store.updateAppearance(resolvedNoteId, payload);
 
     if (note) {
       broadcastNotesChanged({ activeNote: note });
@@ -1566,12 +1616,9 @@ function installIpcHandlers() {
     }
 
     window.setAlwaysOnTop(Boolean(alwaysOnTop));
-    const noteId = getNoteIdForWebContents(event.sender);
-    if (noteId) {
-      const updatedNote = store.setAlwaysOnTop(noteId, Boolean(alwaysOnTop));
-      if (updatedNote) {
-        broadcastNotesChanged({ activeNote: updatedNote });
-      }
+    const entry = windows.get(window.id);
+    if (entry) {
+      saveAlwaysOnTop(entry, Boolean(alwaysOnTop));
     }
     return Boolean(alwaysOnTop);
   });

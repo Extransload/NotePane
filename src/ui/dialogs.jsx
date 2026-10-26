@@ -120,7 +120,7 @@ export function SessionCloseConfirmDialog({
       noteTitle={noteTitle}
       ariaLabel="Close tab confirmation"
       title="Close this tab?"
-      message="This tab contains content. Close it?"
+      message="Closing this tab moves its note to Trash. You can restore it from Trash or undo immediately."
       yesAriaLabelPrefix="Yes, close"
       onCancel={onCancel}
       onConfirm={onConfirm}

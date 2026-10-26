@@ -288,7 +288,6 @@ function stubTwoNoteBridge() {
     markdown: "",
     theme: {},
     seedDemoContent: false,
-    editorFontScale: 1,
     editorFontFamily: "Inter",
     trashedAt: null,
     sortOrder: index + 1,

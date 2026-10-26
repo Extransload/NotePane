@@ -1,6 +1,6 @@
 import { createExtension } from "@blocknote/core";
 import { closeHistory } from "@tiptap/pm/history";
-import { Plugin, Selection } from "@tiptap/pm/state";
+import { AllSelection, Plugin, Selection, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { clamp } from "../utils/values.js";
 import {
@@ -253,6 +253,43 @@ function handleBlockSetKeyDown(editor, view, event) {
   return false;
 }
 
+// Command+A on a note that starts or ends with a table, image or divider selects the whole document
+// (see selectAllEditorDocument). An IME composing into it would keep that edge block and leave a
+// stray jamo, and Enter would keep it or throw in a table, so both first empty the note to one
+// paragraph, as typing over a selection does. Backspace and Delete over the whole note leave that
+// paragraph too, as in Notion, where deleting the text selection would keep the first block's type:
+// an empty callout for a note that starts with one.
+function replaceWholeDocumentWithParagraph(view) {
+  const { state } = view;
+  const { blockContainer, paragraph } = state.schema.nodes;
+  // Inside the document's blockGroup, from its first block to past its last.
+  const tr = state.tr.replaceWith(1, state.doc.content.size - 1, blockContainer.create(null, paragraph.create()));
+  // Inside the new blockContainer, then inside its paragraph.
+  tr.setSelection(TextSelection.create(tr.doc, 3));
+  view.dispatch(tr.scrollIntoView());
+}
+
+// Command+A selects a note that starts and ends in text from its first caret position to its last.
+function selectsWholeDocument(selection) {
+  if (selection instanceof AllSelection) return true;
+  // The text of a note that is one block is that block's text, which deletes as any text does.
+  if (!(selection instanceof TextSelection) || selection.$from.parent === selection.$to.parent) return false;
+  const { doc } = selection.$from;
+  return selection.from === Selection.atStart(doc).from && selection.to === Selection.atEnd(doc).to;
+}
+
+function isPlainDeleteKey(event) {
+  return (event.key === "Backspace" || event.key === "Delete") && !event.isComposing
+    && !(event.shiftKey || event.altKey || event.ctrlKey || event.metaKey);
+}
+
+function handleWholeDocumentKeyDown(view, event) {
+  if (event.isComposing || event.keyCode === 229 || (event.key === "Enter" && !event.altKey)) {
+    replaceWholeDocumentWithParagraph(view);
+  }
+  return false;
+}
+
 export const BlockDragSelection = createExtension(({ editor }) => ({
   key: "notepaneBlockDragSelection",
   prosemirrorPlugins: [new Plugin({
@@ -272,11 +309,18 @@ export const BlockDragSelection = createExtension(({ editor }) => ({
           return false;
         },
         keydown(view, event) {
+          if (isPlainDeleteKey(event) && selectsWholeDocument(view.state.selection)) {
+            event.preventDefault();
+            replaceWholeDocumentWithParagraph(view);
+            return true;
+          }
+          if (view.state.selection instanceof AllSelection) return handleWholeDocumentKeyDown(view, event);
           return isBlockSetSelection(view.state.selection) && handleBlockSetKeyDown(editor, view, event);
         },
         // CDP and some IMEs start a composition without a 229 keydown first.
         compositionstart(view) {
-          if (isBlockSetSelection(view.state.selection)) replaceBlockSelectionWithParagraph(view);
+          if (view.state.selection instanceof AllSelection) replaceWholeDocumentWithParagraph(view);
+          else if (isBlockSetSelection(view.state.selection)) replaceBlockSelectionWithParagraph(view);
           return false;
         },
       },

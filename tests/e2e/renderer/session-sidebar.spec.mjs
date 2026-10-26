@@ -15,6 +15,7 @@ import {
   modifierShortcut,
   moveSessionToTrash,
   openStickyActionBar,
+  waitForEditorSelection,
 } from "../support/renderer-helpers.mjs";
 
 test.beforeEach(async ({ page }) => {
@@ -126,6 +127,26 @@ test("creates and switches note sessions from the sidebar", async ({ page }) => 
 
   await page.keyboard.press(modifierShortcut("Enter"));
   await expectEditorFocused(page);
+});
+
+test("Cmd/Ctrl+Enter inside the editor leaves the caret where it is", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("first");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("second");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("third");
+  const blocks = page.locator(".bn-editor .bn-block-content");
+  const blockCount = await blocks.count();
+  await page.locator(".bn-editor").getByText("second", { exact: true }).click();
+  await page.keyboard.press("End");
+  await waitForEditorSelection(page);
+
+  await page.keyboard.press(modifierShortcut("Enter"));
+  await page.keyboard.type("!");
+
+  await expect(page.locator(".bn-editor").getByText("second!", { exact: true })).toBeVisible();
+  await expect(blocks).toHaveCount(blockCount);
 });
 
 test("reorders session tabs with drag-and-drop and keyboard animation", async ({ page }) => {
@@ -415,6 +436,74 @@ test("renames a session by double-clicking its tab", async ({ page }) => {
 
   await expect(page.getByRole("tab", { name: /Renamed session/ })).toBeVisible();
   await expect(page.getByLabel("Session name")).toHaveCount(0);
+});
+
+// The first click of a double click switches tabs, and the switch remounts the sidebar. In the
+// desktop app it takes long enough that the second click can land before it, after it, or with its
+// press before and its release after.
+test("a right-button double press on another tab never opens its rename later", async ({ page }) => {
+  const nameField = page.getByLabel("Session name");
+  await createBlankSession(page);
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  const firstTab = page.getByRole("tab").first();
+  await firstTab.evaluate((tab) => {
+    for (const [type, detail] of [["mousedown", 1], ["mouseup", 1], ["mousedown", 2], ["mouseup", 2]]) {
+      tab.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, button: 2, detail }));
+    }
+  });
+  await firstTab.click();
+  await expect(firstTab).toHaveAttribute("aria-selected", "true");
+  await expect(nameField).toHaveCount(0);
+});
+
+test("renames an inactive session by double-clicking its tab", async ({ page }) => {
+  const nameField = page.getByLabel("Session name");
+  const firstTab = page.getByRole("tab", { name: /First session/ });
+  const untitledTab = page.getByRole("tab", { name: /Untitled/ });
+  await page.getByRole("tab").first().dblclick();
+  await nameField.fill("First session");
+  await page.keyboard.press("Enter");
+  await createBlankSession(page);
+  await expect(untitledTab).toHaveAttribute("aria-selected", "true");
+
+  // Both clicks before the switch. Escape keeps the name.
+  await firstTab.evaluate((tab) => {
+    for (const [type, detail] of [
+      ["mousedown", 1], ["mouseup", 1], ["click", 1],
+      ["mousedown", 2], ["mouseup", 2], ["click", 2], ["dblclick", 2],
+    ]) {
+      tab.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, detail }));
+    }
+  });
+  await expect(nameField).toBeFocused();
+  await expect(nameField).toHaveValue("First session");
+  await page.keyboard.press("Escape");
+  await expect(nameField).toHaveCount(0);
+  await expect(firstTab).toHaveAttribute("aria-selected", "true");
+
+  // The second press before the switch, its release after it.
+  const untitledTabElement = await untitledTab.elementHandle();
+  await untitledTabElement.evaluate((tab) => {
+    for (const [type, detail] of [["mousedown", 1], ["mouseup", 1], ["click", 1], ["mousedown", 2]]) {
+      tab.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, detail }));
+    }
+  });
+  await expect.poll(() => untitledTabElement.evaluate((tab) => tab.isConnected)).toBe(false);
+  await page.locator(".session-tab-row").nth(1).getByRole("tab").dispatchEvent("mouseup", { detail: 2 });
+  await expect(nameField).toBeFocused();
+  await nameField.fill("Second session");
+  await page.keyboard.press("Enter");
+  await expect(nameField).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: /Second session/ }))
+    .toHaveAttribute("aria-selected", "true");
+
+  // The second click after the switch. A blank name keeps the old one.
+  await firstTab.dblclick();
+  await expect(nameField).toBeFocused();
+  await nameField.fill("   ");
+  await page.keyboard.press("Enter");
+  await expect(nameField).toHaveCount(0);
+  await expect(firstTab).toHaveAttribute("aria-selected", "true");
 });
 
 test("derives untitled session names from editor content", async ({ page }) => {

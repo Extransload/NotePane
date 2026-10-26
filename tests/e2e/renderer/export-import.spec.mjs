@@ -1,10 +1,14 @@
 import { expect, test } from "@playwright/test";
 import {
   clickLastEmptyParagraph,
+  createBlankSession,
+  expectEditorFocused,
   loadTemplatePreview,
   modifierShortcut,
   openStickyActionBar,
+  pastePlainText,
   selectAppTheme,
+  waitForEditorSelection,
 } from "../support/renderer-helpers.mjs";
 
 test.beforeEach(async ({ page }) => {
@@ -103,7 +107,6 @@ function stubExportBridge() {
     // light text. The tabs layout does not paint the shell with it.
     theme: { tabTextColor: "#d9efff", tabTextOpacity: 0.35 },
     seedDemoContent: false,
-    editorFontScale: 1,
     editorFontFamily: "Inter",
     trashedAt: null,
     createdAt: now,
@@ -296,6 +299,165 @@ test("imports Markdown through the slash-command upload modal, including drag an
   await expect(page.getByRole("heading", { name: "Dropped Markdown" })).toBeVisible();
   await expect(page.getByText("Imported with drag and drop", { exact: true })).toBeVisible();
   await expect(importDialog).toHaveCount(0);
+});
+
+test("imports a Markdown toggle without page errors once it is edited and deleted", async ({ page }) => {
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/import");
+  await page.getByText("Import Markdown", { exact: true }).click();
+  const importDialog = page.getByRole("dialog", { name: "Import Markdown" });
+  await importDialog.locator(".markdown-import-dropzone").evaluate((dropzone) => {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(new File(
+      ["Intro\n\n<details>\n<summary>Toggle head</summary>\n\nchild one\n\n</details>\n\nOutro\n"],
+      "toggle.md",
+      { type: "text/markdown" },
+    ));
+    dropzone.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer }));
+  });
+  await expect(importDialog).toHaveCount(0);
+  const editor = page.locator(".bn-editor");
+  const toggle = editor.locator("[data-content-type='toggleListItem']");
+  await expect(toggle).toHaveCount(1);
+  if ((await editor.locator(".bn-toggle-wrapper").first().getAttribute("data-show-children")) !== "true") {
+    await editor.locator(".bn-toggle-button").first().click();
+  }
+  // The DOM range from `startText` at `startOffset` to `endText` at `endOffset`.
+  const selectText = async (startText, startOffset, endText, endOffset) => {
+    await page.evaluate(({ startText, startOffset, endText, endOffset }) => {
+      const textNode = (text) => [...document.querySelectorAll(".bn-editor .bn-inline-content")]
+        .find((element) => element.textContent === text).firstChild;
+      const range = document.createRange();
+      range.setStart(textNode(startText), startOffset);
+      range.setEnd(textNode(endText), endOffset);
+      document.querySelector(".bn-editor").focus();
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+    }, { startText, startOffset, endText, endOffset });
+    await waitForEditorSelection(page);
+  };
+  await selectText("child one", "child one".length, "child one", "child one".length);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("child two");
+  await expect(editor.getByText("child two", { exact: true })).toBeVisible();
+
+  // From the end of Intro to the start of Outro: the toggle and its lines go.
+  await selectText("Intro", "Intro".length, "Outro", 0);
+  await page.keyboard.press("Backspace");
+
+  await expect(toggle).toHaveCount(0);
+  expect(pageErrors).toEqual([]);
+});
+
+test("imports Markdown as the same blocks as pasting it", async ({ page }) => {
+  // Hard breaks written both ways, runs of spaces, and a hard break in a quote.
+  const markdown = "line one\\\nline two\n\nsoft one  \nsoft two\n\nruns  of   spaces\n\n> quote\\\nsecond\n";
+  const blockRows = () => page.locator(".bn-editor .bn-block-content").evaluateAll((elements) =>
+    elements.map((element) => `${element.dataset.contentType}:${element.innerHTML}`));
+
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, markdown);
+  await expect(page.locator(".bn-editor [data-content-type='quote']")).toHaveCount(1);
+  const pastedRows = await blockRows();
+
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/import");
+  await page.getByText("Import Markdown", { exact: true }).click();
+  const importDialog = page.getByRole("dialog", { name: "Import Markdown" });
+  await importDialog.locator(".markdown-import-dropzone").evaluate((dropzone, text) => {
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(new File([text], "breaks.md", { type: "text/markdown" }));
+    dropzone.dispatchEvent(new DragEvent("drop", { bubbles: true, dataTransfer }));
+  }, markdown);
+  await expect(importDialog).toHaveCount(0);
+
+  await expect.poll(blockRows).toEqual(pastedRows);
+  await expect.poll(() => page.locator(".bn-editor .bn-inline-content").evaluateAll((elements) =>
+    elements.map((element) => element.innerText))).toEqual([
+    "line one\nline two",
+    "soft one\nsoft two",
+    "runs of spaces",
+    "quote\nsecond",
+  ]);
+});
+
+test("lists Import Markdown last, so slash and Enter inserts a block instead of opening a file dialog", async ({ page }) => {
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/");
+  const slashMenu = page.locator(".bn-suggestion-menu");
+  const menuItems = slashMenu.locator(".bn-suggestion-menu-item");
+  await expect(menuItems.first()).toContainText("Heading 1");
+  await expect(menuItems.last()).toContainText("Import Markdown");
+
+  await page.keyboard.press("Enter");
+  await expect(slashMenu).toHaveCount(0);
+  await expect(page.locator(".bn-editor .bn-block-content")).toHaveCount(1);
+  await expect(page.locator(".bn-editor [data-content-type='heading'] h1")).toHaveCount(1);
+  await expect(page.getByRole("dialog", { name: "Import Markdown" })).toHaveCount(0);
+
+  // Its aliases still find it.
+  await page.keyboard.type("/md");
+  await expect(menuItems.first()).toContainText("Import Markdown");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog", { name: "Import Markdown" })).toBeVisible();
+});
+
+test("closes the slash menu with Escape and keeps the typed query", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/head");
+  const slashMenu = page.locator(".bn-suggestion-menu");
+  await expect(slashMenu).toBeVisible();
+
+  await page.keyboard.press("Escape");
+
+  await expect(slashMenu).toHaveCount(0);
+  await expectEditorFocused(page);
+  await page.keyboard.type("er");
+  await expect(page.locator(".bn-editor").getByText("/header", { exact: true })).toBeVisible();
+});
+
+// A Korean or Japanese input method can start a composition without the end reaching the page,
+// for example when the input source is switched mid-composition. The menu's own Escape handling
+// then waits for that composition forever; the key event's own flag says whether it is composing.
+test("closes the slash menu with Escape after an input method left a composition open", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/head");
+  const slashMenu = page.locator(".bn-suggestion-menu");
+  await expect(slashMenu).toBeVisible();
+  await page.evaluate(() => document.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true })));
+
+  await page.keyboard.press("Escape");
+
+  await expect(slashMenu).toHaveCount(0);
+});
+
+// An Escape that a Korean input method takes while composing belongs to the input method, which
+// then commits the syllable. One press still closes the menu, once the composition has ended.
+test("closes the slash menu after a Korean composition that Escape was pressed in ends", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/");
+  const slashMenu = page.locator(".bn-suggestion-menu");
+  await expect(slashMenu).toBeVisible();
+  // The compositions Chrome reports while a Korean IME types 콜.
+  const cdp = await page.context().newCDPSession(page);
+  for (const text of ["ㅋ", "코", "콜"]) {
+    await cdp.send("Input.imeSetComposition", { text, selectionStart: text.length, selectionEnd: text.length });
+  }
+  await expect(slashMenu.getByText("Callout", { exact: true })).toBeVisible();
+
+  // Chrome reports this Escape as part of the composition.
+  await page.keyboard.press("Escape");
+  await cdp.send("Input.insertText", { text: "콜" });
+
+  await expect(slashMenu).toHaveCount(0);
+  await expect(page.locator(".bn-editor").getByText("/콜", { exact: true })).toBeVisible();
+  await expectEditorFocused(page);
 });
 
 test("opens the slash menu upward from the lower half", async ({ page }) => {

@@ -1,20 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   EXPORT_TOAST_TIMEOUT_MS,
-  FONT_SIZE_TOAST_TIMEOUT_MS,
+  ZOOM_GAUGE_TIMEOUT_MS,
 } from "../constants.js";
-import { editorFontScaleToSize } from "../model/preferences.js";
 
 /**
- * Transient status messages shown over the editor: the export/save toast with
- * an optional action button, and the font-size readout shown while zooming.
+ * Transient status shown over the editor: the export/save toast with an
+ * optional action button, and the zoom gauge shown while zooming the app.
  * Both auto-dismiss on their own timer and cancel it on unmount.
  */
 export function useStickyToasts() {
   const [exportToast, setExportToast] = useState(null);
-  const [editorFontSizeToast, setEditorFontSizeToast] = useState("");
+  const [zoomGauge, setZoomGauge] = useState(null);
   const exportToastTimerRef = useRef(null);
-  const editorFontSizeToastTimerRef = useRef(null);
+  const zoomGaugeTimerRef = useRef(null);
 
   const showExportToast = useCallback((message, tone = "success", options = {}) => {
     if (exportToastTimerRef.current) {
@@ -49,20 +48,18 @@ export function useStickyToasts() {
     setExportToast(null);
   }, []);
 
-  const showEditorFontSizeToast = useCallback((nextEditorFontScale) => {
-    if (editorFontSizeToastTimerRef.current) {
-      window.clearTimeout(editorFontSizeToastTimerRef.current);
-      editorFontSizeToastTimerRef.current = null;
+  const showZoomGauge = useCallback((zoom) => {
+    if (zoomGaugeTimerRef.current) {
+      window.clearTimeout(zoomGaugeTimerRef.current);
+      zoomGaugeTimerRef.current = null;
     }
 
-    setEditorFontSizeToast(
-      `Font size ${editorFontScaleToSize(nextEditorFontScale)}px`,
-    );
+    setZoomGauge(zoom);
 
-    editorFontSizeToastTimerRef.current = window.setTimeout(() => {
-      setEditorFontSizeToast("");
-      editorFontSizeToastTimerRef.current = null;
-    }, FONT_SIZE_TOAST_TIMEOUT_MS);
+    zoomGaugeTimerRef.current = window.setTimeout(() => {
+      setZoomGauge(null);
+      zoomGaugeTimerRef.current = null;
+    }, ZOOM_GAUGE_TIMEOUT_MS);
   }, []);
 
   useEffect(() => {
@@ -70,17 +67,17 @@ export function useStickyToasts() {
       if (exportToastTimerRef.current) {
         window.clearTimeout(exportToastTimerRef.current);
       }
-      if (editorFontSizeToastTimerRef.current) {
-        window.clearTimeout(editorFontSizeToastTimerRef.current);
+      if (zoomGaugeTimerRef.current) {
+        window.clearTimeout(zoomGaugeTimerRef.current);
       }
     };
   }, []);
 
   return {
-    editorFontSizeToast,
     exportToast,
     hideExportToast,
-    showEditorFontSizeToast,
     showExportToast,
+    showZoomGauge,
+    zoomGauge,
   };
 }

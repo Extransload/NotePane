@@ -174,7 +174,6 @@ function stubVersionHistoryBridge() {
     markdown: "",
     theme: {},
     seedDemoContent: false,
-    editorFontScale: 1,
     editorFontFamily: "Inter",
     trashedAt: null,
     createdAt: now,
@@ -275,6 +274,200 @@ test("selects only the current code block with Command+A", async ({ page }) => {
     .toBeVisible();
 });
 
+test("indents and dedents code lines with Tab and Shift+Tab inside the code block", async ({ page }) => {
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("- list parent");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("``` ");
+  await page.keyboard.type("function a() {");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("return 1;");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("}");
+
+  const code = page.locator(".bn-editor [data-content-type='codeBlock'] code");
+  const codeText = () => code.evaluate((element) => element.textContent);
+  // The code block is the list item's child, so it sits one block group deeper.
+  const codeDepth = () => code.evaluate((element) => {
+    let depth = 0;
+    for (let node = element.parentElement; node; node = node.parentElement) {
+      if (node.classList.contains("bn-block-group")) depth += 1;
+    }
+    return depth;
+  });
+  await expect.poll(codeText).toBe("function a() {\nreturn 1;\n}");
+  const nestedDepth = await codeDepth();
+  expect(nestedDepth).toBe(2);
+
+  await page.keyboard.press(modifierShortcut("A"));
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Tab");
+  await expect.poll(codeText).toBe("  function a() {\n  return 1;\n  }");
+  await page.keyboard.press("Tab");
+  await expect.poll(codeText).toBe("    function a() {\n    return 1;\n    }");
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Shift+Tab");
+  await expect.poll(codeText).toBe("function a() {\nreturn 1;\n}");
+  expect(await codeDepth()).toBe(nestedDepth);
+
+  // A selection inside one line indents that whole line and keeps the rest.
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Home");
+  for (let step = 0; step < "return 1;".length; step += 1) {
+    await page.keyboard.press("Shift+ArrowRight");
+  }
+  await waitForEditorSelection(page);
+  expect(await page.evaluate(() => String(window.getSelection()))).toBe("return 1;");
+  await page.keyboard.press("Tab");
+  await expect.poll(codeText).toBe("function a() {\n  return 1;\n}");
+
+  // A caret Tab still types two spaces; Shift+Tab takes the line's indent away.
+  await page.keyboard.press("ArrowRight");
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Tab");
+  await expect.poll(codeText).toBe("function a() {\n  return 1;  \n}");
+  await page.keyboard.press("Shift+Tab");
+  await expect.poll(codeText).toBe("function a() {\nreturn 1;  \n}");
+  // With no indent left, Shift+Tab still leaves the code block in its list item.
+  await page.keyboard.press("Shift+Tab");
+  await expect.poll(codeText).toBe("function a() {\nreturn 1;  \n}");
+  expect(await codeDepth()).toBe(nestedDepth);
+});
+
+// A table, image or divider at an edge of the note used to be left out of Command+A.
+test("selects a note that starts with an image or a divider with Command+A", async ({ page }) => {
+  const imageSource =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mP8z8Dwn4GBgYGJAQoAKg4DAZbI8WEAAAAASUVORK5CYII=";
+  const editor = page.locator(".bn-editor");
+  for (const { first, firstBlock, removeKey } of [
+    { first: "---", firstBlock: "[data-content-type='divider']", removeKey: "Backspace" },
+    { first: `![first](${imageSource})`, firstBlock: "img.bn-visual-media", removeKey: modifierShortcut("X") },
+  ]) {
+    await createBlankSession(page);
+    await clickLastEmptyParagraph(page);
+    await pastePlainText(page, [first, "", "middle", "", "- last"].join("\n"));
+    await expect(editor.locator(firstBlock)).toHaveCount(1);
+    await editor.getByText("middle", { exact: true }).click();
+    await waitForEditorSelection(page);
+
+    await page.keyboard.press(modifierShortcut("A"));
+    await waitForEditorSelection(page);
+    await page.keyboard.press(removeKey);
+
+    await expect(editor.locator(firstBlock)).toHaveCount(0);
+    await expect(editor.getByText("middle", { exact: true })).toHaveCount(0);
+    await expect(editor.getByText("last", { exact: true })).toHaveCount(0);
+    await expect(editor.locator(".bn-block-content")).toHaveCount(1);
+  }
+});
+
+test("types Korean or presses Enter over a Command+A note that starts with a divider or table", async ({ page }) => {
+  const editor = page.locator(".bn-editor");
+  for (const { first, firstBlock, key } of [
+    { first: "---", firstBlock: "[data-content-type='divider']", key: "korean" },
+    { first: "| a1 | b1 |\n| --- | --- |\n| a2 | b2 |", firstBlock: "table", key: "korean" },
+    { first: "---", firstBlock: "[data-content-type='divider']", key: "Enter" },
+    { first: "| a1 | b1 |\n| --- | --- |\n| a2 | b2 |", firstBlock: "table", key: "Enter" },
+  ]) {
+    await createBlankSession(page);
+    await clickLastEmptyParagraph(page);
+    await pastePlainText(page, [first, "", "middle", "", "- last"].join("\n"));
+    await expect(editor.locator(firstBlock)).toHaveCount(1);
+    await editor.getByText("middle", { exact: true }).click();
+    await waitForEditorSelection(page);
+    await page.keyboard.press(modifierShortcut("A"));
+    await waitForEditorSelection(page);
+
+    if (key === "korean") {
+      // The compositions Chrome reports while a Korean IME types 한.
+      const cdp = await page.context().newCDPSession(page);
+      for (const text of ["ㅎ", "하", "한"]) {
+        await cdp.send("Input.imeSetComposition", { text, selectionStart: text.length, selectionEnd: text.length });
+      }
+      await cdp.send("Input.insertText", { text: "한" });
+      await expect(editor.locator(".bn-block-content")).toHaveText(["한"]);
+    } else {
+      await page.keyboard.press("Enter");
+      await page.keyboard.type("typed");
+      await expect(editor.locator(".bn-block-content")).toHaveText(["", "typed"]);
+    }
+    await expect(editor.locator(firstBlock)).toHaveCount(0);
+  }
+});
+
+// As in Notion, deleting a whole Command+A note leaves one empty paragraph, whatever its first block.
+test("leaves one empty paragraph after Backspace or Delete on a Command+A note that starts with a callout", async ({ page }) => {
+  const editor = page.locator(".bn-editor");
+  const blockRows = () => editor.locator(".bn-block-content").evaluateAll((elements) =>
+    elements.map((element) => `${element.dataset.contentType}:${element.textContent}`));
+  for (const key of ["Backspace", "Delete"]) {
+    await createBlankSession(page);
+    await clickLastEmptyParagraph(page);
+    await pastePlainText(page, ["first", "", "middle", "", "- last"].join("\n"));
+    // `/callout` in the emptied first block turns that block into a callout.
+    await editor.getByText("first", { exact: true }).click();
+    await waitForEditorSelection(page);
+    await page.keyboard.press("End");
+    await page.keyboard.press("Shift+Home");
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type("/callout");
+    await expect(page.locator(".bn-suggestion-menu").getByText("Callout", { exact: true })).toBeVisible();
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("Box");
+    await expect(editor.locator("[data-content-type='callout'] .bn-inline-content")).toHaveText("Box");
+    await editor.getByText("middle", { exact: true }).click();
+    await waitForEditorSelection(page);
+
+    await page.keyboard.press(modifierShortcut("A"));
+    await waitForEditorSelection(page);
+    await page.keyboard.press(key);
+
+    await expect.poll(blockRows).toEqual(["paragraph:"]);
+    await page.keyboard.type("typed");
+    await expect.poll(blockRows).toEqual(["paragraph:typed"]);
+  }
+});
+
+test("keeps a note's only block when its own text is selected and deleted", async ({ page }) => {
+  const editor = page.locator(".bn-editor");
+  // A note that is one code block: Command+A inside it selects the code alone.
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("```");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("lone code");
+  await expect(editor.locator("[data-content-type='codeBlock']")).toContainText("lone code");
+  await page.keyboard.press(modifierShortcut("A"));
+  await page.keyboard.press("Backspace");
+  await expect(editor.locator("[data-content-type='codeBlock']")).toHaveCount(1);
+  await expect(editor.locator("[data-content-type='codeBlock']")).not.toContainText("lone code");
+
+  // A note that is one heading, its text selected by hand.
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("# Lone heading");
+  await page.keyboard.press("Shift+Home");
+  await page.keyboard.press("Backspace");
+  await expect(editor.locator("[data-content-type='heading']")).toHaveCount(1);
+  await expect(editor.locator("[data-content-type='heading']")).toHaveText("");
+});
+
+test("gives back a Markdown mark shortcut on Backspace after a modifier key", async ({ page }) => {
+  const editor = page.locator(".bn-editor");
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("**bold**");
+  await expect(editor.locator("strong", { hasText: "bold" })).toHaveCount(1);
+  // Shift alone, as when switching the Korean IME or reaching for another key, types nothing.
+  await page.keyboard.press("Shift");
+  await page.keyboard.press("Backspace");
+
+  await expect(editor.locator("strong")).toHaveCount(0);
+  await expect(editor.getByText("**bold**", { exact: true })).toBeVisible();
+});
+
 test("keeps Enter and Shift+Enter behavior in the editor", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   await page.keyboard.type("first line");
@@ -360,6 +553,65 @@ test("pastes markdown headings from a rich clipboard as native headings", async 
   await expect(page.getByText("# Heading one", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Explicit link" }))
     .toHaveAttribute("href", "https://example.com/explicit");
+});
+
+// A heading that starts with "1. " made the plain text look like a Markdown list, which threw
+// away the heading, the table and the bold text that the HTML carried.
+test("keeps rich HTML structure when its plain text happens to look like Markdown", async ({ page }) => {
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await pasteClipboardText(page, {
+    plainText: "1. 개요\n본 문서는 중요 내용을 담습니다.\n항목\t값\nA\t3",
+    html:
+      "<meta charset=\"utf-8\"><h1>1. 개요</h1><p>본 문서는 <b>중요</b> 내용을 담습니다.</p>" +
+      "<table><tr><td>항목</td><td>값</td></tr><tr><td>A</td><td>3</td></tr></table>",
+  });
+
+  const editor = page.locator(".bn-editor");
+  await expect(page.getByRole("heading", { name: "1. 개요", level: 1 })).toBeVisible();
+  await expect(editor.locator("[data-content-type='numberedListItem']")).toHaveCount(0);
+  await expect(editor.locator("table")).toHaveCount(1);
+  await expect(editor.getByRole("cell", { name: "항목" })).toBeVisible();
+  await expect(editor.locator("strong", { hasText: "중요" })).toHaveCount(1);
+
+  // HTML that only styles the same text, as a code editor writes it, is still read as Markdown.
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await pasteClipboardText(page, {
+    plainText: "## Wrapped heading\n- wrapped item",
+    html:
+      "<div style=\"color: #333\"><div><span style=\"color: #00f\">## Wrapped heading</span></div>" +
+      "<div><span>- wrapped item</span></div></div>",
+  });
+  await expect(page.getByRole("heading", { name: "Wrapped heading", level: 2 })).toBeVisible();
+  await expect(editor.locator("[data-content-type='bulletListItem']", { hasText: "wrapped item" }))
+    .toHaveCount(1);
+});
+
+test("reads a paste as Markdown when its plain text writes the HTML's structure", async ({ page }) => {
+  const editor = page.locator(".bn-editor");
+  // A chat app: the Markdown lines in paragraphs, with a URL linked.
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await pasteClipboardText(page, {
+    plainText: "# Chat heading\n- chat item https://example.com",
+    html: "<p># Chat heading</p><p>- chat item <a href=\"https://example.com\">https://example.com</a></p>",
+  });
+  await expect(page.getByRole("heading", { name: "Chat heading", level: 1 })).toBeVisible();
+  await expect(editor.locator("[data-content-type='bulletListItem']", { hasText: "chat item" }))
+    .toHaveCount(1);
+
+  // Notion: real HTML structure, and Markdown plain text that also keeps a checked to-do.
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await pasteClipboardText(page, {
+    plainText: "# Plan\n- [x] Done item\n- [ ] Open item",
+    html: "<h1>Plan</h1><ul><li>Done item</li><li>Open item</li></ul>",
+  });
+  await expect(page.getByRole("heading", { name: "Plan", level: 1 })).toBeVisible();
+  const toDos = editor.locator("[data-content-type='checkListItem']");
+  await expect(toDos).toHaveCount(2);
+  await expect(toDos.first().locator("input[type='checkbox']")).toBeChecked();
 });
 
 test("replaces selected text when pasting a URL instead of turning it into link text", async ({ page }) => {
@@ -908,9 +1160,199 @@ test("keeps BlockNote color and delete menus usable inside the app window", asyn
   await page.mouse.move(tableBox.x + 20, tableBox.y + 20);
   await expect(openBlockMenuButton).toBeVisible();
   await openBlockMenuButton.click();
+  // Colors and Delete; a table has no text that Turn into could keep.
   await expect(page.locator(".bn-drag-handle-menu:visible").getByRole("menuitem"))
-    .toHaveCount(3);
+    .toHaveCount(2);
   await expect(page.getByRole("menuitem", { name: /header/i })).toHaveCount(0);
+});
+
+// Opening Turn into near the bottom of the window used to lift the whole block menu, which moved
+// another item under the pointer and switched the open panel.
+test("keeps the block menu in place when Turn into opens near the bottom of the window", async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 620 });
+  await clickLastEmptyParagraph(page);
+  for (let index = 0; index < 9; index += 1) {
+    await page.keyboard.type(`Line ${index}`);
+    await page.keyboard.press("Enter");
+  }
+  await page.keyboard.type("Bottom line");
+  const bottomLine = page.locator(".bn-editor").getByText("Bottom line", { exact: true });
+  const blockMenu = await openBlockMenuFor(page, bottomLine);
+  const menuTop = async () => Math.round((await blockMenu.boundingBox()).y);
+  const topBefore = await menuTop();
+
+  const turnInto = blockMenu.getByText("Turn into", { exact: true });
+  const turnIntoBox = await turnInto.boundingBox();
+  await page.mouse.move(turnIntoBox.x + 20, turnIntoBox.y + turnIntoBox.height / 2, { steps: 4 });
+  const subpanel = page.getByRole("menu", { name: "Turn into" });
+  await expect(subpanel).toBeVisible();
+  // The pass that keeps floating menus inside the window lifts the subpanel, which opened level with
+  // the menu's top, until it clears the window's margin; that same pass used to lift the menu.
+  await expect.poll(async () => {
+    const subpanelBox = await subpanel.boundingBox();
+    return subpanelBox.y < topBefore && subpanelBox.y + subpanelBox.height <= 620 - 8;
+  }).toBe(true);
+
+  expect(await menuTop()).toBe(topBefore);
+});
+
+async function turnInto(page, blockMenu, target) {
+  await blockMenu.getByRole("menuitem", { name: "Turn into" }).click();
+  await page.locator(".notepane-block-menu-subpanel[data-panel='turn-into']:visible")
+    .getByRole("menuitem", { name: target, exact: true })
+    .click();
+}
+
+test("keeps a code block's lines when Turn into makes it text", async ({ page }) => {
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, ["Above", "", "```js", "let a = 1;", "let b = 2;", "```"].join("\n"));
+  const editor = page.locator(".bn-editor");
+  const code = editor.locator("[data-content-type='codeBlock']");
+  await expect(code).toHaveCount(1);
+
+  await turnInto(page, await openBlockMenuFor(page, code), "Paragraph");
+
+  await expect(code).toHaveCount(0);
+  const paragraph = editor.locator("[data-content-type='paragraph']", { hasText: "let a = 1;" });
+  await expect(paragraph).toHaveCount(1);
+  // Notion keeps the code's lines as line breaks inside the one block.
+  await expect(paragraph.locator("br")).toHaveCount(1);
+  expect(await paragraph.evaluate((element) => element.innerText)).toBe("let a = 1;\nlet b = 2;");
+
+  await turnInto(page, await openBlockMenuFor(page, paragraph), "Quote");
+  const quote = editor.locator("[data-content-type='quote']");
+  await expect(quote).toHaveCount(1);
+  expect(await quote.evaluate((element) => element.innerText)).toBe("let a = 1;\nlet b = 2;");
+});
+
+test("offers Turn into only for blocks whose text it can keep", async ({ page }) => {
+  // Tall enough for its side menu to be found by hovering it.
+  const imageSource = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 120;
+    canvas.height = 80;
+    return canvas.toDataURL("image/png");
+  });
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, [
+    "Text line", "", "---", "", "| cellA | cellB |", "| --- | --- |", "| c | d |", "",
+    `![picture](${imageSource})`, "", "Last line",
+  ].join("\n"));
+  const editor = page.locator(".bn-editor");
+
+  for (const block of [
+    editor.locator("[data-content-type='divider']"),
+    editor.locator("[data-content-type='table']"),
+    editor.locator("[data-content-type='image']"),
+  ]) {
+    await expect(block).toHaveCount(1);
+    const blockMenu = await openBlockMenuFor(page, block);
+    await expect(blockMenu.getByRole("menuitem", { name: "Colors" })).toBeVisible();
+    await expect(blockMenu.getByRole("menuitem", { name: "Turn into" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(blockMenu).toHaveCount(0);
+  }
+
+  const textLine = editor.getByText("Text line", { exact: true });
+  await expect((await openBlockMenuFor(page, textLine)).getByRole("menuitem", { name: "Turn into" }))
+    .toBeVisible();
+});
+
+test("puts the caret in a paragraph below a divider typed as ---", async ({ page }) => {
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("top");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("---");
+  await page.keyboard.type("after the divider");
+
+  const blockRows = () => page.locator(".bn-editor .bn-block-content").evaluateAll((elements) =>
+    elements.map((element) => `${element.dataset.contentType}:${element.textContent}`));
+  await expect.poll(blockRows).toEqual([
+    "paragraph:top",
+    "divider:",
+    "paragraph:after the divider",
+  ]);
+
+  // Between two blocks, the text after the divider gets its own paragraph.
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("below");
+  await page.keyboard.press("ArrowUp");
+  await waitForEditorSelection(page);
+  await page.keyboard.type("---");
+  await page.keyboard.type("between");
+  await expect.poll(blockRows).toEqual([
+    "paragraph:top",
+    "divider:",
+    "paragraph:after the divider",
+    "divider:",
+    "paragraph:between",
+    "paragraph:below",
+  ]);
+});
+
+// BlockNote undoes a Markdown shortcut on the Backspace right after it, and must give back exactly
+// the typed marker, space included once, with the caret after it.
+test("gives back exactly the typed Markdown shortcut on Backspace right after it", async ({ page }) => {
+  // The inline content alone, without a code block's language picker.
+  const blockRows = () => page.locator(".bn-editor .bn-block-content").evaluateAll((elements) =>
+    elements.map((element) =>
+      `${element.dataset.contentType}:${element.querySelector(".bn-inline-content").textContent}`));
+  for (const [marker, blockType] of [
+    ["- ", "bulletListItem"],
+    ["# ", "heading"],
+    ["1. ", "numberedListItem"],
+    ["[] ", "checkListItem"],
+    ["\" ", "quote"],
+    ["``` ", "codeBlock"],
+  ]) {
+    await createBlankSession(page);
+    await clickLastEmptyParagraph(page);
+    await page.keyboard.type(marker);
+    await expect.poll(blockRows).toEqual([`${blockType}:`]);
+
+    await page.keyboard.press("Backspace");
+    await expect.poll(blockRows).toEqual([`paragraph:${marker}`]);
+    await page.keyboard.type("x");
+    await expect.poll(blockRows).toEqual([`paragraph:${marker}x`]);
+  }
+});
+
+test("undoes the | quote shortcut back to the typed marker", async ({ page }) => {
+  const blockRows = () => page.locator(".bn-editor .bn-block-content").evaluateAll((elements) =>
+    elements.map((element) => `${element.dataset.contentType}:${element.textContent}`));
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("|");
+  await page.keyboard.press("Space");
+  await expect.poll(blockRows).toEqual(["quote:"]);
+
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect.poll(blockRows).toEqual(["paragraph:| "]);
+
+  await page.keyboard.press(modifierShortcut("Shift+Z"));
+  await expect.poll(blockRows).toEqual(["quote:"]);
+});
+
+test("shows no formatting toolbar for a clicked divider and opens its block menu", async ({ page }) => {
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, ["top", "", "---", "", "bottom"].join("\n"));
+  const divider = page.locator(".bn-editor [data-content-type='divider']");
+  await expect(divider).toHaveCount(1);
+
+  await divider.click();
+  await expect.poll(() => page.evaluate(() => {
+    const view = document.querySelector(".bn-editor").editor.view;
+    return view.state.selection.node?.type.name ?? null;
+  })).not.toBeNull();
+  await expect(page.locator(".bn-formatting-toolbar")).toHaveCount(0);
+
+  const blockMenu = await openBlockMenuFor(page, divider);
+  await expect(blockMenu.getByRole("menuitem", { name: "Delete" })).toBeVisible();
 });
 
 test("highlights the active block while its six-dot menu is open", async ({ page }) => {
@@ -972,6 +1414,15 @@ test("deletes the current block with Command+X when no text is selected", async 
   await expect(page.getByText("delete this block")).toHaveCount(0);
   await expect(page.getByRole("paragraph").filter({ hasText: /^$/ }).last())
     .toBeVisible();
+});
+
+test("leaves the current block in place on Command+Shift+X", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("keep this block");
+  await page.keyboard.press(modifierShortcut("Shift+X"));
+
+  await expect(page.locator(".bn-editor").getByText("keep this block", { exact: true }))
+    .toHaveCount(1);
 });
 
 // Fires the editor's copy handlers into a DataTransfer, the way an in-app
@@ -1262,4 +1713,106 @@ test("cuts every selected block when the selection includes the six-dot menu's b
     ["Alpha handle block", "Bravo middle block"],
     ["Charlie"],
   );
+});
+
+// Records every format written to a DataTransfer from now on, so a test can paste back exactly
+// what a cut wrote: the async clipboard API cannot read blocknote/html.
+async function recordClipboardWrites(page) {
+  await page.evaluate(() => {
+    window.__notepaneClipboardWrites = {};
+    if (window.__notepaneRecordsClipboardWrites) return;
+    window.__notepaneRecordsClipboardWrites = true;
+    const setData = DataTransfer.prototype.setData;
+    DataTransfer.prototype.setData = function recordSetData(type, value) {
+      window.__notepaneClipboardWrites[type] = value;
+      return setData.call(this, type, value);
+    };
+  });
+}
+
+async function pasteRecordedClipboardWrites(page) {
+  return await page.evaluate(() => {
+    const written = { ...window.__notepaneClipboardWrites };
+    const clipboardData = new DataTransfer();
+    for (const [type, value] of Object.entries(written)) {
+      clipboardData.setData(type, value);
+    }
+    document.querySelector(".bn-editor").dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData }),
+    );
+    return Object.keys(written);
+  });
+}
+
+test("cuts a block with Command+X in the formats the editor's own copy writes", async ({ page }) => {
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type(">");
+  await page.keyboard.press("Space");
+  await page.keyboard.insertText("toggle A");
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("child A");
+
+  const editor = page.locator(".bn-editor");
+  const toggle = editor.locator("[data-content-type='toggleListItem']");
+  const child = editor.getByText("child A", { exact: true });
+  const parentOfChild = () => child.evaluate((element) => element
+    .closest(".bn-block-group")
+    .closest(".bn-block-outer")
+    ?.querySelector(":scope > .bn-block > .bn-block-content")
+    ?.dataset.contentType ?? null);
+  await expect(toggle).toHaveCount(1);
+  await expect.poll(parentOfChild).toBe("toggleListItem");
+
+  const colorMenu = await openBlockMenuFor(page, toggle);
+  await colorMenu.getByRole("menuitem", { name: "Colors" }).click();
+  const swatch = page.locator(".notepane-block-menu-subpanel[data-panel='colors']:visible")
+    .locator("[data-color-kind='background']:not([data-color-value='default'])")
+    .first();
+  const color = await swatch.getAttribute("data-color-value");
+  await swatch.click();
+  await expect(toggle).toHaveAttribute("data-background-color", color);
+  await page.keyboard.press("Escape");
+
+  const expectToggleRestored = async () => {
+    await expect(toggle).toHaveCount(1);
+    await expect(toggle).toHaveText("toggle A");
+    await expect(toggle).toHaveAttribute("data-background-color", color);
+    await expect(editor.locator("[data-content-type='bulletListItem']")).toHaveCount(0);
+    await expect(child).toHaveCount(1);
+    await expect.poll(parentOfChild).toBe("toggleListItem");
+  };
+
+  // With the caret in the block and nothing selected.
+  await editor.getByText("toggle A", { exact: true }).click();
+  await waitForEditorSelection(page);
+  await recordClipboardWrites(page);
+  await page.keyboard.press(modifierShortcut("X"));
+  await expect(toggle).toHaveCount(0);
+  await expect(child).toHaveCount(0);
+  await clickLastEmptyParagraph(page);
+  expect(await pasteRecordedClipboardWrites(page))
+    .toEqual(expect.arrayContaining(["blocknote/html", "text/html", "text/plain"]));
+  await expectToggleRestored();
+
+  // With the block's six-dot menu open.
+  await openBlockMenuFor(page, toggle);
+  await recordClipboardWrites(page);
+  await page.keyboard.press(modifierShortcut("X"));
+  await expect(toggle).toHaveCount(0);
+  await clickLastEmptyParagraph(page);
+  expect(await pasteRecordedClipboardWrites(page))
+    .toEqual(expect.arrayContaining(["blocknote/html", "text/html", "text/plain"]));
+  await expectToggleRestored();
+
+  // Serialising a toggle for the clipboard must leave nothing behind that a later edit trips on.
+  await editor.getByText("toggle A", { exact: true }).click();
+  await waitForEditorSelection(page);
+  await page.keyboard.press(modifierShortcut("X"));
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("after the cuts");
+  await expect(editor.getByText("after the cuts", { exact: true })).toHaveCount(1);
+  expect(pageErrors).toEqual([]);
 });

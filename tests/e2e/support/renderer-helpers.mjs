@@ -912,9 +912,6 @@ export async function getEditorScaleMetrics(page) {
     const editor = document.querySelector(".bn-editor");
 
     return {
-      editorFontScale: getComputedStyle(shell)
-        .getPropertyValue("--editor-font-scale")
-        .trim() || "1",
       appFontFamily: getComputedStyle(shell)
         .getPropertyValue("--notepane-ui-font")
         .trim(),

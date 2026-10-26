@@ -11,10 +11,10 @@ import {
 
 /**
  * Window chrome commands: save, export, preferences, colour panel, sidebar,
- * layout mode, font size and table of contents.
+ * layout mode, app zoom and table of contents.
  */
 export function useChromeShortcuts({
-  adjustEditorFontScale,
+  adjustAppZoom,
   normalizedLayoutMode,
   exportNote,
   focusEditor,
@@ -23,6 +23,7 @@ export function useChromeShortcuts({
   openFindInNote,
   openSearchPalette,
   requestNewSession,
+  resetAppZoom,
   saveVersionNow,
   setExportFormatMenu,
   setIsColorPanelOpen,
@@ -48,6 +49,26 @@ export function useChromeShortcuts({
           () => showExportToast("Saved", "success"),
           () => showExportToast("Save failed", "error"),
         );
+        return;
+      }
+
+      // Zoom belongs to the whole app, so it also works from a text field or Preferences. None of
+      // these keys edits text.
+      if (matchesEnabledKeyboardShortcut(event, "zoomIn")) {
+        event.preventDefault();
+        adjustAppZoom(1);
+        return;
+      }
+
+      if (matchesEnabledKeyboardShortcut(event, "zoomOut")) {
+        event.preventDefault();
+        adjustAppZoom(-1);
+        return;
+      }
+
+      if (matchesEnabledKeyboardShortcut(event, "resetZoom")) {
+        event.preventDefault();
+        resetAppZoom();
         return;
       }
 
@@ -103,27 +124,19 @@ export function useChromeShortcuts({
         return;
       }
 
-      if (matchesEnabledKeyboardShortcut(event, "increaseEditorFontSize")) {
-        event.preventDefault();
-        adjustEditorFontScale(1);
-        return;
-      }
-
-      if (matchesEnabledKeyboardShortcut(event, "decreaseEditorFontSize")) {
-        event.preventDefault();
-        adjustEditorFontScale(-1);
-        return;
-      }
-
       if (matchesEnabledKeyboardShortcut(event, "toggleSidebar")) {
         event.preventDefault();
         setIsSidebarOpen((value) => !value);
         return;
       }
 
+      // Moves focus back into the editor. Inside it already, the caret stays where it is, and the
+      // key is still swallowed: Chromium on Windows and Linux reads Ctrl+Enter as a new line.
       if (matchesEnabledKeyboardShortcut(event, "focusEditor")) {
         event.preventDefault();
-        focusEditor();
+        if (!(event.target instanceof Element && event.target.closest(".bn-editor"))) {
+          focusEditor();
+        }
         return;
       }
 
@@ -146,7 +159,7 @@ export function useChromeShortcuts({
   }, [
     normalizedLayoutMode,
     matchesEnabledKeyboardShortcut,
-    adjustEditorFontScale,
+    adjustAppZoom,
     exportNote,
     focusEditor,
     requestNewSession,
@@ -154,6 +167,7 @@ export function useChromeShortcuts({
     onEditorWidthChange,
     openFindInNote,
     openSearchPalette,
+    resetAppZoom,
     toggleLayoutMode,
     saveVersionNow,
     showExportToast,

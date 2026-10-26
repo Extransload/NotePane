@@ -61,17 +61,16 @@ import {
   handleToggleSpace,
 } from "./editor/toggleKeyboard.js";
 import {
+  DEFAULT_APP_ZOOM,
   DEFAULT_EDITOR_FONT_FAMILY,
-  DEFAULT_EDITOR_FONT_SCALE,
   DEFAULT_EDITOR_PREFERENCES,
   DEFAULT_LAYOUT_MODE,
   DEFAULT_THEME,
   DEFAULT_TITLE,
-  EDITOR_FONT_SCALE_STEP,
   EXPORT_TOAST_TIMEOUT_MS,
-  FONT_SIZE_TOAST_TIMEOUT_MS,
   LAYOUT_TRANSITION_TIMEOUT_MS,
   MAX_MARKDOWN_IMPORT_FILE_SIZE,
+  PENDING_RENAME_TIMEOUT_MS,
   SESSION_TAB_ENTER_MS,
   SESSION_TAB_EXIT_MS,
   SIDEBAR_COLLAPSE_WIDTH,
@@ -97,9 +96,12 @@ import {
   scrollEditorBlockIntoView,
 } from "./editor/blocks.js";
 import {
+  guardPasteSerialisation,
   isStandaloneWebUrl,
   normalizeCopiedEditorPlainText,
   normalizePastedMarkdownForBlockNote,
+  setBlocksClipboardData,
+  withSelfRemovingChangeSubscriptions,
 } from "./editor/clipboard.js";
 import {
   setActiveCodeTheme,
@@ -113,12 +115,16 @@ import {
   copyImageToClipboard,
   downloadInBrowser,
   ensurePngName,
-  getStoredImageCrop,
+  getCropSource,
   imageFileName,
+  isFileTransfer,
   preventFocusLoss,
   uploadFile,
   storeDataUrlAsAsset,
 } from "./editor/images.js";
+import { computeCalloutDropPosition } from "./editor/callout.jsx";
+import { FILE_INSERTION_FAILED_EVENT, FileDrop, pasteFiles } from "./editor/fileInsertion.js";
+import { MarkdownShortcutUndo } from "./editor/markdownShortcuts.js";
 import {
   EMPTY_BLOCKS,
   NOTE_PANE_TEMPLATE_BLOCKS,
@@ -172,14 +178,13 @@ import {
   reorderNotesByIds,
 } from "./model/notes.js";
 import {
-  editorFontScaleToSize,
   getEditorFontFamilyCss,
   getEditorFontFamilyOptions,
   normalizeAppTheme,
-  normalizeEditorFontScale,
   normalizeEditorPreferences,
   normalizeLayoutMode,
   normalizeTheme,
+  stepAppZoom,
 } from "./model/preferences.js";
 import {
   getSessionTabStyle,
@@ -235,6 +240,7 @@ import {
   SessionTabContextMenu,
 } from "./ui/menus.jsx";
 import {
+  AppZoomGauge,
   LayoutTransitionOverlay,
   StickyToast,
   TableOfContentsRail,
@@ -285,6 +291,18 @@ function App({ bindTestThemeSetter }) {
   const [notes, setNotes] = useState([]);
   const [trashedNotes, setTrashedNotes] = useState([]);
   const [pendingFind, setPendingFind] = useState(null);
+  // The note whose tab a double click asked to rename while its first click was still switching
+  // to it. The switch remounts StickyEditor, so the request waits here for the new one.
+  const [pendingRenameNoteId, setPendingRenameNoteId] = useState(null);
+  // A rename asked for by a double click on another tab belongs to the switch that click starts; a
+  // request that no switch picks up soon must not open the field on a later visit.
+  useEffect(() => {
+    if (!pendingRenameNoteId) {
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setPendingRenameNoteId(null), PENDING_RENAME_TIMEOUT_MS);
+    return () => window.clearTimeout(timer);
+  }, [pendingRenameNoteId]);
   const [appTheme, setAppTheme] = useState(() =>
     normalizeAppTheme({ themeId: readInitialThemeId() }),
   );
@@ -390,7 +408,6 @@ function App({ bindTestThemeSetter }) {
           theme: DEFAULT_THEME,
           seedDemoContent: new URLSearchParams(window.location.search)
             .get("template") === "1",
-          editorFontScale: DEFAULT_EDITOR_FONT_SCALE,
           editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
 	          trashedAt: null,
 	          sortOrder: notes.length + 1,
@@ -436,7 +453,6 @@ function App({ bindTestThemeSetter }) {
             markdown: "",
             theme: DEFAULT_THEME,
             seedDemoContent: false,
-            editorFontScale: DEFAULT_EDITOR_FONT_SCALE,
             editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
             trashedAt: null,
             createdAt: Date.now(),
@@ -571,7 +587,6 @@ function App({ bindTestThemeSetter }) {
           markdown: "",
           theme: DEFAULT_THEME,
           seedDemoContent: false,
-          editorFontScale: editorPreferences.editorFontScale,
           editorFontFamily: editorPreferences.editorFontFamily,
           trashedAt: null,
           createdAt: Date.now(),
@@ -877,13 +892,16 @@ function App({ bindTestThemeSetter }) {
         pendingFind={pendingFind}
         onFindRequested={setPendingFind}
         onPendingFindHandled={() => setPendingFind(null)}
+        pendingRenameNoteId={pendingRenameNoteId}
+        onRenameRequested={setPendingRenameNoteId}
+        onPendingRenameHandled={() => setPendingRenameNoteId(null)}
       />
       {sessionUndoToast && (
         <StickyToast
         toast={{
             message:
               sessionUndoToast.source === "close"
-                ? `${sessionUndoToast.title} closed.`
+                ? `${sessionUndoToast.title} closed and moved to Trash.`
                 : `${sessionUndoToast.title} moved to Trash.`,
             tone: "success",
             action: {
@@ -928,6 +946,9 @@ function StickyEditor({
   pendingFind,
   onFindRequested,
   onPendingFindHandled,
+  pendingRenameNoteId,
+  onRenameRequested,
+  onPendingRenameHandled,
 }) {
   const parsedStoredBlocks = useMemo(
     () => parseBlocksJSON(note.blocksJSON),
@@ -946,12 +967,15 @@ function StickyEditor({
 
   const editor = useCreateBlockNote({
     schema,
-    extensions: [BlockDragSelection, FindInNote],
+    extensions: [BlockDragSelection, FindInNote, FileDrop, MarkdownShortcutUndo],
     initialContent: initialEditorContent,
     tabBehavior: "prefer-indent",
     // BlockNote paints this onto the drop cursor element, which resolves the token itself and
     // so follows a theme change without a new editor.
-    dropCursor: { color: "var(--notepane-drop-cursor)" },
+    dropCursor: {
+      color: "var(--notepane-drop-cursor)",
+      hooks: { computeDropPosition: computeCalloutDropPosition },
+    },
     tables: {
       splitCells: true,
       cellBackgroundColor: true,
@@ -960,6 +984,11 @@ function StickyEditor({
     },
     uploadFile,
     pasteHandler: ({ event, editor, defaultPasteHandler }) => {
+      // BlockNote's own file paste cannot be undone in one step (see src/editor/fileInsertion.js).
+      if (isFileTransfer(event.clipboardData)) {
+        pasteFiles(editor, [...event.clipboardData.files]);
+        return true;
+      }
       const plainText = event.clipboardData?.getData("text/plain") ?? "";
       if (plainText && !isSelectionInsideCodeBlock(editor)) {
         const pasteView = editor.prosemirrorView;
@@ -991,7 +1020,16 @@ function StickyEditor({
           });
         }
 
-        const normalizedPaste = normalizePastedMarkdownForBlockNote(plainText);
+        const normalizedPaste = normalizePastedMarkdownForBlockNote(
+          plainText,
+          event.clipboardData?.getData("text/html") ?? "",
+        );
+        if (normalizedPaste.shouldPasteHTML) {
+          return defaultPasteHandler({
+            prioritizeMarkdownOverHTML: false,
+            plainTextAsMarkdown: true,
+          });
+        }
         if (normalizedPaste.shouldPasteAsMarkdown) {
           editor.pasteMarkdown(normalizedPaste.markdown);
           return true;
@@ -1011,6 +1049,7 @@ function StickyEditor({
     [editor, openFind],
   );
   useBlockNoteFloatingMenuGuard();
+  useEffect(() => guardPasteSerialisation(editor), [editor]);
   const codeBlockToolTargets = useCodeBlockToolTargets();
 
   useEffect(() => {
@@ -1038,22 +1077,7 @@ function StickyEditor({
 
       event.preventDefault();
       event.stopPropagation();
-      const externalHTML = editor.blocksToHTMLLossy(selectedBlocks);
-      const clipboardHTML = editor.blocksToFullHTML(selectedBlocks);
-      const markdown = editor.blocksToMarkdownLossy(selectedBlocks);
-      event.clipboardData.clearData();
-      event.clipboardData.setData("blocknote/html", clipboardHTML);
-      event.clipboardData.setData("text/html", externalHTML);
-      // Lossy markdown drops Shift+Enter breaks and adds a structural trailing
-      // newline, so the plain text still goes through the editor normalizer.
-      event.clipboardData.setData(
-        "text/plain",
-        normalizeCopiedEditorPlainText(
-          editor,
-          markdown,
-          window.getSelection()?.toString() ?? "",
-        ),
-      );
+      setBlocksClipboardData(editor, selectedBlocks, event.clipboardData);
       if (isBlockSetCut) {
         const { state } = editor.prosemirrorView;
         editor.prosemirrorView.dispatch(
@@ -1107,6 +1131,9 @@ function StickyEditor({
   const focusedTableDecorationsRef = useRef(null);
   const [isTableCellSelectionDismissed, setIsTableCellSelectionDismissed] =
     useState(false);
+  // Escape on selected cells hides the formatting toolbar and keeps the editor focused, so the next
+  // selection the user makes, by keyboard too, brings it back.
+  useEffect(() => editor.onSelectionChange(() => setIsTableCellSelectionDismissed(false)), [editor]);
   const [isMultiTableCellSelection, setIsMultiTableCellSelection] = useState(
     false,
   );
@@ -1226,7 +1253,6 @@ function StickyEditor({
     () => normalizeEditorPreferences(editorPreferences),
     [editorPreferences],
   );
-  const editorFontScale = normalizedEditorPreferences.editorFontScale;
   const editorFontFamily = normalizedEditorPreferences.editorFontFamily;
   const appFontFamily = normalizedEditorPreferences.appFontFamily;
   const showTableOfContents = normalizedEditorPreferences.showTableOfContents;
@@ -1262,9 +1288,9 @@ function StickyEditor({
     return {
       "--notepane-ui-font": appFontFamilyCss,
       "--notepane-display-font": appFontFamilyCss,
-      "--notepane-ui-scale": String(normalizedEditorPreferences.appFontScale),
+      "--notepane-app-zoom": String(normalizedEditorPreferences.appZoom),
     };
-  }, [appFontFamily, appFontOptions, normalizedEditorPreferences.appFontScale]);
+  }, [appFontFamily, appFontOptions, normalizedEditorPreferences.appZoom]);
   const activeTheme = useAppliedTheme(normalizeAppTheme(appTheme).themeId);
   const normalizedLayoutMode = normalizeLayoutMode(layoutMode);
   const visibleSessionNotes = notes;
@@ -1285,7 +1311,6 @@ function StickyEditor({
   const shellStyle = {
     ...stickyChromeStyle,
     ...appTypographyStyle,
-    "--editor-font-scale": String(editorFontScale),
     "--editor-font-family": getEditorFontFamilyCss(
       editorFontFamily,
       editorFontOptions,
@@ -1318,12 +1343,19 @@ function StickyEditor({
   const [activeImageBlockId, setActiveImageBlockId] = useState(null);
   const [cropState, setCropState] = useState(null);
   const {
-    editorFontSizeToast,
     exportToast,
     hideExportToast,
-    showEditorFontSizeToast,
     showExportToast,
+    showZoomGauge,
+    zoomGauge,
   } = useStickyToasts();
+  useEffect(() => {
+    const reportFailedFile = (event) => {
+      showExportToast(`Could not add ${event.detail.name}.`, "error");
+    };
+    window.addEventListener(FILE_INSERTION_FAILED_EVENT, reportFailedFile);
+    return () => window.removeEventListener(FILE_INSERTION_FAILED_EVENT, reportFailedFile);
+  }, [showExportToast]);
   const [exportFormatMenu, setExportFormatMenu] = useState(null);
   const [isMarkdownImportOpen, setIsMarkdownImportOpen] = useState(false);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
@@ -1390,6 +1422,11 @@ function StickyEditor({
     note.title,
     note.titleManuallyEdited,
   ]);
+
+  // The window takes the page title as its own, which Mission Control and the Dock list it by.
+  useEffect(() => {
+    document.title = title;
+  }, [title]);
 
   useEffect(() => {
     if (normalizedLayoutMode !== "sticky") {
@@ -1721,36 +1758,25 @@ function StickyEditor({
 
   const updateGlobalEditorPreferences = useCallback(
     (nextEditorPreferences) => {
-      const nextPreferences = normalizeEditorPreferences(
+      void onEditorPreferencesChanged?.(normalizeEditorPreferences(
         nextEditorPreferences,
         normalizedEditorPreferences,
-      );
-      const didFontSizeChange =
-        nextPreferences.editorFontScale !== editorFontScale;
-
-      void onEditorPreferencesChanged?.(nextPreferences);
-
-      if (didFontSizeChange) {
-        showEditorFontSizeToast(nextPreferences.editorFontScale);
-      }
+      ));
     },
-    [
-      editorFontScale,
-      normalizedEditorPreferences,
-      onEditorPreferencesChanged,
-      showEditorFontSizeToast,
-    ],
+    [normalizedEditorPreferences, onEditorPreferencesChanged],
   );
 
-  const updateEditorFontScale = useCallback(
-    (nextEditorFontScale) => {
-      const normalizedEditorFontScale = normalizeEditorFontScale(nextEditorFontScale);
+  // Cmd/Ctrl+=, - and 0 zoom the whole app as Notion does; Electron applies the stored zoom to every
+  // window. The gauge also shows at either end, so a press that cannot zoom further still answers.
+  const setAppZoom = useCallback(
+    (nextAppZoom) => {
       updateGlobalEditorPreferences({
         ...normalizedEditorPreferences,
-        editorFontScale: normalizedEditorFontScale,
+        appZoom: nextAppZoom,
       });
+      showZoomGauge(nextAppZoom);
     },
-    [normalizedEditorPreferences, updateGlobalEditorPreferences],
+    [normalizedEditorPreferences, showZoomGauge, updateGlobalEditorPreferences],
   );
 
   const toggleTableOfContents = useCallback(() => {
@@ -1760,14 +1786,16 @@ function StickyEditor({
     });
   }, [normalizedEditorPreferences, showTableOfContents, updateGlobalEditorPreferences]);
 
-  const adjustEditorFontScale = useCallback(
+  const adjustAppZoom = useCallback(
     (direction) => {
-      updateEditorFontScale(
-        normalizeEditorFontScale(editorFontScale + direction * EDITOR_FONT_SCALE_STEP),
-      );
+      setAppZoom(stepAppZoom(normalizedEditorPreferences.appZoom, direction));
     },
-    [editorFontScale, updateEditorFontScale],
+    [normalizedEditorPreferences.appZoom, setAppZoom],
   );
+
+  const resetAppZoom = useCallback(() => {
+    setAppZoom(DEFAULT_APP_ZOOM);
+  }, [setAppZoom]);
 
   const selectTableOfContentsEntry = useCallback(
     (entry) => {
@@ -1804,6 +1832,10 @@ function StickyEditor({
   useEffect(() => {
     setIsEditorActive(true);
     const animationFrame = window.requestAnimationFrame(() => {
+      // A note opened from note search has already focused its find field.
+      if (isEditableFormTarget(document.activeElement)) {
+        return;
+      }
       focusLastEditorBlock(editor);
     });
 
@@ -2029,7 +2061,15 @@ function StickyEditor({
 
     try {
       const markdown = await file.text();
-      const blocks = editor.tryParseMarkdownToBlocks(markdown);
+      // The blocks pasting this Markdown gives. Paste parses BlockNote's HTML of the parsed blocks
+      // once more, which drops whitespace BlockNote's Markdown parser keeps: a space at the start of
+      // each line after a hard break, and runs of spaces.
+      const blocks = editor.tryParseHTMLToBlocks(withSelfRemovingChangeSubscriptions(
+        editor,
+        () => editor.blocksToFullHTML(
+          editor.tryParseMarkdownToBlocks(normalizePastedMarkdownForBlockNote(markdown).markdown),
+        ),
+      ));
       if (blocks.length === 0) {
         throw new Error("This Markdown file is empty.");
       }
@@ -2155,7 +2195,7 @@ function StickyEditor({
   });
 
   useChromeShortcuts({
-    adjustEditorFontScale,
+    adjustAppZoom,
     openFindInNote,
     openSearchPalette: notePalette.openPalette,
     normalizedLayoutMode,
@@ -2164,6 +2204,7 @@ function StickyEditor({
     matchesEnabledKeyboardShortcut,
     onEditorWidthChange,
     requestNewSession,
+    resetAppZoom,
     saveVersionNow,
     setExportFormatMenu,
     setIsColorPanelOpen,
@@ -2277,9 +2318,25 @@ function StickyEditor({
       }
     };
 
+    // BlockNote's caption and rename fields close on Enter or Escape and leave focus nowhere, so
+    // Cmd+Z would do nothing until the user clicked back in. The editor takes focus back with the
+    // file block still selected. This runs after the field's own key handler.
+    const returnFocusFromFileField = (event) => {
+      if (
+        (event.key === "Enter" || event.key === "Escape") &&
+        !event.isComposing &&
+        event.target instanceof Element &&
+        event.target.matches("input[name='file-caption'], input[name='file-name']")
+      ) {
+        editor.focus();
+      }
+    };
+
     document.addEventListener("click", handleImageClick, true);
+    document.addEventListener("keydown", returnFocusFromFileField);
     return () => {
       document.removeEventListener("click", handleImageClick, true);
+      document.removeEventListener("keydown", returnFocusFromFileField);
     };
   }, [editor]);
 
@@ -2322,7 +2379,7 @@ function StickyEditor({
 
   const openCropDialog = useCallback(() => {
     const block = findBlockById(editor.document, activeImageBlockId);
-    const url = block?.props?.originalUrl || block?.props?.url;
+    const { url, crop } = getCropSource(block?.props);
     if (!url) {
       return;
     }
@@ -2330,7 +2387,7 @@ function StickyEditor({
     setCropState({
       blockId: block.id,
       sourceUrl: url,
-      crop: getStoredImageCrop(block.props),
+      crop,
     });
   }, [activeImageBlockId, editor]);
 
@@ -2394,7 +2451,8 @@ function StickyEditor({
       editor.updateBlock(block, {
         props: {
           url: croppedUrl,
-          originalUrl: block.props.originalUrl || block.props.url,
+          originalUrl: cropState.sourceUrl,
+          croppedUrl,
           cropX: crop.x,
           cropY: crop.y,
           cropWidth: crop.width,
@@ -2407,7 +2465,7 @@ function StickyEditor({
       setCropState(null);
       scheduleSave();
     },
-    [cropState?.blockId, editor, scheduleSave],
+    [cropState, editor, scheduleSave],
   );
 
 
@@ -2496,6 +2554,32 @@ function StickyEditor({
     setDraftSessionTitle(getSessionDisplayTitle(sessionNote));
     setIsDraftSessionTitleDirty(false);
   }, [getSessionDisplayTitle]);
+
+  // A double click on another tab switches to it with its first click, and the switch remounts this
+  // component before, during or after the second click. A rename asked for before the remount
+  // waits in App (pendingRenameNoteId) and starts here once this window shows that note.
+  const requestSessionRename = useCallback((sessionNote) => {
+    if (sessionNote.id === note.id) {
+      startSessionRename(sessionNote);
+      return;
+    }
+    onRenameRequested(sessionNote.id);
+  }, [note.id, onRenameRequested, startSessionRename]);
+
+  useEffect(() => {
+    if (pendingRenameNoteId !== note.id) {
+      return;
+    }
+    onPendingRenameHandled();
+    startSessionRename(note);
+  }, [note, onPendingRenameHandled, pendingRenameNoteId, startSessionRename]);
+
+  // A switch that fails must not leave a rename waiting for a later visit.
+  const selectSessionTab = useCallback(async (noteId) => {
+    if ((await selectSidebarNote(noteId)) !== noteId) {
+      onPendingRenameHandled();
+    }
+  }, [onPendingRenameHandled, selectSidebarNote]);
 
   const cancelSessionRename = useCallback(() => {
     setEditingSessionId(null);
@@ -2990,6 +3074,24 @@ function StickyEditor({
                   shortcut={getEnabledShortcut("exportPdf")}
                   onClick={openExportFormatMenu}
                 />
+                <button
+                  type="button"
+                  className="preferences-icon-button sticky-history-button has-tooltip"
+                  aria-label="Version history"
+                  data-tooltip="Version history"
+                  onMouseDown={preventFocusLoss}
+                  onClick={() => void openVersionHistory()}
+                >
+                  <History
+                    className="notepane-action-icon notepane-icon-history"
+                    data-icon-family="system-symbol"
+                    data-icon-pack="lucide"
+                    data-icon-tone="restore"
+                    size={24}
+                    strokeWidth={1.9}
+                    aria-hidden="true"
+                  />
+                </button>
                 <LayoutModeSwitch
                   mode={normalizedLayoutMode}
                   compact
@@ -3027,8 +3129,13 @@ function StickyEditor({
                     : "Show sticky actions"
                 }
                 onMouseDown={preventFocusLoss}
-                onClick={() => {
+                onClick={(event) => {
                   if (isStickyActionBarOpen) {
+                    // The first click of a double click opened the actions and turned this button
+                    // into Close under the pointer; only a click of its own closes the window.
+                    if (event.detail > 1) {
+                      return;
+                    }
                     closeCurrentWindow();
                     return;
                   }
@@ -3165,10 +3272,15 @@ function StickyEditor({
                               ? `Mod+${index + 1}`
                               : "",
                           )}
-                          onClick={() => void selectSidebarNote(sessionNote.id)}
+                          onMouseDown={(event) => {
+                            if (event.button === 0 && event.detail > 1 && sessionNote.id !== note.id) {
+                              requestSessionRename(sessionNote);
+                            }
+                          }}
+                          onClick={() => void selectSessionTab(sessionNote.id)}
                           onDoubleClick={(event) => {
                             event.preventDefault();
-                            startSessionRename(sessionNote);
+                            requestSessionRename(sessionNote);
                           }}
                         >
                           <span className="session-dot">{index + 1}</span>
@@ -3220,10 +3332,15 @@ function StickyEditor({
                                 ? `Mod+${index + 1}`
                                 : "",
                             )}
-                            onClick={() => void selectSidebarNote(sessionNote.id)}
+                            onMouseDown={(event) => {
+                              if (event.button === 0 && event.detail > 1 && sessionNote.id !== note.id) {
+                                requestSessionRename(sessionNote);
+                              }
+                            }}
+                            onClick={() => void selectSessionTab(sessionNote.id)}
                             onDoubleClick={(event) => {
                               event.preventDefault();
-                              startSessionRename(sessionNote);
+                              requestSessionRename(sessionNote);
                             }}
                           >
                             <span className="session-name">
@@ -3385,13 +3502,9 @@ function StickyEditor({
               />
             </div>
           )}
-          {editorFontSizeToast && (
-            <div
-              className="editor-font-size-toast"
-              role="status"
-              aria-live="polite"
-            >
-              {editorFontSizeToast}
+          {zoomGauge !== null && (
+            <div className="app-zoom-gauge-dock">
+              <AppZoomGauge zoom={zoomGauge} />
             </div>
           )}
           {isTableOfContentsVisible && (

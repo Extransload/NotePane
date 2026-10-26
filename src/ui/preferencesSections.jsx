@@ -27,11 +27,7 @@ import {
   normalizeKeyboardShortcuts,
 } from "../model/keyboardShortcuts.js";
 import {
-  editorFontScaleToSize,
-  editorFontSizeToScale,
   normalizeEditorFontFamily,
-  normalizeEditorFontScale,
-  normalizeEditorFontSize,
   normalizeEditorPreferences,
 } from "../model/preferences.js";
 import {
@@ -59,7 +55,6 @@ import {
 } from "./controls.jsx";
 import {
   EditorFontFamilyControl,
-  EditorFontSizeControl,
 } from "./EditorFontControls.jsx";
 import {
   CopyValueIcon,
@@ -284,25 +279,6 @@ export function EditorPreferencesSection({
   onEditorPreferencesChange,
 }) {
   const normalizedEditorPreferences = normalizeEditorPreferences(editorPreferences);
-  const [defaultFontSizeDraft, setDefaultFontSizeDraft] = useState(() =>
-    String(editorFontScaleToSize(normalizedEditorPreferences.editorFontScale)),
-  );
-
-  useEffect(() => {
-    setDefaultFontSizeDraft(
-      String(editorFontScaleToSize(normalizedEditorPreferences.editorFontScale)),
-    );
-  }, [normalizedEditorPreferences.editorFontScale]);
-
-  const updateEditorPreferenceFontScale = useCallback(
-    (nextEditorFontScale) => {
-      onEditorPreferencesChange?.({
-        ...normalizedEditorPreferences,
-        editorFontScale: normalizeEditorFontScale(nextEditorFontScale),
-      });
-    },
-    [normalizedEditorPreferences, onEditorPreferencesChange],
-  );
 
   const updateEditorPreferenceFontFamily = useCallback(
     (nextEditorFontFamily) => {
@@ -324,26 +300,13 @@ export function EditorPreferencesSection({
     [normalizedEditorPreferences, onEditorPreferencesChange],
   );
 
-  const updateEditorPreferenceFontSize = useCallback(
-    (nextEditorFontSize) => {
-      const normalizedEditorFontSize = normalizeEditorFontSize(nextEditorFontSize);
-      setDefaultFontSizeDraft(String(normalizedEditorFontSize));
-      updateEditorPreferenceFontScale(
-        editorFontSizeToScale(normalizedEditorFontSize),
-      );
-    },
-    [updateEditorPreferenceFontScale],
-  );
-
-  const commitDefaultFontSizeDraft = useCallback(() => {
-    updateEditorPreferenceFontSize(defaultFontSizeDraft);
-  }, [defaultFontSizeDraft, updateEditorPreferenceFontSize]);
-
   return (
     <section className="preferences-section preferences-default-editor-section">
       <div className="preferences-section-title">Editor</div>
       <div className="preferences-section-description">
-        Font family and size apply to every session tab.
+        The font family applies to every session tab. Zoom the app with {getShortcutLabel(
+          normalizedEditorPreferences.keyboardShortcuts.zoomIn,
+        )} and {getShortcutLabel(normalizedEditorPreferences.keyboardShortcuts.zoomOut)}.
       </div>
       <div className="preference-setting-row editor-font-family-setting">
         <div>
@@ -357,22 +320,6 @@ export function EditorPreferencesSection({
           fontFamily={normalizedEditorPreferences.editorFontFamily}
           fontOptions={fontOptions}
           onFontFamilyChange={updateEditorPreferenceFontFamily}
-        />
-      </div>
-      <div className="preference-setting-row editor-font-size-setting">
-        <div>
-          <div className="preference-setting-title">Font size</div>
-          <div className="preferences-section-description">
-            Default editor text size.
-          </div>
-        </div>
-        <EditorFontSizeControl
-          className="preferences-font-size-control"
-          draftValue={defaultFontSizeDraft}
-          scale={normalizedEditorPreferences.editorFontScale}
-          onDraftChange={setDefaultFontSizeDraft}
-          onCommit={commitDefaultFontSizeDraft}
-          onFontSizeChange={updateEditorPreferenceFontSize}
         />
       </div>
       <div className="preference-setting-row">
@@ -413,8 +360,9 @@ export const PREFERENCE_SHORTCUT_COMMANDS = [
   { id: "toggleTableOfContents", label: "Toggle table of contents" },
   { id: "exportPdf", label: "Export PDF" },
   { id: "preferences", label: "Preferences" },
-  { id: "increaseEditorFontSize", label: "Editor font up" },
-  { id: "decreaseEditorFontSize", label: "Editor font down" },
+  { id: "zoomIn", label: "Zoom in" },
+  { id: "zoomOut", label: "Zoom out" },
+  { id: "resetZoom", label: "Reset zoom" },
   { id: "toggleAlwaysOnTop", label: "Toggle always on top" },
 ];
 

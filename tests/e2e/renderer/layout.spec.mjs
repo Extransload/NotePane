@@ -89,17 +89,17 @@ test("shows table of contents in tab mode only when enabled from preferences", a
   await expect.poll(() => tableOfContents.evaluate((toc) => Math.round(toc.getBoundingClientRect().width))).toBeGreaterThanOrEqual(200);
   await expect(tableOfContents.getByText("Contents")).toBeVisible();
   await page.keyboard.press(modifierShortcut("+"));
-  const fontSizeToast = page.locator(".editor-font-size-toast");
-  await expect(fontSizeToast).toBeVisible();
+  const zoomGauge = page.locator(".app-zoom-gauge");
+  await expect(zoomGauge).toBeVisible();
   const overlayLayers = await page.evaluate(() => ({
-    fontSizeToast: Number.parseInt(getComputedStyle(
-      document.querySelector(".editor-font-size-toast"),
+    zoomGauge: Number.parseInt(getComputedStyle(
+      document.querySelector(".app-zoom-gauge"),
     ).zIndex, 10),
     tableOfContents: Number.parseInt(getComputedStyle(
       document.querySelector("[data-testid='editor-toc']"),
     ).zIndex, 10),
   }));
-  expect(overlayLayers.fontSizeToast).toBeGreaterThan(overlayLayers.tableOfContents);
+  expect(overlayLayers.zoomGauge).toBeGreaterThan(overlayLayers.tableOfContents);
   await expect(tableOfContents.getByRole("button", {
     name: /Jump to NotePane, heading level 1/,
   })).toBeVisible();
@@ -281,7 +281,6 @@ test("shows a blocking loading state while sticky windows are prepared", async (
       markdown: "",
       theme: {},
       seedDemoContent: index === 0,
-      editorFontScale: 1,
       editorFontFamily: "Inter",
       trashedAt: null,
       createdAt: now + index,

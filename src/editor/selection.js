@@ -2,6 +2,8 @@ import {
   size,
 } from "@floating-ui/react";
 import {
+  AllSelection,
+  Selection,
   TextSelection,
 } from "@tiptap/pm/state";
 import {
@@ -19,7 +21,10 @@ export function selectAllBlocks(editor) {
   }
 
   selectAllEditorDocument(editor);
-  if (hasVisibleTextSelection()) {
+  if (
+    hasVisibleTextSelection() ||
+    editor.prosemirrorView?.state.selection instanceof AllSelection
+  ) {
     return;
   }
 
@@ -359,14 +364,25 @@ export function selectAllEditorDocument(editor) {
     return;
   }
 
-  const wholeTextSelection = TextSelection.between(
-    state.doc.resolve(0),
-    state.doc.resolve(state.doc.content.size),
-  );
+  // A text selection from the first text to the last covers the whole note only when the note
+  // starts and ends in text outside a table. A table, image or divider at either end would be
+  // left out, or prosemirror-tables would shrink the selection to the first cell, so such a note
+  // is selected as a whole instead.
+  const { doc } = state;
+  const start = Selection.atStart(doc);
+  const end = Selection.atEnd(doc);
+  const startsAndEndsInText =
+    start instanceof TextSelection &&
+    end instanceof TextSelection &&
+    !getCurrentTableCellRange(start) &&
+    !getCurrentTableCellRange(end);
+  const wholeDocumentSelection = startsAndEndsInText
+    ? TextSelection.between(doc.resolve(0), doc.resolve(doc.content.size))
+    : new AllSelection(doc);
 
   view.dispatch(
     state.tr
-      .setSelection(wholeTextSelection)
+      .setSelection(wholeDocumentSelection)
       .scrollIntoView(),
   );
   view.focus();

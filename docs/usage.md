@@ -27,11 +27,10 @@ for Option. Configurable shortcuts can be changed in Preferences.
 | --- | --- |
 | `/` | Open the block palette |
 | `Enter` / `Shift+Enter` | New block / line break inside a block |
-| `⌘A` | Select the block, then the whole document |
+| `⌘A` | Select the whole note; in a table, the cell text, the cell, the table, then the note; in a code block, its code |
 | `⌘P` | Search every note and jump to a match |
 | `⌘F` | Find in the current note (`Enter` / `⇧Enter` to step, `Esc` to close) |
 | `⌘X` | Cut the current block when nothing is selected |
-| `⌘=` / `⌘-` | Editor font size |
 | `⌘⇧W` | Toggle the wide canvas |
 | `⌘⇧O` | Table of contents |
 | `⌘↩` | Move focus back into the editor |
@@ -42,6 +41,11 @@ for Option. Configurable shortcuts can be changed in Preferences.
 | --- | --- |
 | `⌘,` | Preferences |
 | `⌘⇧E` | Export menu |
+| `⌘=` / `⌘-` / `⌘0` | Zoom the whole app in, out, or back to 100% |
+
+Zoom works like Notion's: every window scales together, from 50% to 200%, and
+the zoom is kept after a restart. While you zoom, a gauge at the top of the
+editor shows where the zoom sits between the smallest and the largest step.
 
 Choose the app theme in Preferences > General > App theme. Nine themes are
 available: NotePane Light (the default), NotePane Dark, Catppuccin Latte,
@@ -58,5 +62,5 @@ mode. Each theme shows it in its own tone, keeping the hue and keeping the
 text on it readable; the colour you picked is stored unchanged, so switching
 themes never loses it.
 
-Export produces a PNG or PDF of the note with all app chrome removed. A PDF
-uses NotePane Light's colours whatever theme is selected.
+Export produces a PDF of the note with all app chrome removed, or an editable
+Markdown file. A PDF uses NotePane Light's colours whatever theme is selected.

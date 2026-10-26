@@ -22,7 +22,9 @@
   changes, and text on it stays readable
 - No light/dark toggle and no light/dark shortcut; `Command/Ctrl + Shift + L` is unbound
 - Preferences panel via sidebar footer button, native app menu, or `Command/Ctrl + ,`
-- Default editor font family and font size customization for newly created sessions
+- Default editor font family for every session; there is no font size setting, text size follows the app zoom
+- App zoom with `Command/Ctrl + =`, `-` and `0`, from 50% to 200%: every window zooms together, a gauge shows the zoom
+  between its smallest and largest step, and the zoom persists
 - Right-click session tab context menu for per-session tab color
 - Sidebar tab background/accent color customization with automatic contrast text
 - Tab color wheel
@@ -44,8 +46,8 @@
 - Delayed hover tooltips for clickable controls
 - Window bounds persistence
 - Editor area is explicitly non-drag so BlockNote mouse interactions remain intact
-- Single share-style export icon with PNG/PDF format choices
-- PNG/PDF export hides app chrome and sticky background
+- Single share-style export icon with PDF/Markdown format choices
+- PDF export hides app chrome and sticky background
 - PDF export renders with NotePane Light colours whatever theme is selected
 
 ## Editor
@@ -66,7 +68,7 @@ BlockNote handles editor interaction directly.
 - `Command/Ctrl + X` cuts/removes the current block when no text is selected
 - Search notes: `Command/Ctrl + P` searches titles and bodies of every note outside Trash and opens the chosen note at its first match
 - Find in note: `Command/Ctrl + F` highlights matches, steps with `Enter` / `Shift + Enter`, and expands collapsed toggles that hold the current match
-- Active editor-only typography control with searchable font family dropdown, installed macOS font discovery where supported, and 6-144px size presets/manual input
+- Editor typography control with searchable font family dropdown and installed macOS font discovery where supported
 
 ## Blocks
 
@@ -74,6 +76,10 @@ BlockNote handles editor interaction directly.
 - Heading
 - Toggle Heading
 - Quote
+- Callout: a box with an icon and nested blocks; Enter adds a line inside, Enter on an empty last line leaves it, and
+  Backspace at the start of a line joins it to the text above inside the box. The
+  icon comes from an emoji picker (filter, recent, random, categories) or an uploaded image, can be removed, and is
+  edited from the icon or the block menu's Edit icon. A block dragged onto a callout's line or padding lands in its body
 - Bullet List
 - Numbered List
 - Check List
@@ -100,13 +106,14 @@ Stored fields:
 - markdown fallback
 - window bounds
 - always-on-top flag
+- app-wide tabs window state: `tabsWindow.alwaysOnTop` and `tabsWindow.bounds`, apart from every note
 - note title
 - app-wide theme: `appTheme.themeId`, one of the nine theme ids, with `appTheme.mode` (`light` or `dark`, the theme's
   scheme) kept so older versions fall back to the matching NotePane theme
 - app-wide layout mode: `layoutMode`, either `tabs` or `sticky`
-- app-wide editor defaults: default font size scale and default font family
+- app-wide editor defaults: default font family
+- app-wide zoom: `editorPreferences.appZoom`, one of the zoom steps from 0.5 to 2
 - optional sidebar tab accent color
 - optional sidebar tab accent opacity
-- per-note editor font size scale
 - per-note editor font family
 - timestamps

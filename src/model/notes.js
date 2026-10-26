@@ -1,7 +1,6 @@
 import {
   AUTO_TITLE_MAX_LENGTH,
   DEFAULT_EDITOR_FONT_FAMILY,
-  DEFAULT_EDITOR_FONT_SCALE,
   DEFAULT_THEME,
   DEFAULT_TITLE,
 } from "../constants.js";
@@ -70,7 +69,6 @@ export function createTemplateSessionNote(sourceNote = {}, timestamp = Date.now(
     theme: DEFAULT_THEME,
     alwaysOnTop: false,
     seedDemoContent: true,
-    editorFontScale: sourceNote.editorFontScale ?? DEFAULT_EDITOR_FONT_SCALE,
     editorFontFamily: sourceNote.editorFontFamily ?? DEFAULT_EDITOR_FONT_FAMILY,
     trashedAt: null,
     sortOrder: 1,

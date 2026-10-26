@@ -234,54 +234,95 @@ test("keeps light/dark mode global across sidebar sessions", async ({ page }) =>
   });
 });
 
-test("changes editor font size globally with shortcuts", async ({ page }) => {
+test("zooms the app with shortcuts and shows the zoom on a gauge", async ({ page }) => {
   const before = await getEditorScaleMetrics(page);
-
-  await expect(page.getByRole("group", { name: "Editor typography" }))
-    .toHaveCount(0);
+  const gauge = page.getByRole("meter", { name: "Zoom" });
+  // Where the thumb's centre sits along the track, in percent.
+  const readThumbPosition = () => gauge.evaluate((track) => {
+    const trackBox = track.getBoundingClientRect();
+    const thumbBox = track.querySelector(".app-zoom-gauge-thumb").getBoundingClientRect();
+    return Math.round(((thumbBox.left + thumbBox.width / 2 - trackBox.left) / trackBox.width) * 100);
+  });
 
   await page.keyboard.press(modifierShortcut("+"));
-  await expect.poll(() => getEditorScaleMetrics(page)).toMatchObject({
-    editorFontScale: "1.08",
-    shellFontSize: before.shellFontSize,
-    headerHeight: before.headerHeight,
-    sidebarWidth: before.sidebarWidth,
-  });
-  await expect(page.locator(".editor-font-size-toast"))
-    .toHaveText("Font size 17px");
-  await expect(page.locator(".editor-font-size-toast"))
-    .toHaveCount(0, { timeout: 3000 });
-  await expect(page.getByRole("group", { name: "Editor typography" }))
-    .toHaveCount(0);
+  await expect(gauge).toHaveAttribute("aria-valuetext", "110%");
+  await expect(gauge).toHaveAttribute("aria-valuemin", "50");
+  await expect(gauge).toHaveAttribute("aria-valuemax", "200");
+  await expect(page.locator(".app-zoom-gauge")).toContainText("110%");
+  await expect.poll(readThumbPosition).toBe(60);
+  // Zoom replaces the old font-size shortcut and leaves the editor font size alone.
+  expect((await getEditorScaleMetrics(page)).editorFontSize).toBe(before.editorFontSize);
+  await expect(gauge).toHaveCount(0, { timeout: 3000 });
 
+  // The zoom belongs to the app, so another tab continues from it.
   await createBlankSession(page);
   await expect(page.getByRole("tab")).toHaveCount(2);
-  await expect(page.getByRole("tab").nth(1)).toHaveAttribute("aria-selected", "true");
-  await expect.poll(() => getEditorScaleMetrics(page)).toMatchObject({
-    editorFontScale: "1.08",
-    shellFontSize: before.shellFontSize,
-    headerHeight: before.headerHeight,
-    sidebarWidth: before.sidebarWidth,
-  });
+  await page.keyboard.press(modifierShortcut("+"));
+  await expect(gauge).toHaveAttribute("aria-valuetext", "125%");
 
-  await page.keyboard.press(modifierShortcut("-"));
-  await expect.poll(() => getEditorScaleMetrics(page)).toMatchObject({
-    editorFontScale: "1",
-    shellFontSize: before.shellFontSize,
-    headerHeight: before.headerHeight,
-    sidebarWidth: before.sidebarWidth,
-  });
-  await expect(page.locator(".editor-font-size-toast"))
-    .toHaveText("Font size 16px");
+  // Pressing past the smallest step keeps it there, and the gauge still answers.
+  for (let press = 0; press < 8; press += 1) {
+    await page.keyboard.press(modifierShortcut("-"));
+  }
+  await expect(gauge).toHaveAttribute("aria-valuetext", "50%");
+  await expect.poll(readThumbPosition).toBe(0);
 
-  await page.getByRole("tab").first().click();
-  await expect(page.getByRole("tab").first()).toHaveAttribute("aria-selected", "true");
-  await expect.poll(() => getEditorScaleMetrics(page)).toMatchObject({
-    editorFontScale: "1",
-    shellFontSize: before.shellFontSize,
-    headerHeight: before.headerHeight,
-    sidebarWidth: before.sidebarWidth,
+  await page.keyboard.press(modifierShortcut("0"));
+  await expect(gauge).toHaveAttribute("aria-valuetext", "100%");
+  await expect.poll(readThumbPosition).toBe(50);
+
+  // Zoom belongs to the app, so it also works while typing in a text field.
+  await page.keyboard.press(modifierShortcut("F"));
+  const findInput = page
+    .getByRole("search", { name: "Find in note" })
+    .getByRole("textbox", { name: "Find in note" });
+  await expect(findInput).toBeFocused();
+  await page.keyboard.press(modifierShortcut("+"));
+  await expect(gauge).toHaveAttribute("aria-valuetext", "110%");
+  await expect(findInput).toHaveValue("");
+  await expect(findInput).toBeFocused();
+});
+
+test("keeps the zoom gauge at the top of the editor after the note scrolls", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  for (let index = 0; index < 60; index += 1) {
+    await page.keyboard.type(`Line ${index}`);
+    await page.keyboard.press("Enter");
+  }
+  const surface = page.getByTestId("sticky-editor-surface");
+  await surface.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
   });
+  await expect.poll(() => surface.evaluate((element) => element.scrollTop)).toBeGreaterThan(400);
+
+  await page.keyboard.press(modifierShortcut("+"));
+
+  const gauge = page.locator(".app-zoom-gauge");
+  await expect(gauge).toContainText("110%");
+  const [surfaceBox, gaugeBox] = await Promise.all([surface.boundingBox(), gauge.boundingBox()]);
+  expect(gaugeBox.y).toBeGreaterThanOrEqual(surfaceBox.y);
+  expect(gaugeBox.y + gaugeBox.height).toBeLessThanOrEqual(surfaceBox.y + 80);
+  // Centred over the editor surface.
+  expect(Math.abs(gaugeBox.x + gaugeBox.width / 2 - (surfaceBox.x + surfaceBox.width / 2)))
+    .toBeLessThanOrEqual(2);
+});
+
+test("leaves the zoom gauge and the empty-line hint out of an export", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.press(modifierShortcut("+"));
+  await expect(page.locator(".app-zoom-gauge")).toBeVisible();
+  const readExportView = () => page.evaluate(() => {
+    const hintBlock = document.querySelector(".bn-block-content[data-is-empty-and-focused]");
+    return {
+      gaugeShown: Boolean(document.querySelector(".app-zoom-gauge")?.checkVisibility()),
+      hint: hintBlock ? getComputedStyle(hintBlock, "::after").content : null,
+    };
+  });
+  expect((await readExportView()).hint).toContain("type");
+
+  await page.evaluate(() => document.body.classList.add("is-exporting"));
+  expect(await readExportView()).toEqual({ gaugeShown: false, hint: "none" });
+  await page.evaluate(() => document.body.classList.remove("is-exporting"));
 });
 
 test("changes editor typography globally from preferences", async ({ page }) => {
@@ -334,16 +375,14 @@ test("changes editor typography globally from preferences", async ({ page }) => 
     .toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#preferences-editor .preferences-section-title"))
     .toHaveText("Editor");
-  await expect(page.getByText("Font family and size apply to every session tab."))
+  await expect(page.getByText(/^The font family applies to every session tab\. Zoom the app with /))
     .toBeVisible();
   const fontFamilyRow = preferencesPanel.locator(".editor-font-family-setting");
-  const fontSizeRow = preferencesPanel.locator(".editor-font-size-setting");
   await expect(fontFamilyRow.getByText("Font family")).toBeVisible();
-  await expect(fontSizeRow.getByText("Font size")).toBeVisible();
-  await expect(fontSizeRow.getByLabel("Editor font size")).toHaveValue("16");
   await expect(fontFamilyRow.getByLabel("Editor font family")).toHaveValue("System");
-  await expect(page.getByRole("button", { name: "Open font size menu" }))
-    .toBeVisible();
+  // Text size follows the app zoom, as in Notion; there is no font size setting.
+  await expect(preferencesPanel.getByText("Font size")).toHaveCount(0);
+  await expect(preferencesPanel.getByText("App font size")).toHaveCount(0);
 
   await fontFamilyRow.getByLabel("Editor font family").fill("gar");
   await expect(page.getByRole("listbox", { name: "Font family options" }))
@@ -353,24 +392,13 @@ test("changes editor typography globally from preferences", async ({ page }) => 
   });
   await expect(page.getByRole("option", { name: "Garamond" })).toBeVisible();
   await page.getByRole("option", { name: "Garamond" }).click();
-  await fontSizeRow.getByLabel("Editor font size").fill("24");
-  await expect(fontSizeRow.getByLabel("Editor font size")).toHaveValue("24");
-  await fontSizeRow.getByRole("button", { name: "Open font size menu" }).click();
-  await expect(page.getByRole("listbox", { name: "Editor font size presets" }))
-    .toBeVisible();
-  await expectFloatingTypographyMenu(page, "Editor font size presets", {
-    maxWidth: 104,
-  });
-  await page.getByRole("option", { name: "48" }).click();
-  await expect(fontSizeRow.getByLabel("Editor font size")).toHaveValue("48");
-  await fontSizeRow.getByLabel("Editor font size").fill("24");
   await page.getByRole("button", { name: "Close preferences" }).click();
 
   await expect.poll(() => getEditorScaleMetrics(page)).toMatchObject({
     appFontFamily: expect.stringContaining("Avenir"),
     sidebarFontFamily: expect.stringContaining("Avenir"),
-    editorFontScale: "1.5",
     editorFontFamily: expect.stringContaining("Garamond"),
+    editorFontSize: before.editorFontSize,
     shellFontSize: before.shellFontSize,
     headerHeight: before.headerHeight,
     sidebarWidth: before.sidebarWidth,
@@ -382,8 +410,8 @@ test("changes editor typography globally from preferences", async ({ page }) => 
   await expect.poll(() => getEditorScaleMetrics(page)).toMatchObject({
     appFontFamily: expect.stringContaining("Avenir"),
     sidebarFontFamily: expect.stringContaining("Avenir"),
-    editorFontScale: "1.5",
     editorFontFamily: expect.stringContaining("Garamond"),
+    editorFontSize: before.editorFontSize,
     shellFontSize: before.shellFontSize,
     headerHeight: before.headerHeight,
     sidebarWidth: before.sidebarWidth,
@@ -393,31 +421,8 @@ test("changes editor typography globally from preferences", async ({ page }) => 
   await expect(page.getByRole("tab").first()).toHaveAttribute("aria-selected", "true");
   await expect.poll(() => getEditorScaleMetrics(page)).toMatchObject({
     appFontFamily: expect.stringContaining("Avenir"),
-    editorFontScale: "1.5",
     editorFontFamily: expect.stringContaining("Garamond"),
   });
-});
-
-test("changes app font size without changing editor text size", async ({ page }) => {
-  const readSizes = () => page.evaluate(() => ({
-    sidebar: Math.round(Number.parseFloat(getComputedStyle(document.querySelector(".session-tab-button")).fontSize) * 10),
-    editor: Math.round(Number.parseFloat(getComputedStyle(document.querySelector(".bn-editor")).fontSize) * 10),
-  }));
-  const before = await readSizes();
-  await page.keyboard.press(modifierShortcut(","));
-  const preferences = page.getByRole("dialog", { name: "Preferences window" });
-  const slider = preferences.getByRole("slider", { name: "App font size" });
-  await expect(slider).toHaveValue("100");
-
-  await slider.focus();
-  await page.keyboard.press("End");
-  await expect(slider).toHaveValue("130");
-  await expect(preferences.locator(".app-font-size-control output")).toHaveText("130%");
-  await expect.poll(readSizes).toEqual({ sidebar: Math.round(before.sidebar * 1.3), editor: before.editor });
-
-  await page.keyboard.press("Home");
-  await expect(slider).toHaveValue("80");
-  await expect.poll(readSizes).toEqual({ sidebar: Math.round(before.sidebar * 0.8), editor: before.editor });
 });
 
 test("supports light/dark mode and readable sidebar tab background customization", async ({ page }) => {
@@ -461,9 +466,9 @@ test("supports light/dark mode and readable sidebar tab background customization
     .toHaveAttribute("aria-selected", "true");
   await expect(preferencesPanel.getByRole("radiogroup", { name: "App theme" })).toBeVisible();
   await expect(preferencesPanel.getByText("Keyboard shortcuts")).toHaveCount(0);
-  await expect(preferencesPanel.getByLabel("Editor font size")).toHaveCount(0);
+  await expect(preferencesPanel.getByLabel("Editor font family")).toHaveCount(0);
   await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
-  await expect(preferencesPanel.getByLabel("Editor font size")).toBeVisible();
+  await expect(preferencesPanel.getByLabel("Editor font family")).toBeVisible();
   await expect(preferencesPanel.getByRole("radiogroup", { name: "App theme" })).toHaveCount(0);
   await preferencesPanel.getByRole("tab", { name: "Shortcuts" }).click();
   await expect(preferencesPanel.getByText("Keyboard shortcuts")).toBeVisible();
@@ -877,14 +882,15 @@ test("uses sticky pastel color and carries it back to the session tab", async ({
     headerActionButtonLabels: [
       "Pin window",
       "Export",
+      "Version history",
       "Switch to Tab sessions mode",
       "Use wide editor",
       "Sticky settings",
       "Move note to trash",
       "Close window",
     ],
-    headerActionButtonCount: 7,
-    headerActionButtonWidths: [24, 24, 24, 24, 24, 24, 24],
+    headerActionButtonCount: 8,
+    headerActionButtonWidths: [24, 24, 24, 24, 24, 24, 24, 24],
     headerTitleCount: 0,
     headerTitleFormCount: 0,
     headerBackground: "rgb(255, 248, 217)",

@@ -882,7 +882,6 @@ function stubPreloadBridge() {
     markdown: "",
     theme: {},
     seedDemoContent: false,
-    editorFontScale: 1,
     editorFontFamily: "Inter",
     trashedAt: null,
     createdAt: now,

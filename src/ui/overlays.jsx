@@ -6,6 +6,8 @@ import {
 } from "@blocknote/react";
 import {
   TableOfContents as TableOfContentsIcon,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import {
   useEffect,
@@ -15,6 +17,10 @@ import {
 import {
   createPortal,
 } from "react-dom";
+import {
+  APP_ZOOM_LEVELS,
+  DEFAULT_APP_ZOOM,
+} from "../constants.js";
 import {
   preventFocusLoss,
 } from "../editor/images.js";
@@ -47,6 +53,38 @@ export function StickyToast({ toast }) {
           {toast.action.label}
         </button>
       )}
+    </div>
+  );
+}
+
+// Shown while Cmd/Ctrl+=, - or 0 zooms the app: where the zoom sits between the smallest and the
+// largest step. Each step is the same distance along the track, so 100% is marked in the middle.
+export function AppZoomGauge({ zoom }) {
+  const lastStep = APP_ZOOM_LEVELS.length - 1;
+  const percent = Math.round(zoom * 100);
+
+  return (
+    <div className="app-zoom-gauge" role="status" aria-live="polite">
+      <ZoomOut className="app-zoom-gauge-icon" aria-hidden="true" />
+      <div
+        className="app-zoom-gauge-track"
+        role="meter"
+        aria-label="Zoom"
+        aria-valuemin={Math.round(APP_ZOOM_LEVELS[0] * 100)}
+        aria-valuemax={Math.round(APP_ZOOM_LEVELS[lastStep] * 100)}
+        aria-valuenow={percent}
+        aria-valuetext={`${percent}%`}
+        style={{
+          "--app-zoom-position": APP_ZOOM_LEVELS.indexOf(zoom) / lastStep,
+          "--app-zoom-default-position": APP_ZOOM_LEVELS.indexOf(DEFAULT_APP_ZOOM) / lastStep,
+        }}
+      >
+        <span className="app-zoom-gauge-fill" />
+        <span className="app-zoom-gauge-default" />
+        <span className="app-zoom-gauge-thumb" />
+      </div>
+      <ZoomIn className="app-zoom-gauge-icon" aria-hidden="true" />
+      <span className="app-zoom-gauge-value">{percent}%</span>
     </div>
   );
 }

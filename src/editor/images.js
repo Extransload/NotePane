@@ -86,6 +86,17 @@ export function preventFocusLoss(event) {
   event.preventDefault();
 }
 
+// The image and crop box that cropping starts from. A cropped image keeps its original, so cropping
+// again can widen the crop. Once the image is replaced, its URL is no longer the crop's result and
+// the new image starts uncropped. A crop saved before `croppedUrl` existed starts from the cropped
+// image, since there is no telling whether it was replaced since.
+export function getCropSource(props = {}) {
+  const isCrop = Boolean(props.originalUrl) && props.croppedUrl === props.url;
+  return isCrop
+    ? { url: props.originalUrl, crop: getStoredImageCrop(props) }
+    : { url: props.url, crop: { ...DEFAULT_CROP } };
+}
+
 export function getStoredImageCrop(props = {}) {
   const crop = {
     x: props.cropX,
@@ -209,6 +220,15 @@ export async function uploadFile(file) {
     });
   }
   return await readFileAsDataUrl(file);
+}
+
+// BlockNote takes a paste or a drop as files only when it carries none of the text it would rather
+// insert.
+const TEXT_TRANSFER_TYPES = ["vscode-editor-data", "blocknote/html", "text/markdown", "text/html", "text/plain"];
+
+export function isFileTransfer(dataTransfer) {
+  const types = dataTransfer?.types ?? [];
+  return types.includes("Files") && !TEXT_TRANSFER_TYPES.some((type) => types.includes(type));
 }
 
 // Falls back to the data URL on failure; the main process externalizes any

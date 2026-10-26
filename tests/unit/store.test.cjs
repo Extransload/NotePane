@@ -448,6 +448,104 @@ test("updates and persists the global layout mode", () => {
   assert.equal(reloadedStore.getLayoutMode(), "tabs");
 });
 
+test("stores the tabs window pin and bounds apart from every note", () => {
+  const directory = createTemporaryDirectory();
+  fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({
+      version: 11,
+      layoutMode: "tabs",
+      tabsWindow: { alwaysOnTop: false, bounds: null },
+      notes: [{ id: "pinned", title: "Pinned", alwaysOnTop: true, createdAt: 1, updatedAt: 1 }],
+    }),
+    "utf8",
+  );
+  const store = new StickyStore(directory);
+  const noteBounds = store.getNote("pinned").bounds;
+
+  // A pinned note does not pin the tabs window once the tabs window has its own record.
+  assert.deepEqual(store.getTabsWindow(), { alwaysOnTop: false, bounds: null });
+
+  store.setTabsWindowAlwaysOnTop(true);
+  store.updateTabsWindowBounds({ x: 300, y: 120, width: 1300, height: 850 });
+
+  const reloadedStore = new StickyStore(directory);
+  assert.deepEqual(reloadedStore.getTabsWindow(), {
+    alwaysOnTop: true,
+    bounds: { x: 300, y: 120, width: 1300, height: 850 },
+  });
+  assert.equal(reloadedStore.getNote("pinned").alwaysOnTop, true);
+  assert.deepEqual(reloadedStore.getNote("pinned").bounds, noteBounds);
+
+  // It travels with a backup, and a backup from before it restores the default.
+  const restoredStore = new StickyStore(createTemporaryDirectory());
+  restoredStore.restoreBackup(reloadedStore.createBackup());
+  assert.deepEqual(restoredStore.getTabsWindow(), reloadedStore.getTabsWindow());
+  const olderBackup = reloadedStore.createBackup();
+  delete olderBackup.data.tabsWindow;
+  restoredStore.restoreBackup(olderBackup);
+  assert.deepEqual(restoredStore.getTabsWindow(), { alwaysOnTop: false, bounds: null });
+});
+
+// Before the tabs window had its own record, pinning it pinned the note it showed, and at launch it
+// opened on the first note in the sidebar. A notes file from then keeps the pin that launch showed.
+test("takes the tabs window pin from the note it opens on when the notes file has no record", () => {
+  const writeNotesFile = (directory, root, notes) => fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({ version: 11, ...root, notes }),
+    "utf8",
+  );
+  const directory = createTemporaryDirectory();
+  writeNotesFile(directory, { layoutMode: "tabs" }, [
+    { id: "second", title: "Second", alwaysOnTop: false, sortOrder: 2, createdAt: 1, updatedAt: 1 },
+    { id: "trashed", title: "Trashed", alwaysOnTop: false, sortOrder: 0.5, trashedAt: 5, createdAt: 2, updatedAt: 2 },
+    { id: "first", title: "First", alwaysOnTop: true, sortOrder: 1, createdAt: 3, updatedAt: 3 },
+  ]);
+
+  const store = new StickyStore(directory);
+  assert.deepEqual(store.getTabsWindow(), { alwaysOnTop: true, bounds: null });
+  // The note keeps its own pin, which its sticky window still uses.
+  assert.equal(store.getNote("first").alwaysOnTop, true);
+
+  // The seeded pin is saved as the tabs window's own, so unpinning the note later leaves it.
+  store.setAlwaysOnTop("first", false);
+  assert.deepEqual(new StickyStore(directory).getTabsWindow(), { alwaysOnTop: true, bounds: null });
+
+  // A pin on a note the tabs window does not open on stays that note's.
+  const otherDirectory = createTemporaryDirectory();
+  writeNotesFile(otherDirectory, { layoutMode: "tabs" }, [
+    { id: "first", title: "First", alwaysOnTop: false, sortOrder: 1, createdAt: 1, updatedAt: 1 },
+    { id: "second", title: "Second", alwaysOnTop: true, sortOrder: 2, createdAt: 2, updatedAt: 2 },
+  ]);
+  assert.deepEqual(new StickyStore(otherDirectory).getTabsWindow(), { alwaysOnTop: false, bounds: null });
+
+  // The sticky layout opens no tabs window at launch, so its notes' pins are sticky pins.
+  const stickyDirectory = createTemporaryDirectory();
+  writeNotesFile(stickyDirectory, { layoutMode: "sticky" }, [
+    { id: "first", title: "First", alwaysOnTop: true, sortOrder: 1, createdAt: 1, updatedAt: 1 },
+  ]);
+  assert.deepEqual(new StickyStore(stickyDirectory).getTabsWindow(), { alwaysOnTop: false, bounds: null });
+});
+
+test("changes only the appearance fields an update carries", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+  const note = store.createNote({ width: 900, height: 700 });
+  store.updateContent({
+    noteId: note.id,
+    blocksJSON: JSON.stringify([{ type: "paragraph", content: "beta" }]),
+    markdown: "beta",
+  });
+  store.updateAppearance(note.id, { title: "Beta", titleManuallyEdited: true });
+
+  store.updateAppearance(note.id, { theme: { tabTextColor: "#eadcff", tabTextOpacity: 1 } });
+
+  const updated = new StickyStore(directory).getNote(note.id);
+  assert.equal(updated.title, "Beta");
+  assert.equal(updated.titleManuallyEdited, true);
+  assert.equal(updated.theme.tabTextColor, "#eadcff");
+});
+
 // Notes no longer detach into their own window; one detached by an older version opens as a tab.
 test("drops the detached flag that older versions stored on notes", () => {
   const directory = createTemporaryDirectory();
@@ -474,24 +572,18 @@ test("keeps editor typography global instead of updating per note appearance", (
   const firstNote = store.createNote({ width: 900, height: 700 });
   const secondNote = store.createNote({ width: 900, height: 700 });
 
-  assert.equal(firstNote.editorFontScale, 1);
-  assert.equal(secondNote.editorFontScale, 1);
   assert.equal(firstNote.editorFontFamily, "system");
   assert.equal(secondNote.editorFontFamily, "system");
 
   store.updateAppearance(firstNote.id, {
-    editorFontScale: 9,
     editorFontFamily: "local:Pretendard",
   });
   store.updateAppearance(secondNote.id, {
-    editorFontScale: 0.38,
     editorFontFamily: "garamond",
   });
 
   const reloadedStore = new StickyStore(directory);
 
-  assert.equal(reloadedStore.getNote(firstNote.id).editorFontScale, 1);
-  assert.equal(reloadedStore.getNote(secondNote.id).editorFontScale, 1);
   assert.equal(reloadedStore.getNote(firstNote.id).editorFontFamily, "system");
   assert.equal(reloadedStore.getNote(secondNote.id).editorFontFamily, "system");
 });
@@ -501,10 +593,9 @@ test("updates editor preferences and applies them to new notes", () => {
   const store = new StickyStore(directory);
 
   assert.deepEqual(store.getEditorPreferences(), {
-    editorFontScale: 1,
     editorFontFamily: "system",
     appFontFamily: "inter",
-    appFontScale: 1,
+    appZoom: 1,
     showTableOfContents: false,
     keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
     keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
@@ -522,37 +613,119 @@ test("updates editor preferences and applies them to new notes", () => {
   };
 
   assert.deepEqual(store.updateEditorPreferences({
-    editorFontScale: 1.5,
     editorFontFamily: "local:Pretendard",
     appFontFamily: "garamond",
-    appFontScale: 1.2,
+    appZoom: 1.25,
     showTableOfContents: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
   }), {
-    editorFontScale: 1.5,
     editorFontFamily: "local:Pretendard",
     appFontFamily: "garamond",
-    appFontScale: 1.2,
+    appZoom: 1.25,
     showTableOfContents: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
   });
 
   const note = store.createNote({ width: 900, height: 700 });
-  assert.equal(note.editorFontScale, 1.5);
   assert.equal(note.editorFontFamily, "local:Pretendard");
 
   const reloadedStore = new StickyStore(directory);
   assert.deepEqual(reloadedStore.getEditorPreferences(), {
-    editorFontScale: 1.5,
     editorFontFamily: "local:Pretendard",
     appFontFamily: "garamond",
-    appFontScale: 1.2,
+    appZoom: 1.25,
     showTableOfContents: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
   });
+});
+
+test("snaps the app zoom to a zoom step and keeps it across a restart", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+
+  assert.equal(store.updateEditorPreferences({ appZoom: 1.3 }).appZoom, 1.25);
+  assert.equal(store.updateEditorPreferences({ appZoom: 7 }).appZoom, 2);
+  assert.equal(store.updateEditorPreferences({ appZoom: 0.1 }).appZoom, 0.5);
+  assert.equal(store.updateEditorPreferences({ appZoom: "large" }).appZoom, 0.5);
+  assert.equal(store.updateEditorPreferences({ appZoom: 0.9 }).appZoom, 0.9);
+
+  assert.equal(new StickyStore(directory).getEditorPreferences().appZoom, 0.9);
+});
+
+test("drops the editor and app font sizes, which are no longer adjustable", () => {
+  const directory = createTemporaryDirectory();
+  fs.mkdirSync(directory, { recursive: true });
+  fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({
+      version: 11,
+      editorPreferences: { editorFontScale: 1.5, appFontScale: 1.3 },
+      notes: [{ id: "sized", title: "Sized", editorFontScale: 2, createdAt: 1, updatedAt: 1 }],
+    }),
+    "utf8",
+  );
+
+  const store = new StickyStore(directory);
+  assert.equal(Object.hasOwn(store.getEditorPreferences(), "editorFontScale"), false);
+  assert.equal(Object.hasOwn(store.getEditorPreferences(), "appFontScale"), false);
+  assert.equal(Object.hasOwn(store.getNote("sized"), "editorFontScale"), false);
+});
+
+test("renderer and store normalizeAppZoom agree", async () => {
+  globalThis.window ??= {};
+  const { normalizeAppZoom: normalizeRendererAppZoom } = await import("../../src/model/preferences.js");
+  const { normalizeAppZoom: normalizeStoreAppZoom } = require("../../electron/store.cjs");
+  const inputs = [
+    ...Array.from({ length: 61 }, (_, index) => index * 0.05),
+    0.625, 0.71, 0.775, 0.85, 0.95, 1.05, 1.175, 1.375, 1.625, 1.875,
+    -1, Infinity, -Infinity, NaN, null, undefined, "", "1.1", "abc", true, [], {},
+  ];
+  for (const fallback of [undefined, 1.5, "garbage"]) {
+    for (const input of inputs) {
+      assert.equal(
+        normalizeRendererAppZoom(input, fallback),
+        normalizeStoreAppZoom(input, fallback),
+        JSON.stringify({ input: String(input), fallback }),
+      );
+    }
+  }
+});
+
+test("moves stored editor font-size shortcuts to the zoom commands", () => {
+  const directory = createTemporaryDirectory();
+  fs.mkdirSync(directory, { recursive: true });
+  const { zoomIn, zoomOut, resetZoom, ...shortcutsBeforeZoom } = DEFAULT_KEYBOARD_SHORTCUTS;
+  fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({
+      version: 11,
+      editorPreferences: {
+        keyboardShortcuts: {
+          ...shortcutsBeforeZoom,
+          increaseEditorFontSize: "Mod+Shift+=",
+          decreaseEditorFontSize: "Mod+-",
+        },
+        keyboardShortcutEnabled: {
+          decreaseEditorFontSize: false,
+        },
+      },
+      notes: [],
+    }),
+    "utf8",
+  );
+
+  const preferences = new StickyStore(directory).getEditorPreferences();
+  assert.equal(preferences.keyboardShortcuts.zoomIn, "Mod+Shift+=");
+  assert.equal(preferences.keyboardShortcuts.zoomOut, "Mod+-");
+  assert.equal(preferences.keyboardShortcuts.resetZoom, resetZoom);
+  assert.equal(preferences.keyboardShortcutEnabled.zoomIn, true);
+  assert.equal(preferences.keyboardShortcutEnabled.zoomOut, false);
+  assert.equal(preferences.keyboardShortcutEnabled.resetZoom, true);
+  assert.equal(Object.hasOwn(preferences.keyboardShortcuts, "increaseEditorFontSize"), false);
+  assert.equal(Object.hasOwn(preferences.keyboardShortcutEnabled, "decreaseEditorFontSize"), false);
 });
 
 test("migrates legacy default sidebar shortcut away from Mod+B", () => {
@@ -1270,7 +1443,7 @@ test("exports and restores a versioned portable workspace backup", () => {
   sourceStore.updateLayoutMode("sticky");
   sourceStore.updateEditorPreferences({
     ...sourceStore.getEditorPreferences(),
-    editorFontScale: 1.25,
+    appZoom: 1.25,
     showTableOfContents: true,
   });
 
@@ -1305,7 +1478,7 @@ test("exports and restores a versioned portable workspace backup", () => {
   assert.equal(restored.trashCount, 1);
   assert.equal(targetStore.getAppTheme().mode, "dark");
   assert.equal(targetStore.getLayoutMode(), "sticky");
-  assert.equal(targetStore.getEditorPreferences().editorFontScale, 1.25);
+  assert.equal(targetStore.getEditorPreferences().appZoom, 1.25);
   assert.equal(targetStore.getEditorPreferences().showTableOfContents, true);
   assert.equal(targetStore.getNote(activeNote.id).markdown, "Portable data");
   assert.deepEqual(targetStore.listTrash().map((note) => note.id), [trashedNote.id]);
@@ -1336,6 +1509,38 @@ test("a backup with only mode restores the matching NotePane theme", () => {
     themeId: "notepane-dark",
     mode: "dark",
   });
+});
+
+test("a backup from before app zoom keeps its font-size shortcuts as the zoom shortcuts", () => {
+  const sourceStore = new StickyStore(createTemporaryDirectory());
+  sourceStore.createNote({ width: 800, height: 600 });
+  const backup = sourceStore.createBackup({ exportedAt: "2026-08-04T08:30:00.000Z" });
+  // NotePane 0.2.0 stored the zoom keys under the editor font-size commands.
+  const { zoomIn, zoomOut, resetZoom, ...shortcutsBeforeZoom } =
+    backup.data.editorPreferences.keyboardShortcuts;
+  const { zoomIn: zoomInEnabled, zoomOut: zoomOutEnabled, resetZoom: resetZoomEnabled, ...enabledBeforeZoom } =
+    backup.data.editorPreferences.keyboardShortcutEnabled;
+  backup.data.editorPreferences.keyboardShortcuts = {
+    ...shortcutsBeforeZoom,
+    increaseEditorFontSize: "Mod+Shift+=",
+    decreaseEditorFontSize: "Mod+Shift+-",
+  };
+  backup.data.editorPreferences.keyboardShortcutEnabled = {
+    ...enabledBeforeZoom,
+    increaseEditorFontSize: false,
+    decreaseEditorFontSize: true,
+  };
+
+  const targetStore = new StickyStore(createTemporaryDirectory());
+  targetStore.createNote({ width: 800, height: 600 });
+  targetStore.restoreBackup(backup);
+
+  const preferences = targetStore.getEditorPreferences();
+  assert.equal(preferences.keyboardShortcuts.zoomIn, "Mod+Shift+=");
+  assert.equal(preferences.keyboardShortcuts.zoomOut, "Mod+Shift+-");
+  assert.equal(preferences.keyboardShortcutEnabled.zoomIn, false);
+  assert.equal(preferences.keyboardShortcutEnabled.zoomOut, true);
+  assert.equal(preferences.keyboardShortcutEnabled.resetZoom, true);
 });
 
 test("rejects malformed, duplicate, and newer NotePane backups", () => {

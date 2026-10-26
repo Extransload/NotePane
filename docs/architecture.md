@@ -29,7 +29,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Directory | Owns | Notable files |
 | --- | --- | --- |
 | `src/` | entry point and shared constants | `main.jsx`, `constants.js` |
-| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `selection.js`, `blockSelection.js`, `blockSelectionRules.js`, `blockDragSelection.js`, `blocks.js`, `clipboard.js`, `images.js` |
+| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `callout.jsx`, `calloutIconPicker.jsx`, `selection.js`, `blockSelection.js`, `blockSelectionRules.js`, `blockDragSelection.js`, `blocks.js`, `clipboard.js`, `images.js` |
 | `src/model/` | normalising and deriving stored data | `notes.js`, `preferences.js`, `keyboardShortcuts.js` |
 | `src/style/` | themes, theme tokens, tone matching, colour maths and computed inline styles | `themes.js`, `themeTokens.js`, `toneMatch.js`, `applyTheme.js`, `themeStyles.js`, `colorMath.js` |
 | `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
@@ -42,15 +42,19 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | To change this | Look here |
 | --- | --- |
 | Block schema, template content, custom blocks | `src/editor/schema.jsx` |
+| Callout block: Enter and Backspace in its text and body, drops into its body, Markdown export as a quote | `src/editor/callout.jsx` |
+| Callout icon picker: emoji data, recent icons, upload, remove | `src/editor/calloutIconPicker.jsx` |
 | Text selection, table cell selection and navigation | `src/editor/selection.js` |
 | Block selection model, exactly-selected blocks, block-set indent and move | `src/editor/blockSelection.js`, `src/editor/blockSelectionRules.js` |
-| Marquee and drag selection gestures, edge auto-scroll, and the keyboard (Enter, Tab, move) and IME composition routing for a block set | `src/editor/blockDragSelection.js` |
+| Marquee and drag selection gestures, edge auto-scroll, and the keyboard (Enter, Tab, move, delete) and IME composition routing for a block set or the whole note | `src/editor/blockDragSelection.js` |
 | Block lookup, cut, table of contents extraction | `src/editor/blocks.js` |
-| Copy/paste normalisation and Markdown round-tripping | `src/editor/clipboard.js` |
+| Copy/paste normalisation, block clipboard formats for copy and cut, and Markdown round-tripping | `src/editor/clipboard.js` |
 | Which element counts as an editor shortcut target | `src/editor/targets.js` |
+| Backspace right after a Markdown shortcut such as `- ` gives back exactly the typed marker | `src/editor/markdownShortcuts.js` |
 | BlockNote floating menu positioning and clamping | `src/editor/floatingMenus.js` |
 | Image download, crop geometry, upload | `src/editor/images.js` |
-| Code block language detection and prettifying | `src/editor/codeFormatting.js` |
+| Pasting and dropping files: where the file block goes, its upload, one undo step for both | `src/editor/fileInsertion.js` |
+| Code block language detection, prettifying, and Tab / Shift+Tab line indent | `src/editor/codeFormatting.js` |
 | Note search matching, snippets and plain-text extraction | `src/model/search.js` |
 | Find in note decorations and navigation | `src/editor/findInNote.js`, `src/hooks/useFindInNote.js` |
 | Note titles, ordering, trash previews | `src/model/notes.js` |
@@ -70,7 +74,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Keys handled on the editor surface | `src/hooks/useEditorSurfaceShortcuts.js` |
 | Window, session and tab-mode keyboard commands | `src/hooks/useKeyboardCommands.js` |
 | Session tab drag and drop | `src/hooks/useSessionTabDrag.js` |
-| Export and font-size toasts | `src/hooks/useStickyToasts.js` |
+| Export toast and zoom gauge timing | `src/hooks/useStickyToasts.js` |
+| Zoom gauge, export toast and other overlays | `src/ui/overlays.jsx` |
 
 `src/main.jsx` keeps only `App` (session list, theme and layout state, IPC subscriptions) and `StickyEditor`
 (editor instance, the remaining per-note state, and the rendered tree). A new non-trivial behaviour belongs in a
@@ -142,8 +147,9 @@ without copying font files into the app.
 
 Editor defaults are app-wide preferences stored at `editorPreferences` in `notes.json`. New sessions copy those defaults
 into their own per-note typography fields at creation time; changing defaults does not mutate existing sessions.
-App font family and app font scale (80–130%) are also stored there, but apply immediately to interface text in every
-open window. The editor text keeps its separate per-note font scale.
+The app font family is also stored there and applies immediately to interface text in every open window. There is no
+font size setting: as in Notion, text size follows the app zoom (`appZoom`), which the main process applies as page
+zoom to every window (`setZoomFactor`) when preferences change and each time a window loads.
 
 Sidebar session changes use note list/create/activate/delete IPC calls. Activating a session changes the note bound to
 the current window, then remounts the BlockNote editor with that note's stored document. Deleting the active session
@@ -158,6 +164,8 @@ The app supports two layout modes.
 - `alwaysOnTop` defaults to `false`
 - transparent window background for native note transparency
 - Bounds are saved on move/resize/close
+- The tabs window keeps its own always-on-top flag and bounds at `tabsWindow` in `notes.json`; sticky windows keep
+  theirs per note, so pinning or resizing one never carries over to the other
 - Tab session mode keeps every session in one primary tabs window
 - Sticky mode opens every session as its own compact sticky-note window when entering the mode
 - Sticky mode arranges note windows in a small grid using the current primary display work area
@@ -168,7 +176,8 @@ The app supports two layout modes.
 - Sidebar tab close appears only on row hover and deletes a note/session when more than one session exists
 - `Command/Ctrl + 1` through `Command/Ctrl + 9` activates the matching sidebar session
 - `Command/Ctrl + Option/Alt + Left/Right` activates the previous/next sidebar session and wraps at the ends
-- `Command/Ctrl + W` deletes the current sidebar session in tab session mode instead of closing the primary window
+- `Command/Ctrl + W` moves the current sidebar session to Trash in tab session mode instead of closing the primary
+  window; the confirmation and the undo toast both say so
 - Sidebar tab double-click starts inline rename
 
 ## BlockNote configuration

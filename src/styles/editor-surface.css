@@ -43,7 +43,7 @@
 .sticky-editor-surface .bn-editor {
   padding-top: var(--sticky-editor-top-gutter);
   padding-bottom: var(--sticky-editor-bottom-gutter);
-  font-size: calc(16px * var(--editor-font-scale, 1));
+  font-size: 16px;
   font-family: var(
     --editor-font-family,
     -apple-system,
@@ -112,7 +112,7 @@
   background: color-mix(in srgb, var(--sticky-panel-bg) 84%, transparent);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--sticky-text-color) 7%, transparent);
   color: var(--sticky-panel-text);
-  font: 760 calc(11px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
+  font: 760 11px/1 var(--notepane-ui-font);
   cursor: pointer;
   transform: translateX(-50%);
   -webkit-app-region: no-drag;
@@ -151,7 +151,7 @@
   background: color-mix(in srgb, var(--sticky-panel-bg) 84%, transparent);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--sticky-text-color) 7%, transparent);
   color: var(--sticky-panel-muted);
-  font: 680 calc(10.5px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
+  font: 680 10.5px/1 var(--notepane-ui-font);
   -webkit-app-region: no-drag;
   transform: translateX(-50%);
 }
@@ -166,7 +166,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--sticky-note-accent-color, var(--sticky-panel-text)) 7%, transparent);
   color: var(--sticky-panel-text);
-  font: 740 calc(10.5px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
+  font: 740 10.5px/1 var(--notepane-ui-font);
   cursor: pointer;
 }
 
@@ -222,7 +222,7 @@
   padding: 0 10px;
   border-bottom: 0;
   color: var(--sticky-panel-muted);
-  font: 650 calc(12px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
+  font: 650 12px/1 var(--notepane-ui-font);
 }
 
 .editor-table-of-contents:not(:hover):not(:focus-within) .editor-toc-header {
@@ -273,7 +273,7 @@
   overflow: hidden;
   background: transparent;
   color: var(--sticky-panel-text);
-  font: 620 calc(14px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
+  font: 620 14px/1 var(--notepane-ui-font);
   line-height: 1.45;
   text-align: left;
   overflow-wrap: anywhere;
@@ -355,30 +355,98 @@
   box-shadow: none;
 }
 
-.editor-font-size-toast {
+/* A zero-height row pinned to the top of the scrolling editor surface, as the find bar's dock is, so
+   the zoom gauge stays in view however far the note has scrolled. */
+.app-zoom-gauge-dock {
+  position: sticky;
+  z-index: 26;
+  top: 0;
+  height: 0;
+}
+
+/* Centred with auto margins rather than a transform, which the entry animation would replace. */
+.app-zoom-gauge {
+  display: flex;
   position: absolute;
   z-index: 26;
   top: 16px;
-  left: 50%;
+  right: 0;
+  left: 0;
   width: fit-content;
-  margin: 0;
-  padding: 7px 10px;
+  align-items: center;
+  gap: 7px;
+  margin: 0 auto;
+  padding: 6px 12px 6px 9px;
   border: 1px solid color-mix(in srgb, var(--sticky-border-color) 42%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--sticky-panel-bg) 84%, transparent);
+  background: color-mix(in srgb, var(--sticky-panel-bg) 94%, transparent);
+  backdrop-filter: blur(12px);
   box-shadow: 0 6px 18px color-mix(in srgb, var(--sticky-text-color) 7%, transparent);
   color: var(--sticky-panel-text);
-  font: 760 calc(11px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
+  font: 760 11px/1 var(--notepane-ui-font);
   pointer-events: none;
-  transform: translateX(-50%);
   -webkit-app-region: no-drag;
   animation: fontSizeToastIn 140ms ease both;
+}
+
+.app-zoom-gauge-icon {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  color: var(--sticky-panel-muted);
+}
+
+.app-zoom-gauge-track {
+  position: relative;
+  width: 112px;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sticky-panel-text) 14%, transparent);
+}
+
+.app-zoom-gauge-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--app-zoom-position) * 100%);
+  border-radius: inherit;
+  background: var(--notepane-control-accent);
+}
+
+/* 100%, the zoom Cmd/Ctrl+0 returns to. */
+.app-zoom-gauge-default {
+  position: absolute;
+  top: -3px;
+  left: calc(var(--app-zoom-default-position) * 100%);
+  width: 2px;
+  height: 10px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--sticky-panel-text) 28%, transparent);
+  transform: translateX(-50%);
+}
+
+.app-zoom-gauge-thumb {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--app-zoom-position) * 100%);
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--notepane-control-accent);
+  border-radius: 50%;
+  background: var(--sticky-panel-bg);
+  transform: translate(-50%, -50%);
+  transition: left 120ms ease;
+}
+
+.app-zoom-gauge-value {
+  min-width: 4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .preferences-section-description {
   margin-top: 4px;
   color: var(--sticky-panel-muted);
-  font: 560 calc(9.5px * var(--notepane-ui-scale))/1.35 var(--notepane-ui-font);
+  font: 560 9.5px/1.35 var(--notepane-ui-font);
 }
 
 .editor-font-setting-control {
@@ -392,26 +460,18 @@
   -webkit-app-region: no-drag;
 }
 
-.editor-font-size-control {
-  max-width: 88px;
-  flex-basis: 88px;
-}
-
 .editor-font-family-input,
-.editor-font-size-input,
-.editor-font-family-menu-button,
-.editor-font-size-menu-button {
+.editor-font-family-menu-button {
   height: 28px;
   border: 0;
   border-radius: 8px;
   outline: none;
   background: transparent;
   color: var(--sticky-panel-text);
-  font: 700 calc(11px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
+  font: 700 11px/1 var(--notepane-ui-font);
 }
 
-.editor-font-family-combobox,
-.editor-font-size-combobox {
+.editor-font-family-combobox {
   position: relative;
   display: flex;
   align-items: center;
@@ -443,15 +503,7 @@
   color: var(--bn-colors-selected-text);
 }
 
-.editor-font-size-input {
-  width: 100%;
-  min-width: 0;
-  padding: 0 1px 0 8px;
-  text-align: center;
-}
-
-.editor-font-family-menu-button,
-.editor-font-size-menu-button {
+.editor-font-family-menu-button {
   display: grid;
   width: 26px;
   flex: 0 0 26px;
@@ -462,17 +514,13 @@
 }
 
 .editor-font-family-combobox:hover,
-.editor-font-size-combobox:hover,
-.editor-font-family-combobox:focus-within,
-.editor-font-size-combobox:focus-within {
+.editor-font-family-combobox:focus-within {
   border-color: color-mix(in srgb, var(--sticky-panel-text) 18%, var(--sticky-border-color));
   background: var(--sticky-control-hover-bg);
 }
 
 .editor-font-family-menu-button:hover,
-.editor-font-family-menu-button[aria-expanded="true"],
-.editor-font-size-menu-button:hover,
-.editor-font-size-menu-button[aria-expanded="true"] {
+.editor-font-family-menu-button[aria-expanded="true"] {
   background: color-mix(in srgb, var(--sticky-panel-text) 8%, transparent);
   color: var(--sticky-panel-text);
 }
@@ -495,8 +543,7 @@
   animation: menuIn 120ms ease both;
 }
 
-.editor-font-family-menu,
-.editor-font-size-menu {
+.editor-font-family-menu {
   grid-auto-rows: minmax(22px, auto);
 }
 
@@ -513,7 +560,7 @@
   border-radius: 7px;
   background: transparent;
   color: var(--sticky-panel-text);
-  font: 700 calc(10.5px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
+  font: 700 10.5px/1 var(--notepane-ui-font);
   text-align: left;
   cursor: pointer;
 }
@@ -542,7 +589,7 @@
 .notepane-dropdown-option-meta {
   flex: 0 0 auto;
   color: var(--sticky-panel-muted);
-  font: 750 calc(8px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
+  font: 750 8px/1 var(--notepane-ui-font);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -557,14 +604,10 @@
   );
 }
 
-.editor-font-size-option {
-  grid-template-columns: 16px minmax(0, 1fr);
-}
-
 .editor-font-family-empty {
   padding: 7px 8px;
   color: var(--sticky-panel-muted);
-  font: 650 calc(10px * var(--notepane-ui-scale))/1.2 var(--notepane-ui-font);
+  font: 650 10px/1.2 var(--notepane-ui-font);
 }
 
 .notepane-dropdown-option:hover,
@@ -574,7 +617,6 @@
   background: var(--sticky-control-hover-bg);
 }
 
-.editor-font-size-input:focus,
 .editor-font-family-input:focus {
   background: transparent;
 }
@@ -593,7 +635,7 @@
   background: var(--notepane-adaptive-tooltip-bg);
   box-shadow: var(--notepane-shadow-adaptive-tooltip);
   color: var(--notepane-adaptive-tooltip-text);
-  font: 750 calc(11px * var(--notepane-ui-scale))/1.15 var(--notepane-ui-font);
+  font: 750 11px/1.15 var(--notepane-ui-font);
   opacity: 1;
   pointer-events: none;
   text-align: center;
@@ -630,12 +672,12 @@
 .bn-tooltip .mantine-Text-root {
   margin: 0;
   color: inherit !important;
-  font: 600 calc(10px * var(--notepane-ui-scale))/1.2 var(--notepane-ui-font) !important;
+  font: 600 10px/1.2 var(--notepane-ui-font) !important;
 }
 
 .bn-tooltip .mantine-Text-root + .mantine-Text-root {
   color: var(--notepane-tooltip-muted) !important;
-  font-size: calc(9px * var(--notepane-ui-scale)) !important;
+  font-size: 9px !important;
   font-weight: 500 !important;
 }
 
@@ -719,7 +761,7 @@
   height: 100%;
   place-items: center;
   color: var(--notepane-loading-text);
-  font: calc(13px * var(--notepane-ui-scale)) var(--notepane-ui-font);
+  font: 13px var(--notepane-ui-font);
 }
 
 .layout-transition-overlay {
@@ -769,7 +811,7 @@
 .layout-transition-copy strong {
   overflow: hidden;
   color: var(--sticky-panel-text);
-  font: 760 calc(12px * var(--notepane-ui-scale))/1.1 var(--notepane-ui-font);
+  font: 760 12px/1.1 var(--notepane-ui-font);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -777,7 +819,7 @@
 .layout-transition-copy span {
   overflow: hidden;
   color: var(--sticky-panel-muted);
-  font: 560 calc(11px * var(--notepane-ui-scale))/1.2 var(--notepane-ui-font);
+  font: 560 11px/1.2 var(--notepane-ui-font);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

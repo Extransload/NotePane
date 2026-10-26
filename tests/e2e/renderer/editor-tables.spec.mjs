@@ -1,8 +1,13 @@
 import { expect, test } from "@playwright/test";
 import {
+  clickLastEmptyParagraph,
+  createBlankSession,
+  expectEditorFocused,
   expectFocusedTableCellBorderToMatch,
   loadTemplatePreview,
   modifierShortcut,
+  pastePlainText,
+  waitForEditorSelection,
 } from "../support/renderer-helpers.mjs";
 
 test.beforeEach(async ({ page }) => {
@@ -52,12 +57,11 @@ test("focuses table cells without changing their drag selection behavior", async
     boxShadow: "none",
   });
 
+  // A second Escape selects the table block, as in Notion, and the editor keeps focus for Cmd+Z.
   await page.keyboard.press("Escape");
-  await expect(page.locator(".bn-editor"))
-    .not.toHaveClass(/ProseMirror-focused/);
-  await expect.poll(() => page.locator(".bn-editor .selectedCell").evaluate((cell) => (
-    getComputedStyle(cell, "::after").backgroundColor
-  ))).toBe("rgba(0, 0, 0, 0)");
+  await expect(page.locator(".bn-editor .selectedCell")).toHaveCount(0);
+  await expect(page.locator(".bn-editor [data-block-selected] table")).toHaveCount(1);
+  await expectEditorFocused(page);
   await expect(page.locator(".bn-formatting-toolbar:visible")).toHaveCount(0);
 
   await activeCell.getByText("Tabs", { exact: true }).click();
@@ -371,7 +375,7 @@ test("does not focus the first cell when clicking blank table surface", async ({
   ))).not.toContain("0px 0px 0px 2px");
 });
 
-test("auto-fits table columns from the current font size within the editor width", async ({ page }) => {
+test("auto-fits table columns within the editor width", async ({ page }) => {
   await loadTemplatePreview(page);
   await page.getByRole("button", { name: "Use this template" }).click();
   const tableCells = page.locator(".bn-editor table td");
@@ -388,7 +392,7 @@ test("auto-fits table columns from the current font size within the editor width
     initialTableBounds.innerWidth - 1,
   );
   const autoFitColumn = async () => {
-    // A larger font pushes the table below the viewport, so the double click
+    // Long content can push the table below the viewport, so the double click
     // has to follow the cell instead of its original coordinates.
     await cell.scrollIntoViewIfNeeded();
     const box = await cell.boundingBox();
@@ -400,17 +404,6 @@ test("auto-fits table columns from the current font size within the editor width
 
   await cell.click();
   await autoFitColumn();
-  const defaultFontWidth = (await cell.boundingBox()).width;
-
-  for (let index = 0; index < 5; index += 1) {
-    await page.keyboard.press(modifierShortcut("+"));
-  }
-  await expect.poll(() => page.locator(".bn-editor").evaluate((editor) => (
-    Number.parseFloat(getComputedStyle(editor).fontSize)
-  ))).toBeGreaterThan(20);
-  await autoFitColumn();
-  await expect.poll(async () => (await cell.boundingBox()).width)
-    .toBeGreaterThan(defaultFontWidth + 8);
 
   await cell.click();
   await page.keyboard.press(modifierShortcut("A"));
@@ -451,4 +444,99 @@ test("keeps resized tables inside a local horizontal scroller", async ({ page })
   expect(geometry.surfaceScrollWidth).toBeLessThanOrEqual(
     geometry.surfaceClientWidth + 1,
   );
+});
+
+// prosemirror-tables shrank a text selection that starts in the first cell to that cell, so
+// Command+A in a note that starts with a table selected only the first cell's text.
+test("selects a note that starts with a table with Command+A", async ({ page }) => {
+  await createBlankSession(page);
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, [
+    "| a1 | b1 |", "| --- | --- |", "| a2 | b2 |", "", "middle", "", "- last",
+  ].join("\n"));
+  const editor = page.locator(".bn-editor");
+  await expect(editor.locator("table")).toHaveCount(1);
+  await editor.getByText("middle", { exact: true }).click();
+  await waitForEditorSelection(page);
+
+  // A second Command+A keeps the whole note rather than cycling into the table.
+  for (let press = 0; press < 2; press += 1) {
+    await page.keyboard.press(modifierShortcut("A"));
+    await waitForEditorSelection(page);
+    await expect(editor.locator(".selectedCell")).toHaveCount(0);
+    const selectedText = await page.evaluate(() => String(window.getSelection()));
+    for (const text of ["a1", "b2", "middle", "last"]) {
+      expect(selectedText).toContain(text);
+    }
+  }
+
+  const copiedText = await page.evaluate(() => {
+    const clipboardData = new DataTransfer();
+    document.querySelector(".bn-editor").dispatchEvent(
+      new ClipboardEvent("copy", { bubbles: true, cancelable: true, clipboardData }),
+    );
+    return clipboardData.getData("text/plain");
+  });
+  for (const text of ["a1", "b2", "middle", "last"]) {
+    expect(copiedText).toContain(text);
+  }
+
+  await page.keyboard.press("Backspace");
+  await expect(editor.locator("table")).toHaveCount(0);
+  await expect(editor.getByText("middle", { exact: true })).toHaveCount(0);
+  await expect(editor.locator(".bn-block-content")).toHaveCount(1);
+});
+
+test("keeps the editor focused after a row handle action and Escape, so Cmd+Z undoes it", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const rows = page.locator(".bn-editor table").first().locator("tr");
+  const rowCount = await rows.count();
+  await page.getByRole("cell", { name: "Tabs" }).first().getByText("Tabs", { exact: true }).click();
+
+  // The row handle sits left of the row, the column handle above the column.
+  const handles = page.locator(".bn-table-handle:visible");
+  await expect(handles).toHaveCount(2);
+  const lefts = await handles.evaluateAll((elements) => (
+    elements.map((element) => element.getBoundingClientRect().left)
+  ));
+  await handles.nth(lefts.indexOf(Math.min(...lefts))).click();
+  await page.locator(".bn-table-handle-menu [role='menuitem']")
+    .filter({ hasText: "Add row below" })
+    .click();
+  await expect(rows).toHaveCount(rowCount + 1);
+
+  // Escape clears the row the handle selected.
+  await page.keyboard.press("Escape");
+  await expectEditorFocused(page);
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect(rows).toHaveCount(rowCount);
+});
+
+test("shows the formatting toolbar again for text selected by keyboard after Escape on table cells", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  await page.getByRole("cell", { name: "Tabs" }).first().getByText("Tabs", { exact: true }).click();
+  const handles = page.locator(".bn-table-handle:visible");
+  await expect(handles).toHaveCount(2);
+  const lefts = await handles.evaluateAll((elements) => (
+    elements.map((element) => element.getBoundingClientRect().left)
+  ));
+  await handles.nth(lefts.indexOf(Math.min(...lefts))).click();
+  await page.locator(".bn-table-handle-menu [role='menuitem']")
+    .filter({ hasText: "Add row below" })
+    .click();
+  await page.keyboard.press("Escape");
+  await expectEditorFocused(page);
+  const formattingToolbar = page.locator(".bn-formatting-toolbar:visible");
+  await expect(formattingToolbar).toHaveCount(0);
+
+  // Back to text by keyboard alone: the editor kept focus, so no focus event brings the toolbar back.
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("End");
+  await page.keyboard.type(" kept");
+  for (let index = 0; index < 4; index += 1) {
+    await page.keyboard.press("Shift+ArrowLeft");
+  }
+  await expect(formattingToolbar).toHaveCount(1);
 });

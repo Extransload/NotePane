@@ -1,21 +1,14 @@
 import {
-  BASE_EDITOR_FONT_SIZE_PX,
+  APP_ZOOM_LEVELS,
   DEFAULT_APP_FONT_FAMILY,
-  DEFAULT_APP_FONT_SCALE,
+  DEFAULT_APP_ZOOM,
   DEFAULT_APP_THEME,
   DEFAULT_EDITOR_FONT_FAMILY,
-  DEFAULT_EDITOR_FONT_SCALE,
   DEFAULT_EDITOR_PREFERENCES,
   DEFAULT_LAYOUT_MODE,
   DEFAULT_THEME,
   EDITOR_BUILTIN_FONT_FAMILY_OPTIONS,
   LOCAL_FONT_VALUE_PREFIX,
-  MAX_EDITOR_FONT_SCALE,
-  MAX_APP_FONT_SCALE,
-  MAX_EDITOR_FONT_SIZE_PX,
-  MIN_EDITOR_FONT_SCALE,
-  MIN_APP_FONT_SCALE,
-  MIN_EDITOR_FONT_SIZE_PX,
 } from "../constants.js";
 import {
   disableShadowingDefaultShortcuts,
@@ -75,10 +68,6 @@ export function normalizeEditorPreferences(
     : DEFAULT_EDITOR_PREFERENCES;
 
   return {
-    editorFontScale: normalizeEditorFontScale(
-      source.editorFontScale,
-      fallbackSource.editorFontScale,
-    ),
     editorFontFamily: normalizeEditorFontFamily(
       source.editorFontFamily,
       fallbackSource.editorFontFamily,
@@ -87,10 +76,7 @@ export function normalizeEditorPreferences(
       source.appFontFamily,
       fallbackSource.appFontFamily,
     ),
-    appFontScale: normalizeAppFontScale(
-      source.appFontScale,
-      fallbackSource.appFontScale,
-    ),
+    appZoom: normalizeAppZoom(source.appZoom, fallbackSource.appZoom),
     showTableOfContents:
       typeof source.showTableOfContents === "boolean"
         ? source.showTableOfContents
@@ -147,56 +133,25 @@ export function normalizeOptionalHexColor(value, fallback = null) {
       : null;
 }
 
-export function normalizeEditorFontScale(value, fallback = DEFAULT_EDITOR_FONT_SCALE) {
+// Snaps to the nearest zoom step, so a stored value always sits on the gauge. Mirrors
+// `normalizeAppZoom` in electron/store.cjs.
+export function normalizeAppZoom(value, fallback = DEFAULT_APP_ZOOM) {
   const numericValue = Number(value);
   const fallbackValue = Number(fallback);
   const resolvedValue = Number.isFinite(numericValue)
     ? numericValue
     : Number.isFinite(fallbackValue)
       ? fallbackValue
-      : DEFAULT_EDITOR_FONT_SCALE;
+      : DEFAULT_APP_ZOOM;
 
-  return Math.round(
-    clamp(resolvedValue, MIN_EDITOR_FONT_SCALE, MAX_EDITOR_FONT_SCALE) * 100,
-  ) / 100;
+  return APP_ZOOM_LEVELS.reduce((nearest, level) =>
+    Math.abs(level - resolvedValue) < Math.abs(nearest - resolvedValue) ? level : nearest);
 }
 
-export function normalizeAppFontScale(value, fallback = DEFAULT_APP_FONT_SCALE) {
-  const numericValue = Number(value);
-  const fallbackValue = Number(fallback);
-  const resolvedValue = Number.isFinite(numericValue)
-    ? numericValue
-    : Number.isFinite(fallbackValue)
-      ? fallbackValue
-      : DEFAULT_APP_FONT_SCALE;
-
-  return Math.round(clamp(resolvedValue, MIN_APP_FONT_SCALE, MAX_APP_FONT_SCALE) * 100) / 100;
-}
-
-export function normalizeEditorFontSize(value, fallback = BASE_EDITOR_FONT_SIZE_PX) {
-  const numericValue = Number(value);
-  const fallbackValue = Number(fallback);
-  const resolvedValue = Number.isFinite(numericValue)
-    ? numericValue
-    : Number.isFinite(fallbackValue)
-      ? fallbackValue
-      : BASE_EDITOR_FONT_SIZE_PX;
-
-  return Math.round(
-    clamp(resolvedValue, MIN_EDITOR_FONT_SIZE_PX, MAX_EDITOR_FONT_SIZE_PX),
-  );
-}
-
-export function editorFontScaleToSize(scale) {
-  return normalizeEditorFontSize(
-    normalizeEditorFontScale(scale) * BASE_EDITOR_FONT_SIZE_PX,
-  );
-}
-
-export function editorFontSizeToScale(fontSize) {
-  return normalizeEditorFontScale(
-    normalizeEditorFontSize(fontSize) / BASE_EDITOR_FONT_SIZE_PX,
-  );
+// The zoom one step in `direction` (1 or -1), held at the smallest and largest steps.
+export function stepAppZoom(zoom, direction) {
+  const index = APP_ZOOM_LEVELS.indexOf(normalizeAppZoom(zoom));
+  return APP_ZOOM_LEVELS[clamp(index + direction, 0, APP_ZOOM_LEVELS.length - 1)];
 }
 
 export function normalizeEditorFontFamily(value, fallback = DEFAULT_EDITOR_FONT_FAMILY) {

@@ -18,6 +18,9 @@ const DEFAULT_APP_THEME = Object.freeze({
   mode: "light",
 });
 const DEFAULT_LAYOUT_MODE = "tabs";
+// The tabs window shows every note, so its pin and bounds belong to the app rather than to the
+// active note. `bounds` stays null until the window first saves them.
+const DEFAULT_TABS_WINDOW = Object.freeze({ alwaysOnTop: false, bounds: null });
 const MIN_NOTE_BOUNDS_WIDTH = 320;
 const MIN_NOTE_BOUNDS_HEIGHT = 260;
 const DEFAULT_NOTE_THEME = Object.freeze({
@@ -153,14 +156,10 @@ const NOTE_PANE_TEMPLATE_BLOCKS = Object.freeze([
   },
 ]);
 const NOTE_PANE_TEMPLATE_BLOCKS_JSON = JSON.stringify(NOTE_PANE_TEMPLATE_BLOCKS);
-const DEFAULT_EDITOR_FONT_SCALE = 1;
-const MIN_EDITOR_FONT_SCALE = 0.38;
-const MAX_EDITOR_FONT_SCALE = 9;
 const DEFAULT_EDITOR_FONT_FAMILY = "system";
 const DEFAULT_APP_FONT_FAMILY = "inter";
-const DEFAULT_APP_FONT_SCALE = 1;
-const MIN_APP_FONT_SCALE = 0.8;
-const MAX_APP_FONT_SCALE = 1.3;
+const APP_ZOOM_LEVELS = Object.freeze([0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]);
+const DEFAULT_APP_ZOOM = 1;
 const DEFAULT_KEYBOARD_SHORTCUTS = Object.freeze({
   newSession: "Mod+T",
   newNote: "Mod+N",
@@ -177,9 +176,16 @@ const DEFAULT_KEYBOARD_SHORTCUTS = Object.freeze({
   toggleTableOfContents: "Mod+Shift+O",
   exportPdf: "Mod+Shift+E",
   preferences: "Mod+,",
-  increaseEditorFontSize: "Mod+=",
-  decreaseEditorFontSize: "Mod+-",
+  zoomIn: "Mod+=",
+  zoomOut: "Mod+-",
+  resetZoom: "Mod+0",
   toggleAlwaysOnTop: "Mod+Shift+P",
+});
+// The editor font-size shortcuts became the app zoom shortcuts. A stored binding and its on/off
+// choice move to the new command.
+const RENAMED_KEYBOARD_SHORTCUT_COMMANDS = Object.freeze({
+  increaseEditorFontSize: "zoomIn",
+  decreaseEditorFontSize: "zoomOut",
 });
 const KEYBOARD_SHORTCUT_COMMAND_IDS = Object.keys(DEFAULT_KEYBOARD_SHORTCUTS);
 const KEYBOARD_SHORTCUT_TOGGLE_COMMAND_IDS = [
@@ -196,10 +202,9 @@ const LEGACY_DEFAULT_MOVE_TAB_LEFT_SHORTCUT = "Mod+Shift+ArrowLeft";
 const LEGACY_DEFAULT_MOVE_TAB_RIGHT_SHORTCUT = "Mod+Shift+ArrowRight";
 const LEGACY_DEFAULT_TOGGLE_LAYOUT_MODE_SHORTCUT = "Mod+Shift+M";
 const DEFAULT_EDITOR_PREFERENCES = Object.freeze({
-  editorFontScale: DEFAULT_EDITOR_FONT_SCALE,
   editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
   appFontFamily: DEFAULT_APP_FONT_FAMILY,
-  appFontScale: DEFAULT_APP_FONT_SCALE,
+  appZoom: DEFAULT_APP_ZOOM,
   showTableOfContents: false,
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
@@ -236,6 +241,7 @@ class StickyStore {
     this.state = {
       appTheme: DEFAULT_APP_THEME,
       layoutMode: DEFAULT_LAYOUT_MODE,
+      tabsWindow: DEFAULT_TABS_WINDOW,
       editorPreferences: DEFAULT_EDITOR_PREFERENCES,
       notes: [],
     };
@@ -333,6 +339,7 @@ class StickyStore {
       this.state = {
         appTheme: DEFAULT_APP_THEME,
         layoutMode: DEFAULT_LAYOUT_MODE,
+        tabsWindow: DEFAULT_TABS_WINDOW,
         editorPreferences: DEFAULT_EDITOR_PREFERENCES,
         notes: [],
       };
@@ -361,6 +368,7 @@ class StickyStore {
             : parsedObject.appTheme ?? inferLegacyAppTheme(rawNotes),
         ),
         layoutMode: normalizeLayoutMode(parsedObject.layoutMode),
+        tabsWindow: normalizeTabsWindow(parsedObject.tabsWindow),
         editorPreferences,
         notes: backfillMissingSortOrders(
           rawNotes.map((note) =>
@@ -368,11 +376,21 @@ class StickyStore {
           ),
         ),
       };
+      // Before the tabs window had its own record, pinning it pinned the note it showed, and at
+      // launch it opened on the first listed note (getMainTabsNote in main.cjs). That note's pin
+      // becomes the tabs window's, and the note keeps it for its own sticky window.
+      if (parsedObject.tabsWindow === undefined && this.state.layoutMode === "tabs") {
+        this.state.tabsWindow = {
+          ...this.state.tabsWindow,
+          alwaysOnTop: this.listNotes()[0]?.alwaysOnTop === true,
+        };
+      }
     } catch (error) {
       this.backupCorruptedFile(this.filePath, "notes-corrupted", error);
       this.state = {
         appTheme: DEFAULT_APP_THEME,
         layoutMode: DEFAULT_LAYOUT_MODE,
+        tabsWindow: DEFAULT_TABS_WINDOW,
         editorPreferences: DEFAULT_EDITOR_PREFERENCES,
         notes: [],
       };
@@ -398,6 +416,22 @@ class StickyStore {
     this.state.layoutMode = normalizeLayoutMode(layoutMode, this.state.layoutMode);
     this.save();
     return this.getLayoutMode();
+  }
+
+  getTabsWindow() {
+    return { ...this.state.tabsWindow };
+  }
+
+  setTabsWindowAlwaysOnTop(alwaysOnTop) {
+    this.state.tabsWindow = { ...this.state.tabsWindow, alwaysOnTop: Boolean(alwaysOnTop) };
+    this.save();
+    return this.getTabsWindow();
+  }
+
+  updateTabsWindowBounds(bounds) {
+    this.state.tabsWindow = normalizeTabsWindow({ ...this.state.tabsWindow, bounds });
+    this.save();
+    return this.getTabsWindow();
   }
 
   getEditorPreferences() {
@@ -522,9 +556,6 @@ class StickyStore {
       theme: options?.theme ?? DEFAULT_NOTE_THEME,
       alwaysOnTop: false,
       seedDemoContent,
-      editorFontScale: Object.hasOwn(options, "editorFontScale")
-        ? options.editorFontScale
-        : editorPreferences.editorFontScale,
       editorFontFamily: Object.hasOwn(options, "editorFontFamily")
         ? options.editorFontFamily
         : editorPreferences.editorFontFamily,
@@ -590,7 +621,6 @@ class StickyStore {
       theme: DEFAULT_NOTE_THEME,
       alwaysOnTop: false,
       seedDemoContent: true,
-      editorFontScale: sourceNote.editorFontScale ?? editorPreferences.editorFontScale,
       editorFontFamily:
         sourceNote.editorFontFamily ?? editorPreferences.editorFontFamily,
       trashedAt: null,
@@ -843,6 +873,7 @@ class StickyStore {
       version: 11,
       appTheme: this.state.appTheme,
       layoutMode: this.state.layoutMode,
+      tabsWindow: this.state.tabsWindow,
       editorPreferences: this.state.editorPreferences,
       notes: this.state.notes,
     });
@@ -921,7 +952,9 @@ function normalizeBackup(value) {
     noteIds.add(note.id);
   }
 
-  const editorPreferences = normalizeEditorPreferences(data.editorPreferences);
+  const editorPreferences = normalizeEditorPreferences(
+    renameLegacyShortcutPreferences(data.editorPreferences),
+  );
   const notes = backfillMissingSortOrders(
     data.notes.map((note) => normalizeNote(note, { editorPreferences })),
   );
@@ -941,6 +974,7 @@ function normalizeBackup(value) {
     data: {
       appTheme: normalizeAppTheme(data.appTheme),
       layoutMode: normalizeLayoutMode(data.layoutMode),
+      tabsWindow: normalizeTabsWindow(data.tabsWindow),
       editorPreferences,
       notes,
     },
@@ -997,10 +1031,6 @@ function normalizeNote(value, options = {}) {
     seedDemoContent: typeof source.seedDemoContent === "boolean"
       ? source.seedDemoContent
       : false,
-    editorFontScale: normalizeEditorFontScale(
-      source.editorFontScale,
-      editorPreferences.editorFontScale,
-    ),
     editorFontFamily: normalizeEditorFontFamily(
       source.editorFontFamily,
       editorPreferences.editorFontFamily,
@@ -1211,10 +1241,10 @@ function stripMarkdownTitleSyntax(value) {
 }
 
 function migrateLegacyEditorPreferences(value, version = 1) {
-  const source = value && typeof value === "object" ? value : {};
+  const source = renameLegacyShortcutPreferences(value);
   const keyboardShortcuts = source.keyboardShortcuts;
   if (!keyboardShortcuts || typeof keyboardShortcuts !== "object") {
-    return value;
+    return source;
   }
 
   const nextKeyboardShortcuts = { ...keyboardShortcuts };
@@ -1264,6 +1294,34 @@ function migrateLegacyEditorPreferences(value, version = 1) {
   };
 }
 
+// Applies RENAMED_KEYBOARD_SHORTCUT_COMMANDS to stored preferences, from notes.json or from a backup
+// an older version exported.
+function renameLegacyShortcutPreferences(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    ...source,
+    keyboardShortcuts: renameLegacyShortcutCommands(source.keyboardShortcuts),
+    keyboardShortcutEnabled: renameLegacyShortcutCommands(source.keyboardShortcutEnabled),
+  };
+}
+
+function renameLegacyShortcutCommands(value) {
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const renamed = { ...value };
+  for (const [legacyId, commandId] of Object.entries(RENAMED_KEYBOARD_SHORTCUT_COMMANDS)) {
+    if (Object.hasOwn(renamed, legacyId)) {
+      if (!Object.hasOwn(renamed, commandId)) {
+        renamed[commandId] = renamed[legacyId];
+      }
+      delete renamed[legacyId];
+    }
+  }
+  return renamed;
+}
+
 // Same rules as normalizeAppTheme in src/model/preferences.js (tests/unit/themes.test.cjs checks
 // that they agree). `mode` is always the theme's scheme, so an older build still reads a
 // sensible light or dark value.
@@ -1311,6 +1369,16 @@ function normalizeLayoutMode(value, fallback = DEFAULT_LAYOUT_MODE) {
   return fallback === "sticky" ? "sticky" : "tabs";
 }
 
+function normalizeTabsWindow(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    alwaysOnTop: source.alwaysOnTop === true,
+    bounds: source.bounds && typeof source.bounds === "object"
+      ? normalizeBounds(source.bounds, { width: 960, height: 720 })
+      : null,
+  };
+}
+
 function normalizeEditorPreferences(
   value,
   fallback = DEFAULT_EDITOR_PREFERENCES,
@@ -1321,10 +1389,6 @@ function normalizeEditorPreferences(
     : DEFAULT_EDITOR_PREFERENCES;
 
   return {
-    editorFontScale: normalizeEditorFontScale(
-      source.editorFontScale,
-      fallbackSource.editorFontScale,
-    ),
     editorFontFamily: normalizeEditorFontFamily(
       source.editorFontFamily,
       fallbackSource.editorFontFamily,
@@ -1333,10 +1397,7 @@ function normalizeEditorPreferences(
       source.appFontFamily,
       fallbackSource.appFontFamily,
     ),
-    appFontScale: normalizeAppFontScale(
-      source.appFontScale,
-      fallbackSource.appFontScale,
-    ),
+    appZoom: normalizeAppZoom(source.appZoom, fallbackSource.appZoom),
     showTableOfContents:
       typeof source.showTableOfContents === "boolean"
         ? source.showTableOfContents
@@ -1627,32 +1688,18 @@ function normalizeOpacity(value, fallback = DEFAULT_NOTE_THEME.tabTextOpacity) {
     : DEFAULT_NOTE_THEME.tabTextOpacity;
 }
 
-function normalizeEditorFontScale(value, fallback = DEFAULT_EDITOR_FONT_SCALE) {
+// Snaps to the nearest zoom step. Mirrors `normalizeAppZoom` in src/model/preferences.js.
+function normalizeAppZoom(value, fallback = DEFAULT_APP_ZOOM) {
   const numericValue = Number(value);
   const fallbackValue = Number(fallback);
   const resolvedValue = Number.isFinite(numericValue)
     ? numericValue
     : Number.isFinite(fallbackValue)
       ? fallbackValue
-      : DEFAULT_EDITOR_FONT_SCALE;
+      : DEFAULT_APP_ZOOM;
 
-  return Math.round(
-    clamp(resolvedValue, MIN_EDITOR_FONT_SCALE, MAX_EDITOR_FONT_SCALE) * 100,
-  ) / 100;
-}
-
-function normalizeAppFontScale(value, fallback = DEFAULT_APP_FONT_SCALE) {
-  const numericValue = Number(value);
-  const fallbackValue = Number(fallback);
-  const resolvedValue = Number.isFinite(numericValue)
-    ? numericValue
-    : Number.isFinite(fallbackValue)
-      ? fallbackValue
-      : DEFAULT_APP_FONT_SCALE;
-
-  return Math.round(
-    clamp(resolvedValue, MIN_APP_FONT_SCALE, MAX_APP_FONT_SCALE) * 100,
-  ) / 100;
+  return APP_ZOOM_LEVELS.reduce((nearest, level) =>
+    Math.abs(level - resolvedValue) < Math.abs(nearest - resolvedValue) ? level : nearest);
 }
 
 function normalizeEditorFontFamily(value, fallback = DEFAULT_EDITOR_FONT_FAMILY) {
@@ -1753,10 +1800,10 @@ module.exports = {
   DEFAULT_LAYOUT_MODE,
   DEFAULT_NOTE_THEME,
   DEFAULT_THEME,
-  DEFAULT_EDITOR_FONT_SCALE,
   DEFAULT_EDITOR_FONT_FAMILY,
   DEFAULT_APP_FONT_FAMILY,
   DEFAULT_KEYBOARD_SHORTCUTS,
   DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
   normalizeAppTheme,
+  normalizeAppZoom,
 };

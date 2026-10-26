@@ -9,19 +9,14 @@ import {
 } from "react";
 import {
   EDITOR_BUILTIN_FONT_FAMILY_OPTIONS,
-  EDITOR_FONT_SIZE_PRESETS,
-  MAX_EDITOR_FONT_SIZE_PX,
-  MIN_EDITOR_FONT_SIZE_PX,
 } from "../constants.js";
 import {
   preventFocusLoss,
 } from "../editor/images.js";
 import {
-  editorFontScaleToSize,
   filterEditorFontOptions,
   getEditorFontFamilyOption,
   normalizeEditorFontFamily,
-  normalizeEditorFontSize,
 } from "../model/preferences.js";
 import {
   DropdownMenuOption,
@@ -161,126 +156,6 @@ export function EditorFontFamilyControl({
           ) : (
             <div className="editor-font-family-empty">No fonts found</div>
           )}
-        </FloatingDropdownMenu>
-      </div>
-    </div>
-  );
-}
-
-export function EditorFontSizeControl({
-  className = "",
-  draftValue,
-  scale,
-  onDraftChange,
-  onCommit,
-  onFontSizeChange,
-}) {
-  const currentFontSize = editorFontScaleToSize(scale);
-  const [isSizeMenuOpen, setIsSizeMenuOpen] = useState(false);
-  const sizeMenuAnchorRef = useRef(null);
-
-  const closeSizeMenu = useCallback(() => {
-    setIsSizeMenuOpen(false);
-  }, []);
-
-  const applyFontSize = useCallback(
-    (nextSize) => {
-      const normalizedSize = normalizeEditorFontSize(nextSize, currentFontSize);
-      onDraftChange(String(normalizedSize));
-      onFontSizeChange(normalizedSize);
-      closeSizeMenu();
-    },
-    [closeSizeMenu, currentFontSize, onDraftChange, onFontSizeChange],
-  );
-
-  return (
-    <div
-      ref={sizeMenuAnchorRef}
-      className={`editor-font-setting-control editor-font-size-control ${className}`.trim()}
-      onMouseDown={preventFocusLoss}
-    >
-      <div className="editor-font-size-combobox">
-        <input
-          className="editor-font-size-input"
-          aria-label="Editor font size"
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          min={MIN_EDITOR_FONT_SIZE_PX}
-          max={MAX_EDITOR_FONT_SIZE_PX}
-          value={draftValue}
-          onMouseDown={(event) => event.stopPropagation()}
-          onChange={(event) => {
-            const nextValue = event.target.value.trim();
-            const nextSize = Number(nextValue);
-            onDraftChange(nextValue);
-            if (
-              /^\d{1,3}$/.test(nextValue) &&
-              Number.isFinite(nextSize) &&
-              nextSize >= MIN_EDITOR_FONT_SIZE_PX &&
-              nextSize <= MAX_EDITOR_FONT_SIZE_PX
-            ) {
-              onFontSizeChange(nextSize);
-            }
-          }}
-          onFocus={() => setIsSizeMenuOpen(false)}
-          onBlur={onCommit}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowDown") {
-              event.preventDefault();
-              setIsSizeMenuOpen(true);
-              return;
-            }
-            if (event.key === "Enter") {
-              event.preventDefault();
-              onCommit();
-              event.currentTarget.blur();
-              return;
-            }
-            if (event.key === "Escape") {
-              event.preventDefault();
-              onDraftChange(String(currentFontSize));
-              closeSizeMenu();
-              event.currentTarget.blur();
-            }
-          }}
-        />
-        <button
-          type="button"
-          className="editor-font-size-menu-button"
-          aria-label="Open font size menu"
-          aria-haspopup="listbox"
-          aria-expanded={isSizeMenuOpen ? "true" : "false"}
-          onMouseDown={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-          onClick={() => setIsSizeMenuOpen((value) => !value)}
-        >
-          ⌄
-        </button>
-        <FloatingDropdownMenu
-          anchorRef={sizeMenuAnchorRef}
-          ariaLabel="Editor font size presets"
-          className="editor-font-size-menu"
-          isOpen={isSizeMenuOpen}
-          align="end"
-          maxHeight={196}
-          maxWidth={104}
-          minWidth={76}
-          onRequestClose={closeSizeMenu}
-          preferredWidth={86}
-        >
-          {EDITOR_FONT_SIZE_PRESETS.map((fontSize) => (
-            <DropdownMenuOption
-              key={fontSize}
-              className="editor-font-size-option"
-              selected={currentFontSize === fontSize}
-              onClick={() => applyFontSize(fontSize)}
-            >
-              {fontSize}
-            </DropdownMenuOption>
-          ))}
         </FloatingDropdownMenu>
       </div>
     </div>

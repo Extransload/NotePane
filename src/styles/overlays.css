@@ -18,7 +18,7 @@
     0 14px 30px color-mix(in srgb, var(--sticky-text-color) 14%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--notepane-glass) 42%, transparent);
   color: var(--sticky-panel-text);
-  font: 720 calc(11px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
+  font: 720 11px/1 var(--notepane-ui-font);
   pointer-events: auto;
   -webkit-app-region: no-drag;
   animation: toastIn 150ms ease both;
@@ -57,7 +57,7 @@
   border-radius: 999px;
   background: var(--chrome-icon-button-bg);
   color: var(--icon-chrome-active-color);
-  font: 760 calc(11px * var(--notepane-ui-scale))/1 var(--notepane-ui-font);
+  font: 760 11px/1 var(--notepane-ui-font);
   cursor: pointer;
   transition:
     background 130ms ease,
@@ -164,7 +164,7 @@
   gap: 8px;
   margin-top: 12px;
   color: var(--sticky-panel-muted);
-  font: 600 calc(11px * var(--notepane-ui-scale))/1.4 var(--notepane-ui-font);
+  font: 600 11px/1.4 var(--notepane-ui-font);
 }
 
 .crop-actions span {
@@ -174,7 +174,7 @@
 .crop-error {
   margin-top: 8px;
   color: var(--sticky-danger-color);
-  font: 600 calc(11px * var(--notepane-ui-scale))/1.4 var(--notepane-ui-font);
+  font: 600 11px/1.4 var(--notepane-ui-font);
 }
 
 body.is-exporting,
@@ -200,8 +200,15 @@ body.is-exporting .default-template-suggestion,
 body.is-exporting .editor-font-setting-control,
 body.is-exporting .editor-table-of-contents,
 body.is-exporting .preferences-panel,
-body.is-exporting .preferences-backdrop {
+body.is-exporting .preferences-backdrop,
+body.is-exporting .app-zoom-gauge-dock {
   display: none !important;
+}
+
+/* The caret's empty block shows a hint such as "Enter text or type '/' for commands"; the export
+   button keeps the editor focused, so the hint would print. */
+body.is-exporting .bn-block-content:has(.ProseMirror-trailingBreak:only-child)::after {
+  content: none !important;
 }
 
 body.is-exporting .sticky-shell,

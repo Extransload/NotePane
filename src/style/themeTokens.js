@@ -38,6 +38,7 @@ const STRENGTH = {
   buttonActiveBorder: [0.26, 0.3],
   codeBorder: [0.34, 0.34],
   inlineCode: [0.16, 0.1],
+  callout: [0.05, 0.08],
   glass: [0.38, 0.08],
   glassSoft: [0.28, 0.08],
   glassButton: [0.42, 0.08],
@@ -228,6 +229,7 @@ export function buildThemeTokens(theme) {
     "--sticky-code-color-scheme":
       getRelativeLuminance(palette.codeBg) < getRelativeLuminance(palette.codeText) ? "dark" : "light",
     "--sticky-inline-code-bg": hexToCssRgb(palette.text, s("inlineCode")),
+    "--sticky-callout-bg": hexToCssRgb(palette.text, s("callout")),
     // The danger colour, darkened or lightened toward the text colour until it reads at 4.5:1 on
     // the inline code chip as it shows over the window.
     "--sticky-inline-code-text": readableOn(

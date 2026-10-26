@@ -4,7 +4,9 @@ import {
   createBlankSession,
   loadTemplatePreview,
   modifierShortcut,
+  pasteClipboardText,
   pastePlainText,
+  waitForEditorSelection,
 } from "../support/renderer-helpers.mjs";
 
 test.beforeEach(async ({ page }) => {
@@ -114,6 +116,74 @@ test("creates and focuses the first child when Enter ends a toggle heading", asy
         Node.DOCUMENT_POSITION_FOLLOWING);
   }, [await newFirstChild.elementHandle(), await child.elementHandle()]))
     .resolves.toBe(true);
+});
+
+test("applies the slash menu item that Enter picks in a toggle title", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type(">");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Toggle parent /h2");
+  const slashMenu = page.locator(".bn-suggestion-menu");
+  await expect(slashMenu.locator("[aria-selected='true']")).toHaveText(/^Heading 2/);
+
+  await page.keyboard.press("Enter");
+  await expect(slashMenu).toHaveCount(0);
+  await page.keyboard.type("Picked heading");
+
+  // The command text is gone and the heading came from the menu, not a new toggle child.
+  await expect(page.getByText("/h2")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Picked heading", level: 2 })).toBeVisible();
+  await expect(page.locator("[data-content-type='toggleListItem']").filter({
+    hasText: "Toggle parent",
+  }).locator("xpath=ancestor::*[contains(@class, 'bn-block-outer')][1]//h2"))
+    .toHaveCount(0);
+});
+
+test("pastes an HTML toggle without page errors", async ({ page }) => {
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await clickLastEmptyParagraph(page);
+  await pasteClipboardText(page, {
+    plainText: "Pasted toggle\nhidden child",
+    html: "<details open><summary>Pasted toggle</summary><p>hidden child</p></details><p>after</p>",
+  });
+  const toggle = page.locator("[data-content-type='toggleListItem']").filter({ hasText: "Pasted toggle" });
+  await expect(toggle).toHaveCount(1);
+  await page.keyboard.type(" typed");
+  await expect(page.locator(".bn-editor")).toContainText("typed");
+
+  await toggle.getByRole("button").first().click();
+  await expect(toggle.locator(".bn-toggle-wrapper")).toHaveAttribute("data-show-children", "true");
+  await expect(page.locator(".bn-editor").getByText("hidden child", { exact: true })).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
+test("keeps an open toggle's lines in sight when Enter splits its title", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type(">");
+  await page.keyboard.press("Space");
+  await page.keyboard.type("Toggle title");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("inner line");
+  const innerLine = page.locator(".bn-editor").getByText("inner line", { exact: true });
+  await expect(innerLine).toBeVisible();
+
+  // The caret between "Toggle" and " title".
+  await page.locator(".bn-editor .bn-inline-content").filter({ hasText: /^Toggle title$/ }).evaluate((element) => {
+    element.closest("[contenteditable]").focus();
+    const range = document.createRange();
+    range.setStart(element.firstChild, "Toggle".length);
+    range.collapse(true);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+  });
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Enter");
+
+  const toggles = page.locator(".bn-editor [data-content-type='toggleListItem']");
+  await expect(toggles).toHaveCount(2);
+  await expect(toggles.nth(1)).toHaveText(" title");
+  await expect(innerLine).toBeVisible();
 });
 
 test("uses identical Enter behavior for ordinary and heading toggles", async ({ page }) => {

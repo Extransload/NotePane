@@ -23,6 +23,20 @@ test.afterEach(() => {
   }
 });
 
+// A suite running in the background must not flash note windows over the person's screen.
+test("Electron test windows stay out of sight", async () => {
+  const electronApp = await launchApp(createTemporaryDirectory("notepane-hidden-"));
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    expect(await electronApp.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().map((window) => window.getOpacity()))).toEqual([0]);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron app opens a sticky window and persists editor content", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const exportDirectory = createTemporaryDirectory("notepane-export-");
@@ -227,39 +241,70 @@ test("changing the theme updates the open window", async () => {
   }
 });
 
-test("app font size applies to every window and persists", async () => {
-  const userDataDirectory = createTemporaryDirectory("notepane-app-font-");
+test("Cmd/Ctrl+= zooms every window, and the zoom persists", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-zoom-");
   writeInitialNotes(userDataDirectory, [
     { id: "first-note", title: "First note", createdAt: 1, updatedAt: 1 },
     { id: "second-note", title: "Second note", createdAt: 2, updatedAt: 2 },
   ]);
-  const electronApp = await launchApp(userDataDirectory);
-  const readBodyFontSize = (page) => page.evaluate(() =>
-    Number.parseFloat(getComputedStyle(document.body).fontSize));
+  const readZooms = (electronApp) => electronApp.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().map((window) => Math.round(window.webContents.getZoomFactor() * 100)));
+  // How much larger the page draws than its window, as a person sees the zoom.
+  const readPageZoom = (page) => page.evaluate(() =>
+    Math.round((window.outerWidth / window.innerWidth) * 100));
+  const readStoredZoom = () => JSON.parse(fs.readFileSync(
+    path.join(userDataDirectory, "notes.json"), "utf8",
+  )).editorPreferences.appZoom;
+  const expectWindowButtonsAt = async (electronApp, y) => {
+    if (process.platform === "darwin") {
+      await expect.poll(() => getAllWindowButtonPositions(electronApp))
+        .toEqual([{ x: 14, y }, { x: 14, y }]);
+    }
+  };
 
+  let electronApp = await launchApp(userDataDirectory);
   try {
     const tabsPage = await electronApp.firstWindow();
     await expect(tabsPage.getByTestId("sticky-editor-surface")).toBeVisible();
-    await tabsPage.keyboard.press(modifierShortcut(","));
-    const preferences = tabsPage.getByRole("dialog", { name: "Preferences window" });
-    await expect(preferences).toBeVisible();
-    await preferences.getByRole("tab", { name: "General" }).click();
-    const slider = preferences.getByRole("slider", { name: "App font size" });
-    await slider.scrollIntoViewIfNeeded();
-    await slider.focus();
-    await tabsPage.keyboard.press("End");
-    await expect(slider).toHaveValue("130");
+    await tabsPage.keyboard.press(modifierShortcut("="));
+    await expect(tabsPage.getByRole("meter", { name: "Zoom" }))
+      .toHaveAttribute("aria-valuetext", "110%");
+    await expect.poll(() => readZooms(electronApp)).toEqual([110]);
+    await expect.poll(() => readPageZoom(tabsPage)).toBe(110);
+    await expect.poll(readStoredZoom).toBe(1.1);
 
-    await expect.poll(() => readBodyFontSize(tabsPage)).toBe(20.8);
-    await expect.poll(() => JSON.parse(fs.readFileSync(
-      path.join(userDataDirectory, "notes.json"), "utf8",
-    )).editorPreferences.appFontScale).toBe(1.3);
-
-    // The sticky windows that open next use the stored size.
+    // Windows opened afterwards start at the zoom, and their buttons stay centred on the larger
+    // header: 10 + 30 * 0.1 / 2, rounded.
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(() => readZooms(electronApp)).toEqual([110, 110]);
+    await expectWindowButtonsAt(electronApp, 12);
+
+    // Zooming from one window zooms them all.
     const secondPage = await getStickyPageByNoteId(electronApp, "second-note");
     await expect(secondPage.getByTestId("sticky-editor-surface")).toBeVisible();
-    await expect.poll(() => readBodyFontSize(secondPage)).toBe(20.8);
+    await secondPage.keyboard.press(modifierShortcut("0"));
+    await expect.poll(() => readZooms(electronApp)).toEqual([100, 100]);
+    await secondPage.keyboard.press(modifierShortcut("-"));
+    await expect.poll(() => readZooms(electronApp)).toEqual([90, 90]);
+    await expect.poll(() => readPageZoom(secondPage)).toBe(90);
+    await expectWindowButtonsAt(electronApp, 9);
+  } finally {
+    await electronApp.close();
+  }
+
+  electronApp = await launchApp(userDataDirectory);
+  try {
+    await expect.poll(() => readZooms(electronApp)).toEqual([90, 90]);
+    await expectWindowButtonsAt(electronApp, 9);
+
+    // At 50% the sticky header is 15px, about the buttons' own height, so they stay inside it.
+    const page = await getStickyPageByNoteId(electronApp, "first-note");
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    for (let press = 0; press < 4; press += 1) {
+      await page.keyboard.press(modifierShortcut("-"));
+    }
+    await expect.poll(() => readZooms(electronApp)).toEqual([50, 50]);
+    await expectWindowButtonsAt(electronApp, 1);
   } finally {
     await electronApp.close();
   }
@@ -834,6 +879,91 @@ test("Electron reopens a window saved on a disconnected display inside the scree
   }
 });
 
+test("Electron reopens a tabs window saved on a disconnected display inside the screen", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+  ]);
+  const notesPath = path.join(userDataDirectory, "notes.json");
+  const state = JSON.parse(fs.readFileSync(notesPath, "utf8"));
+  state.tabsWindow = { alwaysOnTop: false, bounds: { x: -20000, y: -20000, width: 900, height: 600 } };
+  fs.writeFileSync(notesPath, JSON.stringify(state), "utf8");
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
+
+    const { bounds, workArea } = await electronApp.evaluate(({ BrowserWindow, screen }) => ({
+      bounds: BrowserWindow.getAllWindows()[0].getBounds(),
+      workArea: screen.getPrimaryDisplay().workArea,
+    }));
+    expect(bounds).toMatchObject({ width: 900, height: 600 });
+    expect(bounds.x).toBeGreaterThanOrEqual(workArea.x);
+    expect(bounds.y).toBeGreaterThanOrEqual(workArea.y);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(workArea.x + workArea.width);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(workArea.y + workArea.height);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+// The tabs window has one size and place whichever tab is active, apart from the notes' sticky bounds.
+test("Electron restores the tabs window bounds after sticky mode and after a restart", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "alpha", title: "Alpha", markdown: "alpha body", createdAt: 1, updatedAt: 1 },
+    { id: "beta", title: "Beta", markdown: "beta body", createdAt: 2, updatedAt: 2 },
+    { id: "gamma", title: "Gamma", markdown: "gamma body", createdAt: 3, updatedAt: 3 },
+  ]);
+  let electronApp = await launchApp(userDataDirectory);
+  let movedBounds;
+
+  try {
+    const firstPage = await electronApp.firstWindow();
+    await expect(firstPage.getByTestId("sticky-editor-surface")).toContainText("alpha body");
+    const openedBounds = await getFirstWindowBounds(electronApp);
+
+    // Sticky mode moves this window into the sticky grid; tabs mode brings it back.
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(() => electronApp.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().filter((window) => window.isVisible()).length)).toBe(3);
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(() => readAllWindowBounds(electronApp)).toEqual([openedBounds]);
+
+    await expect.poll(() => getOpenPages(electronApp).length).toBe(1);
+    const page = getOpenPages(electronApp)[0];
+    await page.getByRole("tab", { name: /Gamma/ }).click();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("gamma body");
+    movedBounds = await electronApp.evaluate(({ BrowserWindow, screen }) => {
+      const { workArea } = screen.getPrimaryDisplay();
+      const window = BrowserWindow.getAllWindows()[0];
+      window.setBounds({
+        x: workArea.x + 40,
+        y: workArea.y + 30,
+        width: Math.min(1000, workArea.width - 80),
+        height: Math.min(680, workArea.height - 60),
+      });
+      // A move or resize by hand ends with these events.
+      window.emit("resized");
+      window.emit("moved");
+      return window.getBounds();
+    });
+    expect(movedBounds).not.toEqual(openedBounds);
+  } finally {
+    await electronApp.close();
+  }
+
+  electronApp = await launchApp(userDataDirectory);
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    expect(await readAllWindowBounds(electronApp)).toEqual([movedBounds]);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron runs every renderer sandboxed with the preload bridge intact", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-sandbox-");
   const electronApp = await launchApp(userDataDirectory);
@@ -1126,6 +1256,41 @@ test("Electron note search switches tabs and opens find on the match", async () 
     const findBar = page.getByRole("search", { name: "Find in note" });
     await expect(findBar.getByRole("textbox", { name: "Find in note" })).toHaveValue("needle");
     await expect(findBar).toContainText("1 / 1");
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Electron note search leaves focus in the find field of the tab it opens", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", markdown: "needle one\n\nneedle two", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const editor = page.getByTestId("sticky-editor-surface");
+    await editor.getByText("first body").click();
+    await page.keyboard.press(modifierShortcut("P"));
+    const palette = page.getByRole("dialog", { name: "Search notes" });
+    await palette.getByRole("textbox", { name: "Search notes" }).fill("needle");
+    await palette.getByRole("textbox", { name: "Search notes" }).press("Enter");
+
+    await expect.poll(() => getCurrentPageNoteId(page)).toBe("second-note");
+    const findBar = page.getByRole("search", { name: "Find in note" });
+    await expect(findBar).toContainText("1 / 2");
+    const blocks = editor.locator(".bn-block-content");
+    const blockCount = await blocks.count();
+    await expect(findBar.getByRole("textbox", { name: "Find in note" })).toBeFocused();
+
+    // Enter steps to the next match and Escape closes find; neither edits the note.
+    await page.keyboard.press("Enter");
+    await expect(findBar).toContainText("2 / 2");
+    await page.keyboard.press("Escape");
+    await expect(findBar).toHaveCount(0);
+    await expect(blocks).toHaveCount(blockCount);
   } finally {
     await electronApp.close();
   }
@@ -1488,6 +1653,8 @@ test("Cmd/Ctrl+W closes the tab with confirmation", async () => {
     await page.keyboard.press(modifierShortcut("W"));
     const closeDialog = page.getByRole("dialog", { name: "Close tab confirmation" });
     await expect(closeDialog).toBeVisible();
+    // Closing a tab moves its note to Trash, and the dialog says so.
+    await expect(closeDialog).toContainText("moves its note to Trash");
     await page.keyboard.press("Escape");
     await expect(closeDialog).toHaveCount(0);
 
@@ -1495,7 +1662,7 @@ test("Cmd/Ctrl+W closes the tab with confirmation", async () => {
     await expect(closeDialog).toBeVisible();
     await page.keyboard.press("Enter");
     await expect(closeDialog).toHaveCount(0);
-    await expect(page.locator(".sticky-toast-success")).toContainText("closed");
+    await expect(page.locator(".sticky-toast-success")).toContainText("Close me closed and moved to Trash.");
     await expect.poll(() => page.getByRole("tab").count()).toBe(1);
   } finally {
     await electronApp.close();
@@ -1685,6 +1852,46 @@ test("Electron sticky close icon closes the current window with the platform sho
         );
       });
     }).toEqual(["second-note"]);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+// The first click turns "Show sticky actions" into "Close window" under the pointer, so the second
+// click of a double click must not close the window.
+test("Electron sticky actions toggle ignores the second click of a double click", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByRole("tab")).toHaveCount(2);
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(() => readAllWindowBounds(electronApp).then((bounds) => bounds.length))
+      .toBe(2);
+
+    const secondStickyPage = await getStickyPageByNoteId(electronApp, "second-note");
+    const actionToggle = secondStickyPage.locator(".sticky-header-action-preview");
+    await expect(actionToggle).toHaveAttribute("aria-label", "Show sticky actions");
+    await actionToggle.dblclick();
+    await expect(actionToggle).toHaveAttribute("aria-label", "Close window");
+    // Main handles a window's requests in order, so a close the clicks asked for is done by now.
+    await getCurrentPageNoteId(secondStickyPage);
+    expect(await readAllWindowBounds(electronApp)).toHaveLength(2);
+    await expect(actionToggle).toHaveAttribute("aria-expanded", "true");
+
+    // A separate click still closes it.
+    await actionToggle.click().catch((error) => {
+      if (!String(error).includes("closed")) {
+        throw error;
+      }
+    });
+    await expect.poll(() => readAllWindowBounds(electronApp).then((bounds) => bounds.length))
+      .toBe(1);
   } finally {
     await electronApp.close();
   }
@@ -2106,6 +2313,255 @@ test("Electron sticky windows keep independent pin and color updates", async () 
   }
 });
 
+// A colour change sends no title flag, so a title named by hand must not fall back to the first line.
+test("Electron keeps a sticky note's hand-edited title when its colour changes", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "Alpha", markdown: "alpha", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Beta", markdown: "beta", createdAt: 2, updatedAt: 2 },
+  ]);
+  const readStoredNote = () => JSON.parse(
+    fs.readFileSync(path.join(userDataDirectory, "notes.json"), "utf8"),
+  ).notes.find((note) => note.id === "second-note");
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    const secondStickyPage = await getStickyPageByNoteId(electronApp, "second-note");
+    await expect(secondStickyPage.getByTestId("sticky-editor-surface")).toContainText("beta");
+
+    const settings = await openStickySettings(secondStickyPage);
+    await settings.getByRole("button", { name: "Pastel color 5" }).click();
+    await expect.poll(() => readStoredNote().theme.tabTextColor).toBe("#eadcff");
+    expect(readStoredNote()).toMatchObject({ title: "Beta", titleManuallyEdited: true });
+  } finally {
+    await electronApp.close();
+  }
+});
+
+// Tabs mode pins the tabs window, which no note owns, and each sticky window then shows its own note's pin.
+test("Electron keeps the tabs window pin off the notes and out of sticky windows", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "alpha", title: "Alpha", markdown: "alpha body", createdAt: 1, updatedAt: 1 },
+    { id: "beta", title: "Beta", markdown: "beta body", createdAt: 2, updatedAt: 2 },
+    { id: "gamma", title: "Gamma", markdown: "gamma body", createdAt: 3, updatedAt: 3 },
+  ]);
+  let electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const editor = page.getByTestId("sticky-editor-surface");
+    await expect(editor).toContainText("alpha body");
+
+    await page.getByRole("tab", { name: /Beta/ }).click();
+    await expect(editor).toContainText("beta body");
+    await clickMenuItem(electronApp, "Toggle Always On Top");
+    await expect.poll(() => readWindowPins(electronApp))
+      .toEqual([{ noteId: "beta", alwaysOnTop: true }]);
+    await expect.poll(() => readStoredPins(userDataDirectory)).toEqual({
+      tabsWindow: true,
+      notes: { alpha: false, beta: false, gamma: false },
+    });
+
+    // The tabs window becomes Gamma's sticky window.
+    await page.getByRole("tab", { name: /Gamma/ }).click();
+    await expect(editor).toContainText("gamma body");
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(() => readWindowPins(electronApp)).toEqual([
+      { noteId: "alpha", alwaysOnTop: false },
+      { noteId: "beta", alwaysOnTop: false },
+      { noteId: "gamma", alwaysOnTop: false },
+    ]);
+    const gammaPage = await getPageBoundToNote(electronApp, "gamma");
+    await openStickyActionBar(gammaPage);
+    await expect(gammaPage.getByRole("button", { name: "Pin window" }))
+      .toHaveAttribute("aria-pressed", "false");
+
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(() => readWindowPins(electronApp))
+      .toEqual([{ noteId: "alpha", alwaysOnTop: true }]);
+  } finally {
+    await electronApp.close();
+  }
+
+  electronApp = await launchApp(userDataDirectory);
+  try {
+    await expect.poll(() => readWindowPins(electronApp))
+      .toEqual([{ noteId: "alpha", alwaysOnTop: true }]);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+test("Electron keeps a pinned sticky note from pinning the tabs window", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "alpha", title: "Alpha", markdown: "alpha body", createdAt: 1, updatedAt: 1 },
+    { id: "beta", title: "Beta", markdown: "beta body", createdAt: 2, updatedAt: 2 },
+  ]);
+  let electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("alpha body");
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(() => readWindowPins(electronApp)).toEqual([
+      { noteId: "alpha", alwaysOnTop: false },
+      { noteId: "beta", alwaysOnTop: false },
+    ]);
+    const alphaPage = await getPageBoundToNote(electronApp, "alpha");
+    await openStickyActionBar(alphaPage);
+    await alphaPage.getByRole("button", { name: "Pin window" }).click();
+    await expect.poll(() => readWindowPins(electronApp)).toEqual([
+      { noteId: "alpha", alwaysOnTop: true },
+      { noteId: "beta", alwaysOnTop: false },
+    ]);
+
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(() => readWindowPins(electronApp))
+      .toEqual([{ noteId: "alpha", alwaysOnTop: false }]);
+    await expect.poll(() => readStoredPins(userDataDirectory)).toEqual({
+      tabsWindow: false,
+      notes: { alpha: true, beta: false },
+    });
+  } finally {
+    await electronApp.close();
+  }
+
+  // Alpha is the active tab at launch, and Alpha's sticky window still comes back pinned.
+  electronApp = await launchApp(userDataDirectory);
+  try {
+    await expect.poll(() => readWindowPins(electronApp))
+      .toEqual([{ noteId: "alpha", alwaysOnTop: false }]);
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(() => readWindowPins(electronApp)).toEqual([
+      { noteId: "alpha", alwaysOnTop: true },
+      { noteId: "beta", alwaysOnTop: false },
+    ]);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+// Mission Control and the Dock list windows by title, so each window carries the title of the note
+// it shows, never the page's "NotePane".
+test("Electron titles every window with the note it shows", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "alpha", title: "Alpha", markdown: "alpha body", createdAt: 1, updatedAt: 1 },
+    { id: "beta", title: "Beta", markdown: "beta body", createdAt: 2, updatedAt: 2 },
+  ]);
+  let electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const editor = page.getByTestId("sticky-editor-surface");
+    await expect(editor).toContainText("alpha body");
+    await expect.poll(() => readWindowTitles(electronApp))
+      .toEqual([{ noteId: "alpha", title: "Alpha" }]);
+
+    await page.getByRole("tab", { name: /Beta/ }).click();
+    await expect(editor).toContainText("beta body");
+    await expect.poll(() => readWindowTitles(electronApp))
+      .toEqual([{ noteId: "beta", title: "Beta" }]);
+
+    await page.getByRole("tab", { name: /Beta/ }).dblclick();
+    await page.getByLabel("Session name").fill("Beta renamed");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => readWindowTitles(electronApp))
+      .toEqual([{ noteId: "beta", title: "Beta renamed" }]);
+
+    // Recolouring the other tab saves that note's appearance, which leaves the title alone.
+    await page.locator(".session-tab-row").first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Color..." }).click();
+    const sessionColorPanel = page.getByRole("dialog", { name: "Session color panel" });
+    await page.getByLabel("RGB session tab color value").fill("rgb(255 255 255)");
+    await sessionColorPanel.getByRole("button", { name: "Close preferences" }).click();
+    await expect.poll(() => readStoredNote(userDataDirectory, "alpha").theme?.tabTextColor)
+      .toBe("#ffffff");
+    expect(await readWindowTitles(electronApp))
+      .toEqual([{ noteId: "beta", title: "Beta renamed" }]);
+
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(() => readWindowTitles(electronApp)).toEqual([
+      { noteId: "alpha", title: "Alpha" },
+      { noteId: "beta", title: "Beta renamed" },
+    ]);
+  } finally {
+    await electronApp.close();
+  }
+
+  electronApp = await launchApp(userDataDirectory);
+  try {
+    await expect.poll(() => readWindowTitles(electronApp)).toEqual([
+      { noteId: "alpha", title: "Alpha" },
+      { noteId: "beta", title: "Beta renamed" },
+    ]);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+// Cmd/Ctrl+S saves versions in a sticky window too, so its actions open the history, which has to
+// fit a sticky window at its minimum size.
+test("Electron opens version history from a minimum-size sticky window", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "alpha", title: "Alpha", markdown: "alpha body", createdAt: 1, updatedAt: 1 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    // With one note, the tabs window becomes Alpha's sticky window.
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toContainText("alpha body");
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
+    await electronApp.browserWindow(page).then((window) =>
+      window.evaluate((browserWindow) => browserWindow.setBounds({ width: 320, height: 260 })));
+    await expect.poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight]))
+      .toEqual([320, 260]);
+
+    await page.locator(".bn-editor").getByText("alpha body").click();
+    await page.keyboard.press("End");
+    await page.keyboard.insertText(" sticky snapshot");
+    await page.keyboard.press(modifierShortcut("S"));
+    await expect(page.locator(".sticky-toast-success")).toHaveText("Saved");
+
+    await openStickyActionBar(page);
+    const historyButton = page.getByRole("button", { name: "Version history" });
+    await expect(historyButton).toBeInViewport({ ratio: 1 });
+    await historyButton.click();
+    const history = page.getByRole("dialog", { name: "Version history" });
+    await expect(history).toContainText("Saved manually");
+    await expect(history.locator(".version-history-preview"))
+      .toContainText("alpha body sticky snapshot");
+
+    // The whole panel shows, below the header band where the native window buttons sit.
+    await expect(history).toBeInViewport({ ratio: 1 });
+    const headerBottom = await page.getByTestId("sticky-header")
+      .evaluate((header) => header.getBoundingClientRect().bottom);
+    expect((await history.boundingBox()).y).toBeGreaterThanOrEqual(headerBottom);
+    for (const control of [
+      history.getByRole("button", { name: "Close version history" }),
+      history.getByRole("button", { name: /Saved manually/ }),
+      history.getByRole("button", { name: "Restore this version" }),
+    ]) {
+      await expect(control).toBeInViewport({ ratio: 1 });
+    }
+    await expect(history.locator(".version-history-preview .bn-editor"))
+      .toBeInViewport({ ratio: 0.2 });
+
+    await history.getByRole("button", { name: "Close version history" }).click();
+    await expect(history).toHaveCount(0);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron moves a sticky window when dragging its header", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const electronApp = await launchApp(userDataDirectory);
@@ -2252,6 +2708,67 @@ async function getStickyPageByNoteId(electronApp, noteId) {
   }
 
   throw new Error(`Sticky page not found: ${noteId}`);
+}
+
+// Finds a page by the note its window shows now. A tabs window that becomes a sticky window keeps
+// the note id of the URL it first loaded, so getStickyPageByNoteId cannot find it.
+async function getPageBoundToNote(electronApp, noteId) {
+  let match = null;
+  await expect.poll(async () => {
+    const pages = getOpenPages(electronApp);
+    const noteIds = await Promise.all(
+      pages.map((page) => getCurrentPageNoteId(page).catch(() => null)),
+    );
+    match = pages[noteIds.indexOf(noteId)] ?? null;
+    return match !== null;
+  }).toBe(true);
+  return match;
+}
+
+// The note each open window shows now and whether it floats on top, ordered by note id. It reads
+// through the pages: script run in a window that is closing never returns, while a closing page
+// rejects and reads as null.
+async function readWindowPins(electronApp) {
+  const pins = await Promise.all(getOpenPages(electronApp).map(async (page) => ({
+    noteId: await getCurrentPageNoteId(page).catch(() => null),
+    alwaysOnTop: await electronApp.browserWindow(page)
+      .then((window) => window.evaluate((browserWindow) => browserWindow.isAlwaysOnTop()))
+      .catch(() => null),
+  })));
+  return pins.sort((a, b) => String(a.noteId).localeCompare(String(b.noteId)));
+}
+
+// The note each open window shows now and its native title, ordered by note id.
+async function readWindowTitles(electronApp) {
+  const titles = await Promise.all(getOpenPages(electronApp).map(async (page) => ({
+    noteId: await getCurrentPageNoteId(page).catch(() => null),
+    title: await electronApp.browserWindow(page)
+      .then((window) => window.evaluate((browserWindow) => browserWindow.getTitle()))
+      .catch(() => null),
+  })));
+  return titles.sort((a, b) => String(a.noteId).localeCompare(String(b.noteId)));
+}
+
+function readStoredNote(userDataDirectory, noteId) {
+  const state = JSON.parse(
+    fs.readFileSync(path.join(userDataDirectory, "notes.json"), "utf8"),
+  );
+  return state.notes.find((note) => note.id === noteId);
+}
+
+function readStoredPins(userDataDirectory) {
+  const state = JSON.parse(
+    fs.readFileSync(path.join(userDataDirectory, "notes.json"), "utf8"),
+  );
+  return {
+    tabsWindow: state.tabsWindow?.alwaysOnTop ?? null,
+    notes: Object.fromEntries(state.notes.map((note) => [note.id, note.alwaysOnTop])),
+  };
+}
+
+function readAllWindowBounds(electronApp) {
+  return electronApp.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows().map((window) => window.getBounds()));
 }
 
 // Runs `read` on every open page, skipping pages that close while being read

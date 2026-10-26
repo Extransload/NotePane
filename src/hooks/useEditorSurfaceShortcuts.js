@@ -4,6 +4,9 @@ import {
   resolveBlocksForMenuBlock,
 } from "../editor/blocks.js";
 import {
+  createBlockSetSelection,
+} from "../editor/blockSelection.js";
+import {
   applyEditorColor,
 } from "../editor/colorFormatting.jsx";
 import {
@@ -122,7 +125,9 @@ export function useEditorSurfaceShortcuts({
 
       const key = event.key.toLowerCase();
       const isRepeatRecentColorShortcut = key === "h" && event.shiftKey;
-      if (key !== "a" && key !== "x" && !isRepeatRecentColorShortcut) {
+      // Only a plain Mod+X cuts the block; Mod+Shift+X is not a cut.
+      const isCutShortcut = key === "x" && !event.shiftKey;
+      if (key !== "a" && !isCutShortcut && !isRepeatRecentColorShortcut) {
         return;
       }
 
@@ -134,7 +139,7 @@ export function useEditorSurfaceShortcuts({
       // block. The side menu stays frozen on that block while the menu is open,
       // but the handle-click hint ends at any click or plain key in the menu, so
       // the block comes from the side menu and never from the caret.
-      if (key === "x" && !event.shiftKey && isDragHandleMenuTarget(event.target)) {
+      if (isCutShortcut && isDragHandleMenuTarget(event.target)) {
         event.preventDefault();
         const sideMenu = editor.getExtension(SideMenuExtension);
         const blocks = resolveBlocksForMenuBlock(editor, sideMenu?.store.state?.block?.id);
@@ -299,12 +304,22 @@ export function useEditorSurfaceShortcuts({
         return;
       }
 
+      // Escape from selected cells selects the table block, as in Notion. The editor keeps focus,
+      // so Cmd+Z works straight away, after a row or column handle action too.
       if (selection?.$anchorCell && selection?.$headCell) {
         event.preventDefault();
         event.stopPropagation();
-        view.dom.blur();
+        const { $anchorCell } = selection;
+        let depth = $anchorCell.depth;
+        while (depth > 0 && $anchorCell.node(depth).type.name !== "blockContainer") {
+          depth -= 1;
+        }
+        const tableBlock = createBlockSetSelection(view.state.doc, [$anchorCell.node(depth).attrs.id]);
+        if (tableBlock) {
+          view.dispatch(view.state.tr.setSelection(tableBlock));
+        }
         setIsTableCellSelectionDismissed(true);
-        setIsEditorActive(false);
+        setIsEditorActive(true);
         return;
       }
 
