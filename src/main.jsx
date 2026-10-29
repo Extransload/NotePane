@@ -10,6 +10,9 @@ import {
   useState,
 } from "react";
 import {
+  flushSync,
+} from "react-dom";
+import {
   createRoot,
 } from "react-dom/client";
 import "@blocknote/core/fonts/inter.css";
@@ -176,6 +179,7 @@ import {
   applyThemeToDocument,
   getExportTheme,
   readInitialThemeId,
+  runThemeTransition,
   withExportTheme,
 } from "./style/applyTheme.js";
 import {
@@ -387,11 +391,17 @@ function App({ bindTestThemeSetter }) {
     };
   }, []);
 
+  // A theme the user picks, here or in another window, cross-fades in; the stored theme read at
+  // startup does not, so a window never fades on its first paint.
+  const showAppTheme = useCallback((nextAppTheme) => {
+    runThemeTransition(nextAppTheme.themeId, () => flushSync(() => setAppTheme(nextAppTheme)));
+  }, []);
+
   useEffect(() => {
     return electronApi?.onAppThemeChanged?.((nextAppTheme) => {
-      setAppTheme(normalizeAppTheme(nextAppTheme));
+      showAppTheme(normalizeAppTheme(nextAppTheme));
     });
-  }, []);
+  }, [showAppTheme]);
 
   useEffect(() => {
     return electronApi?.onLayoutModeChanged?.((nextLayoutMode) => {
@@ -453,9 +463,9 @@ function App({ bindTestThemeSetter }) {
 
   const updateAppTheme = useCallback(async (themeId) => {
     const nextAppTheme = normalizeAppTheme({ themeId });
-    setAppTheme(nextAppTheme);
+    showAppTheme(nextAppTheme);
     await electronApi?.updateAppTheme?.(nextAppTheme);
-  }, []);
+  }, [showAppTheme]);
 
   // Dev-only test hook (src/style/sentinelThemes.js); null in production.
   useEffect(() => bindTestThemeSetter?.(updateAppTheme), [bindTestThemeSetter, updateAppTheme]);
@@ -2612,11 +2622,13 @@ function StickyEditor({
               </div>
             )}
           </Presence>
-          {zoomGauge !== null && (
-            <div className="app-zoom-gauge-dock">
-              <AppZoomGauge zoom={zoomGauge} />
-            </div>
-          )}
+          <Presence when={zoomGauge}>
+            {(zoom) => (
+              <div className="app-zoom-gauge-dock">
+                <AppZoomGauge zoom={zoom} />
+              </div>
+            )}
+          </Presence>
           {isTableOfContentsVisible && (
             <TableOfContentsRail
               entries={tableOfContentsEntries}

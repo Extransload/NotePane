@@ -284,7 +284,8 @@
   transition:
     background 130ms ease,
     border-color 130ms ease,
-    color 130ms ease;
+    color 130ms ease,
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
 }
 
 .theme-filter-chip:hover {
@@ -466,7 +467,8 @@
   transition:
     background 120ms ease,
     border-color 120ms ease,
-    transform 120ms ease;
+    transform 120ms ease,
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
 }
 
 .preference-data-button:hover:not(:disabled) {
@@ -666,7 +668,8 @@
     transform 130ms ease,
     background 130ms ease,
     border-color 130ms ease,
-    color 130ms ease;
+    color 130ms ease,
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
 }
 
 .trash-preview-button:hover {
@@ -794,7 +797,8 @@
     transform 130ms ease,
     background 130ms ease,
     border-color 130ms ease,
-    color 130ms ease;
+    color 130ms ease,
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
 }
 
 .trash-action-button:hover,
@@ -1061,7 +1065,8 @@
     background 130ms ease,
     border-color 130ms ease,
     color 130ms ease,
-    opacity 130ms ease;
+    opacity 130ms ease,
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
 }
 
 .shortcut-recorder-button {

@@ -280,3 +280,36 @@ test("filters the cards by scheme and name, with arrow keys inside the visible c
   await chips.getByRole("button", { name: "All" }).click();
   await expect(cards).toHaveCount(PICKER_LABELS.length);
 });
+
+// Counts the view transitions the page starts; each one still runs through the browser's API.
+function countViewTransitions() {
+  window.__viewTransitions = 0;
+  const startViewTransition = Document.prototype.startViewTransition;
+  Document.prototype.startViewTransition = function countedViewTransition(...args) {
+    window.__viewTransitions += 1;
+    return startViewTransition.apply(this, args);
+  };
+}
+
+test("cross-fades a picked theme, but not the first paint or under reduced motion", async ({ page }) => {
+  await page.addInitScript(countViewTransitions);
+  await page.goto("/?themeId=notepane-dark");
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  await expectAppliedTheme(page, "notepane-dark");
+  const readTransitionCount = () => page.evaluate(() => window.__viewTransitions);
+  expect(await readTransitionCount()).toBe(0);
+
+  const preferences = await openPreferences(page);
+  await preferences.getByTestId("theme-card-notepane-light").click();
+  await expectAppliedTheme(page, "notepane-light");
+  expect(await readTransitionCount()).toBe(1);
+  // The page under the fading snapshot keeps taking clicks.
+  await preferences.getByTestId("theme-card-catppuccin-latte").click();
+  await expectAppliedTheme(page, "catppuccin-latte");
+  expect(await readTransitionCount()).toBe(2);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await preferences.getByTestId("theme-card-notepane-dark").click();
+  await expectAppliedTheme(page, "notepane-dark");
+  expect(await readTransitionCount()).toBe(2);
+});

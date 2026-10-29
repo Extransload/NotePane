@@ -301,6 +301,61 @@ test("zooms the app with shortcuts and shows the zoom on a gauge", async ({ page
   await expect(findInput).toBeFocused();
 });
 
+test("springs the zoom gauge in and glides its thumb between steps unless the system asks for reduced motion", async ({ page }) => {
+  const readGaugeMotion = () => page.evaluate(() => {
+    const thumb = document.querySelector(".app-zoom-gauge-thumb");
+    const thumbStyle = getComputedStyle(thumb);
+    return {
+      gaugeAnimation: getComputedStyle(document.querySelector(".app-zoom-gauge")).animationName,
+      thumbTransition: `${thumbStyle.transitionProperty} ${thumbStyle.transitionDuration}`,
+    };
+  });
+  await page.keyboard.press(modifierShortcut("+"));
+  await expect(page.getByRole("meter", { name: "Zoom" })).toHaveAttribute("aria-valuetext", "110%");
+  expect(await readGaugeMotion()).toEqual({
+    gaugeAnimation: "notepaneGaugeIn",
+    thumbTransition: "translate 0.18s",
+  });
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.keyboard.press(modifierShortcut("+"));
+  await expect(page.getByRole("meter", { name: "Zoom" })).toHaveAttribute("aria-valuetext", "125%");
+  expect(await readGaugeMotion()).toEqual({
+    gaugeAnimation: "none",
+    thumbTransition: "none 0s",
+  });
+});
+
+test("presses buttons in and eases menu item hovers unless the system asks for reduced motion", async ({ page }) => {
+  const preferencesButton = page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Preferences" });
+  const readScale = () => preferencesButton.evaluate((element) => getComputedStyle(element).scale);
+  const pressAndRelease = async (expectedWhilePressed) => {
+    await preferencesButton.hover();
+    await page.mouse.down();
+    await expect.poll(readScale).toBe(expectedWhilePressed);
+    // Released away from the button, so it is not clicked.
+    await page.mouse.move(600, 300);
+    await page.mouse.up();
+    await expect.poll(readScale).toMatch(/^(none|1)$/);
+  };
+  await pressAndRelease("0.96");
+
+  await page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Export" }).click();
+  const exportItem = page.getByRole("menu", { name: "Export format" }).getByRole("menuitem").first();
+  const readHoverTransition = () => exportItem.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return `${style.transitionProperty} ${style.transitionDuration}`;
+  });
+  expect(await readHoverTransition()).toBe("background-color 0.09s");
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("menu", { name: "Export format" })).toHaveCount(0);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await pressAndRelease("none");
+  await page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Export" }).click();
+  expect(await readHoverTransition()).toBe("none 0s");
+});
+
 test("keeps the zoom gauge at the top of the editor after the note scrolls", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   for (let index = 0; index < 60; index += 1) {

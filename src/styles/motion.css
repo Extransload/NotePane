@@ -197,6 +197,10 @@ body.is-exporting .sticky-editor-surface {
   --notepane-motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --notepane-motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
   --notepane-motion-toast-shift: 8px;
+  --notepane-motion-press-duration: 90ms;
+  --notepane-motion-press-scale: 0.96;
+  --notepane-motion-hover-duration: 90ms;
+  --notepane-motion-theme-duration: 220ms;
 }
 
 @keyframes notepaneToastIn {
@@ -319,6 +323,119 @@ body.is-exporting .sticky-editor-surface {
 
 .search-palette-backdrop[data-state="closing"] .search-palette {
   animation: notepaneMenuOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+/* Buttons and icon buttons press in. Each one's own rule lists `scale` among its transitions;
+   the scale property leaves a hover lift or a positioning transform alone. */
+:is(
+  .sidebar-toggle,
+  .session-delete-button,
+  .session-add-button,
+  .preferences-close-button,
+  .preferences-icon-button,
+  .layout-mode-button,
+  .editor-width-button,
+  .sticky-color-button,
+  .sticky-pin-button,
+  .sticky-trash-button,
+  .sidebar-reopen-button,
+  .image-tools button,
+  .crop-actions button,
+  .sticky-toast-action,
+  .find-bar-button,
+  .theme-filter-chip,
+  .preference-data-button,
+  .trash-preview-button,
+  .trash-action-button,
+  .trash-confirm-button,
+  .shortcut-recorder-button,
+  .shortcut-reset-button,
+  .template-use-button,
+  .version-history-footer button
+):active:not(:disabled) {
+  scale: var(--notepane-motion-press-scale);
+}
+
+/* Menu items and list rows that had no transition ease their hover background. */
+.session-tab-context-menu button,
+.export-format-menu button,
+.notepane-dropdown-option,
+.search-result,
+.version-history-item,
+.editor-toc-entry {
+  transition: background-color var(--notepane-motion-hover-duration) var(--notepane-motion-ease-out);
+}
+
+.find-bar-button,
+.version-history-footer button {
+  transition:
+    background-color var(--notepane-motion-hover-duration) var(--notepane-motion-ease-out),
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
+}
+
+/* The zoom gauge springs in, its fill and thumb glide to each new step, and it fades back up
+   when it times out. */
+@keyframes notepaneGaugeIn {
+  from {
+    opacity: 0;
+    translate: 0 calc(var(--notepane-motion-shift) * -1.5);
+    scale: 0.92;
+  }
+}
+
+.app-zoom-gauge {
+  animation: notepaneGaugeIn var(--notepane-motion-toast-in-duration) var(--notepane-motion-ease-spring) both;
+}
+
+.app-zoom-gauge[data-state="closing"] {
+  animation: notepaneMenuOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+.app-zoom-gauge-fill {
+  transition: transform var(--notepane-motion-panel-duration) var(--notepane-motion-ease-spring);
+}
+
+.app-zoom-gauge-thumb {
+  transition: translate var(--notepane-motion-panel-duration) var(--notepane-motion-ease-spring);
+}
+
+/* A theme change cross-fades the whole window (runThemeTransition in src/style/applyTheme.js).
+   The page under the fading snapshots keeps taking clicks. */
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--notepane-motion-theme-duration);
+  animation-timing-function: var(--notepane-motion-ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(
+    .session-tab-context-menu button,
+    .export-format-menu button,
+    .notepane-dropdown-option,
+    .search-result,
+    .version-history-item,
+    .editor-toc-entry,
+    .find-bar-button,
+    .version-history-footer button,
+    .app-zoom-gauge-fill,
+    .app-zoom-gauge-thumb
+  ) {
+    transition: none !important;
+  }
+
+  :active {
+    scale: none !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

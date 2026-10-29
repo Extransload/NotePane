@@ -197,7 +197,8 @@
     background 130ms ease,
     color 130ms ease,
     border-color 130ms ease,
-    opacity 130ms ease;
+    opacity 130ms ease,
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
 }
 
 .session-tabs {

@@ -83,7 +83,8 @@
   transition:
     background 130ms ease,
     border-color 130ms ease,
-    transform 130ms ease;
+    transform 130ms ease,
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
 }
 
 .sticky-toast-action:hover {

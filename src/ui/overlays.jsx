@@ -165,9 +165,10 @@ function StickyToastTimeBar({ timer }) {
 export function AppZoomGauge({ zoom }) {
   const lastStep = APP_ZOOM_LEVELS.length - 1;
   const percent = Math.round(zoom * 100);
+  const { rootProps } = usePresenceContext();
 
   return (
-    <div className="app-zoom-gauge" role="status" aria-live="polite">
+    <div {...rootProps} className="app-zoom-gauge" role="status" aria-live="polite">
       <ZoomOut className="app-zoom-gauge-icon" aria-hidden="true" />
       <div
         className="app-zoom-gauge-track"

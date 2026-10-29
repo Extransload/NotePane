@@ -120,7 +120,8 @@
     background 130ms ease,
     border-color 130ms ease,
     color 130ms ease,
-    transform 130ms ease;
+    transform 130ms ease,
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
 }
 
 .template-use-button:hover {
@@ -397,19 +398,22 @@
 }
 
 .app-zoom-gauge-track {
+  --app-zoom-track-width: 112px;
   position: relative;
-  width: 112px;
+  width: var(--app-zoom-track-width);
   height: 4px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--sticky-panel-text) 14%, transparent);
 }
 
+/* The fill and thumb move by transform, which src/styles/motion.css eases between steps. */
 .app-zoom-gauge-fill {
   position: absolute;
-  inset: 0 auto 0 0;
-  width: calc(var(--app-zoom-position) * 100%);
+  inset: 0;
   border-radius: inherit;
   background: var(--notepane-control-accent);
+  transform: scaleX(var(--app-zoom-position));
+  transform-origin: left center;
 }
 
 /* 100%, the zoom Cmd/Ctrl+0 returns to. */
@@ -427,14 +431,14 @@
 .app-zoom-gauge-thumb {
   position: absolute;
   top: 50%;
-  left: calc(var(--app-zoom-position) * 100%);
+  left: 0;
   width: 12px;
   height: 12px;
   border: 2px solid var(--notepane-control-accent);
   border-radius: 50%;
   background: var(--sticky-panel-bg);
   transform: translate(-50%, -50%);
-  transition: left 120ms ease;
+  translate: calc(var(--app-zoom-position) * var(--app-zoom-track-width)) 0;
 }
 
 .app-zoom-gauge-value {
