@@ -2049,6 +2049,7 @@ async function recordClosingFloatingUI(page) {
             kind,
             duration: fade ? `${fade.effect.getTiming().duration}ms` : style.transitionDuration,
             inert: element.inert,
+            hidden: element.getAttribute("aria-hidden"),
           });
         }
       }
@@ -2110,7 +2111,37 @@ test("closes BlockNote's floating UI with a short fade that takes no pointer", a
   expect(kinds).toEqual(expect.arrayContaining(["slash menu", "formatting toolbar", "table handle menu"]));
   expect(kinds.some((kind) => kind === "block menu copy" || kind === "block menu")).toBe(true);
   expect(closing.filter(({ duration }) => !["0.11s", "110ms"].includes(duration))).toEqual([]);
-  expect(closing.filter(({ kind, inert }) => kind === "block menu copy" && !inert)).toEqual([]);
+  // Nothing that is leaving can be reached by the keyboard, a role lookup or assistive tech.
+  expect(closing.filter(({ inert, hidden }) => !inert || hidden !== "true")).toEqual([]);
+});
+
+test("removes a closed slash menu after its fade and gives a reopened one back to the pointer", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const wrappers = page.locator("div:has(> .bn-suggestion-menu)");
+  const dividers = page.locator(".bn-editor [data-content-type='divider']");
+  const dividerCount = await dividers.count();
+
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/");
+  await expect(wrappers).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(wrappers).toHaveCount(0);
+
+  // Escape and a new slash at once: the menu that opens, reused or new, is live and its item is
+  // picked by the pointer.
+  await page.keyboard.type("/");
+  await page.keyboard.press("Escape");
+  await page.keyboard.type("/divider");
+  await expect(wrappers).toHaveCount(1);
+  expect(await wrappers.evaluate((wrapper) => ({
+    inert: wrapper.inert,
+    hidden: wrapper.getAttribute("aria-hidden"),
+    pointerEvents: wrapper.style.pointerEvents,
+  }))).toEqual({ inert: false, hidden: null, pointerEvents: "" });
+  await page.locator(".bn-suggestion-menu-item").filter({ hasText: "Divider" }).first().click();
+  await expect(dividers).toHaveCount(dividerCount + 1);
+  await expect(wrappers).toHaveCount(0);
 });
 
 test("closes BlockNote's floating UI at once when reduced motion is requested", async ({ page }) => {
