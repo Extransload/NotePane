@@ -29,6 +29,7 @@ import {
   SLASH_MENU_MAX_HEIGHT,
 } from "../constants.js";
 import { setDividerSlashMenuItem } from "./divider.jsx";
+import { createFloatingCloseOptions } from "./floatingMenus.js";
 import { getMathSlashMenuItems } from "./math.jsx";
 import { insertBookmark } from "./bookmark.jsx";
 import { insertTwoColumns, isSelectionInColumn } from "./columns.jsx";
@@ -38,6 +39,7 @@ import {
 
 export function createSlashMenuFloatingUIOptions() {
   return {
+    ...createFloatingCloseOptions(),
     useFloatingOptions: {
       placement: "bottom-start",
       middleware: [

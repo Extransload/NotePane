@@ -10,6 +10,35 @@
   --notepane-motion-block-enter-duration: 160ms;
   --notepane-motion-block-move-duration: 180ms;
   --notepane-motion-check-duration: 160ms;
+  --notepane-motion-floating-close-duration: 110ms;
+}
+
+/* BlockNote's floating UI closes with a short fade that takes no pointer
+   (src/editor/floatingMenus.js). A closing popover is a copy of its last content whose inline style
+   has `pointer-events: none`: motion.css sets the slash menu's and the toolbar's fade with
+   !important, so the copy takes the close duration here, and the entrance animations do not play
+   again inside it. */
+div:has(> .bn-suggestion-menu)[style*="pointer-events: none"],
+div:has(> .bn-formatting-toolbar)[style*="pointer-events: none"] {
+  transition-duration: var(--notepane-motion-floating-close-duration) !important;
+}
+
+/* The table handles' popovers take no floating options, so their closing copy keeps floating-ui's
+   own close style (`opacity: 0`, 250ms). The copy of a handle whose menu was open closes like the
+   other menus and takes no pointer. */
+div[style*="opacity: 0"]:has(> .bn-table-handle-menu) {
+  transition-duration: var(--notepane-motion-floating-close-duration) !important;
+  pointer-events: none !important;
+}
+
+[style*="pointer-events: none"] > :is(.bn-suggestion-menu, .bn-formatting-toolbar),
+[style*="pointer-events: none"] :is(
+  .bn-menu-dropdown,
+  .mantine-Popover-dropdown,
+  .notepane-block-menu-subpanel,
+  .color-panel
+) {
+  animation: none !important;
 }
 
 /* The chevron turns with the children opening below it. A chevron that renders already open, on
@@ -38,6 +67,12 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  div:has(> .bn-suggestion-menu)[style*="pointer-events: none"],
+  div:has(> .bn-formatting-toolbar)[style*="pointer-events: none"],
+  div[style*="opacity: 0"]:has(> .bn-table-handle-menu) {
+    transition-duration: 0s !important;
+  }
+
   .bn-editor .bn-toggle-button {
     transition: none !important;
   }

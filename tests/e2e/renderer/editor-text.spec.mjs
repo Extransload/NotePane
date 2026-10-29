@@ -2016,3 +2016,117 @@ test("pops a checklist box when it is ticked, not when it is cleared", async ({ 
   await expect(box).toBeChecked();
   expect(await readCheckPops(page)).toEqual([]);
 });
+
+// Records every BlockNote floating surface that starts to close: a popover's closing copy or a
+// Mantine menu fading out (both take no pointer), and the copy NotePane fades in place of a menu its
+// popover took away. Installed before the closing action, so a short fade is never missed.
+async function recordClosingFloatingUI(page) {
+  await page.evaluate(() => {
+    window.__closingFloatingUI = [];
+    const seen = new WeakSet();
+    const kinds = [
+      ["slash menu", "div:has(> .bn-suggestion-menu)"],
+      ["formatting toolbar", "div:has(> .bn-formatting-toolbar)"],
+      ["block menu copy", ".notepane-floating-menu-closing"],
+      ["block menu", ".bn-drag-handle-menu:not(.notepane-floating-menu-closing)"],
+      ["table handle menu", ".bn-table-handle-menu"],
+    ];
+    const record = () => {
+      for (const [kind, selector] of kinds) {
+        for (const element of document.querySelectorAll(selector)) {
+          const style = getComputedStyle(element);
+          if (seen.has(element) || style.pointerEvents !== "none") continue;
+          seen.add(element);
+          const fade = element.getAnimations().find((animation) => !animation.transitionProperty);
+          window.__closingFloatingUI.push({
+            kind,
+            duration: fade ? `${fade.effect.getTiming().duration}ms` : style.transitionDuration,
+            inert: element.inert,
+          });
+        }
+      }
+    };
+    new MutationObserver(record).observe(document.body, {
+      subtree: true, childList: true, attributes: true, attributeFilter: ["style", "class"],
+    });
+  });
+}
+
+function takeClosingFloatingUI(page) {
+  return page.evaluate(() => window.__closingFloatingUI.splice(0));
+}
+
+// Waits for the menu's entrance fade to end: a menu closed while it is still fainter than half
+// opacity gets no copy of its own.
+async function openTemplateBlockMenu(page, block) {
+  await block.hover();
+  await page.locator(".bn-side-menu [data-test='dragHandle']:visible").last().click();
+  const menu = page.locator(".bn-drag-handle-menu:not(.notepane-floating-menu-closing)");
+  await expect(menu).toBeVisible();
+  await menu.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+}
+
+test("closes BlockNote's floating UI with a short fade that takes no pointer", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  await recordClosingFloatingUI(page);
+  const paragraph = page.locator(".bn-editor [data-content-type='paragraph']").first();
+
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/");
+  await expect(page.locator(".bn-suggestion-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-suggestion-menu")).toHaveCount(0);
+
+  await paragraph.dblclick();
+  await expect(page.locator(".bn-formatting-toolbar")).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".bn-formatting-toolbar")).toHaveCount(0);
+
+  // Escape hides the side menu with its block menu; a copy of the menu fades in its place.
+  await openTemplateBlockMenu(page, paragraph);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-drag-handle-menu")).toHaveCount(0);
+
+  // The handle stays while the pointer is on the table, so Mantine fades the menu out itself.
+  await page.locator(".bn-editor table td").nth(4).hover();
+  await page.locator(".bn-table-handle").first().click();
+  await expect(page.locator(".bn-table-handle-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-table-handle-menu")).toHaveCount(0);
+
+  // A click on the table handle selects its cells, so a formatting toolbar may close there too.
+  // The block menu fades as NotePane's copy when the side menu goes with it, or by Mantine when the
+  // side menu stays.
+  const closing = await takeClosingFloatingUI(page);
+  const kinds = closing.map(({ kind }) => kind);
+  expect(kinds).toEqual(expect.arrayContaining(["slash menu", "formatting toolbar", "table handle menu"]));
+  expect(kinds.some((kind) => kind === "block menu copy" || kind === "block menu")).toBe(true);
+  expect(closing.filter(({ duration }) => !["0.11s", "110ms"].includes(duration))).toEqual([]);
+  expect(closing.filter(({ kind, inert }) => kind === "block menu copy" && !inert)).toEqual([]);
+});
+
+test("closes BlockNote's floating UI at once when reduced motion is requested", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  await recordClosingFloatingUI(page);
+
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/");
+  await expect(page.locator(".bn-suggestion-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-suggestion-menu")).toHaveCount(0);
+  // After typing, BlockNote shows the side menu again once the pointer selects something.
+  const paragraph = page.locator(".bn-editor [data-content-type='paragraph']").first();
+  await paragraph.dblclick();
+  await expect(page.locator(".bn-formatting-toolbar")).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await openTemplateBlockMenu(page, paragraph);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-drag-handle-menu")).toHaveCount(0);
+
+  const closing = await takeClosingFloatingUI(page);
+  expect(closing.filter(({ kind }) => kind === "block menu copy")).toEqual([]);
+  expect(closing.filter(({ duration }) => duration !== "0s")).toEqual([]);
+});
