@@ -1969,3 +1969,43 @@ test("adds blocks without the rise-in when reduced motion is requested", async (
   expect(await page.evaluate(() => document.getAnimations()
     .filter((animation) => animation.animationName === "notepaneBlockEnter").length)).toBe(0);
 });
+
+// Records each checklist pop: the scales it passes through. Installed before the click, as the pop
+// starts in the click's own task.
+async function recordCheckPops(page) {
+  await page.evaluate(() => {
+    window.__checkPops = [];
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function recordPop(keyframes, options) {
+      if (options?.id === "notepane-check-pop") {
+        window.__checkPops.push(keyframes.map((keyframe) => Number(keyframe.scale)));
+      }
+      return animate.call(this, keyframes, options);
+    };
+  });
+}
+
+function readCheckPops(page) {
+  return page.evaluate(() => window.__checkPops.splice(0));
+}
+
+test("pops a checklist box when it is ticked, not when it is cleared", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const box = page.locator(".bn-editor [data-content-type='checkListItem'] input[type='checkbox']").first();
+  await expect(box).not.toBeChecked();
+  await recordCheckPops(page);
+
+  await box.click();
+  await expect(box).toBeChecked();
+  await expect.poll(() => readCheckPops(page)).toEqual([[1, 1.15, 1]]);
+
+  await box.click();
+  await expect(box).not.toBeChecked();
+  expect(await readCheckPops(page)).toEqual([]);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await box.click();
+  await expect(box).toBeChecked();
+  expect(await readCheckPops(page)).toEqual([]);
+});

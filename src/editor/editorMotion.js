@@ -3,7 +3,7 @@ import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 // Motion inside the editor content: toggles opening and closing, blocks the user creates rising in,
-// and moved blocks settling into place. Durations and easing are the tokens of
+// moved blocks settling into place, and a checklist box popping as it is ticked. Durations and easing are the tokens of
 // src/styles/editor-motion.css and src/styles/motion.css.
 //
 // Everything here animates through the Web Animations API, which writes no attribute or style
@@ -369,6 +369,62 @@ function createBlockMoveView(view) {
   };
 }
 
+// A checklist box the user ticks pops once. BlockNote stores the tick from the box's change event
+// and may draw the item again, so the box is looked up after the editor has updated.
+const CHECK_POP_ANIMATION_ID = "notepane-check-pop";
+
+function checkBoxOf(view, blockId) {
+  return view.dom.querySelector(
+    `.bn-block-outer[data-id="${CSS.escape(blockId)}"] > .bn-block > [data-content-type="checkListItem"] input[type="checkbox"]`,
+  );
+}
+
+function popCheckBox(box) {
+  box.animate([{ scale: 1 }, { scale: 1.15 }, { scale: 1 }], {
+    id: CHECK_POP_ANIMATION_ID,
+    ...motionTiming(box, "--notepane-motion-check-duration"),
+  });
+}
+
+function createCheckPopView(view) {
+  let tickedBlockId = null;
+  let forget = 0;
+  const rememberTick = (event) => {
+    const box = event.target;
+    if (
+      !(box instanceof HTMLInputElement) ||
+      box.type !== "checkbox" ||
+      !box.checked ||
+      !box.closest('[data-content-type="checkListItem"]') ||
+      !isEditorMotionAllowed(view.dom)
+    ) {
+      return;
+    }
+    tickedBlockId = box.closest(".bn-block-outer")?.getAttribute("data-id") ?? null;
+    window.clearTimeout(forget);
+    forget = window.setTimeout(() => {
+      tickedBlockId = null;
+    });
+  };
+  view.dom.addEventListener("change", rememberTick, true);
+  return {
+    update(updatedView) {
+      if (!tickedBlockId) {
+        return;
+      }
+      const box = checkBoxOf(updatedView, tickedBlockId);
+      tickedBlockId = null;
+      if (box?.checked) {
+        popCheckBox(box);
+      }
+    },
+    destroy() {
+      window.clearTimeout(forget);
+      view.dom.removeEventListener("change", rememberTick, true);
+    },
+  };
+}
+
 // Each editor gets its own plugins: a plugin's view state belongs to one editor view.
 export const EditorMotion = createExtension(() => ({
   key: "notepane-editor-motion",
@@ -381,6 +437,10 @@ export const EditorMotion = createExtension(() => ({
     new Plugin({
       key: new PluginKey("notepane-block-move-motion"),
       view: createBlockMoveView,
+    }),
+    new Plugin({
+      key: new PluginKey("notepane-check-pop-motion"),
+      view: createCheckPopView,
     }),
   ],
 }))();
