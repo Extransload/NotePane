@@ -1525,3 +1525,150 @@ div:has(> .bn-formatting-toolbar.notepane-formatting-toolbar.is-table-context) {
     transition: none;
   }
 }
+
+/* ==========================================================================
+   Bookmarks (src/editor/bookmark.jsx)
+   A card for a web page, and the address field of a bookmark that has none yet.
+   ========================================================================== */
+
+.bn-root .bn-block-content[data-content-type="bookmark"] {
+  width: 100%;
+  padding: 3px 0;
+}
+
+.bn-root .notepane-bookmark {
+  display: flex;
+  width: 100%;
+  min-height: 72px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--sticky-border-color) 80%, transparent);
+  border-radius: 6px;
+  color: var(--sticky-text-color);
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 120ms ease;
+}
+
+.bn-root .notepane-bookmark:hover {
+  background-color: var(--sticky-control-hover-bg);
+}
+
+.bn-root .notepane-bookmark-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px 14px;
+}
+
+.bn-root .notepane-bookmark-title {
+  overflow: hidden;
+  font-size: 0.94em;
+  font-weight: 500;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bn-root .notepane-bookmark-description {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--sticky-muted-color);
+  font-size: 0.82em;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.bn-root .notepane-bookmark-site {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: auto;
+  color: var(--sticky-muted-color);
+  font-size: 0.78em;
+}
+
+.bn-root .notepane-bookmark-site-icon {
+  flex: 0 0 auto;
+}
+
+.bn-root .notepane-bookmark-site-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bn-root .notepane-bookmark-status {
+  flex: 0 0 auto;
+  opacity: 0.8;
+}
+
+.bn-root .notepane-bookmark-thumbnail {
+  flex: 0 0 auto;
+  width: 30%;
+  max-width: 220px;
+  min-height: 72px;
+  max-height: 120px;
+  object-fit: cover;
+  border-left: 1px solid color-mix(in srgb, var(--sticky-border-color) 60%, transparent);
+}
+
+.bn-root .notepane-bookmark-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--sticky-border-color) 80%, transparent);
+  border-radius: 6px;
+  color: var(--sticky-muted-color);
+}
+
+.bn-root .notepane-bookmark-field-icon {
+  flex: 0 0 auto;
+}
+
+.bn-root .notepane-bookmark-field-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--sticky-text-color);
+  font: inherit;
+  font-size: 0.9em;
+}
+
+.bn-root .notepane-bookmark-field-input::placeholder {
+  color: var(--sticky-muted-color);
+}
+
+.bn-root .notepane-bookmark-field:has(.notepane-bookmark-field-input[aria-invalid="true"]) {
+  border-color: var(--notepane-input-error);
+}
+
+.bn-root .notepane-bookmark-field-button {
+  flex: 0 0 auto;
+  padding: 4px 10px;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sticky-text-color);
+  font: inherit;
+  font-size: 0.82em;
+  cursor: pointer;
+}
+
+.bn-root .notepane-bookmark-field-button:hover:not(:disabled) {
+  background: var(--sticky-control-hover-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bn-root .notepane-bookmark {
+    transition: none;
+  }
+}

@@ -1511,6 +1511,28 @@ test("Electron copies an asset image to the system clipboard as image data", asy
   }
 });
 
+test("Electron refuses bookmark metadata for local and non-web addresses", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    const results = await page.evaluate(async (urls) => Promise.all(urls.map((url) =>
+      window.blocknoteSticky.fetchBookmarkMetadata(url).then(
+        () => "fetched",
+        (error) => String(error.message),
+      ))), ["http://127.0.0.1:9/", "http://localhost/", "file:///etc/passwd", "http://[::1]/"]);
+
+    expect(results[0]).toContain("Private network addresses cannot be bookmarked.");
+    expect(results[1]).toContain("Local addresses cannot be bookmarked.");
+    expect(results[2]).toContain("Only http and https addresses can be bookmarked.");
+    expect(results[3]).toContain("Private network addresses cannot be bookmarked.");
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron moves an inline image from an older notes file into an asset", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [

@@ -88,6 +88,11 @@ BlockNote handles editor interaction directly.
   of a column stays in it; in an empty column it removes the column, and the other column's blocks stay in place. A
   marquee inside a column selects its blocks; one that also touches a block outside selects the whole layout.
   Markdown export writes the columns' blocks one after another
+- Bookmark: a card for a web page with its title, description, site name and preview image on the right, from the
+  slash menu (`/bookmark`, then paste an address and press Enter) or the six-dot menu's Turn into bookmark on a
+  paragraph that is exactly one link. Pasting an address into an empty paragraph still gives a link. Clicking the card
+  opens the page in the browser. The desktop app reads the page and keeps the preview image as a local asset; the
+  browser preview shows the address alone. Markdown export writes `[title](url)`
 - Bullet List
 - Numbered List
 - Check List

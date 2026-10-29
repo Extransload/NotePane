@@ -33,6 +33,7 @@ const {
   resolveWindowBackgroundColor,
 } = require("./windowTheme.cjs");
 const { readAssetFromUrl } = require("./assetSources.cjs");
+const { fetchBookmarkMetadata } = require("./bookmarkMetadata.cjs");
 const { resolveUpdateMode, startAppUpdates } = require("./appUpdates.cjs");
 const packageInfo = require("../package.json");
 
@@ -1678,6 +1679,13 @@ function installIpcHandlers() {
     }
     clipboard.writeImage(image);
     return true;
+  });
+
+  // The preview image is stored as an asset, so a bookmark card never hot-links it.
+  ipcMain.handle("bookmarks:fetch-metadata", async (_event, url) => {
+    return await fetchBookmarkMetadata(url, {
+      storeImage: (buffer, mimeType) => store.assets.put(buffer, mimeType),
+    });
   });
 
   ipcMain.handle("fonts:list", async () => {

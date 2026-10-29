@@ -14,6 +14,7 @@ import {
   size,
 } from "@floating-ui/react";
 import {
+  Bookmark,
   Columns2,
   Heading4,
   Lightbulb,
@@ -27,6 +28,7 @@ import {
 import {
   SLASH_MENU_MAX_HEIGHT,
 } from "../constants.js";
+import { insertBookmark } from "./bookmark.jsx";
 import { insertTwoColumns, isSelectionInColumn } from "./columns.jsx";
 
 export function createSlashMenuFloatingUIOptions() {
@@ -165,6 +167,17 @@ export function NotePaneSlashMenuController({ editor, onImportMarkdown }) {
         onItemClick: () => insertTwoColumns(editor),
       });
     }
+    // Bookmarks: after the media blocks, in their group.
+    const fileIndex = items.findIndex((item) => item.key === "file");
+    items.splice(fileIndex + 1, 0, {
+      title: "Bookmark",
+      subtext: "A card for a web page",
+      aliases: ["bookmark", "link", "url", "web", "embed", "북마크", "링크"],
+      group: items[fileIndex]?.group,
+      icon: <Bookmark size={18} />,
+      key: "bookmark",
+      onItemClick: () => insertBookmark(editor),
+    });
     // Last, so `/` and Enter inserts a block rather than opening a file dialog.
     items.push(importMarkdown);
     return filterSuggestionItems(items, query);

@@ -18,6 +18,7 @@ import {
 import { closeHistory } from "@tiptap/pm/history";
 import { InputRule, inputRules } from "@tiptap/pm/inputrules";
 import { TextSelection } from "@tiptap/pm/state";
+import { createBookmarkBlockSpec } from "./bookmark.jsx";
 import { createCalloutBlockSpec } from "./callout.jsx";
 import { columnBlockSpec, columnListBlockSpec } from "./columns.jsx";
 import { indentCodeBlockLines } from "./codeFormatting.js";
@@ -329,6 +330,8 @@ export const schema = BlockNoteSchema.create({
     // Columns (src/editor/columns.jsx).
     columnList: columnListBlockSpec,
     column: columnBlockSpec,
+    // Bookmark cards (src/editor/bookmark.jsx).
+    bookmark: createBookmarkBlockSpec(),
   },
   styleSpecs: {
     code: notionInlineCodeStyle,
