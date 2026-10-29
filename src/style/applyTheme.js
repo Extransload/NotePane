@@ -78,7 +78,10 @@ export function runThemeTransition(themeId, update, ownerDocument = document) {
     !ownerDocument.body?.classList.contains("is-exporting") &&
     !ownerDocument.defaultView?.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
   if (canCrossFade) {
-    ownerDocument.startViewTransition(update);
+    const transition = ownerDocument.startViewTransition(update);
+    // Picking another theme mid-fade skips this transition, which rejects `ready`; `update` has
+    // still run, so the skip needs no handling.
+    transition.ready.catch(() => {});
   } else {
     update();
   }
