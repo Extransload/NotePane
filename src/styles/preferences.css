@@ -993,17 +993,53 @@
   justify-content: flex-end;
 }
 
+/* One bordered list of 40px rows split by hairlines, read as a table: command, on/off, keys,
+   reset. The header row names the columns. */
 .shortcut-list {
   display: grid;
-  gap: 7px;
+  overflow: hidden;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: 10px;
+}
+
+.shortcut-list-header,
+.shortcut-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px 104px 56px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px 0 12px;
+}
+
+.shortcut-list-header {
+  height: 28px;
+  color: var(--sticky-panel-muted);
+  font: 680 10px/1 var(--notepane-ui-font);
+}
+
+.shortcut-list-header span:not(:first-child) {
+  text-align: center;
 }
 
 .shortcut-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 58px minmax(96px, auto) 58px;
-  align-items: center;
+  min-height: 40px;
   justify-content: stretch;
-  gap: 8px;
+  border: 0;
+  border-top: 1px solid var(--sticky-border-color);
+  border-radius: 0;
+  background: transparent;
+}
+
+.shortcut-row:first-child {
+  border-top: 0;
+}
+
+.shortcut-row:hover {
+  background: color-mix(in srgb, var(--sticky-control-hover-bg) 60%, transparent);
+}
+
+.shortcut-row[data-recording="true"] {
+  background: color-mix(in srgb, var(--notepane-control-accent) 10%, transparent);
 }
 
 .shortcut-command-label {
@@ -1015,7 +1051,7 @@
 .shortcut-fixed-label,
 .shortcut-reset-spacer {
   display: grid;
-  height: 28px;
+  height: 26px;
   min-width: 0;
   place-items: center;
 }
@@ -1028,7 +1064,7 @@
 .shortcut-recorder-button,
 .shortcut-reset-button {
   display: grid;
-  height: 28px;
+  height: 26px;
   min-width: 0;
   place-items: center;
   padding: 0 8px;

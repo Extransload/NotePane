@@ -473,6 +473,12 @@ export function KeyboardShortcutsSection({
   return (
     <section className="preferences-section preferences-shortcuts-section">
       <div className="preferences-section-title">Keyboard shortcuts</div>
+      <div className="shortcut-list-header" aria-hidden="true">
+        <span>Command</span>
+        <span>On</span>
+        <span>Keys</span>
+        <span />
+      </div>
       <div className="shortcut-list" role="list" aria-label="Keyboard shortcuts">
         {PREFERENCE_SHORTCUT_COMMANDS.map((command) => {
           const shortcut = normalizedShortcuts[command.id] ?? "";

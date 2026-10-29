@@ -28,6 +28,8 @@
   changes, and text on it stays readable
 - No light/dark toggle and no light/dark shortcut; `Command/Ctrl + Shift + L` is unbound
 - Preferences panel via sidebar footer button, native app menu, or `Command/Ctrl + ,`
+- Preferences > Shortcuts lists every command as a 40px table row: name, on/off switch, the keys (click to record
+  new ones) and Reset
 - Default editor font family for every session; there is no font size setting, text size follows the app zoom
 - App zoom with `Command/Ctrl + =`, `-` and `0`, from 50% to 200%: every window zooms together, a gauge shows the zoom
   between its smallest and largest step, and the zoom persists

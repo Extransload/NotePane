@@ -1539,3 +1539,23 @@ test("shows the open note's title and its save status in the tabs header", async
   await expect(title).toHaveCount(0);
   await expect(status).toHaveCount(0);
 });
+
+test("lists keyboard shortcuts as dense aligned rows", async ({ page }) => {
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await preferences.getByRole("tab", { name: "Shortcuts" }).click();
+  const rows = preferences.getByRole("listitem");
+  await expect(rows.first()).toBeVisible();
+  const layout = await preferences.getByRole("list", { name: "Keyboard shortcuts" }).evaluate((list) =>
+    [...list.querySelectorAll(".shortcut-row")].map((row) => ({
+      height: row.getBoundingClientRect().height,
+      toggleLeft: Math.round(row.querySelector("[role='switch']").getBoundingClientRect().left),
+    })));
+  expect(layout.length).toBeGreaterThan(15);
+  for (const row of layout) {
+    expect(row.height).toBeGreaterThanOrEqual(38);
+    expect(row.height).toBeLessThanOrEqual(44);
+  }
+  // One column of switches, as in a table.
+  expect(new Set(layout.map((row) => row.toggleLeft)).size).toBe(1);
+});
