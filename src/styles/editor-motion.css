@@ -7,6 +7,7 @@
 
 :root {
   --notepane-motion-toggle-duration: 180ms;
+  --notepane-motion-block-enter-duration: 160ms;
 }
 
 /* The chevron turns with the children opening below it. A chevron that renders already open, on
@@ -17,9 +18,30 @@
     background-color 120ms ease;
 }
 
+/* A block the user just created rises in, once: the class comes from a ProseMirror decoration that
+   is removed when this animation ends. A new block inside another new block moves with it. */
+@keyframes notepaneBlockEnter {
+  from {
+    opacity: 0;
+    translate: 0 var(--notepane-motion-shift);
+  }
+}
+
+.bn-editor .notepane-block-enter {
+  animation: notepaneBlockEnter var(--notepane-motion-block-enter-duration) var(--notepane-motion-ease-out);
+}
+
+.bn-editor .notepane-block-enter .notepane-block-enter {
+  animation: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .bn-editor .bn-toggle-button {
     transition: none !important;
+  }
+
+  .bn-editor .notepane-block-enter {
+    animation: none !important;
   }
 }
 
@@ -27,8 +49,16 @@
   .bn-editor .bn-toggle-button {
     transition: none !important;
   }
+
+  .bn-editor .notepane-block-enter {
+    animation: none !important;
+  }
 }
 
 body.is-exporting .bn-editor .bn-toggle-button {
   transition: none !important;
+}
+
+body.is-exporting .bn-editor .notepane-block-enter {
+  animation: none !important;
 }

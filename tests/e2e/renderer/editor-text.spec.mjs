@@ -1877,3 +1877,95 @@ test("cuts a block with Command+X in the formats the editor's own copy writes", 
   await expect(editor.getByText("after the cuts", { exact: true })).toHaveCount(1);
   expect(pageErrors).toEqual([]);
 });
+
+// Records the block each rise-in animation starts on, from the page's first paint on.
+async function openPageRecordingBlockEntrances(page) {
+  await page.addInitScript(() => {
+    window.__blockEntrances = [];
+    document.addEventListener("animationstart", (event) => {
+      if (event.animationName === "notepaneBlockEnter") {
+        window.__blockEntrances.push(event.target.getAttribute("data-id"));
+      }
+    }, true);
+  });
+  await page.goto("/");
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+}
+
+function readBlockEntrances(page) {
+  return page.evaluate(() => [...window.__blockEntrances]);
+}
+
+function readEnteringBlockCount(page) {
+  return page.evaluate(() => document.querySelectorAll(".bn-editor .notepane-block-enter").length);
+}
+
+function blockIdOfText(page, text) {
+  return page.locator(".bn-editor .bn-block-outer").filter({ hasText: text }).last().getAttribute("data-id");
+}
+
+test("rises in the blocks the user creates and no others", { tag: OPENS_OWN_PAGE }, async ({ page }) => {
+  await openPageRecordingBlockEntrances(page);
+  // The decoration that starts the animation is added in the transaction itself, so a block that
+  // is not rising in has no class right after the change.
+  expect(await readEnteringBlockCount(page)).toBe(0);
+
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.insertText("Typed line");
+  expect(await readEnteringBlockCount(page)).toBe(0);
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("Line from Enter");
+  const enterBlockId = await blockIdOfText(page, "Line from Enter");
+  await expect.poll(() => readBlockEntrances(page)).toEqual([enterBlockId]);
+  // The class goes when the animation ends; typing in the block again does not bring it back.
+  await expect(page.locator(".bn-editor .notepane-block-enter")).toHaveCount(0);
+  await page.keyboard.insertText(" again");
+  expect(await readEnteringBlockCount(page)).toBe(0);
+
+  // The slash menu on a line with text puts the new block below it.
+  await page.keyboard.type("/heading 2");
+  await expect(page.locator(".bn-suggestion-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".bn-editor h2")).toHaveCount(1);
+  const headingBlockId = await page.locator(".bn-editor .bn-block-outer:has(h2)").last().getAttribute("data-id");
+  await expect.poll(() => readBlockEntrances(page)).toEqual([enterBlockId, headingBlockId]);
+
+  // A paste into an empty line fills that line and adds the rest below it.
+  await page.keyboard.insertText("Heading text");
+  await page.keyboard.press("Enter");
+  await waitForEditorSelection(page);
+  await pasteClipboardText(page, {
+    plainText: "Paste one\nPaste two\nPaste three",
+    html: "<p>Paste one</p><p>Paste two</p><p>Paste three</p>",
+  });
+  await expect(page.locator(".bn-editor").getByText("Paste three", { exact: true })).toBeVisible();
+  const pastedIds = [await blockIdOfText(page, "Paste two"), await blockIdOfText(page, "Paste three")];
+  await expect.poll(async () => (await readBlockEntrances(page)).slice(2)).toEqual(
+    expect.arrayContaining(pastedIds),
+  );
+  await expect(page.locator(".bn-editor .notepane-block-enter")).toHaveCount(0);
+
+  // Switching notes builds the editor again from the stored note: nothing rises in.
+  const entrancesBeforeSwitch = (await readBlockEntrances(page)).length;
+  const noteId = await page.evaluate(() => document.querySelector("[role='tab'][aria-selected='true']")
+    ?.closest(".session-tab-row")?.getAttribute("data-note-id"));
+  await createBlankSession(page);
+  expect(await readEnteringBlockCount(page)).toBe(0);
+  const firstTab = page.locator(`.session-tab-row[data-note-id="${noteId}"]`).getByRole("tab");
+  await firstTab.click();
+  await expect(firstTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".bn-editor")).toBeVisible();
+  expect(await readEnteringBlockCount(page)).toBe(0);
+  expect(await readBlockEntrances(page)).toHaveLength(entrancesBeforeSwitch);
+});
+
+test("adds blocks without the rise-in when reduced motion is requested", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.insertText("Still line");
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("Next still line");
+  expect(await readEnteringBlockCount(page)).toBe(0);
+  expect(await page.evaluate(() => document.getAnimations()
+    .filter((animation) => animation.animationName === "notepaneBlockEnter").length)).toBe(0);
+});

@@ -1,8 +1,10 @@
 import { createExtension } from "@blocknote/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
-// Motion inside the editor content: toggles opening and closing. Durations and easing are the
-// tokens of src/styles/editor-motion.css and src/styles/motion.css.
+// Motion inside the editor content: toggles opening and closing, and blocks the user creates
+// rising in. Durations and easing are the tokens of src/styles/editor-motion.css and
+// src/styles/motion.css.
 //
 // Everything here animates through the Web Animations API, which writes no attribute or style
 // into the DOM ProseMirror owns, so its DOM observer never sees a mutation. Nothing animates under
@@ -128,12 +130,158 @@ function createToggleMotionView(view) {
   };
 }
 
-export const EditorMotion = createExtension({
+// Blocks the user creates (Enter, the slash menu, a paste, a drop) rise in once. A ProseMirror
+// decoration puts `notepane-block-enter` on each new block for one CSS animation and is removed when
+// it ends, so the class never comes back when ProseMirror draws the block again. Loading or
+// switching a note builds a new editor and creates no block through a transaction.
+const blockEnterKey = new PluginKey("notepane-block-enter");
+const BLOCK_ENTER_CLASS = "notepane-block-enter";
+const BLOCK_ENTER_ANIMATION = "notepaneBlockEnter";
+const BLOCK_NODE_TYPES = new Set(["blockContainer", "columnList"]);
+// More new blocks than this in one step is a whole note arriving (a template, an import, a
+// restored version), not blocks the user is placing.
+const MAX_ENTERING_BLOCKS = 12;
+
+// The ids of block nodes in a step's inserted content. Block content (text, tables) is not
+// searched: blocks never sit inside it.
+function insertedBlockIds(transaction) {
+  const ids = new Set();
+  for (const step of transaction.steps) {
+    step.slice?.content.descendants((node) => {
+      if (BLOCK_NODE_TYPES.has(node.type.name) && node.attrs.id) {
+        ids.add(node.attrs.id);
+      }
+      return node.type.spec.group !== "blockContent";
+    });
+  }
+  return ids;
+}
+
+function blockIdsOf(doc) {
+  const ids = new Set();
+  doc.descendants((node) => {
+    if (BLOCK_NODE_TYPES.has(node.type.name)) {
+      ids.add(node.attrs.id);
+    }
+    return node.type.spec.group !== "blockContent";
+  });
+  return ids;
+}
+
+// Undo and redo bring back blocks that were there before; they reappear in place. BlockNote gives a
+// new block its id in a transaction appended to the user's, which carries the user's as its root.
+function isHistoryStep(transaction) {
+  const root = transaction.getMeta("appendedTransaction") ?? transaction;
+  return Boolean(root.getMeta("history$"));
+}
+
+function createEnteringBlockDecorations(transaction, oldDoc, view) {
+  if (!transaction.docChanged || isHistoryStep(transaction) || !view || !isEditorMotionAllowed(view.dom)) {
+    return [];
+  }
+  const candidates = insertedBlockIds(transaction);
+  if (!candidates.size) {
+    return [];
+  }
+  const existing = blockIdsOf(oldDoc);
+  const entering = [...candidates].filter((id) => !existing.has(id));
+  if (!entering.length || entering.length > MAX_ENTERING_BLOCKS) {
+    return [];
+  }
+  const wanted = new Set(entering);
+  const decorations = [];
+  transaction.doc.descendants((node, pos) => {
+    if (BLOCK_NODE_TYPES.has(node.type.name) && wanted.has(node.attrs.id)) {
+      decorations.push(Decoration.node(pos, pos + node.nodeSize, { class: BLOCK_ENTER_CLASS }, {
+        blockId: node.attrs.id,
+      }));
+    }
+    return node.type.spec.group !== "blockContent";
+  });
+  return decorations;
+}
+
+function createBlockEnterPlugin() {
+  let editorView = null;
+  return new Plugin({
+    key: blockEnterKey,
+    state: {
+      init: () => DecorationSet.empty,
+      apply(transaction, decorations, oldState) {
+        let next = decorations.map(transaction.mapping, transaction.doc);
+        const ended = transaction.getMeta(blockEnterKey);
+        if (ended) {
+          next = next.remove(next.find(undefined, undefined, (spec) => ended.includes(spec.blockId)));
+        }
+        const entering = createEnteringBlockDecorations(transaction, oldState.doc, editorView);
+        return entering.length ? next.add(transaction.doc, entering) : next;
+      },
+    },
+    props: {
+      decorations: (state) => blockEnterKey.getState(state),
+    },
+    view(view) {
+      editorView = view;
+      const finish = (blockIds) => {
+        const pending = blockEnterKey.getState(view.state)
+          .find(undefined, undefined, (spec) => blockIds.includes(spec.blockId));
+        if (pending.length) {
+          view.dispatch(view.state.tr
+            .setMeta(blockEnterKey, pending.map((decoration) => decoration.spec.blockId))
+            .setMeta("addToHistory", false));
+        }
+      };
+      // A nested new block does not animate on its own (its new parent carries it), so the parent's
+      // end clears the classes inside it too.
+      const onAnimationEnd = (event) => {
+        if (event.animationName !== BLOCK_ENTER_ANIMATION || !(event.target instanceof Element)) {
+          return;
+        }
+        const blocks = [event.target, ...event.target.querySelectorAll(`.${BLOCK_ENTER_CLASS}`)];
+        finish(blocks.map((block) => block.getAttribute("data-id")).filter(Boolean));
+      };
+      // A block that never paints, such as one inside a closed toggle, sends no animation event.
+      let fallback = 0;
+      const clearLeftovers = () => {
+        const leftovers = blockEnterKey.getState(view.state).find();
+        if (leftovers.length) {
+          finish(leftovers.map((decoration) => decoration.spec.blockId));
+        }
+      };
+      view.dom.addEventListener("animationend", onAnimationEnd);
+      view.dom.addEventListener("animationcancel", onAnimationEnd);
+      return {
+        update(updatedView, previousState) {
+          if (blockEnterKey.getState(updatedView.state) === blockEnterKey.getState(previousState)) {
+            return;
+          }
+          window.clearTimeout(fallback);
+          if (blockEnterKey.getState(updatedView.state).find().length) {
+            fallback = window.setTimeout(
+              clearLeftovers,
+              readMotionDuration(updatedView.dom, "--notepane-motion-block-enter-duration") * 4 + 200,
+            );
+          }
+        },
+        destroy() {
+          editorView = null;
+          window.clearTimeout(fallback);
+          view.dom.removeEventListener("animationend", onAnimationEnd);
+          view.dom.removeEventListener("animationcancel", onAnimationEnd);
+        },
+      };
+    },
+  });
+}
+
+// Each editor gets its own plugins: a plugin's view state belongs to one editor view.
+export const EditorMotion = createExtension(() => ({
   key: "notepane-editor-motion",
   prosemirrorPlugins: [
     new Plugin({
       key: new PluginKey("notepane-toggle-motion"),
       view: createToggleMotionView,
     }),
+    createBlockEnterPlugin(),
   ],
-});
+}))();
