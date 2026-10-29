@@ -124,6 +124,10 @@ function colourScan({ phase, scope, indices, allowlist }) {
     const rect = element.getBoundingClientRect();
     return rect.width > 0 || rect.height > 0;
   };
+  // floating-ui's portal container, one per BlockNote popover, is an unstyled wrapper mounted and
+  // unmounted with its popover, so it can be there for one reading and gone for the next. It
+  // paints nothing itself; what it holds is still scanned.
+  const isPortalContainer = (element) => element.hasAttribute("data-floating-ui-portal");
 
   function boxProperties(style) {
     const properties = ["background-color"];
@@ -301,7 +305,10 @@ function colourScan({ phase, scope, indices, allowlist }) {
       first === second ? 0 : first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1);
     const targets = [];
     for (const element of ordered) {
-      if (NON_PAINTING.has(element.tagName.toLowerCase()) || isAllowlisted(element) || excluded(element)) continue;
+      if (
+        NON_PAINTING.has(element.tagName.toLowerCase()) || isAllowlisted(element) || excluded(element) ||
+        isPortalContainer(element)
+      ) continue;
       if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true }) || !hasBox(element)) continue;
       targets.push({
         element,
