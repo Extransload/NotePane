@@ -1900,6 +1900,12 @@ function readEnteringBlockCount(page) {
   return page.evaluate(() => document.querySelectorAll(".bn-editor .notepane-block-enter").length);
 }
 
+function settleBlockEntrances(page) {
+  return page.evaluate(() => Promise.all(document.getAnimations()
+    .filter((animation) => animation.animationName === "notepaneBlockEnter")
+    .map((animation) => animation.finished)));
+}
+
 function blockIdOfText(page, text) {
   return page.locator(".bn-editor .bn-block-outer").filter({ hasText: text }).last().getAttribute("data-id");
 }
@@ -1917,10 +1923,11 @@ test("rises in the blocks the user creates and no others", { tag: OPENS_OWN_PAGE
   await page.keyboard.insertText("Line from Enter");
   const enterBlockId = await blockIdOfText(page, "Line from Enter");
   await expect.poll(() => readBlockEntrances(page)).toEqual([enterBlockId]);
-  // The class goes when the animation ends; typing in the block again does not bring it back.
-  await expect(page.locator(".bn-editor .notepane-block-enter")).toHaveCount(0);
+  // Once the rise has ended, the next change drops the class, and the block does not rise again.
+  await settleBlockEntrances(page);
   await page.keyboard.insertText(" again");
   expect(await readEnteringBlockCount(page)).toBe(0);
+  expect(await readBlockEntrances(page)).toEqual([enterBlockId]);
 
   // The slash menu on a line with text puts the new block below it.
   await page.keyboard.type("/heading 2");
@@ -1943,7 +1950,7 @@ test("rises in the blocks the user creates and no others", { tag: OPENS_OWN_PAGE
   await expect.poll(async () => (await readBlockEntrances(page)).slice(2)).toEqual(
     expect.arrayContaining(pastedIds),
   );
-  await expect(page.locator(".bn-editor .notepane-block-enter")).toHaveCount(0);
+  await settleBlockEntrances(page);
 
   // Switching notes builds the editor again from the stored note: nothing rises in.
   const entrancesBeforeSwitch = (await readBlockEntrances(page)).length;

@@ -131,9 +131,12 @@ function createToggleMotionView(view) {
 }
 
 // Blocks the user creates (Enter, the slash menu, a paste, a drop) rise in once. A ProseMirror
-// decoration puts `notepane-block-enter` on each new block for one CSS animation and is removed when
-// it ends, so the class never comes back when ProseMirror draws the block again. Loading or
-// switching a note builds a new editor and creates no block through a transaction.
+// decoration puts `notepane-block-enter` on each new block for one CSS animation. Once it has ended,
+// the next transaction drops the decoration, so the class never comes back when ProseMirror draws
+// the block again. That transaction is always one the editor makes anyway: a transaction of its own
+// would make ProseMirror write its selection back into the DOM, undoing a caret the browser has just
+// moved (an arrow key) before ProseMirror read it. Loading or switching a note builds a new editor
+// and creates no block through a transaction.
 const blockEnterKey = new PluginKey("notepane-block-enter");
 const BLOCK_ENTER_CLASS = "notepane-block-enter";
 const BLOCK_ENTER_ANIMATION = "notepaneBlockEnter";
@@ -194,6 +197,7 @@ function createEnteringBlockDecorations(transaction, oldDoc, view) {
     if (BLOCK_NODE_TYPES.has(node.type.name) && wanted.has(node.attrs.id)) {
       decorations.push(Decoration.node(pos, pos + node.nodeSize, { class: BLOCK_ENTER_CLASS }, {
         blockId: node.attrs.id,
+        createdAt: transaction.time,
       }));
     }
     return node.type.spec.group !== "blockContent";
@@ -203,16 +207,23 @@ function createEnteringBlockDecorations(transaction, oldDoc, view) {
 
 function createBlockEnterPlugin() {
   let editorView = null;
+  const endedBlockIds = new Set();
   return new Plugin({
     key: blockEnterKey,
     state: {
       init: () => DecorationSet.empty,
       apply(transaction, decorations, oldState) {
         let next = decorations.map(transaction.mapping, transaction.doc);
-        const ended = transaction.getMeta(blockEnterKey);
-        if (ended) {
-          next = next.remove(next.find(undefined, undefined, (spec) => ended.includes(spec.blockId)));
+        if (next !== DecorationSet.empty) {
+          // A block that never paints, such as one inside a closed toggle, sends no animation
+          // event; its decoration goes once the animation would long have ended.
+          const expiry = transaction.time - 4 * (editorView
+            ? readMotionDuration(editorView.dom, "--notepane-motion-block-enter-duration")
+            : 0);
+          next = next.remove(next.find(undefined, undefined, (spec) =>
+            endedBlockIds.has(spec.blockId) || spec.createdAt < expiry));
         }
+        endedBlockIds.clear();
         const entering = createEnteringBlockDecorations(transaction, oldState.doc, editorView);
         return entering.length ? next.add(transaction.doc, entering) : next;
       },
@@ -222,50 +233,21 @@ function createBlockEnterPlugin() {
     },
     view(view) {
       editorView = view;
-      const finish = (blockIds) => {
-        const pending = blockEnterKey.getState(view.state)
-          .find(undefined, undefined, (spec) => blockIds.includes(spec.blockId));
-        if (pending.length) {
-          view.dispatch(view.state.tr
-            .setMeta(blockEnterKey, pending.map((decoration) => decoration.spec.blockId))
-            .setMeta("addToHistory", false));
-        }
-      };
       // A nested new block does not animate on its own (its new parent carries it), so the parent's
-      // end clears the classes inside it too.
+      // end ends the ones inside it too.
       const onAnimationEnd = (event) => {
         if (event.animationName !== BLOCK_ENTER_ANIMATION || !(event.target instanceof Element)) {
           return;
         }
-        const blocks = [event.target, ...event.target.querySelectorAll(`.${BLOCK_ENTER_CLASS}`)];
-        finish(blocks.map((block) => block.getAttribute("data-id")).filter(Boolean));
-      };
-      // A block that never paints, such as one inside a closed toggle, sends no animation event.
-      let fallback = 0;
-      const clearLeftovers = () => {
-        const leftovers = blockEnterKey.getState(view.state).find();
-        if (leftovers.length) {
-          finish(leftovers.map((decoration) => decoration.spec.blockId));
+        for (const block of [event.target, ...event.target.querySelectorAll(`.${BLOCK_ENTER_CLASS}`)]) {
+          endedBlockIds.add(block.getAttribute("data-id"));
         }
       };
       view.dom.addEventListener("animationend", onAnimationEnd);
       view.dom.addEventListener("animationcancel", onAnimationEnd);
       return {
-        update(updatedView, previousState) {
-          if (blockEnterKey.getState(updatedView.state) === blockEnterKey.getState(previousState)) {
-            return;
-          }
-          window.clearTimeout(fallback);
-          if (blockEnterKey.getState(updatedView.state).find().length) {
-            fallback = window.setTimeout(
-              clearLeftovers,
-              readMotionDuration(updatedView.dom, "--notepane-motion-block-enter-duration") * 4 + 200,
-            );
-          }
-        },
         destroy() {
           editorView = null;
-          window.clearTimeout(fallback);
           view.dom.removeEventListener("animationend", onAnimationEnd);
           view.dom.removeEventListener("animationcancel", onAnimationEnd);
         },
