@@ -66,7 +66,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Preference and font normalisation and defaults | `src/model/preferences.js` |
 | Shortcut parsing, matching, display labels (`formatKeyboardShortcutLabel`, the one label for NotePane's and BlockNote's shortcut forms) | `src/model/keyboardShortcuts.js` |
 | Theme list, lookup and the fallback for an unknown theme id | `src/style/themes.js` (data in `electron/themes.json`) |
-| Every colour token a theme produces, derived from its palette | `src/style/themeTokens.js` |
+| Every colour token a theme produces, derived from its palette; `--sticky-portal-menu-shadow` is the one flat shadow of every floating surface | `src/style/themeTokens.js` |
 | Showing a user-painted colour in the theme's tone | `src/style/toneMatch.js` |
 | Applying a theme to the document, the first-paint theme, the export theme | `src/style/applyTheme.js` |
 | Applying the selected theme in a window, code theme included | `src/hooks/useAppliedTheme.js` |

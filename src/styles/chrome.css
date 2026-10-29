@@ -11,7 +11,6 @@
   padding: 7px 12px 7px calc(86px / var(--notepane-app-zoom, 1));
   border-bottom: 1px solid var(--sticky-border-color);
   background: var(--sticky-header-bg);
-  box-shadow: var(--notepane-shadow-header-glass);
   user-select: none;
   -webkit-app-region: drag;
   transition:

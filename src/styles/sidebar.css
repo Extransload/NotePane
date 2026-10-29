@@ -11,7 +11,6 @@
   overflow: visible;
   border-right: 1px solid var(--sticky-border-color);
   background: var(--sticky-sidebar-bg);
-  box-shadow: var(--notepane-shadow-sidebar-edge);
   -webkit-app-region: no-drag;
   transition:
     background 160ms ease;
@@ -30,12 +29,7 @@
   min-width: 0;
   padding: 10px 8px 8px;
   border-bottom: 1px solid color-mix(in srgb, var(--sticky-border-color) 70%, transparent);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--sticky-sidebar-bg) 96%, var(--notepane-glass)),
-      var(--sticky-sidebar-bg)
-    );
+  background: var(--sticky-sidebar-bg);
   -webkit-app-region: no-drag;
 }
 

@@ -4,7 +4,7 @@
       "color": "rgb(55, 53, 47)",
       "backgroundColor": "rgb(242, 242, 239)",
       "borderTopColor": "rgb(55, 53, 47)",
-      "boxShadow": "rgba(255, 255, 255, 0.04) -1px 0px 0px 0px inset"
+      "boxShadow": "none"
     },
     "active session tab": {
       "color": "rgb(31, 31, 31)",
@@ -16,7 +16,7 @@
       "color": "rgb(55, 53, 47)",
       "backgroundColor": "rgb(240, 240, 237)",
       "borderTopColor": "rgb(55, 53, 47)",
-      "boxShadow": "rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset"
+      "boxShadow": "none"
     },
     "editor surface text": {
       "color": "rgb(55, 53, 47)",
@@ -160,13 +160,13 @@
       "color": "rgb(55, 53, 47)",
       "backgroundColor": "color(srgb 0.960784 0.960784 0.94902 / 0.94)",
       "borderTopColor": "color(srgb 0.215686 0.207843 0.184314 / 0.0923922)",
-      "boxShadow": "color(srgb 0.215686 0.207843 0.184314 / 0.14) 0px 14px 30px 0px, color(srgb 1 1 1 / 0.42) 0px 1px 0px 0px inset"
+      "boxShadow": "rgba(55, 53, 47, 0.14) 0px 8px 24px 0px"
     },
     "formatting toolbar": {
       "color": "rgb(55, 53, 47)",
       "backgroundColor": "rgb(247, 247, 245)",
       "borderTopColor": "rgb(210, 209, 206)",
-      "boxShadow": "rgba(55, 53, 47, 0.16) 0px 12px 26px 0px, rgba(255, 255, 255, 0.38) 0px 1px 0px 0px inset"
+      "boxShadow": "rgba(55, 53, 47, 0.14) 0px 8px 24px 0px"
     },
     "preferences dialog surface": {
       "color": "rgb(55, 53, 47)",
@@ -186,7 +186,7 @@
       "color": "rgb(241, 241, 239)",
       "backgroundColor": "rgb(26, 26, 26)",
       "borderTopColor": "rgb(241, 241, 239)",
-      "boxShadow": "rgba(255, 255, 255, 0.04) -1px 0px 0px 0px inset"
+      "boxShadow": "none"
     },
     "active session tab": {
       "color": "rgb(31, 31, 31)",
@@ -198,7 +198,7 @@
       "color": "rgb(241, 241, 239)",
       "backgroundColor": "rgb(31, 31, 31)",
       "borderTopColor": "rgb(241, 241, 239)",
-      "boxShadow": "rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset"
+      "boxShadow": "none"
     },
     "editor surface text": {
       "color": "rgb(241, 241, 239)",
@@ -342,13 +342,13 @@
       "color": "rgb(241, 241, 239)",
       "backgroundColor": "color(srgb 0.141176 0.141176 0.141176 / 0.94)",
       "borderTopColor": "color(srgb 1 1 1 / 0.0923922)",
-      "boxShadow": "color(srgb 0.945098 0.945098 0.937255 / 0.14) 0px 14px 30px 0px, color(srgb 1 1 1 / 0.42) 0px 1px 0px 0px inset"
+      "boxShadow": "rgba(0, 0, 0, 0.4) 0px 8px 24px 0px"
     },
     "formatting toolbar": {
       "color": "rgb(241, 241, 239)",
       "backgroundColor": "rgb(32, 32, 32)",
       "borderTopColor": "rgb(75, 75, 74)",
-      "boxShadow": "rgba(0, 0, 0, 0.46) 0px 14px 34px 0px, rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset"
+      "boxShadow": "rgba(0, 0, 0, 0.4) 0px 8px 24px 0px"
     },
     "preferences dialog surface": {
       "color": "rgb(241, 241, 239)",

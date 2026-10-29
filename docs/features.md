@@ -24,6 +24,9 @@
 - Theme picker in Preferences > General > App theme: preview cards that apply the theme at once to every window;
   All / Light / Dark chips and a name filter narrow the cards, and arrow keys move within the cards shown
 - Every colour comes from the selected theme, code block syntax colours included
+- Flat surfaces: menus, toolbars, the colour panel, sticky settings, toasts and the search palette draw one soft
+  outer shadow and the theme's border, with no glass highlight along their top edge; buttons and the header are flat
+  too
 - Session and sticky colours are shown in each theme's tone (tone matching): the hue is kept, the stored colour never
   changes, and text on it stays readable
 - No light/dark toggle and no light/dark shortcut; `Command/Ctrl + Shift + L` is unbound

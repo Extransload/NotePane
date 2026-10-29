@@ -108,12 +108,12 @@ export function deriveNoteChrome(theme) {
     tableControlHoverBackground: pair(shade, shade),
     portalMenuBackground: pair(inkLight, shade),
     tableControlShadow: pair(
-      `0 5px 12px ${withAlpha(inkDark, 0.12)}, inset 0 1px 0 ${withAlpha(inkLight, 0.28)}`,
-      `0 7px 16px ${withAlpha(shade, 0.34)}, inset 0 1px 0 ${withAlpha(inkLight, 0.08)}`,
+      `0 5px 12px ${withAlpha(inkDark, 0.12)}`,
+      `0 7px 16px ${withAlpha(shade, 0.34)}`,
     ),
     portalMenuShadow: pair(
-      `0 12px 26px ${withAlpha(inkDark, 0.16)}, inset 0 1px 0 ${withAlpha(inkLight, 0.38)}`,
-      `0 14px 34px ${withAlpha(shade, 0.46)}, inset 0 1px 0 ${withAlpha(inkLight, 0.08)}`,
+      `0 8px 24px ${withAlpha(inkDark, 0.14)}`,
+      `0 8px 24px ${withAlpha(shade, 0.4)}`,
     ),
     blockNoteShadowColor: pair(withAlpha(inkDark, 0.18), withAlpha(shade, 0.48)),
     controlBackground: pair(withAlpha(inkLight, 0.46), withAlpha(shade, 0.2)),

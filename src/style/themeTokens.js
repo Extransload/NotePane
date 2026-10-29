@@ -39,12 +39,9 @@ const STRENGTH = {
   codeBorder: [0.34, 0.34],
   inlineCode: [0.16, 0.1],
   callout: [0.05, 0.08],
-  glass: [0.38, 0.08],
-  glassSoft: [0.28, 0.08],
-  glassButton: [0.42, 0.08],
   menuShadow: [0.14, 0.4],
   panelShadow: [0.18, 0.42],
-  portalShadow: [0.16, 0.46],
+  portalShadow: [0.14, 0.4],
   controlShadow: [0.12, 0.34],
   buttonShadow: [0.06, 0.18],
   bnShadow: [0.16, 0.48],
@@ -60,7 +57,7 @@ const STRENGTH = {
 const GEOMETRY = {
   menu: ["0 10px 24px", "0 12px 34px"],
   panel: ["0 22px 54px", "0 22px 54px"],
-  portal: ["0 12px 26px", "0 14px 34px"],
+  portal: ["0 8px 24px", "0 8px 24px"],
   control: ["0 5px 12px", "0 7px 16px"],
   button: ["0 4px 10px", "0 4px 12px"],
 };
@@ -75,7 +72,7 @@ function commaRgba(hex, alpha) {
 }
 
 // Roles the stylesheets painted with a fixed colour before themes existed: status dots,
-// focus rings, tooltips, the code block tool bar, glass highlights, backdrops and shadows.
+// focus rings, tooltips, the code block tool bar, backdrops and shadows.
 function stylesheetRoleTokens(palette, scheme, glass) {
   const shadowColour = (alpha) => hexToCssRgb(palette.shadow, alpha);
   // BlockNote's tooltip is an inverted chip on light themes and a raised panel on dark ones.
@@ -84,11 +81,8 @@ function stylesheetRoleTokens(palette, scheme, glass) {
   return {
     "--notepane-glass": glass,
     "--notepane-shadow-color": palette.shadow,
-    // The inset highlight along the top of the sticky header and of its title field.
-    "--notepane-shadow-header-glass": `inset 0 1px 0 ${hexToCssRgb(glass, 0.08)}`,
-    "--notepane-shadow-sidebar-edge": `inset -1px 0 0 ${hexToCssRgb(glass, 0.04)}`,
-    "--notepane-shadow-swatch": `inset 0 1px 0 ${hexToCssRgb(glass, 0.35)}`,
-    "--notepane-shadow-color-wheel": `inset 0 0 0 1px ${hexToCssRgb(glass, 0.18)}, 0 6px 14px ${shadowColour(0.2)}`,
+    // The colour wheel's rim is the theme border, so the disc meets the panel without a glass line.
+    "--notepane-shadow-color-wheel": `inset 0 0 0 1px var(--sticky-border-color), 0 6px 14px ${shadowColour(0.2)}`,
     "--notepane-shadow-history-panel": `0 18px 45px ${shadowColour(0.2)}`,
     "--notepane-backdrop-preferences": shadowColour(0.18),
     "--notepane-backdrop-history": shadowColour(0.28),
@@ -190,7 +184,6 @@ export function buildThemeTokens(theme) {
   const tint = scheme === "dark" ? palette.shadow : palette.text;
   const shadow = (name, strength, base = palette.shadow) =>
     `${g(name)} ${hexToCssRgb(base, s(strength))}`;
-  const highlight = (strength) => `inset 0 1px 0 ${hexToCssRgb(glass, s(strength))}`;
 
   const tokens = {
     "--sticky-effective-bg": palette.window,
@@ -211,11 +204,13 @@ export function buildThemeTokens(theme) {
     "--sticky-table-control-bg": mixHexColors(palette.window, palette.text, 0.03),
     "--sticky-table-control-hover-bg": palette.hover,
     "--sticky-table-control-text": palette.text,
-    "--sticky-table-control-shadow": `${shadow("control", "controlShadow", tint)}, ${highlight("glassSoft")}`,
+    "--sticky-table-control-shadow": shadow("control", "controlShadow", tint),
     "--sticky-portal-menu-bg": palette.panel,
     "--sticky-portal-menu-hover-bg": palette.hover,
     "--sticky-portal-menu-border-color": palette.line,
-    "--sticky-portal-menu-shadow": `${shadow("portal", "portalShadow", tint)}, ${highlight("glass")}`,
+    // Every floating surface (menus, toolbars, toasts, palettes, small dialogs) is flat: this one
+    // soft shadow and the theme border, with no inset highlight.
+    "--sticky-portal-menu-shadow": shadow("portal", "portalShadow", tint),
     "--sticky-control-bg": hexToCssRgb(glass, s("controlBg")),
     "--sticky-control-hover-bg": hexToCssRgb(hoverBase, s("controlHover")),
     "--sticky-danger-color": palette.danger,
@@ -267,7 +262,7 @@ export function buildThemeTokens(theme) {
     "--chrome-icon-button-border": hexToCssRgb(palette.text, s("buttonBorder")),
     "--chrome-icon-button-hover-border": hexToCssRgb(palette.text, s("buttonHoverBorder")),
     "--chrome-icon-button-active-border": hexToCssRgb(palette.text, s("buttonActiveBorder")),
-    "--chrome-icon-button-shadow": `${shadow("button", "buttonShadow")}, ${highlight("glassButton")}`,
+    "--chrome-icon-button-shadow": shadow("button", "buttonShadow"),
     "--session-tab-active-bg": palette.header,
     "--session-tab-inactive-bg": palette.header,
     "--session-tab-hover-bg": palette.header,

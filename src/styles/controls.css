@@ -12,7 +12,7 @@
   border: 1px solid var(--sticky-border-color);
   border-radius: 10px;
   background: var(--sticky-panel-bg);
-  box-shadow: var(--sticky-menu-shadow);
+  box-shadow: var(--sticky-portal-menu-shadow);
   color: var(--sticky-panel-text);
   -webkit-app-region: no-drag;
   animation: menuIn 130ms ease both;
@@ -97,7 +97,6 @@
   border: 1px solid color-mix(in srgb, var(--sticky-border-color) 75%, var(--notepane-shadow-color));
   border-radius: 50%;
   background: var(--session-tab-menu-color);
-  box-shadow: var(--notepane-shadow-swatch);
 }
 
 @keyframes pinButtonPop {

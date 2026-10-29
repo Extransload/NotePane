@@ -14,9 +14,7 @@
   border: 1px solid color-mix(in srgb, var(--sticky-border-color) 76%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--sticky-panel-bg) 94%, transparent);
-  box-shadow:
-    0 14px 30px color-mix(in srgb, var(--sticky-text-color) 14%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--notepane-glass) 42%, transparent);
+  box-shadow: var(--sticky-portal-menu-shadow);
   color: var(--sticky-panel-text);
   font: 720 11px/1 var(--notepane-ui-font);
   pointer-events: auto;

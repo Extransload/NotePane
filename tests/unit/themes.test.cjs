@@ -507,12 +507,10 @@ test("the code block colour scheme follows the code background", async () => {
 const STYLESHEET_LITERAL_TOKENS = {
   "--notepane-glass": ["#ffffff", "#ffffff"],
   "--notepane-shadow-color": ["#000000", "#000000"],
-  "--notepane-shadow-header-glass": ["inset 0 1px 0 rgb(255 255 255 / 0.08)", "inset 0 1px 0 rgb(255 255 255 / 0.08)"],
-  "--notepane-shadow-sidebar-edge": ["inset -1px 0 0 rgb(255 255 255 / 0.04)", "inset -1px 0 0 rgb(255 255 255 / 0.04)"],
-  "--notepane-shadow-swatch": ["inset 0 1px 0 rgb(255 255 255 / 0.35)", "inset 0 1px 0 rgb(255 255 255 / 0.35)"],
+  // The rim is the theme border now, not a glass line.
   "--notepane-shadow-color-wheel": [
-    "inset 0 0 0 1px rgb(255 255 255 / 0.18), 0 6px 14px rgb(0 0 0 / 0.2)",
-    "inset 0 0 0 1px rgb(255 255 255 / 0.18), 0 6px 14px rgb(0 0 0 / 0.2)",
+    "inset 0 0 0 1px var(--sticky-border-color), 0 6px 14px rgb(0 0 0 / 0.2)",
+    "inset 0 0 0 1px var(--sticky-border-color), 0 6px 14px rgb(0 0 0 / 0.2)",
   ],
   "--notepane-shadow-history-panel": ["0 18px 45px rgb(0 0 0 / 0.2)", "0 18px 45px rgb(0 0 0 / 0.2)"],
   "--notepane-backdrop-preferences": ["rgb(0 0 0 / 0.18)", "rgb(0 0 0 / 0.18)"],
@@ -587,8 +585,12 @@ const LIBRARY_COLOUR_TOKENS = {
 };
 
 // Tokens of the tokens.css capture that nothing read, deleted with their overrides: the brand
-// constants and the icon fills.
+// constants and the icon fills; and the glass highlights of the header, sidebar edge and swatches,
+// removed with the flat surfaces.
 const DELETED_TOKENS = new Set([
+  "--notepane-shadow-header-glass",
+  "--notepane-shadow-sidebar-edge",
+  "--notepane-shadow-swatch",
   "--brand-pane-cream",
   "--brand-pastel-sage",
   "--brand-pastel-sky",
@@ -596,6 +598,14 @@ const DELETED_TOKENS = new Set([
   "--icon-surface-fill",
   "--icon-muted-fill",
 ]);
+
+// Shadows that lost their inset glass highlight: the outer shadow alone, and for menus and every
+// other floating surface one flat soft shadow. [NotePane Light, NotePane Dark].
+const FLAT_SHADOW_TOKENS = {
+  "--sticky-table-control-shadow": ["0 5px 12px rgb(55 53 47 / 0.12)", "0 7px 16px rgb(0 0 0 / 0.34)"],
+  "--sticky-portal-menu-shadow": ["0 8px 24px rgb(55 53 47 / 0.14)", "0 8px 24px rgb(0 0 0 / 0.4)"],
+  "--chrome-icon-button-shadow": ["0 4px 10px rgb(0 0 0 / 0.06)", "0 4px 12px rgb(0 0 0 / 0.18)"],
+};
 
 // Tokens added for new UI after the tokens.css capture, which pin today's derived value in
 // [NotePane Light, NotePane Dark].
@@ -627,6 +637,7 @@ async function assertNotePaneTokens(themeId, scheme) {
         ...STYLESHEET_LITERAL_TOKENS,
         ...LIBRARY_COLOUR_TOKENS,
         ...BRIDGE_SHADOWED_TOKENS,
+        ...FLAT_SHADOW_TOKENS,
         ...ADDED_TOKENS,
       }).map(
         ([name, values]) => [name, values[literalIndex]],

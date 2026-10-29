@@ -13,7 +13,7 @@
   border: 1px solid var(--sticky-border-color);
   border-radius: 14px;
   background: var(--sticky-panel-bg);
-  box-shadow: var(--sticky-panel-shadow);
+  box-shadow: var(--sticky-portal-menu-shadow);
   color: var(--sticky-panel-text);
   -webkit-app-region: no-drag;
 }
@@ -130,6 +130,7 @@
 }
 
 .sticky-settings-window {
+  box-shadow: var(--sticky-portal-menu-shadow);
   width: min(560px, calc(100vw - 56px));
   max-height: min(720px, calc(100vh - 56px));
 }
@@ -193,10 +194,6 @@
   border-color: color-mix(in srgb, var(--sticky-text-color) 10%, transparent);
   background: var(--sticky-control-hover-bg);
   color: var(--sticky-panel-text);
-}
-
-.preferences-window-sidebar button[aria-selected="true"] {
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--sticky-panel-bg) 68%, transparent);
 }
 
 .preferences-window-sidebar button:focus-visible {
