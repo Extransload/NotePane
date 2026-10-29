@@ -1368,3 +1368,60 @@ test("takes selection, placeholder, Mantine and drop cursor colours from the the
     expect(byTheme[1][name], `${name} follows the theme`).not.toBe(byTheme[0][name]);
   }
 });
+
+// Two session notes over a desktop bridge stub that records every appearance write.
+function stubRecordingTwoNoteBridge() {
+  const makeNote = (index, title) => ({
+    id: `appearance-note-${index + 1}`,
+    title,
+    titleManuallyEdited: true,
+    blocksJSON: null,
+    markdown: "",
+    theme: {},
+    seedDemoContent: false,
+    editorFontFamily: "Inter",
+    trashedAt: null,
+    sortOrder: index + 1,
+    createdAt: index + 1,
+    updatedAt: index + 1,
+  });
+  const notes = [makeNote(0, "First tab"), makeNote(1, "Second tab")];
+  window.__appearanceWrites = [];
+  window.blocknoteSticky = {
+    getCurrentNoteId: async () => notes[0].id,
+    getNote: async (noteId) => notes.find((note) => note.id === noteId) ?? notes[0],
+    listNotes: async () => [...notes],
+    listTrash: async () => [],
+    getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
+    getLayoutMode: async () => "tabs",
+    getEditorPreferences: async () => ({}),
+    listFonts: async () => [],
+    saveContent: async () => undefined,
+    updateAppearance: async (payload) => {
+      window.__appearanceWrites.push(payload);
+    },
+  };
+}
+
+test("writes the colour of every session tab recoloured within the save debounce", async ({ page }) => {
+  await page.clock.install();
+  await page.addInitScript(stubRecordingTwoNoteBridge);
+  await page.reload();
+  await expect(page.locator(".session-tab-row")).toHaveCount(2);
+  const recolourTab = async (index, hex, rgb) => {
+    await page.locator(".session-tab-row").nth(index).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Color..." }).click();
+    await page.getByLabel("HEX session tab color value").fill(hex);
+    await expect.poll(() => getTabCssValue(page, index, "backgroundColor")).toBe(rgb);
+  };
+
+  // Time stands still from here, so the second recolour lands inside the first one's debounce.
+  await page.clock.pauseAt(Date.now() + 60_000);
+  await recolourTab(0, "ff0000", "rgb(255, 0, 0)");
+  await recolourTab(1, "0000ff", "rgb(0, 0, 255)");
+  expect(await page.evaluate(() => window.__appearanceWrites.length)).toBe(0);
+  await page.clock.runFor(1_000);
+
+  await expect.poll(() => page.evaluate(() => window.__appearanceWrites.map((write) => write.noteId).sort()))
+    .toEqual(["appearance-note-1", "appearance-note-2"]);
+});

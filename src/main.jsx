@@ -66,7 +66,6 @@ import {
   MAX_MARKDOWN_IMPORT_FILE_SIZE,
   PENDING_RENAME_TIMEOUT_MS,
   SESSION_TAB_ENTER_MS,
-  SESSION_TAB_EXIT_MS,
   SIDEBAR_COLLAPSE_WIDTH,
   SIDEBAR_COMPACT_WIDTH,
   SIDEBAR_DEFAULT_WIDTH,
@@ -248,11 +247,13 @@ import {
   useSessionNumberShortcuts,
   useTabModeShortcuts,
 } from "./hooks/useKeyboardCommands.js";
+import { useNoteAppearance } from "./hooks/useNoteAppearance.js";
 import { useNotePersistence } from "./hooks/useNotePersistence.js";
 import { useOverlayState } from "./hooks/useOverlayState.js";
 import { EditorErrorBoundary } from "./ui/EditorErrorBoundary.jsx";
 import { usePendingSaveFlush } from "./hooks/usePendingSaveFlush.js";
 import { useSessionList } from "./hooks/useSessionList.js";
+import { useSessionTabActions } from "./hooks/useSessionTabActions.js";
 import { useSessionTabDrag } from "./hooks/useSessionTabDrag.js";
 import { useStickyToasts } from "./hooks/useStickyToasts.js";
 import {
@@ -264,7 +265,6 @@ import {
 import {
   arraysEqual,
   clamp,
-  delay,
   moveArrayItem,
   nextAnimationFrame,
 } from "./utils/values.js";
@@ -746,11 +746,7 @@ function StickyEditor({
         isEmptySessionDocument(initialEditorContent),
     );
   const [isEditorActive, setIsEditorActive] = useState(false);
-  const [editingSessionId, setEditingSessionId] = useState(null);
-  const [draftSessionTitle, setDraftSessionTitle] = useState("");
-  const [isDraftSessionTitleDirty, setIsDraftSessionTitleDirty] = useState(false);
   const [enteringSessionIds, setEnteringSessionIds] = useState(() => new Set());
-  const [removingSessionIds, setRemovingSessionIds] = useState(() => new Set());
   const [draggingSessionNoteId, setDraggingSessionNoteId] = useState(null);
   const [isPinned, setIsPinned] = useState(Boolean(note.alwaysOnTop));
   const [activeImageBlockId, setActiveImageBlockId] = useState(null);
@@ -779,11 +775,14 @@ function StickyEditor({
   const saveTimerRef = useRef(null);
   const saveRetryTimerRef = useRef(null);
   const isEditorDirtyRef = useRef(false);
-  const appearanceTimerRef = useRef(null);
-  const sessionAppearanceTimerRef = useRef(null);
-  // Payloads waiting on the appearance debounce, sent on unmount instead of dropped.
-  const pendingAppearanceRef = useRef(null);
-  const pendingSessionAppearanceRef = useRef(null);
+  const {
+    appearanceTimerRef,
+    pendingAppearanceRef,
+    pendingSessionAppearanceRef,
+    scheduleAppearanceSave,
+    scheduleSessionAppearanceSave,
+    sessionAppearanceTimerRef,
+  } = useNoteAppearance(note.id);
   const sessionTabRowsRef = useRef(new Map());
   const previousSessionTabRectsRef = useRef(null);
   const lastSavedBlocksRef = useRef("");
@@ -1074,57 +1073,6 @@ function StickyEditor({
   useEffect(() => {
     refreshTableOfContents();
   }, [note.id, refreshTableOfContents]);
-
-  const scheduleAppearanceSave = useCallback(
-    (nextTitle, nextTheme, options = {}) => {
-      if (!electronApi) {
-        return;
-      }
-
-      if (appearanceTimerRef.current) {
-        window.clearTimeout(appearanceTimerRef.current);
-      }
-
-      const payload = {
-        noteId: note.id,
-        title: normalizeTitle(nextTitle),
-        theme: normalizeTheme(nextTheme),
-      };
-      if (Object.hasOwn(options, "titleManuallyEdited")) {
-        payload.titleManuallyEdited = Boolean(options.titleManuallyEdited);
-      }
-      pendingAppearanceRef.current = payload;
-      appearanceTimerRef.current = window.setTimeout(() => {
-        appearanceTimerRef.current = null;
-        pendingAppearanceRef.current = null;
-        void electronApi.updateAppearance(payload);
-      }, 160);
-    },
-    [note.id],
-  );
-
-  const scheduleSessionAppearanceSave = useCallback((sessionNote, nextTheme) => {
-    if (!electronApi || !sessionNote?.id) {
-      return;
-    }
-
-    if (sessionAppearanceTimerRef.current) {
-      window.clearTimeout(sessionAppearanceTimerRef.current);
-    }
-
-    const payload = {
-      noteId: sessionNote.id,
-      title: getNoteDisplayTitle(sessionNote),
-      titleManuallyEdited: isTitleManuallyEdited(sessionNote),
-      theme: normalizeTheme(nextTheme),
-    };
-    pendingSessionAppearanceRef.current = payload;
-    sessionAppearanceTimerRef.current = window.setTimeout(() => {
-      sessionAppearanceTimerRef.current = null;
-      pendingSessionAppearanceRef.current = null;
-      void electronApi.updateAppearance(payload);
-    }, 160);
-  }, []);
 
   const updateTheme = useCallback(
     (nextTheme) => {
@@ -1903,266 +1851,44 @@ function StickyEditor({
     return () => window.clearTimeout(timerId);
   }, [visibleSessionNotes]);
 
-  const startSessionRename = useCallback((sessionNote) => {
-    setEditingSessionId(sessionNote.id);
-    setDraftSessionTitle(getSessionDisplayTitle(sessionNote));
-    setIsDraftSessionTitleDirty(false);
-  }, [getSessionDisplayTitle]);
-
-  // A double click on another tab switches to it with its first click, and the switch remounts this
-  // component before, during or after the second click. A rename asked for before the remount
-  // waits in App (pendingRenameNoteId) and starts here once this window shows that note.
-  const requestSessionRename = useCallback((sessionNote) => {
-    if (sessionNote.id === note.id) {
-      startSessionRename(sessionNote);
-      return;
-    }
-    onRenameRequested(sessionNote.id);
-  }, [note.id, onRenameRequested, startSessionRename]);
-
-  useEffect(() => {
-    if (pendingRenameNoteId !== note.id) {
-      return;
-    }
-    onPendingRenameHandled();
-    startSessionRename(note);
-  }, [note, onPendingRenameHandled, pendingRenameNoteId, startSessionRename]);
-
-  // A switch that fails must not leave a rename waiting for a later visit.
-  const selectSessionTab = useCallback(async (noteId) => {
-    if ((await selectSidebarNote(noteId)) !== noteId) {
-      onPendingRenameHandled();
-    }
-  }, [onPendingRenameHandled, selectSidebarNote]);
-
-  const cancelSessionRename = useCallback(() => {
-    setEditingSessionId(null);
-    setDraftSessionTitle("");
-    setIsDraftSessionTitleDirty(false);
-  }, []);
-
-  const commitSessionRename = useCallback(
-    async (sessionNote) => {
-      setEditingSessionId(null);
-      setDraftSessionTitle("");
-      setIsDraftSessionTitleDirty(false);
-
-      if (!isDraftSessionTitleDirty) {
-        return;
-      }
-
-      const normalizedTitle = normalizeTitle(
-        draftSessionTitle,
-        getSessionDisplayTitle(sessionNote),
-      );
-
-      const updatedNote = {
-        ...sessionNote,
-        title: normalizedTitle,
-        titleManuallyEdited: true,
-      };
-
-      if (sessionNote.id === note.id) {
-        setTitle(normalizedTitle);
-        onNoteChanged({
-          ...note,
-          title: normalizedTitle,
-          titleManuallyEdited: true,
-          theme,
-        });
-        scheduleAppearanceSave(normalizedTitle, theme, {
-          titleManuallyEdited: true,
-        });
-        return;
-      }
-
-      onNoteChanged(updatedNote);
-      await electronApi?.updateAppearance({
-        noteId: sessionNote.id,
-        title: normalizedTitle,
-        titleManuallyEdited: true,
-        theme: normalizeTheme(sessionNote.theme),
-      });
-    },
-    [
-      draftSessionTitle,
-      getSessionDisplayTitle,
-      isDraftSessionTitleDirty,
-      note,
-      onNoteChanged,
-      scheduleAppearanceSave,
-      theme,
-    ],
-  );
-
-  const requestDeleteSessionNote = useCallback(
-    (sessionNote) => {
-      if (removingSessionIds.has(sessionNote.id)) {
-        return;
-      }
-
-      setEditingSessionId(null);
-      setDraftSessionTitle("");
-      setIsDraftSessionTitleDirty(false);
-      openOverlay("sessionTrashConfirm", sessionNote);
-    },
-    [openOverlay, removingSessionIds],
-  );
-
-  const deleteSessionNote = useCallback(
-    async (sessionNote, options = {}) => {
-      if (removingSessionIds.has(sessionNote.id)) {
-        return;
-      }
-
-      setEditingSessionId(null);
-      setDraftSessionTitle("");
-      setIsDraftSessionTitleDirty(false);
-      setRemovingSessionIds((currentIds) => {
-        const nextIds = new Set(currentIds);
-        nextIds.add(sessionNote.id);
-        return nextIds;
-      });
-
-      try {
-        await delay(SESSION_TAB_EXIT_MS);
-        await saveNow();
-        const deletedSnapshot =
-          sessionNote.id === note.id ? getCurrentNoteSnapshot() : sessionNote;
-        const deletedTitle = getNoteDisplayTitle(
-          deletedSnapshot,
-          sessionNote.id === note.id ? editor.document : null,
-        );
-        const result = await onDeleteNote(
-          sessionNote.id,
-          deletedSnapshot,
-        );
-        if (result?.deleted === false) {
-          showExportToast("Could not move session to Trash.", "error");
-          return;
-        }
-
-        onSessionMovedToTrash?.({
-          noteId: sessionNote.id,
-          title: deletedTitle,
-          source: options.source ?? "trash",
-        });
-      } finally {
-        setRemovingSessionIds((currentIds) => {
-          const nextIds = new Set(currentIds);
-          nextIds.delete(sessionNote.id);
-          return nextIds;
-        });
-      }
-    },
-    [
-      editor.document,
-      getCurrentNoteSnapshot,
-      note.id,
-      onDeleteNote,
-      removingSessionIds,
-      saveNow,
-      showExportToast,
-      onSessionMovedToTrash,
-    ],
-  );
-
-  const hasSessionContent = useCallback(
-    (sessionNote) => {
-      if (sessionNote.id === note.id) {
-        return !isEmptySessionDocument(editor.document);
-      }
-
-      if (sessionNote.seedDemoContent || Boolean(sessionNote.markdown?.trim())) {
-        return true;
-      }
-
-      return !isEmptySessionDocument(parseBlocksJSON(sessionNote.blocksJSON) ?? EMPTY_BLOCKS);
-    },
-    [editor.document, note.id],
-  );
-
-  const requestCloseCurrentTab = useCallback(() => {
-    if (normalizedLayoutMode !== "tabs") {
-      closeCurrentWindow();
-      return;
-    }
-
-    const currentSessionNote = visibleSessionNotes.find(
-      (sessionNote) => sessionNote.id === note.id,
-    );
-    if (!currentSessionNote || removingSessionIds.has(currentSessionNote.id)) {
-      return;
-    }
-
-    if (hasSessionContent(currentSessionNote)) {
-      openOverlay("sessionCloseConfirm", currentSessionNote);
-      return;
-    }
-
-    void deleteSessionNote(currentSessionNote, { source: "close" });
-  }, [
-    closeCurrentWindow,
-    openOverlay,
-    deleteSessionNote,
-    normalizedLayoutMode,
-    hasSessionContent,
-    note.id,
+  const {
+    cancelSessionRename,
+    changeDraftSessionTitle,
+    commitSessionRename,
+    confirmCloseCurrentTab,
+    confirmDeleteSessionNote,
+    draftSessionTitle,
+    editingSessionId,
     removingSessionIds,
+    requestDeleteSessionNote,
+    requestSessionRename,
+    selectSessionTab,
+  } = useSessionTabActions({
+    closeCurrentWindow,
+    closeOverlay,
+    editor,
+    getCurrentNoteSnapshot,
+    getSessionDisplayTitle,
+    matchesEnabledKeyboardShortcut,
+    normalizedLayoutMode,
+    note,
+    onDeleteNote,
+    onNoteChanged,
+    onPendingRenameHandled,
+    onRenameRequested,
+    onSessionMovedToTrash,
+    openOverlay,
+    pendingRenameNoteId,
+    pendingSessionCloseNote,
+    pendingSessionTrashNote,
+    saveNow,
+    scheduleAppearanceSave,
+    selectSidebarNote,
+    setTitle,
+    showExportToast,
+    theme,
     visibleSessionNotes,
-  ]);
-
-  const confirmCloseCurrentTab = useCallback(async () => {
-    const sessionNote = pendingSessionCloseNote;
-    if (!sessionNote) {
-      return;
-    }
-
-    closeOverlay("sessionCloseConfirm");
-    await deleteSessionNote(sessionNote, { source: "close" });
-  }, [closeOverlay, deleteSessionNote, pendingSessionCloseNote]);
-
-  useEffect(() => {
-    return electronApi?.onCloseTabRequested?.(requestCloseCurrentTab);
-  }, [requestCloseCurrentTab]);
-
-  useEffect(() => {
-    if (!pendingSessionCloseNote) {
-      return;
-    }
-
-    if (!visibleSessionNotes.some((sessionNote) => sessionNote.id === pendingSessionCloseNote.id)) {
-      closeOverlay("sessionCloseConfirm");
-    }
-  }, [closeOverlay, pendingSessionCloseNote, visibleSessionNotes]);
-
-  useEffect(() => {
-    const handleCloseShortcut = (event) => {
-      if (
-        !matchesEnabledKeyboardShortcut(event, "closeWindow") ||
-        isShortcutRecorderTarget(event.target)
-      ) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      requestCloseCurrentTab();
-    };
-
-    document.addEventListener("keydown", handleCloseShortcut, true);
-    return () => document.removeEventListener("keydown", handleCloseShortcut, true);
-  }, [matchesEnabledKeyboardShortcut, requestCloseCurrentTab]);
-
-  const confirmDeleteSessionNote = useCallback(async () => {
-    const sessionNote = pendingSessionTrashNote;
-    if (!sessionNote) {
-      return;
-    }
-
-    closeOverlay("sessionTrashConfirm");
-    await deleteSessionNote(sessionNote);
-  }, [closeOverlay, deleteSessionNote, pendingSessionTrashNote]);
+  });
 
   const getSessionTabRowClassName = useCallback(
     (sessionNote) =>
@@ -2555,10 +2281,7 @@ function StickyEditor({
                           autoFocus
                           spellCheck={false}
                           onFocus={(event) => event.target.select()}
-                          onChange={(event) => {
-                            setDraftSessionTitle(event.target.value);
-                            setIsDraftSessionTitleDirty(true);
-                          }}
+                          onChange={(event) => changeDraftSessionTitle(event.target.value)}
                           onBlur={() => void commitSessionRename(sessionNote)}
                           onKeyDown={(event) => {
                             if (event.nativeEvent.isComposing) {

@@ -33,7 +33,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | `src/model/` | normalising and deriving stored data | `notes.js`, `preferences.js`, `keyboardShortcuts.js` |
 | `src/style/` | themes, theme tokens, tone matching, colour maths and computed inline styles | `themes.js`, `themeTokens.js`, `toneMatch.js`, `applyTheme.js`, `themeStyles.js`, `colorMath.js` |
 | `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
-| `src/hooks/` | stateful behaviour lifted out of `App` and `StickyEditor` | `useSessionList.js`, `useOverlayState.js`, `useNotePersistence.js`, `useEditorSurfaceShortcuts.js` |
+| `src/hooks/` | stateful behaviour lifted out of `App` and `StickyEditor` | `useSessionList.js`, `useOverlayState.js`, `useNoteAppearance.js`, `useSessionTabActions.js`, `useNotePersistence.js`, `useEditorSurfaceShortcuts.js` |
 | `src/utils/` | small generic helpers | `values.js`, `dom.js`, `sessionTabAnimation.js` |
 | `src/styles/` | stylesheets, imported in cascade order | `tokens.css`, `chrome.css`, `blocknote.css` |
 
@@ -75,9 +75,11 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Colour conversion and contrast | `src/style/colorMath.js` |
 | The window's session list and trash: load on startup, `notes:changed` updates, create, select, reorder, move to Trash, restore, purge, the undo toast after a move to Trash | `src/hooks/useSessionList.js` |
 | Saving, debouncing, version snapshots | `src/hooks/useNotePersistence.js` |
+| Debounced title and colour writes, for the open note and for each recoloured session tab | `src/hooks/useNoteAppearance.js` |
 | Flushing pending saves on unmount or when main asks | `src/hooks/usePendingSaveFlush.js` |
 | Keys handled on the editor surface | `src/hooks/useEditorSurfaceShortcuts.js` |
 | Window, session and tab-mode keyboard commands | `src/hooks/useKeyboardCommands.js` |
+| Session tab rename, move to Trash, and closing the current tab | `src/hooks/useSessionTabActions.js` |
 | Session tab drag and drop | `src/hooks/useSessionTabDrag.js` |
 | Export toast and zoom gauge timing | `src/hooks/useStickyToasts.js` |
 | Zoom gauge, export toast and other overlays | `src/ui/overlays.jsx` |
