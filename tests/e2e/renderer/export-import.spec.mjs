@@ -519,3 +519,62 @@ test("opens the slash menu upward from the lower half", async ({ page }) => {
   )).toBe(true);
   await expect(slashMenu.getByRole("option").last()).toBeInViewport();
 });
+
+test("labels slash menu shortcuts the way Preferences labels shortcuts", async ({ page }) => {
+  const isMac = process.platform === "darwin";
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await preferences.getByRole("tab", { name: "Shortcuts" }).click();
+  await expect(preferences.getByRole("button", { name: "Shortcut for New session" }))
+    .toHaveText(isMac ? "⌘T" : "Ctrl+T");
+  await preferences.getByRole("button", { name: "Close preferences" }).click();
+
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/");
+  const heading = page.locator(".bn-suggestion-menu-item").filter({
+    has: page.getByText("Heading 1", { exact: true }),
+  });
+  await expect(heading).toContainText(isMac ? "⌘⌥1" : "Ctrl+Alt+1");
+  await expect(page.locator(".bn-suggestion-menu")).not.toContainText(/ALT|-Alt-|⌘-/);
+});
+
+test("anchors the export menu to its button and hides the formatting toolbar while it is open", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("heading", { name: "NotePane", exact: true }).dblclick();
+  const toolbar = page.locator(".bn-formatting-toolbar");
+  await expect(toolbar).toBeVisible();
+
+  await page.keyboard.press(modifierShortcut("Shift+E"));
+  const menu = page.getByRole("menu", { name: "Export format" });
+  await expect(menu).toBeVisible();
+  await expect(toolbar).toHaveCount(0);
+  const button = page.getByTestId("session-sidebar-footer").getByRole("button", { name: "Export" });
+  await expect.poll(async () => {
+    const menuBox = await menu.boundingBox();
+    const buttonBox = await button.boundingBox();
+    // The footer sits at the bottom of the window, so the menu opens above the button.
+    return Math.abs(menuBox.x - buttonBox.x) <= 1 &&
+      menuBox.y + menuBox.height <= buttonBox.y &&
+      buttonBox.y - (menuBox.y + menuBox.height) <= 12;
+  }).toBe(true);
+
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(toolbar).toBeVisible();
+
+  // Without the sidebar, the shortcut opens the menu under the right end of the header.
+  await page.getByRole("button", { name: "Switch to Sticky windows mode" }).click();
+  await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
+  await page.locator(".bn-editor").getByRole("heading", { name: "NotePane", exact: true }).click();
+  await page.keyboard.press(modifierShortcut("Shift+E"));
+  await expect(menu).toBeVisible();
+  const header = page.getByTestId("sticky-header");
+  await expect.poll(async () => {
+    const menuBox = await menu.boundingBox();
+    const headerBox = await header.boundingBox();
+    const viewport = page.viewportSize();
+    return menuBox.y >= headerBox.y + headerBox.height &&
+      menuBox.y - (headerBox.y + headerBox.height) <= 12 &&
+      viewport.width - (menuBox.x + menuBox.width) <= 24;
+  }).toBe(true);
+});

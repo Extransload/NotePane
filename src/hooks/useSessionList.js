@@ -257,6 +257,51 @@ export function useSessionList({
     setNote(nextNote);
   }, [editorPreferences, layoutMode, notes.length]);
 
+  // A new session holding a copy of `source` (title, blocks, Markdown and colour), shown in
+  // this window. The desktop app creates a blank note, saves the content and the title into it,
+  // then opens it; the browser preview copies it in memory.
+  const duplicateSidebarNote = useCallback(async (source) => {
+    const title = `${normalizeTitle(source.title)} copy`;
+    const blocksJSON =
+      source.blocksJSON ?? (source.seedDemoContent ? NOTE_PANE_TEMPLATE_BLOCKS_JSON : null);
+    const markdown = source.markdown ?? "";
+    const theme = source.theme ?? DEFAULT_THEME;
+
+    if (!electronApi) {
+      const now = Date.now();
+      const copy = {
+        id: crypto.randomUUID(),
+        title,
+        titleManuallyEdited: true,
+        blocksJSON,
+        markdown,
+        theme,
+        seedDemoContent: false,
+        editorFontFamily: editorPreferences.editorFontFamily,
+        trashedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      setNotes((currentNotes) => mergeNotes(currentNotes, copy));
+      setNote(copy);
+      return copy;
+    }
+
+    const created = await electronApi.createNote({ template: "blank" });
+    if (blocksJSON) {
+      await electronApi.saveContent({ noteId: created.id, blocksJSON, markdown });
+    }
+    const named = await electronApi.updateAppearance({
+      noteId: created.id,
+      title,
+      titleManuallyEdited: true,
+      theme,
+    });
+    setNotes((currentNotes) => mergeNotes(currentNotes, named ?? created));
+    const activatedNote = await electronApi.activateNote(created.id);
+    return adoptNote(activatedNote ?? named ?? created);
+  }, [adoptNote, editorPreferences]);
+
   const reorderNotes = useCallback(
     async (orderedNoteIds, options = {}) => {
       const shouldPersist = options.persist !== false;
@@ -458,6 +503,7 @@ export function useSessionList({
   return {
     createSidebarNote,
     deleteSidebarNote,
+    duplicateSidebarNote,
     note,
     notes,
     purgeTrashedNote,

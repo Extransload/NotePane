@@ -2665,6 +2665,73 @@ function writePortableBackup(filePath, data) {
   );
 }
 
+test("duplicates a session and opens one in its own sticky window from the tab menu", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-tab-menu-");
+  const notesPath = path.join(userDataDirectory, "notes.json");
+  writeInitialNotes(userDataDirectory, [
+    {
+      id: "alpha-note",
+      title: "Alpha",
+      blocksJSON: JSON.stringify([{
+        id: "alpha-block",
+        type: "paragraph",
+        props: { textColor: "default", backgroundColor: "default", textAlignment: "left" },
+        content: [{ type: "text", text: "alpha body", styles: {} }],
+        children: [],
+      }]),
+      markdown: "alpha body",
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    { id: "beta-note", title: "Beta", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const editorSurface = page.getByTestId("sticky-editor-surface");
+    await expect(editorSurface).toContainText("alpha body");
+    const tabs = page.getByRole("tab");
+    const sourceTitle = (await tabs.first().textContent()).trim();
+    const copyTab = page.getByRole("tab", { name: `${sourceTitle} copy`, exact: true });
+
+    await page.locator(".session-tab-row").first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Duplicate" }).click();
+    await expect(tabs).toHaveCount(3);
+    await expect(copyTab).toHaveAttribute("aria-selected", "true");
+    await expect(editorSurface).toContainText("alpha body");
+    await expect.poll(() => {
+      const stored = JSON.parse(fs.readFileSync(notesPath, "utf8")).notes
+        .find((note) => note.title === `${sourceTitle} copy`);
+      return stored?.blocksJSON ?? "";
+    }).toContain("alpha body");
+
+    // The copy is the open note, so the tabs window moves off it before its sticky window opens.
+    const stickyWindowPromise = electronApp.waitForEvent("window");
+    await page.locator(".session-tab-row").nth(2).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Open as sticky" }).click();
+    const stickyPage = await stickyWindowPromise;
+    await expect(stickyPage.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
+    await expect(stickyPage.getByTestId("sticky-editor-surface")).toContainText("alpha body");
+    await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "tabs");
+    await expect(copyTab).toHaveAttribute("aria-selected", "false");
+    expect(JSON.parse(fs.readFileSync(notesPath, "utf8")).layoutMode).toBe("tabs");
+
+    // Its tab brings the sticky window forward instead of opening the note in a second editor.
+    await copyTab.click();
+    await expect(copyTab).toHaveAttribute("aria-selected", "false");
+
+    // Switching the sticky window to tabs puts the note back into the tabs window.
+    await stickyPage.getByRole("button", { name: "Show sticky actions" }).click();
+    await stickyPage.getByRole("button", { name: "Switch to Tab sessions mode" }).click();
+    await expect.poll(() => electronApp.windows().length).toBe(1);
+    await expect(copyTab).toHaveAttribute("aria-selected", "true");
+    expect(JSON.parse(fs.readFileSync(notesPath, "utf8")).layoutMode).toBe("tabs");
+  } finally {
+    await electronApp.close();
+  }
+});
+
 function writeInitialNotes(userDataDirectory, notes) {
   fs.mkdirSync(userDataDirectory, { recursive: true });
   fs.writeFileSync(

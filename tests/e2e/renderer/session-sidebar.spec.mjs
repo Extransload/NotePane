@@ -892,3 +892,73 @@ test("moves the current sticky note to trash from the sticky header", async ({ p
     .filter({ hasText: "Sticky trash target" });
   await expect(trashRow).toBeVisible();
 });
+
+test("opens the session tab menu at the pointer, clamped inside the window", async ({ page }) => {
+  const row = page.locator(".session-tab-row").first();
+  const box = await row.boundingBox();
+  await page.mouse.click(box.x + 20, box.y + 10, { button: "right" });
+  const menu = page.getByRole("menu", { name: /Session options/ });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem")).toHaveText([
+    "Rename",
+    "Duplicate",
+    "Color...",
+    "Move to Trash",
+  ]);
+  // Open as sticky needs the desktop app's sticky windows.
+  await expect(menu.getByRole("menuitem", { name: "Open as sticky" })).toHaveCount(0);
+  // Measured once its opening animation has settled.
+  await expect.poll(async () => {
+    const menuBox = await menu.boundingBox();
+    return Math.max(
+      Math.abs(menuBox.x - (box.x + 20)),
+      Math.abs(menuBox.y - (box.y + 10)),
+    );
+  }).toBeLessThanOrEqual(8);
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+
+  // Opened near the bottom-right corner, the menu moves back inside the window.
+  const viewport = page.viewportSize();
+  await row.dispatchEvent("contextmenu", {
+    button: 2,
+    clientX: viewport.width - 4,
+    clientY: viewport.height - 4,
+  });
+  await expect(menu).toBeVisible();
+  await expect.poll(async () => {
+    const rect = await menu.boundingBox();
+    return rect.x >= 0 && rect.y >= 0 &&
+      rect.x + rect.width <= viewport.width && rect.y + rect.height <= viewport.height;
+  }).toBe(true);
+});
+
+test("renames, duplicates and moves a session to Trash from its tab menu", async ({ page }) => {
+  await loadTemplatePreview(page);
+  const menu = page.getByRole("menu", { name: /Session options/ });
+  const tabs = page.getByRole("tab");
+
+  await page.locator(".session-tab-row").first().click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "Rename" }).click();
+  await expect(menu).toHaveCount(0);
+  const nameInput = page.getByLabel("Session name");
+  await expect(nameInput).toBeFocused();
+  await nameInput.fill("Roadmap");
+  await nameInput.press("Enter");
+  await expect(tabs.first()).toHaveText("Roadmap");
+
+  await page.locator(".session-tab-row").first().click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "Duplicate" }).click();
+  await expect(tabs).toHaveCount(2);
+  await expect(tabs.nth(1)).toHaveText("Roadmap copy");
+  await expect(tabs.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Launch checklist" })).toBeVisible();
+
+  await page.locator(".session-tab-row").nth(1).click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "Move to Trash" }).click();
+  const confirmDialog = page.getByRole("dialog", { name: "Move session to trash confirmation" });
+  await expect(confirmDialog).toBeVisible();
+  await confirmDialog.getByRole("button", { name: /Yes, move .* to trash/ }).click();
+  await expect(tabs).toHaveCount(1);
+  await expect(tabs.first()).toHaveText("Roadmap");
+});

@@ -199,6 +199,7 @@ import {
   ExportPdfButton,
   LayoutModeSwitch,
   PreferencesButton,
+  SaveStatus,
   StickyPinButton,
   StickySettingsButton,
   StickyTrashButton,
@@ -216,6 +217,7 @@ import {
 } from "./ui/icons.jsx";
 import {
   ExportFormatMenu,
+  getExportMenuAnchor,
   MarkdownImportDialog,
   SessionTabContextMenu,
 } from "./ui/menus.jsx";
@@ -241,6 +243,7 @@ import { useFindInNote } from "./hooks/useFindInNote.js";
 import { FindInNote, getFindSeedText } from "./editor/findInNote.js";
 import { FindBar } from "./ui/FindBar.jsx";
 import { useNoteSearchPalette } from "./hooks/useNoteSearchPalette.js";
+import { useSidebarVisibility } from "./hooks/useSidebarVisibility.js";
 import { SearchPalette } from "./ui/SearchPalette.jsx";
 import {
   useChromeShortcuts,
@@ -295,6 +298,7 @@ function App({ bindTestThemeSetter }) {
   const {
     createSidebarNote,
     deleteSidebarNote,
+    duplicateSidebarNote,
     note,
     notes,
     purgeTrashedNote,
@@ -314,7 +318,7 @@ function App({ bindTestThemeSetter }) {
     setLayoutMode,
   });
   const [recentEditorColors, setRecentEditorColors] = useState([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { isSidebarOpen, setIsSidebarOpen } = useSidebarVisibility();
   const [isEditorWide, setIsEditorWide] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [layoutTransition, setLayoutTransition] = useState(null);
@@ -495,6 +499,7 @@ function App({ bindTestThemeSetter }) {
         setSidebarWidth={setSidebarWidth}
         onCreateNote={createSidebarNote}
         onDeleteNote={deleteSidebarNote}
+        onDuplicateNote={duplicateSidebarNote}
         onRestoreTrashedNote={restoreTrashedNote}
         onPurgeTrashedNote={purgeTrashedNote}
         onSelectNote={selectNote}
@@ -550,6 +555,7 @@ function StickyEditor({
   setSidebarWidth,
   onCreateNote,
   onDeleteNote,
+  onDuplicateNote,
   onRestoreTrashedNote,
   onPurgeTrashedNote,
   onSelectNote,
@@ -918,7 +924,18 @@ function StickyEditor({
   }, [editor, note.markdown, parsedStoredBlocks]);
 
   const saveFailureShownRef = useRef(false);
+  // Shown in the tabs header. A "saved" report only counts after a write it followed: a save
+  // that found nothing to write leaves the status alone.
+  const [saveStatus, setSaveStatus] = useState({ status: "idle", sequence: 0 });
   const handleSaveStateChanged = useCallback((state) => {
+    setSaveStatus((current) =>
+      state.status === "saved" && current.status !== "saving" && current.status !== "failed"
+        ? current
+        : { status: state.status, sequence: current.sequence + 1 },
+    );
+    if (state.status === "saving") {
+      return;
+    }
     if (state.status === "failed") {
       saveFailureShownRef.current = true;
       const reason = String(state.error?.message || "unknown error")
@@ -1373,11 +1390,7 @@ function StickyEditor({
   }, [closeOverlay, editor, hideExportToast, note.id, showExportToast, title]);
 
   const openExportFormatMenu = useCallback((event) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    openOverlay("exportFormatMenu", {
-      x: Math.round(bounds.right),
-      y: Math.round(bounds.top),
-    });
+    openOverlay("exportFormatMenu", getExportMenuAnchor(event.currentTarget));
   }, [openOverlay]);
 
   const importMarkdownFile = useCallback(async (file) => {
@@ -1858,11 +1871,14 @@ function StickyEditor({
     confirmCloseCurrentTab,
     confirmDeleteSessionNote,
     draftSessionTitle,
+    duplicateSessionNote,
     editingSessionId,
+    openSessionAsSticky,
     removingSessionIds,
     requestDeleteSessionNote,
     requestSessionRename,
     selectSessionTab,
+    startSessionRename,
   } = useSessionTabActions({
     closeCurrentWindow,
     closeOverlay,
@@ -1873,6 +1889,7 @@ function StickyEditor({
     normalizedLayoutMode,
     note,
     onDeleteNote,
+    onDuplicateNote,
     onNoteChanged,
     onPendingRenameHandled,
     onRenameRequested,
@@ -2121,6 +2138,16 @@ function StickyEditor({
           onPointerDown={startHeaderWindowDrag}
         >
         <div className="sticky-drag-strip" aria-hidden="true" />
+        {normalizedLayoutMode === "tabs" && (
+          <>
+            <div className="sticky-header-title" data-testid="sticky-header-title">
+              {getSessionDisplayTitle(
+                visibleSessionNotes.find((sessionNote) => sessionNote.id === note.id) ?? note,
+              )}
+            </div>
+            <SaveStatus status={saveStatus.status} sequence={saveStatus.sequence} />
+          </>
+        )}
         <div
           className={`sticky-header-actions${
             isStickyActionBarOpen ? " is-open" : ""
@@ -2467,7 +2494,15 @@ function StickyEditor({
                   onMouseDown={preventFocusLoss}
                   onClick={() => void openVersionHistory()}
                 >
-                  <History aria-hidden="true" size={17} strokeWidth={2} />
+                  <History
+                    className="notepane-action-icon notepane-icon-history"
+                    data-icon-family="system-symbol"
+                    data-icon-pack="lucide"
+                    data-icon-tone="restore"
+                    size={24}
+                    strokeWidth={1.9}
+                    aria-hidden="true"
+                  />
                 </button>
                 <ExportPdfButton
                   shortcut={getEnabledShortcut("exportPdf")}
@@ -2632,7 +2667,9 @@ function StickyEditor({
               onCopyImage={canCopyImageToClipboard() ? copyActiveImage : undefined}
               activeImageBlockId={activeImageBlockId}
               portalElement={document.body}
-              hidden={isTableCellSelectionDismissed}
+              // The export menu stands for the whole note: the toolbar of a selection would sit
+              // under it, so it is hidden until the menu closes.
+              hidden={isTableCellSelectionDismissed || Boolean(exportFormatMenu)}
             />
             <BlockMenuHighlightController />
             <NotePaneSideMenuController
@@ -2672,13 +2709,33 @@ function StickyEditor({
           y={sessionTabMenu.y}
           sessionNote={sessionTabMenuNote}
           activeTheme={activeTheme}
+          canOpenAsSticky={
+            Boolean(electronApi?.openStickyNote) &&
+            normalizedLayoutMode === "tabs" &&
+            visibleSessionNotes.length > 1
+          }
+          onRename={() => {
+            closeOverlay("sessionTabMenu");
+            startSessionRename(sessionTabMenuNote);
+          }}
+          onDuplicate={() => {
+            closeOverlay("sessionTabMenu");
+            void duplicateSessionNote(sessionTabMenuNote);
+          }}
+          onOpenAsSticky={() => {
+            closeOverlay("sessionTabMenu");
+            void openSessionAsSticky(sessionTabMenuNote);
+          }}
           onOpenColor={() => openSessionColorPanel(sessionTabMenuNote.id)}
+          onMoveToTrash={() => {
+            closeOverlay("sessionTabMenu");
+            requestDeleteSessionNote(sessionTabMenuNote);
+          }}
         />
       )}
       {exportFormatMenu && (
         <ExportFormatMenu
-          x={exportFormatMenu.x}
-          y={exportFormatMenu.y}
+          anchor={exportFormatMenu}
           onExport={(type) => void exportNote(type)}
         />
       )}

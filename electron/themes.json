@@ -73,9 +73,9 @@
       "--notepane-find-current-bg": "rgba(249, 115, 22, 0.55)",
       "--sticky-control-bg": "rgb(255 255 255 / 0.76)",
       "--chrome-icon-button-bg": "rgb(255 255 255 / 0.74)",
-      "--sticky-table-control-shadow": "0 5px 12px rgb(55 53 47 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.28)",
-      "--sticky-portal-menu-shadow": "0 12px 26px rgb(55 53 47 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.38)",
-      "--chrome-icon-button-shadow": "0 4px 10px rgb(0 0 0 / 0.06), inset 0 1px 0 rgb(255 255 255 / 0.42)",
+      "--sticky-table-control-shadow": "0 5px 12px rgb(55 53 47 / 0.12)",
+      "--sticky-portal-menu-shadow": "0 8px 24px rgb(55 53 47 / 0.14)",
+      "--chrome-icon-button-shadow": "0 4px 10px rgb(0 0 0 / 0.06)",
       "--notepane-success": "#2f9e44",
       "--notepane-progress": "#3478f6",
       "--notepane-focus-ring": "rgb(90 150 255 / 0.66)",
@@ -90,10 +90,6 @@
       "--notepane-icon-turn-into": "#4d79b8",
       "--notepane-icon-colors": "#a45bb9",
       "--notepane-glass": "#ffffff",
-      "--notepane-shadow-header-glass": "inset 0 1px 0 rgb(255 255 255 / 0.08)",
-      "--notepane-shadow-sidebar-edge": "inset -1px 0 0 rgb(255 255 255 / 0.04)",
-      "--notepane-shadow-swatch": "inset 0 1px 0 rgb(255 255 255 / 0.35)",
-      "--notepane-shadow-color-wheel": "inset 0 0 0 1px rgb(255 255 255 / 0.18), 0 6px 14px rgb(0 0 0 / 0.2)",
       "--notepane-tooltip-bg": "#2f3437",
       "--notepane-tooltip-text": "#ffffff",
       "--notepane-tooltip-border": "rgb(255 255 255 / 0.12)",
@@ -203,7 +199,7 @@
           "--sticky-portal-menu-shadow",
           "--chrome-icon-button-shadow"
         ],
-        "reason": "NotePane Light's inset glass highlight on table controls, menus and icon buttons is pure white, brighter than its #f5f5f2 panel, which the derivation uses."
+        "reason": "NotePane Light's hand-tuned outer shadows under table controls, menus and icon buttons, tinted with its ink; the derivation uses the theme's text colour."
       },
       {
         "tokens": [
@@ -250,13 +246,9 @@
       },
       {
         "tokens": [
-          "--notepane-glass",
-          "--notepane-shadow-header-glass",
-          "--notepane-shadow-sidebar-edge",
-          "--notepane-shadow-swatch",
-          "--notepane-shadow-color-wheel"
+          "--notepane-glass"
         ],
-        "reason": "NotePane draws the glass highlights on the header, sidebar edge, title field, swatches and colour wheel rim in pure white; the derivation uses the panel colour."
+        "reason": "NotePane outlines the image resize handles in pure white, which shows over any image; the derivation uses the panel colour."
       },
       {
         "tokens": [
@@ -336,12 +328,12 @@
         "onDark": "#000000"
       },
       "tableControlShadow": {
-        "onLight": "0 5px 12px rgb(55 53 47 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.28)",
-        "onDark": "0 7px 16px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.08)"
+        "onLight": "0 5px 12px rgb(55 53 47 / 0.12)",
+        "onDark": "0 7px 16px rgb(0 0 0 / 0.34)"
       },
       "portalMenuShadow": {
-        "onLight": "0 12px 26px rgb(55 53 47 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.38)",
-        "onDark": "0 14px 34px rgb(0 0 0 / 0.46), inset 0 1px 0 rgb(255 255 255 / 0.08)"
+        "onLight": "0 8px 24px rgb(55 53 47 / 0.14)",
+        "onDark": "0 8px 24px rgb(0 0 0 / 0.4)"
       },
       "blockNoteShadowColor": {
         "onLight": "rgb(55 53 47 / 0.18)",
@@ -457,9 +449,9 @@
       "--chrome-icon-button-border": "rgb(255 255 255 / 0.14)",
       "--chrome-icon-button-hover-border": "rgb(255 255 255 / 0.24)",
       "--chrome-icon-button-active-border": "rgb(255 255 255 / 0.30)",
-      "--sticky-table-control-shadow": "0 7px 16px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.08)",
-      "--sticky-portal-menu-shadow": "0 14px 34px rgb(0 0 0 / 0.46), inset 0 1px 0 rgb(255 255 255 / 0.08)",
-      "--chrome-icon-button-shadow": "0 4px 12px rgb(0 0 0 / 0.18), inset 0 1px 0 rgb(255 255 255 / 0.08)",
+      "--sticky-table-control-shadow": "0 7px 16px rgb(0 0 0 / 0.34)",
+      "--sticky-portal-menu-shadow": "0 8px 24px rgb(0 0 0 / 0.4)",
+      "--chrome-icon-button-shadow": "0 4px 12px rgb(0 0 0 / 0.18)",
       "--notepane-success": "#2f9e44",
       "--notepane-progress": "#3478f6",
       "--notepane-focus-ring": "rgb(90 150 255 / 0.66)",
@@ -475,10 +467,6 @@
       "--notepane-icon-turn-into": "#4d79b8",
       "--notepane-icon-colors": "#a45bb9",
       "--notepane-glass": "#ffffff",
-      "--notepane-shadow-header-glass": "inset 0 1px 0 rgb(255 255 255 / 0.08)",
-      "--notepane-shadow-sidebar-edge": "inset -1px 0 0 rgb(255 255 255 / 0.04)",
-      "--notepane-shadow-swatch": "inset 0 1px 0 rgb(255 255 255 / 0.35)",
-      "--notepane-shadow-color-wheel": "inset 0 0 0 1px rgb(255 255 255 / 0.18), 0 6px 14px rgb(0 0 0 / 0.2)",
       "--notepane-tooltip-bg": "#2b2b2b",
       "--notepane-tooltip-text": "#ffffff",
       "--notepane-tooltip-border": "rgb(255 255 255 / 0.12)",
@@ -598,7 +586,7 @@
           "--sticky-portal-menu-shadow",
           "--chrome-icon-button-shadow"
         ],
-        "reason": "NotePane Dark's inset glass highlight on table controls, menus and icon buttons is pure white; the derivation uses its text colour #f1f1ef."
+        "reason": "NotePane Dark's hand-tuned black outer shadows under table controls, menus and icon buttons; the derivation uses its shadow colour at other strengths."
       },
       {
         "tokens": [
@@ -651,13 +639,9 @@
       },
       {
         "tokens": [
-          "--notepane-glass",
-          "--notepane-shadow-header-glass",
-          "--notepane-shadow-sidebar-edge",
-          "--notepane-shadow-swatch",
-          "--notepane-shadow-color-wheel"
+          "--notepane-glass"
         ],
-        "reason": "NotePane draws the glass highlights on the header, sidebar edge, title field, swatches and colour wheel rim in pure white; the derivation uses the text colour."
+        "reason": "NotePane outlines the image resize handles in pure white, which shows over any image; the derivation uses the text colour."
       },
       {
         "tokens": [
@@ -746,12 +730,12 @@
         "onDark": "#000000"
       },
       "tableControlShadow": {
-        "onLight": "0 5px 12px rgb(55 53 47 / 0.12), inset 0 1px 0 rgb(255 255 255 / 0.28)",
-        "onDark": "0 7px 16px rgb(0 0 0 / 0.34), inset 0 1px 0 rgb(255 255 255 / 0.08)"
+        "onLight": "0 5px 12px rgb(55 53 47 / 0.12)",
+        "onDark": "0 7px 16px rgb(0 0 0 / 0.34)"
       },
       "portalMenuShadow": {
-        "onLight": "0 12px 26px rgb(55 53 47 / 0.16), inset 0 1px 0 rgb(255 255 255 / 0.38)",
-        "onDark": "0 14px 34px rgb(0 0 0 / 0.46), inset 0 1px 0 rgb(255 255 255 / 0.08)"
+        "onLight": "0 8px 24px rgb(55 53 47 / 0.14)",
+        "onDark": "0 8px 24px rgb(0 0 0 / 0.4)"
       },
       "blockNoteShadowColor": {
         "onLight": "rgb(55 53 47 / 0.18)",

@@ -567,6 +567,21 @@ function getPrimaryEntry() {
   );
 }
 
+function getDetachedStickyEntry(webContents) {
+  const entry = windows.get(BrowserWindow.fromWebContents(webContents)?.id);
+  return entry?.detachedSticky && store.getLayoutMode() === "tabs" ? entry : null;
+}
+
+// Closes a note's sticky window, opened from the tabs layout, once its edits are written, and
+// shows the note in the tabs window.
+async function dockStickyWindowIntoTabs(entry) {
+  const { noteId } = entry;
+  await closeWindowAfterFlush(entry);
+  if (entry.flushedBeforeClose) {
+    ensureTabsWindow(noteId);
+  }
+}
+
 function getEntriesForNote(noteId) {
   return [...windows.values()].filter(
     (entry) => entry.noteId === noteId && !entry.window.isDestroyed(),
@@ -822,6 +837,9 @@ function syncWindowsForLayoutMode(activeNoteId, options = {}) {
         persistWindowBounds(entry.window);
       }
       entry.primary = false;
+      // A note opened as a sticky window from the tabs layout is now one sticky window among the
+      // others, closed with them when the layout returns to tabs.
+      entry.detachedSticky = false;
       entry.window.setAlwaysOnTop(Boolean(store.getNote(entry.noteId)?.alwaysOnTop));
       entry.window.setMinimumSize(STICKY_MIN_WIDTH, STICKY_MIN_HEIGHT);
       applyWindowChrome(entry.window, false);
@@ -855,6 +873,11 @@ function syncWindowsForLayoutMode(activeNoteId, options = {}) {
     if (entry.window.id === primaryId) {
       entry.primary = true;
       applyWindowChrome(entry.window, true);
+      continue;
+    }
+    // Opened with Open as sticky (`notes:open-sticky`) while the app stays in the tabs layout.
+    if (entry.detachedSticky) {
+      targetWindows.add(entry.window);
       continue;
     }
 
@@ -1211,11 +1234,22 @@ function installIpcHandlers() {
     return appTheme;
   });
 
-  ipcMain.handle("layout-mode:get", () => {
-    return store.getLayoutMode();
+  // A window keeps the app's layout, except a note opened as a sticky window from the tabs
+  // layout, which stays sticky while the app stays in tabs.
+  ipcMain.handle("layout-mode:get", (event) => {
+    return getDetachedStickyEntry(event.sender) ? "sticky" : store.getLayoutMode();
   });
 
   ipcMain.handle("layout-mode:update", async (_event, layoutMode) => {
+    // Switching such a window to tabs puts its note back into the tabs window; the app's layout
+    // does not change.
+    const detachedEntry = getDetachedStickyEntry(_event.sender);
+    if (detachedEntry) {
+      if (layoutMode === "tabs") {
+        void dockStickyWindowIntoTabs(detachedEntry);
+      }
+      return "sticky";
+    }
     return updateLayoutMode(layoutMode, {
       activeNoteId: getNoteIdForWebContents(_event.sender),
     });
@@ -1365,6 +1399,24 @@ function installIpcHandlers() {
     };
   });
 
+  // Opens one note in its own sticky window while the app stays in the tabs layout. The tabs
+  // window moves off the note first, so one note is never open in two editors.
+  ipcMain.handle("notes:open-sticky", (_event, noteId) => {
+    const note = typeof noteId === "string" ? store.getNote(noteId) : null;
+    if (!note || store.getLayoutMode() !== "tabs") {
+      return null;
+    }
+
+    const window = ensureWindowForNote(note);
+    const entry = windows.get(window?.id);
+    if (!entry) {
+      return null;
+    }
+    entry.detachedSticky = true;
+    presentWindow(window);
+    return note;
+  });
+
   ipcMain.handle("notes:activate", (event, noteId) => {
     const note = typeof noteId === "string" ? store.getNote(noteId) : null;
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -1373,6 +1425,15 @@ function installIpcHandlers() {
     }
 
     const entry = windows.get(window.id);
+    // The note is open in its own sticky window: that window comes forward and the tabs window
+    // stays on its note.
+    const detachedEntry = entry?.primary
+      ? getEntriesForNote(note.id).find((candidate) => candidate.detachedSticky)
+      : null;
+    if (detachedEntry) {
+      presentWindow(detachedEntry.window);
+      return store.getNote(entry.noteId);
+    }
     if (
       store.getLayoutMode() === "sticky" &&
       entry &&

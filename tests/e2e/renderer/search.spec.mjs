@@ -374,3 +374,52 @@ test("refining the find query stays on the current match", async ({ page }) => {
   await expect(page.locator(".bn-editor p").filter({ has: page.locator(".is-current") }))
     .toHaveText("needle three");
 });
+
+test("sizes the search palette to its results and labels their matches and edit time", async ({ page }) => {
+  await typeParagraphs(page, ["sizing probe once", "sizing probe twice"]);
+  await page.keyboard.press(modifierShortcut("P"));
+  const input = palette(page).getByRole("textbox", { name: "Search notes" });
+  await input.fill("probe");
+  const option = palette(page).getByRole("option");
+  await expect(option).toHaveCount(1);
+  await expect(option.locator(".search-result-count")).toHaveText("2 matches");
+  await expect(option.locator("time")).toHaveText("just now");
+  await input.fill("probe once");
+  await expect(option.locator(".search-result-count")).toHaveText("1 match");
+
+  // As tall as the field and the one result, not the palette's maximum height.
+  const heights = await page.evaluate(() => {
+    const box = document.querySelector(".search-palette");
+    const parts = [...box.children].reduce((sum, child) => sum + child.getBoundingClientRect().height, 0);
+    return { box: box.getBoundingClientRect().height, parts };
+  });
+  expect(Math.abs(heights.box - heights.parts)).toBeLessThanOrEqual(2);
+  expect(heights.box).toBeLessThan(160);
+});
+
+test("scrolls a long search result list and keeps the keyboard selection in view", async ({ page }) => {
+  await page.addInitScript(stubTwoNoteBridge);
+  await page.reload();
+  await expect(page.locator(".session-tab-row")).toHaveCount(2);
+  await page.evaluate(() => {
+    for (let index = 3; index <= 24; index += 1) {
+      window.__searchBridge.addNote(`Stored note ${index}`);
+    }
+  });
+  await page.keyboard.press(modifierShortcut("P"));
+  await expect(palette(page).getByRole("option")).toHaveCount(24);
+
+  const maxHeight = await page.evaluate(() => Math.min(window.innerHeight * 0.7, 520));
+  const box = await palette(page).boundingBox();
+  expect(box.height).toBeLessThanOrEqual(maxHeight + 1);
+
+  // Up from the first result wraps to the last, which scrolls into view.
+  await palette(page).getByRole("textbox", { name: "Search notes" }).press("ArrowUp");
+  const last = palette(page).getByRole("option").last();
+  await expect(last).toHaveAttribute("aria-selected", "true");
+  await expect.poll(async () => {
+    const list = await palette(page).getByRole("listbox").boundingBox();
+    const item = await last.boundingBox();
+    return item.y >= list.y - 1 && item.y + item.height <= list.y + list.height + 1;
+  }).toBe(true);
+});

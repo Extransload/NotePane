@@ -65,17 +65,19 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Pasting and dropping files: where the file block goes, its upload, one undo step for both | `src/editor/fileInsertion.js` |
 | Code block language detection, prettifying, and Tab / Shift+Tab line indent | `src/editor/codeFormatting.js` |
 | Note search matching, snippets and plain-text extraction | `src/model/search.js` |
+| The note search palette: its results, match count and last-edited labels, keyboard selection | `src/ui/SearchPalette.jsx`, `src/hooks/useNoteSearchPalette.js`, `formatRelativeEditTime` in `src/model/notes.js` |
 | Find in note decorations and navigation | `src/editor/findInNote.js`, `src/hooks/useFindInNote.js` |
 | Note titles, ordering, trash previews | `src/model/notes.js` |
 | Preference and font normalisation and defaults | `src/model/preferences.js` |
-| Shortcut parsing, matching, display labels | `src/model/keyboardShortcuts.js` |
+| Shortcut parsing, matching, display labels (`formatKeyboardShortcutLabel`, the one label for NotePane's and BlockNote's shortcut forms) | `src/model/keyboardShortcuts.js` |
 | Theme list, lookup and the fallback for an unknown theme id | `src/style/themes.js` (data in `electron/themes.json`) |
-| Every colour token a theme produces, derived from its palette | `src/style/themeTokens.js` |
+| Every colour token a theme produces, derived from its palette; `--sticky-portal-menu-shadow` is the one flat shadow of every floating surface | `src/style/themeTokens.js` |
 | Showing a user-painted colour in the theme's tone | `src/style/toneMatch.js` |
 | Applying a theme to the document, the first-paint theme, the export theme | `src/style/applyTheme.js` |
 | Applying the selected theme in a window, code theme included | `src/hooks/useAppliedTheme.js` |
 | Code block syntax colours per theme, re-highlighting on a theme change | `src/editor/codeHighlighter.js` |
 | The theme picker in Preferences | `src/ui/ThemePicker.jsx` |
+| The Preferences window: its page sidebar, page header and the cards each page is made of | `src/ui/preferencesWindow.jsx`, `src/ui/PreferencesCard.jsx`, `src/ui/preferencesSections.jsx`, `src/ui/trashPreferences.jsx` |
 | Sticky shell and session tab computed styles | `src/style/themeStyles.js` |
 | Colour conversion and contrast | `src/style/colorMath.js` |
 | The window's session list and trash: load on startup, `notes:changed` updates, create, select, reorder, move to Trash, restore, purge, the undo toast after a move to Trash | `src/hooks/useSessionList.js` |
@@ -84,8 +86,10 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Flushing pending saves on unmount or when main asks | `src/hooks/usePendingSaveFlush.js` |
 | Keys handled on the editor surface | `src/hooks/useEditorSurfaceShortcuts.js` |
 | Window, session and tab-mode keyboard commands | `src/hooks/useKeyboardCommands.js` |
-| Session tab rename, move to Trash, and closing the current tab | `src/hooks/useSessionTabActions.js` |
+| Session tab rename, duplicate, open as sticky, move to Trash, and closing the current tab | `src/hooks/useSessionTabActions.js` |
+| The session tab menu and the export format menu, placed at their anchor and clamped to the window | `src/ui/menus.jsx` |
 | Session tab drag and drop | `src/hooks/useSessionTabDrag.js` |
+| Whether the tabs sidebar is open: the user's choice, and the compact sidebar of a narrow window | `src/hooks/useSidebarVisibility.js` |
 | Export toast and zoom gauge timing | `src/hooks/useStickyToasts.js` |
 | Zoom gauge, export toast and other overlays | `src/ui/overlays.jsx` |
 | Which panels, menus and confirmations are open, which ones close each other, and the order Escape closes them in | `src/hooks/useOverlayState.js` |
@@ -194,6 +198,11 @@ The app supports two layout modes.
 - `Command/Ctrl + W` moves the current sidebar session to Trash in tab session mode instead of closing the primary
   window; the confirmation and the undo toast both say so
 - Sidebar tab double-click starts inline rename
+- Open as sticky (session tab menu) calls `notes:open-sticky`: in the tabs layout, the note gets its own sticky
+  window, marked `detachedSticky`, and the app's `layoutMode` stays `tabs`. `layout-mode:get` answers `sticky` to
+  that window, layout syncs in the tabs layout keep it open, `notes:activate` from the tabs window for its note
+  brings it forward instead, and `layout-mode:update` to `tabs` from it closes it after its flush and shows the note
+  in the tabs window. Entering the sticky layout makes it an ordinary sticky window
 
 ## BlockNote configuration
 
@@ -314,7 +323,9 @@ keeps the selected color/opacity on that session tab.
 
 Sticky styling is applied outside the BlockNote editor:
 
-- `.sticky-header` has no title text in tab session mode.
+- `.sticky-header` shows the note's display title, centred and not editable, and the save status in tab session
+  mode. Both are text only, so the header stays one drag region. The status follows `onSaveStateChanged` from
+  `useNotePersistence`: `saving` when a write starts, `saved` after it lands, `failed` for each failed attempt.
 - `.sticky-header` contains editable title in sticky mode.
 - `.sticky-header` contains the sidebar toggle or title, drag strip, and mode-specific action controls.
 - Sticky mode uses a shorter header.

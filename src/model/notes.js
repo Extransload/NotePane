@@ -270,6 +270,33 @@ export function formatTrashTimestamp(value) {
   })}`;
 }
 
+const RELATIVE_TIME_UNITS = [
+  ["year", 365 * 24 * 60 * 60 * 1000],
+  ["month", 30 * 24 * 60 * 60 * 1000],
+  ["week", 7 * 24 * 60 * 60 * 1000],
+  ["day", 24 * 60 * 60 * 1000],
+  ["hour", 60 * 60 * 1000],
+  ["minute", 60 * 1000],
+];
+
+// How long ago a note was last edited, as "just now", "5 min. ago" or "yesterday"; empty when
+// the note has no edit time.
+export function formatRelativeEditTime(value, now = Date.now()) {
+  const timestamp = Number(value);
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return "";
+  }
+
+  const elapsed = Math.max(0, now - timestamp);
+  const formatter = new Intl.RelativeTimeFormat("en", { numeric: "auto", style: "short" });
+  for (const [unit, length] of RELATIVE_TIME_UNITS) {
+    if (elapsed >= length) {
+      return formatter.format(-Math.floor(elapsed / length), unit);
+    }
+  }
+  return "just now";
+}
+
 export function getTrashPreviewLines(note) {
   const blocks = parseBlocksJSON(note?.blocksJSON);
   if (Array.isArray(blocks)) {

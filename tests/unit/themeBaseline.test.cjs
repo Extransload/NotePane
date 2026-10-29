@@ -50,11 +50,21 @@ function normaliseColours(value) {
     .replace(/\s+/g, " ")
     .trim();
 }
+// The flat surfaces dropped the inset glass highlight from the table control and menu shadows,
+// and menus take one soft shadow. The frozen fixture and today's model are read through this.
+const FLAT_MENU_SHADOWS = new Map([
+  ["0 12px 26px rgb(55 53 47 / 0.16)", "0 8px 24px rgb(55 53 47 / 0.14)"],
+  ["0 14px 34px rgb(0 0 0 / 0.46)", "0 8px 24px rgb(0 0 0 / 0.4)"],
+]);
+function withoutGlass(value) {
+  const outer = value.replace(/, inset 0 1px 0 rgb\(255 255 255 \/ [\d.]+\)$/, "");
+  return outer === value ? value : FLAT_MENU_SHADOWS.get(outer) ?? outer;
+}
 const normalise = (style) =>
   Object.fromEntries(
     Object.entries(style)
       .filter(([name]) => !DELETED_STICKY_KEYS.has(name))
-      .map(([name, value]) => [name, normaliseColours(value)]),
+      .map(([name, value]) => [name, withoutGlass(normaliseColours(value))]),
   );
 
 // Text rules. Today's sticky rule takes the higher-contrast colour of the pair; today's tab

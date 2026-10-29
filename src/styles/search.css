@@ -88,6 +88,8 @@
   z-index: 60;
   inset: 0;
   display: flex;
+  /* The palette is as tall as its results, up to its max-height; stretching would fill it. */
+  align-items: flex-start;
   justify-content: center;
   padding-top: min(14vh, 120px);
   background: color-mix(in srgb, var(--sticky-text-color) 8%, transparent);
@@ -102,12 +104,13 @@
   border: 1px solid color-mix(in srgb, var(--sticky-border-color) 48%, transparent);
   border-radius: 12px;
   background: var(--sticky-panel-bg);
-  box-shadow: 0 18px 48px color-mix(in srgb, var(--sticky-text-color) 18%, transparent);
+  box-shadow: var(--sticky-portal-menu-shadow);
   color: var(--sticky-panel-text);
   font: 500 13px/1.35 var(--notepane-ui-font);
 }
 
 .search-palette-input {
+  flex: 0 0 auto;
   height: 44px;
   padding: 0 16px;
   border: 0;
@@ -119,6 +122,7 @@
 }
 
 .search-palette-results {
+  min-height: 0;
   margin: 0;
   padding: 6px;
   overflow-y: auto;
@@ -153,10 +157,23 @@
   white-space: nowrap;
 }
 
-.search-result-count {
-  opacity: 0.6;
+.search-result-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--sticky-panel-muted);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.search-result-count {
+  font-weight: 650;
+}
+
+.search-result-count + .search-result-time::before {
+  margin-right: 8px;
+  content: "·";
 }
 
 .search-result-snippet {

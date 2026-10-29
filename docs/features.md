@@ -10,22 +10,40 @@
 - Sticky mode windows have per-session pastel color, opacity, pinning, layout, and editor controls in a header settings modal
 - Sticky color/opacity carries back to the sidebar session tab color when returning to Tab session mode
 - Custom NotePane shell
-- Padded draggable header with no visible title in tab session mode
+- Padded draggable header that shows, in tab session mode, the open note's title centred (the sidebar tab's text,
+  following a rename) and its save status at the right: "Saving..." while a write is in flight, a muted "Saved" that
+  fades after a moment, and "Not saved - retrying" in the danger colour while writes fail
 - Editable title in sticky mode header
 - Session rename by double-clicking a sidebar tab
 - Hover-only session delete button in the sidebar tab row
+- Below 760px of window width the tabs sidebar turns compact by itself and returns when the window is wider again;
+  the show/hide choice made in a wide window is kept, and one made in a narrow window lasts until the window crosses
+  the breakpoint
 - 52 app themes: NotePane Light (default) and NotePane Dark, Catppuccin Latte, Frappé, Macchiato and Mocha, Nord,
   Dracula and Tokyo Night, followed by 43 palettes adapted from TablePeek
-- Theme picker in Preferences > General > App theme: preview cards that apply the theme at once to every window
+- Theme picker in Preferences > General > App theme: preview cards that apply the theme at once to every window;
+  All / Light / Dark chips and a name filter narrow the cards, and arrow keys move within the cards shown
 - Every colour comes from the selected theme, code block syntax colours included
+- Flat surfaces: menus, toolbars, the colour panel, sticky settings, toasts and the search palette draw one soft
+  outer shadow and the theme's border, with no glass highlight along their top edge; buttons and the header are flat
+  too
 - Session and sticky colours are shown in each theme's tone (tone matching): the hue is kept, the stored colour never
   changes, and text on it stays readable
 - No light/dark toggle and no light/dark shortcut; `Command/Ctrl + Shift + L` is unbound
-- Preferences panel via sidebar footer button, native app menu, or `Command/Ctrl + ,`
+- Preferences panel via sidebar footer button, native app menu, or `Command/Ctrl + ,`: a sidebar of pages (General,
+  Editor, Trash, Shortcuts, each with an icon) beside the page, which scrolls on its own. A page is its title and
+  cards of settings: General has Appearance (the theme picker) and Data (backup export and import), Editor has
+  Typography (editor and app font) and Behaviour (table of contents), Trash and Shortcuts one card each
+- Preferences > Shortcuts lists every command as a 40px table row: name, on/off switch, the keys (click to record
+  new ones) and Reset
 - Default editor font family for every session; there is no font size setting, text size follows the app zoom
 - App zoom with `Command/Ctrl + =`, `-` and `0`, from 50% to 200%: every window zooms together, a gauge shows the zoom
   between its smallest and largest step, and the zoom persists
-- Right-click session tab context menu for per-session tab color
+- Right-click session tab context menu, opened at the pointer and kept inside the window: Rename (inline rename),
+  Duplicate (a new session with the same content, colour and "<title> copy" as its name), Open as sticky (desktop
+  tabs layout: the note opens in its own sticky window while the app stays in tabs; its tab then brings that window
+  forward, and switching the window to tabs puts the note back), Color... for the per-session tab color, and Move
+  to Trash with its confirmation
 - Sidebar tab background/accent color customization with automatic contrast text
 - Tab color wheel
 - Color brightness/value slider that is preserved when the wheel color changes
@@ -42,12 +60,18 @@
 - Cycle sticky windows: `Command/Ctrl + Backtick`
 - Toggle always on top: `Command/Ctrl + Shift + P`
 - Toggle Tab/Sticky mode: `Command/Ctrl + Shift + T`
-- Open export menu: `Command/Ctrl + Shift + E`
+- Open export menu: `Command/Ctrl + Shift + E`. The menu opens at the sidebar's export button, or under the right
+  end of the header when the sidebar is not shown, and the formatting toolbar of a text selection hides while it is
+  open and comes back after
 - Delayed hover tooltips for clickable controls
 - Short entrance motion: menus, popovers and the colour panel fade in (the slash menu and NotePane's own menus also
   slide a few pixels from their anchor), the sidebar slides between its width and the compact rail, Preferences and
   search fade in, and a switched note fades in. Closing stays instant, and the motion is off when the system asks for
   reduced motion and in print and export
+- Shortcut labels read the same everywhere NotePane shows them (Preferences, tooltips, slash menu badges, the
+  formatting toolbar's merge and colour buttons): `⌘⌥⇧1` on a Mac, `Ctrl+Alt+Shift+1` elsewhere
+- Sidebar footer actions (version history, export, Preferences, layout, editor width) share one muted chrome tone;
+  the theme's accent marks only the button under the pointer and a pressed toggle
 - Window bounds persistence
 - Editor area is explicitly non-drag so BlockNote mouse interactions remain intact
 - Single share-style export icon with PDF/Markdown format choices
@@ -75,7 +99,9 @@ BlockNote handles editor interaction directly.
   right
 - `Command/Ctrl + A` selects all editor blocks
 - `Command/Ctrl + X` cuts/removes the current block when no text is selected
-- Search notes: `Command/Ctrl + P` searches titles and bodies of every note outside Trash and opens the chosen note at its first match
+- Search notes: `Command/Ctrl + P` searches titles and bodies of every note outside Trash and opens the chosen note at its first match.
+  The palette is as tall as its results, up to 70% of the window, and scrolls past that with the keyboard selection
+  kept in view; each result shows its match count ("7 matches") and when the note was last edited ("5 min. ago")
 - Find in note: `Command/Ctrl + F` highlights matches, steps with `Enter` / `Shift + Enter`, and expands collapsed toggles that hold the current match
 - Editor typography control with searchable font family dropdown and installed macOS font discovery where supported
 

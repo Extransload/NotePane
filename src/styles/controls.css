@@ -1,11 +1,10 @@
 /* Menus, switches and the colour picker used by chrome and preferences. */
 
+/* Placed inline at their anchor, clamped to the window (useAnchoredMenuStyle in src/ui/menus.jsx). */
 .session-tab-context-menu,
 .export-format-menu {
   position: fixed;
   z-index: 46;
-  left: clamp(8px, var(--session-tab-menu-x, var(--export-format-menu-x)), calc(100vw - 196px));
-  top: clamp(8px, var(--session-tab-menu-y, var(--export-format-menu-y)), calc(100vh - 116px));
   display: grid;
   min-width: 148px;
   gap: 4px;
@@ -13,7 +12,7 @@
   border: 1px solid var(--sticky-border-color);
   border-radius: 10px;
   background: var(--sticky-panel-bg);
-  box-shadow: var(--sticky-menu-shadow);
+  box-shadow: var(--sticky-portal-menu-shadow);
   color: var(--sticky-panel-text);
   -webkit-app-region: no-drag;
   animation: menuIn 130ms ease both;
@@ -38,6 +37,32 @@
 .session-tab-context-menu button:hover,
 .export-format-menu button:hover {
   background: var(--sticky-control-hover-bg);
+}
+
+.session-tab-context-menu {
+  min-width: 168px;
+  gap: 2px;
+}
+
+.session-tab-context-menu button:focus-visible {
+  outline: 2px solid var(--notepane-focus-outline);
+  outline-offset: -2px;
+}
+
+.session-tab-menu-icon {
+  flex: 0 0 auto;
+  color: var(--icon-chrome-color);
+}
+
+.session-tab-context-menu button.is-danger,
+.session-tab-context-menu button.is-danger .session-tab-menu-icon {
+  color: var(--sticky-danger-color);
+}
+
+.session-tab-menu-separator {
+  height: 1px;
+  margin: 3px 4px;
+  background: var(--sticky-border-color);
 }
 
 .export-format-menu {
@@ -72,7 +97,6 @@
   border: 1px solid color-mix(in srgb, var(--sticky-border-color) 75%, var(--notepane-shadow-color));
   border-radius: 50%;
   background: var(--session-tab-menu-color);
-  box-shadow: var(--notepane-shadow-swatch);
 }
 
 @keyframes pinButtonPop {

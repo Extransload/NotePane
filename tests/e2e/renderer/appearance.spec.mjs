@@ -4,8 +4,8 @@ import {
   createBlankSession,
   expectActiveTabColor,
   expectAdaptiveTooltipPlacement,
-  expectDistinctIconColors,
   expectFloatingTypographyMenu,
+  expectFooterIconsShareOneTone,
   expectStickyPlaceholderReadable,
   expectStickyTableChromeReadable,
   expectSystemSymbolIcons,
@@ -18,6 +18,7 @@ import {
   loadTemplatePreview,
   modifierShortcut,
   openStickyActionBar,
+  resolveColorToken,
   selectAppTheme,
 } from "../support/renderer-helpers.mjs";
 
@@ -156,12 +157,28 @@ test("keeps sticky chrome outside the editable BlockNote surface", async ({ page
   expect(dragRegions.sidebarScrollbarThumb).not.toBe("rgb(255, 255, 255)");
 });
 
+test("tints a sidebar footer icon with the accent only under the pointer", async ({ page }) => {
+  const footer = page.getByTestId("session-sidebar-footer");
+  const exportIcon = footer.locator(".export-icon-button .notepane-action-icon");
+  const readColor = () => exportIcon.evaluate((icon) => getComputedStyle(icon).color);
+  const muted = await resolveColorToken(page, "--icon-chrome-color");
+  const accent = await resolveColorToken(page, "--icon-chrome-accent-color");
+  expect(accent).not.toBe(muted);
+
+  await expect.poll(readColor).toBe(muted);
+  await footer.getByRole("button", { name: "Export" }).hover();
+  await expect.poll(readColor).toBe(accent);
+  await expect(page.locator(".adaptive-tooltip")).toContainText("Export");
+  await page.mouse.move(600, 300);
+  await expect.poll(readColor).toBe(muted);
+});
+
 test("keeps light/dark mode global across sidebar sessions", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   await expect(page.locator(".brand-wordmark-image-light")).toBeVisible();
   await expect(page.locator(".brand-wordmark-image-dark")).toBeHidden();
   const lightIconColors = await getActionIconColors(page);
-  expectDistinctIconColors(lightIconColors);
+  expectFooterIconsShareOneTone(lightIconColors);
   await expectSystemSymbolIcons(page);
 
   await selectAppTheme(page, "notepane-dark");
@@ -179,10 +196,11 @@ test("keeps light/dark mode global across sidebar sessions", async ({ page }) =>
     };
   }).toEqual({
     changed: true,
-    distinct: Object.keys(lightIconColors).length,
+    // The footer's one chrome tone and the sidebar toggle's own tone.
+    distinct: 2,
   });
   const darkIconColors = await getActionIconColors(page);
-  expectDistinctIconColors(darkIconColors);
+  expectFooterIconsShareOneTone(darkIconColors);
   expect(darkIconColors.layout).not.toBe(lightIconColors.layout);
   expect(darkIconColors.sidebar).not.toBe(lightIconColors.sidebar);
   expect(darkIconColors.export).not.toBe(lightIconColors.export);
@@ -344,9 +362,6 @@ test("changes editor typography globally from preferences", async ({ page }) => 
       return Math.round(descriptionRect.top - titleRect.bottom);
     });
   expect(appThemeLabelGap).toBeGreaterThanOrEqual(3);
-  const appFontRow = preferencesPanel.locator(".app-font-family-setting");
-  await expect(appFontRow.getByText("App font")).toBeVisible();
-  await expect(appFontRow.getByLabel("App font family")).toHaveValue("Inter");
   await expect(preferencesPanel.getByText("Workspace backup")).toBeVisible();
   const exportBackupButton = preferencesPanel.getByRole("button", {
     name: "Export backup",
@@ -362,6 +377,14 @@ test("changes editor typography globally from preferences", async ({ page }) => 
   await importBackupButton.click();
   await expect(page.locator(".sticky-toast-error"))
     .toHaveText("Data restore is available in the desktop app.");
+  await expect(page.locator("#preferences-editor")).toHaveCount(0);
+  await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
+  await expect(preferencesPanel.getByRole("tab", { name: "Editor" }))
+    .toHaveAttribute("aria-selected", "true");
+  // The app font sits with the editor font in the Editor page's Typography card.
+  const appFontRow = preferencesPanel.locator(".app-font-family-setting");
+  await expect(appFontRow.getByText("App font")).toBeVisible();
+  await expect(appFontRow.getByLabel("App font family")).toHaveValue("Inter");
   await appFontRow.getByLabel("App font family").fill("avenir");
   await expect(page.getByRole("listbox", { name: "App font family options" }))
     .toBeVisible();
@@ -369,10 +392,6 @@ test("changes editor typography globally from preferences", async ({ page }) => 
     maxWidth: 238,
   });
   await page.getByRole("option", { name: "Avenir" }).click();
-  await expect(page.locator("#preferences-editor")).toHaveCount(0);
-  await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
-  await expect(preferencesPanel.getByRole("tab", { name: "Editor" }))
-    .toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#preferences-editor .preferences-section-title"))
     .toHaveText("Editor");
   await expect(page.getByText(/^The font family applies to every session tab\. Zoom the app with /))
@@ -1424,4 +1443,120 @@ test("writes the colour of every session tab recoloured within the save debounce
 
   await expect.poll(() => page.evaluate(() => window.__appearanceWrites.map((write) => write.noteId).sort()))
     .toEqual(["appearance-note-1", "appearance-note-2"]);
+});
+
+// A preload bridge with one stored note whose saves wait while `__saveBridge.holding` is set
+// until `__saveBridge.release()`, and fail while `__saveBridge.failing` is set.
+function stubSaveBridge() {
+  const now = Date.now();
+  const note = {
+    id: "save-note",
+    title: "Save probe",
+    titleManuallyEdited: true,
+    blocksJSON: null,
+    markdown: "",
+    theme: {},
+    seedDemoContent: false,
+    editorFontFamily: "system",
+    trashedAt: null,
+    sortOrder: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+  let release = null;
+  window.__saveBridge = {
+    failing: false,
+    holding: false,
+    release: () => release?.(),
+  };
+  window.blocknoteSticky = {
+    getCurrentNoteId: async () => note.id,
+    getNote: async () => note,
+    listNotes: async () => [note],
+    listTrash: async () => [],
+    getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
+    getLayoutMode: async () => "tabs",
+    getEditorPreferences: async () => ({}),
+    listFonts: async () => [],
+    saveContent: async () => {
+      if (window.__saveBridge.holding) {
+        await new Promise((resolve) => {
+          release = resolve;
+        });
+      }
+      if (window.__saveBridge.failing) {
+        throw new Error("Disk full.");
+      }
+      return undefined;
+    },
+    updateAppearance: async () => undefined,
+    onNotesChanged: () => () => {},
+  };
+}
+
+test("shows the open note's title and its save status in the tabs header", async ({ page }) => {
+  await page.addInitScript(stubSaveBridge);
+  await page.reload();
+  const header = page.getByTestId("sticky-header");
+  const title = page.getByTestId("sticky-header-title");
+  const status = page.getByTestId("save-status");
+  await expect(title).toHaveText("Save probe");
+  await expect(page.getByRole("tab").first()).toHaveText("Save probe");
+  expect(await header.evaluate((element) => getComputedStyle(element).getPropertyValue("-webkit-app-region")))
+    .toBe("drag");
+
+  await page.getByRole("tab").first().dblclick();
+  await page.getByLabel("Session name").fill("Renamed probe");
+  await page.keyboard.press("Enter");
+  await expect(title).toHaveText("Renamed probe");
+
+  await page.evaluate(() => {
+    window.__saveBridge.holding = true;
+  });
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.insertText("save status probe");
+  await expect(status).toHaveText("Saving...");
+  await page.evaluate(() => window.__saveBridge.release());
+  await expect(status).toHaveText("Saved");
+  await expect.poll(() => status.locator(".save-status-label")
+    .evaluate((label) => Number(getComputedStyle(label).opacity))).toBe(0);
+
+  await page.evaluate(() => {
+    window.__saveBridge.holding = false;
+    window.__saveBridge.failing = true;
+  });
+  await page.keyboard.insertText(" again");
+  await expect(status).toHaveText("Not saved - retrying");
+  const danger = await resolveColorToken(page, "--sticky-danger-color");
+  await expect.poll(() => status.evaluate((element) => getComputedStyle(element).color)).toBe(danger);
+  await page.evaluate(() => {
+    window.__saveBridge.failing = false;
+  });
+  // The next retry writes the note.
+  await expect(status).toHaveText("Saved");
+
+  await page.getByRole("button", { name: "Switch to Sticky windows mode" }).click();
+  await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
+  await expect(title).toHaveCount(0);
+  await expect(status).toHaveCount(0);
+});
+
+test("lists keyboard shortcuts as dense aligned rows", async ({ page }) => {
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await preferences.getByRole("tab", { name: "Shortcuts" }).click();
+  const rows = preferences.getByRole("listitem");
+  await expect(rows.first()).toBeVisible();
+  const layout = await preferences.getByRole("list", { name: "Keyboard shortcuts" }).evaluate((list) =>
+    [...list.querySelectorAll(".shortcut-row")].map((row) => ({
+      height: row.getBoundingClientRect().height,
+      toggleLeft: Math.round(row.querySelector("[role='switch']").getBoundingClientRect().left),
+    })));
+  expect(layout.length).toBeGreaterThan(15);
+  for (const row of layout) {
+    expect(row.height).toBeGreaterThanOrEqual(38);
+    expect(row.height).toBeLessThanOrEqual(44);
+  }
+  // One column of switches, as in a table.
+  expect(new Set(layout.map((row) => row.toggleLeft)).size).toBe(1);
 });

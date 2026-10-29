@@ -4,8 +4,15 @@ import {
   useState,
 } from "react";
 import {
+  formatRelativeEditTime,
+} from "../model/notes.js";
+import {
   resolveNoteMarkColor,
 } from "../style/themeStyles.js";
+
+function formatMatchCount(count) {
+  return `${count} ${count === 1 ? "match" : "matches"}`;
+}
 
 function HighlightedText({ text, ranges }) {
   const parts = [];
@@ -79,6 +86,14 @@ export function SearchPalette({
   };
 
   const activeResult = results[activeIndex];
+  const activeResultId = activeResult?.note.id;
+
+  // The list scrolls once it reaches the palette's height; the keyboard selection stays in view.
+  useEffect(() => {
+    if (activeResultId) {
+      document.getElementById(`search-result-${activeResultId}`)?.scrollIntoView({ block: "nearest" });
+    }
+  }, [activeResultId]);
 
   return (
     <div
@@ -138,9 +153,22 @@ export function SearchPalette({
                 <span className="search-result-title">
                   <HighlightedText text={result.title} ranges={result.titleRanges} />
                 </span>
-                {result.matchCount > 0 && (
-                  <span className="search-result-count">{result.matchCount}</span>
-                )}
+                <span className="search-result-meta">
+                  {result.matchCount > 0 && (
+                    <span className="search-result-count">
+                      {formatMatchCount(result.matchCount)}
+                    </span>
+                  )}
+                  {result.note.updatedAt > 0 && (
+                    <time
+                      className="search-result-time"
+                      dateTime={new Date(result.note.updatedAt).toISOString()}
+                      title={`Edited ${new Date(result.note.updatedAt).toLocaleString()}`}
+                    >
+                      {formatRelativeEditTime(result.note.updatedAt)}
+                    </time>
+                  )}
+                </span>
                 {result.snippet.text && (
                   <span className="search-result-snippet">
                     {result.snippet.clippedStart ? "…" : ""}

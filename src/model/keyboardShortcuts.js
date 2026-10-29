@@ -41,8 +41,42 @@ export function getShortcutLabel(shortcut) {
   ].filter(Boolean).join("+");
 }
 
+const SHORTCUT_SYMBOL_TOKENS = {
+  "⌘": "Mod",
+  "⌃": "Mod",
+  "⌥": "Alt",
+  "⇧": "Shift",
+};
+
+/**
+ * The one display label for a shortcut written in any form the app meets: NotePane's own
+ * ("Mod+Shift+E"), BlockNote's ("Mod-Alt-1") and BlockNote's already formatted badges
+ * ("⌘-ALT-1", "⌘⇧M"). A Mac shows "⌘⌥⇧1", elsewhere "Ctrl+Alt+Shift+1".
+ */
+export function formatKeyboardShortcutLabel(value) {
+  const text = String(value ?? "").trim();
+  if (!text) {
+    return "";
+  }
+  const separator = text.includes("+") ? "+" : "-";
+  const tokens = text
+    .split(separator)
+    .flatMap((token) => {
+      // Modifier symbols written together ("⌘⇧M") are tokens of their own.
+      const symbols = [];
+      let rest = token;
+      while (rest.length > 1 && SHORTCUT_SYMBOL_TOKENS[rest[0]]) {
+        symbols.push(SHORTCUT_SYMBOL_TOKENS[rest[0]]);
+        rest = rest.slice(1);
+      }
+      return [...symbols, SHORTCUT_SYMBOL_TOKENS[rest] ?? rest];
+    })
+    .filter(Boolean);
+  return parseKeyboardShortcut(tokens.join("+")) ? getShortcutLabel(tokens.join("+")) : text;
+}
+
 export function formatShortcutTooltip(label, shortcut) {
-  const shortcutLabel = getShortcutLabel(shortcut);
+  const shortcutLabel = formatKeyboardShortcutLabel(shortcut);
   return shortcutLabel ? `${label} · ${shortcutLabel}` : label;
 }
 

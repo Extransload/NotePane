@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { formatKeyboardShortcut } from "@blocknote/core";
 import { TableHandlesExtension } from "@blocknote/core/extensions";
 import { Combine, Copy, Crop, Download, SplitSquareHorizontal } from "lucide-react";
 import {
@@ -15,6 +14,7 @@ import {
   useEditorState,
   useExtension,
 } from "@blocknote/react";
+import { formatKeyboardShortcutLabel } from "../model/keyboardShortcuts.js";
 
 const EDITOR_COLOR_VALUES = [
   "default",
@@ -297,7 +297,7 @@ function TableCellMergeSplitButton() {
       className="bn-button notepane-table-merge-split-button"
       label={label}
       mainTooltip={label}
-      secondaryTooltip={formatKeyboardShortcut("Mod-Shift-M")}
+      secondaryTooltip={formatKeyboardShortcutLabel("Mod+Shift+M")}
       icon={isMerge ? <Combine /> : <SplitSquareHorizontal />}
       onClick={() => {
         if (isMerge) {
@@ -356,7 +356,7 @@ function RecentColorStyleButton({ recentColors, onColorUsed }) {
           className="bn-button notepane-color-toolbar-button"
           label={dictionary.formatting_toolbar.colors.tooltip}
           mainTooltip={dictionary.formatting_toolbar.colors.tooltip}
-          secondaryTooltip="Mod+Shift+H"
+          secondaryTooltip={formatKeyboardShortcutLabel("Mod+Shift+H")}
           icon={(
             <ActiveColorIcon
               textColor={state.textColor}

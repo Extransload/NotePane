@@ -32,6 +32,9 @@ import { setDividerSlashMenuItem } from "./divider.jsx";
 import { getMathSlashMenuItems } from "./math.jsx";
 import { insertBookmark } from "./bookmark.jsx";
 import { insertTwoColumns, isSelectionInColumn } from "./columns.jsx";
+import {
+  formatKeyboardShortcutLabel,
+} from "../model/keyboardShortcuts.js";
 
 export function createSlashMenuFloatingUIOptions() {
   return {
@@ -151,7 +154,10 @@ export function NotePaneSlashMenuController({ editor, onImportMarkdown }) {
         insertOrUpdateBlockForSlashMenu(editor, { type: "callout" });
       },
     };
-    const items = getDefaultReactSlashMenuItems(editor);
+    // BlockNote formats its badges itself ("⌘-ALT-1"); they take the app's labels instead.
+    const items = getDefaultReactSlashMenuItems(editor).map((item) =>
+      item.badge ? { ...item, badge: formatKeyboardShortcutLabel(item.badge) } : item,
+    );
     setDividerSlashMenuItem(items, editor);
     items.splice(items.findIndex((item) => item.key === "quote") + 1, 0, callout);
     const toggleHeading3Index = items.findIndex(
