@@ -17,6 +17,7 @@ import { resolveBlocksForMenuBlock } from "./blocks.js";
 import { editCalloutIcon } from "./callout.jsx";
 import { getCodeBlockText } from "./codeFormatting.js";
 import { EditorColorPickerSections } from "./colorFormatting.jsx";
+import { TableBlockMenuItems } from "./tableHandles.jsx";
 
 export function NotePaneSideMenuController({
   portalElement,
@@ -183,6 +184,7 @@ function NotePaneDragHandleMenu({
           </span>
         </Components.Generic.Menu.Item>
       )}
+      <TableBlockMenuItems onPointerEnter={() => setActivePanel(null)} />
       <Components.Generic.Menu.Item
         className="bn-menu-item"
         closeMenuOnClick={false}

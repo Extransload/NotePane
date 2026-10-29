@@ -1,4 +1,7 @@
 import {
+  getNodeById,
+} from "@blocknote/core";
+import {
   size,
 } from "@floating-ui/react";
 import {
@@ -7,7 +10,11 @@ import {
   TextSelection,
 } from "@tiptap/pm/state";
 import {
+  Decoration,
+} from "@tiptap/pm/view";
+import {
   CellSelection,
+  TableMap,
 } from "prosemirror-tables";
 
 export function hasVisibleTextSelection() {
@@ -199,6 +206,70 @@ export function getCurrentTableCellPositions(selection) {
     }
   });
   return cellPositions;
+}
+
+// Selects the whole row or column through one cell of a table block, as a row or column handle
+// does in Notion. `rowIndex` is a row of the table and `colIndex` a cell of the first row, the
+// indices BlockNote's table handles report and its menu actions resolve (getCellsAtColumnHandle
+// reads the column through row 0), so merged cells in other rows cannot shift the column.
+export function selectTableHandleCells(editor, blockId, orientation, rowIndex, colIndex) {
+  const view = editor.prosemirrorView;
+  const state = view?.state;
+  const blockInfo = state ? getNodeById(blockId, state.doc) : null;
+  if (!view || !blockInfo) {
+    return false;
+  }
+
+  // posBeforeNode is before the block container; one step in is before the table node.
+  const $table = state.doc.resolve(blockInfo.posBeforeNode + 2);
+  const table = $table.parent;
+  const cellRowIndex = orientation === "row" ? rowIndex : 0;
+  const cellIndex = orientation === "row" ? 0 : colIndex;
+  if (
+    table.type.spec.tableRole !== "table" ||
+    cellRowIndex >= table.childCount ||
+    cellIndex >= table.child(cellRowIndex).childCount
+  ) {
+    return false;
+  }
+
+  const $row = state.doc.resolve($table.posAtIndex(cellRowIndex) + 1);
+  const $cell = state.doc.resolve($row.posAtIndex(cellIndex));
+  view.dispatch(state.tr.setSelection(
+    orientation === "row"
+      ? CellSelection.rowSelection($cell)
+      : CellSelection.colSelection($cell),
+  ));
+  view.focus();
+  return true;
+}
+
+// A cell selection is drawn as one outline around its rectangle, as in Notion: each selected
+// cell gets a class for every side it shares with the rectangle.
+export function getCellSelectionEdgeDecorations(state) {
+  const selection = state.selection;
+  if (!(selection instanceof CellSelection)) {
+    return [];
+  }
+
+  const tableStart = selection.$anchorCell.start(-1);
+  const map = TableMap.get(selection.$anchorCell.node(-1));
+  const rect = map.rectBetween(
+    selection.$anchorCell.pos - tableStart,
+    selection.$headCell.pos - tableStart,
+  );
+  const decorations = [];
+  selection.forEachCell((cell, position) => {
+    const cellRect = map.findCell(position - tableStart);
+    const edges = ["top", "right", "bottom", "left"]
+      .filter((edge) => cellRect[edge] === rect[edge]);
+    if (edges.length > 0) {
+      decorations.push(Decoration.node(position, position + cell.nodeSize, {
+        class: edges.map((edge) => `notepane-cell-range-${edge}`).join(" "),
+      }));
+    }
+  });
+  return decorations;
 }
 
 export function moveSelectedTableCell(editor, key) {

@@ -438,6 +438,28 @@ test("renames a session by double-clicking its tab", async ({ page }) => {
   await expect(page.getByLabel("Session name")).toHaveCount(0);
 });
 
+test("keeps a long session title tooltip inside the window", async ({ page }) => {
+  const title = "긴제목".repeat(30);
+  await page.getByRole("tab").first().dblclick();
+  await page.getByLabel("Session name").fill(title);
+  await page.keyboard.press("Enter");
+
+  const tab = page.getByRole("tab").first();
+  await tab.hover();
+  const tooltip = page.getByRole("tooltip");
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText(await tab.textContent());
+
+  const bounds = await tooltip.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, width: rect.width, height: rect.height, viewportWidth: window.innerWidth };
+  });
+  expect(bounds.left).toBeGreaterThanOrEqual(0);
+  expect(bounds.right).toBeLessThanOrEqual(bounds.viewportWidth);
+  expect(bounds.width).toBeLessThanOrEqual(220);
+  expect(bounds.height).toBeGreaterThan(30);
+});
+
 // The first click of a double click switches tabs, and the switch remounts the sidebar. In the
 // desktop app it takes long enough that the second click can land before it, after it, or with its
 // press before and its release after.

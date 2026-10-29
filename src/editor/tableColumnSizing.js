@@ -1,4 +1,7 @@
 import {
+  getNodeById,
+} from "@blocknote/core";
+import {
   TableMap,
   columnResizingPluginKey,
   updateColumnsOnResize,
@@ -77,6 +80,43 @@ export function previewActiveTableColumnResize(editor, event) {
     width,
   );
   return true;
+}
+
+// Notion's "Fit to width": scales every column by the same factor so the table is exactly as wide
+// as the space it sits in, in one undo step.
+export function fitTableToWidth(editor, blockId) {
+  const view = editor?.prosemirrorView;
+  const blockInfo = view ? getNodeById(blockId, view.state.doc) : null;
+  const tableElement = editor?.domElement?.querySelector(
+    `.bn-block-outer[data-id="${CSS.escape(blockId)}"] table`,
+  );
+  const container = tableElement?.parentElement;
+  if (!blockInfo || !container) {
+    return false;
+  }
+
+  const renderedWidths = [...tableElement.querySelectorAll(":scope > colgroup > col")]
+    .map((column) => column.getBoundingClientRect().width);
+  const renderedTotal = renderedWidths.reduce((total, width) => total + width, 0);
+  const containerStyle = getComputedStyle(container);
+  const availableWidth = Math.floor(
+    container.clientWidth -
+      Number.parseFloat(containerStyle.paddingLeft || "0") -
+      Number.parseFloat(containerStyle.paddingRight || "0"),
+  );
+  if (!(renderedTotal > 0) || !(availableWidth > 0)) {
+    return false;
+  }
+
+  const scale = availableWidth / renderedTotal;
+  const widths = renderedWidths.map((width) => (
+    Math.max(MIN_AUTO_FIT_COLUMN_WIDTH, Math.floor(width * scale))
+  ));
+  widths[widths.length - 1] += Math.max(
+    0,
+    availableWidth - widths.reduce((total, width) => total + width, 0),
+  );
+  return updateTableColumnWidths(view, blockInfo.posBeforeNode + 1, widths);
 }
 
 function getTableColumnAtCellPosition(doc, cellPosition) {
@@ -190,6 +230,40 @@ function findTableElementAtPosition(view, tableStart) {
     node = node.parentNode;
   }
   return node instanceof HTMLTableElement ? node : null;
+}
+
+function updateTableColumnWidths(view, tablePosition, widths) {
+  const table = view.state.doc.nodeAt(tablePosition);
+  if (table?.type.spec.tableRole !== "table") {
+    return false;
+  }
+  const map = TableMap.get(table);
+  if (map.width !== widths.length) {
+    return false;
+  }
+
+  const tableStart = tablePosition + 1;
+  const transaction = view.state.tr;
+  for (const relativePosition of new Set(map.map)) {
+    const cell = table.nodeAt(relativePosition);
+    const firstColumn = map.colCount(relativePosition);
+    const colwidth = widths.slice(firstColumn, firstColumn + cell.attrs.colspan);
+    if (cell.attrs.colwidth?.every((width, index) => width === colwidth[index])) {
+      continue;
+    }
+    transaction.setNodeMarkup(tableStart + relativePosition, null, {
+      ...cell.attrs,
+      colwidth,
+    });
+  }
+
+  if (!transaction.docChanged) {
+    return false;
+  }
+  view.dispatch(transaction);
+  findTableElementAtPosition(view, tableStart)
+    ?.style.setProperty("width", "auto", "important");
+  return true;
 }
 
 function updateTableColumnWidth(view, cellPosition, width) {

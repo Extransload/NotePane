@@ -657,9 +657,37 @@
 }
 
 .bn-editor :is(td, th).notepane-table-cell-focused,
-.bn-editor :is(td, th):focus-within,
-.bn-editor :is(td, th).selectedCell {
+.bn-editor :is(td, th):focus-within {
   box-shadow: inset 0 0 0 2px var(--sticky-table-focused-border-color);
+}
+
+/* A cell selection is one outline around its rectangle (getCellSelectionEdgeDecorations). */
+.bn-editor :is(td, th).selectedCell {
+  --notepane-cell-range-top: 0px;
+  --notepane-cell-range-right: 0px;
+  --notepane-cell-range-bottom: 0px;
+  --notepane-cell-range-left: 0px;
+  box-shadow:
+    inset 0 var(--notepane-cell-range-top) 0 0 var(--sticky-table-focused-border-color),
+    inset calc(-1 * var(--notepane-cell-range-right)) 0 0 0 var(--sticky-table-focused-border-color),
+    inset 0 calc(-1 * var(--notepane-cell-range-bottom)) 0 0 var(--sticky-table-focused-border-color),
+    inset var(--notepane-cell-range-left) 0 0 0 var(--sticky-table-focused-border-color);
+}
+
+.bn-editor .selectedCell.notepane-cell-range-top {
+  --notepane-cell-range-top: 2px;
+}
+
+.bn-editor .selectedCell.notepane-cell-range-right {
+  --notepane-cell-range-right: 2px;
+}
+
+.bn-editor .selectedCell.notepane-cell-range-bottom {
+  --notepane-cell-range-bottom: 2px;
+}
+
+.bn-editor .selectedCell.notepane-cell-range-left {
+  --notepane-cell-range-left: 2px;
 }
 
 .bn-editor .selectedCell::after {
@@ -759,6 +787,18 @@ body:has(.bn-editor[data-block-selection="true"]) .bn-formatting-toolbar {
 .bn-table-cell-handle:hover {
   background: var(--sticky-table-control-hover-bg) !important;
   color: var(--sticky-table-control-text) !important;
+}
+
+/* The open handle menu covers its row or column: the text toolbar for that selection waits. */
+body:has(.bn-table-handle-menu) .bn-formatting-toolbar {
+  display: none;
+}
+
+/* The handle whose menu is open marks the row or column that menu selected. */
+.bn-table-handle[data-expanded="true"] {
+  border-color: var(--sticky-table-focused-border-color) !important;
+  background: var(--sticky-table-active-bg) !important;
+  color: var(--sticky-table-focused-border-color) !important;
 }
 
 :is(.bn-table-handle, .bn-extend-button, .bn-table-cell-handle) svg {
@@ -1318,6 +1358,47 @@ div:has(> .bn-formatting-toolbar.notepane-formatting-toolbar.is-table-context) {
 .notepane-block-menu-subpanel[data-panel="colors"] {
   width: 180px;
   padding: 9px;
+}
+
+.notepane-table-handle-menu {
+  min-width: 200px;
+}
+
+.mantine-Menu-itemLabel:has(> .notepane-menu-switch) {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.notepane-menu-switch {
+  position: relative;
+  width: 26px;
+  height: 16px;
+  flex: 0 0 auto;
+  margin-inline-start: auto;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sticky-panel-text) 22%, transparent);
+  transition: background 140ms ease;
+}
+
+.notepane-menu-switch::before {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--sticky-portal-menu-bg);
+  content: "";
+  transition: transform 140ms ease;
+}
+
+.notepane-menu-switch[data-checked="true"] {
+  background: var(--sticky-table-focused-border-color);
+}
+
+.notepane-menu-switch[data-checked="true"]::before {
+  transform: translateX(10px);
 }
 
 .bn-suggestion-menu[role="listbox"] {

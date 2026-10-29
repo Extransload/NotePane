@@ -56,6 +56,9 @@ import {
   previewActiveTableColumnResize,
 } from "./editor/tableColumnSizing.js";
 import {
+  NotePaneTableHandlesController,
+} from "./editor/tableHandles.jsx";
+import {
   handleToggleBackspace,
   handleToggleEnter,
   handleToggleSpace,
@@ -132,6 +135,7 @@ import {
   schema,
 } from "./editor/schema.jsx";
 import {
+  getCellSelectionEdgeDecorations,
   getCurrentTableCellRange,
   getFocusedTableCellSnapshot,
   getTableCellElementForSnapshot,
@@ -1144,11 +1148,12 @@ function StickyEditor({
       return undefined;
     }
     const decorations = (state) => {
+        const rangeDecorations = getCellSelectionEdgeDecorations(state);
         if (
           suppressFocusedTableCellRef.current ||
           columnResizingPluginKey.getState(state)?.dragging
         ) {
-          return DecorationSet.empty;
+          return DecorationSet.create(state.doc, rangeDecorations);
         }
         const selection = state.selection;
         const isSingleCellSelection = Boolean(
@@ -1157,7 +1162,7 @@ function StickyEditor({
             selection.$anchorCell.pos === selection.$headCell.pos,
         );
         if (!selection.empty && !isSingleCellSelection && !pendingTableExtensionFocusRef.current) {
-          return DecorationSet.empty;
+          return DecorationSet.create(state.doc, rangeDecorations);
         }
         const preservedCell = pendingTableExtensionFocusRef.current
           ? getTableCellElementForSnapshot(editor, pendingTableExtensionFocusRef.current)
@@ -1170,7 +1175,7 @@ function StickyEditor({
         const cellRange = preservedRange || getCurrentTableCellRange(selection);
         const cellNode = cellRange ? state.doc.nodeAt(cellRange.cellPos) : null;
         if (!cellRange || !cellNode) {
-          return DecorationSet.empty;
+          return DecorationSet.create(state.doc, rangeDecorations);
         }
         return DecorationSet.create(state.doc, [
           Decoration.node(
@@ -1178,6 +1183,7 @@ function StickyEditor({
             cellRange.cellPos + cellNode.nodeSize,
             { class: "notepane-table-cell-focused" },
           ),
+          ...rangeDecorations,
         ]);
       };
     focusedTableDecorationsRef.current = decorations;
@@ -3553,6 +3559,7 @@ function StickyEditor({
             formattingToolbar={false}
             sideMenu={false}
             slashMenu={false}
+            tableHandles={false}
           >
             <NotePaneSlashMenuController
               editor={editor}
@@ -3570,6 +3577,10 @@ function StickyEditor({
             />
             <BlockMenuHighlightController />
             <NotePaneSideMenuController
+              recentColors={recentEditorColors}
+              onColorUsed={onEditorColorUsed}
+            />
+            <NotePaneTableHandlesController
               recentColors={recentEditorColors}
               onColorUsed={onEditorColorUsed}
             />

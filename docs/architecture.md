@@ -45,6 +45,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Callout block: Enter and Backspace in its text and body, drops into its body, Markdown export as a quote | `src/editor/callout.jsx` |
 | Callout icon picker: emoji data, recent icons, upload, remove | `src/editor/calloutIconPicker.jsx` |
 | Text selection, table cell selection and navigation | `src/editor/selection.js` |
+| Table row and column handle menus, the table items of the six-dot block menu | `src/editor/tableHandles.jsx` |
+| Table column widths: live resize, double-click auto-fit, fit to width | `src/editor/tableColumnSizing.js` |
 | Block selection model, exactly-selected blocks, block-set indent and move | `src/editor/blockSelection.js`, `src/editor/blockSelectionRules.js` |
 | Marquee and drag selection gestures, edge auto-scroll, and the keyboard (Enter, Tab, move, delete) and IME composition routing for a block set or the whole note | `src/editor/blockDragSelection.js` |
 | Block lookup, cut, table of contents extraction | `src/editor/blocks.js` |

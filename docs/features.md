@@ -63,7 +63,10 @@ BlockNote handles editor interaction directly.
 - Block nesting
 - Formatting toolbar
 - Link toolbar
-- Table handles
+- Table handles: a row or column handle selects its whole row or column, outlined as one rectangle, and opens
+  Notion's menu: header row or column switch (first row or column), colour, insert above/below or left/right,
+  duplicate (tables without merged cells), clear contents and delete
+- Table block menu (six-dot handle): fit to width, header row and header column switches
 - `Command/Ctrl + A` selects all editor blocks
 - `Command/Ctrl + X` cuts/removes the current block when no text is selected
 - Search notes: `Command/Ctrl + P` searches titles and bodies of every note outside Trash and opens the chosen note at its first match

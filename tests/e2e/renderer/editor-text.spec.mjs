@@ -1160,10 +1160,13 @@ test("keeps BlockNote color and delete menus usable inside the app window", asyn
   await page.mouse.move(tableBox.x + 20, tableBox.y + 20);
   await expect(openBlockMenuButton).toBeVisible();
   await openBlockMenuButton.click();
-  // Colors and Delete; a table has no text that Turn into could keep.
-  await expect(page.locator(".bn-drag-handle-menu:visible").getByRole("menuitem"))
-    .toHaveCount(2);
-  await expect(page.getByRole("menuitem", { name: /header/i })).toHaveCount(0);
+  // Colors, the table items (Fit to width, Header row, Header column) and Delete; a table has no
+  // text that Turn into could keep.
+  const tableMenuItems = page.locator(".bn-drag-handle-menu:visible").getByRole("menuitem");
+  await expect(tableMenuItems).toHaveCount(5);
+  await expect(tableMenuItems.filter({ hasText: "Turn into" })).toHaveCount(0);
+  await expect(tableMenuItems.filter({ hasText: /^Header row$/ })).toHaveCount(1);
+  await expect(tableMenuItems.filter({ hasText: /^Header column$/ })).toHaveCount(1);
 });
 
 // Opening Turn into near the bottom of the window used to lift the whole block menu, which moved

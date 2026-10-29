@@ -502,7 +502,7 @@ test("keeps the editor focused after a row handle action and Escape, so Cmd+Z un
   ));
   await handles.nth(lefts.indexOf(Math.min(...lefts))).click();
   await page.locator(".bn-table-handle-menu [role='menuitem']")
-    .filter({ hasText: "Add row below" })
+    .filter({ hasText: "Insert below" })
     .click();
   await expect(rows).toHaveCount(rowCount + 1);
 
@@ -524,7 +524,7 @@ test("shows the formatting toolbar again for text selected by keyboard after Esc
   ));
   await handles.nth(lefts.indexOf(Math.min(...lefts))).click();
   await page.locator(".bn-table-handle-menu [role='menuitem']")
-    .filter({ hasText: "Add row below" })
+    .filter({ hasText: "Insert below" })
     .click();
   await page.keyboard.press("Escape");
   await expectEditorFocused(page);
@@ -539,4 +539,96 @@ test("shows the formatting toolbar again for text selected by keyboard after Esc
     await page.keyboard.press("Shift+ArrowLeft");
   }
   await expect(formattingToolbar).toHaveCount(1);
+});
+
+test("selects a row from its handle, then duplicates and clears it in one undo step each", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const rows = page.locator(".bn-editor table").first().locator("tr");
+  const rowCount = await rows.count();
+  const tabsRowText = await rows.nth(1).textContent();
+  const openRowMenu = async () => {
+    await page.getByRole("cell", { name: "Tabs" }).first().getByText("Tabs", { exact: true }).click();
+    const handles = page.locator(".bn-table-handle:visible");
+    await expect(handles).toHaveCount(2);
+    const lefts = await handles.evaluateAll((elements) => (
+      elements.map((element) => element.getBoundingClientRect().left)
+    ));
+    await handles.nth(lefts.indexOf(Math.min(...lefts))).click();
+  };
+  const menuItem = (name) => page.locator(".bn-table-handle-menu [role='menuitem']")
+    .filter({ hasText: name });
+
+  // The whole row is selected and outlined as one rectangle: only the end cells draw the sides.
+  await openRowMenu();
+  const selectedCells = page.locator(".bn-editor .selectedCell");
+  await expect(selectedCells).toHaveCount(3);
+  await expect(selectedCells.first()).toHaveText("Tabs");
+  await expect(selectedCells.nth(0)).toHaveClass(/notepane-cell-range-left/);
+  await expect(selectedCells.nth(1)).not.toHaveClass(/notepane-cell-range-(left|right)/);
+  await expect(selectedCells.nth(2)).toHaveClass(/notepane-cell-range-right/);
+  for (const index of [0, 1, 2]) {
+    await expect(selectedCells.nth(index)).toHaveClass(/notepane-cell-range-top/);
+    await expect(selectedCells.nth(index)).toHaveClass(/notepane-cell-range-bottom/);
+  }
+
+  await menuItem("Duplicate").click();
+  await expect(rows).toHaveCount(rowCount + 1);
+  await expect(rows.nth(2)).toHaveText(tabsRowText);
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect(rows).toHaveCount(rowCount);
+
+  await openRowMenu();
+  await menuItem("Clear contents").click();
+  await expect(rows.nth(1)).toHaveText("");
+  await expect(rows).toHaveCount(rowCount);
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect(rows.nth(1)).toHaveText(tabsRowText);
+});
+
+test("toggles table headers and fits the table to the editor width from the six-dot menu", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const table = page.locator(".bn-editor table").first();
+  const firstCell = table.locator("td, th").first();
+  const openBlockMenu = async () => {
+    await table.locator("xpath=ancestor::div[contains(@class, 'bn-block-outer')][1]").hover();
+    await page.locator(".bn-side-menu [data-test='dragHandle']:visible").last().click();
+  };
+
+  // A header switch keeps the menu open and shows the new state; after the menu closes, the
+  // editor has focus again and Cmd+Z undoes the switch.
+  await openBlockMenu();
+  const headerColumn = page.locator(".bn-drag-handle-menu [role='menuitem']")
+    .filter({ hasText: "Header column" });
+  const headerCellsInSecondRow = table.locator("tr").nth(1).locator("th");
+  const headerColumnWasOn = await headerCellsInSecondRow.count() > 0;
+  await headerColumn.click();
+  await expect(headerCellsInSecondRow).toHaveCount(headerColumnWasOn ? 0 : 1);
+  await expect(headerColumn.locator(".notepane-menu-switch"))
+    .toHaveAttribute("data-checked", headerColumnWasOn ? "false" : "true");
+  await page.keyboard.press("Escape");
+  await expectEditorFocused(page);
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect(headerCellsInSecondRow).toHaveCount(headerColumnWasOn ? 1 : 0);
+
+  // A column dragged wider than the editor scrolls the table; Fit to width brings it back.
+  const wrapper = page.locator(".bn-editor [data-content-type='table'] .tableWrapper").first();
+  // The undo above scrolls to the selection it restores, which may be away from the table.
+  await firstCell.scrollIntoViewIfNeeded();
+  const cellBox = await firstCell.boundingBox();
+  await page.mouse.move(cellBox.x + cellBox.width - 1, cellBox.y + cellBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cellBox.x + cellBox.width + 500, cellBox.y + cellBox.height / 2, { steps: 6 });
+  await page.mouse.up();
+  const isOverflowing = () => wrapper.evaluate((element) => element.scrollWidth > element.clientWidth);
+  await expect.poll(isOverflowing).toBe(true);
+
+  await openBlockMenu();
+  await page.locator(".bn-drag-handle-menu [role='menuitem']")
+    .filter({ hasText: "Fit to width" })
+    .click();
+  await expect.poll(isOverflowing).toBe(false);
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect.poll(isOverflowing).toBe(true);
 });
