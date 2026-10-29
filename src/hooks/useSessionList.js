@@ -23,6 +23,7 @@ import {
   reorderNotesByIds,
 } from "../model/notes.js";
 import { hasPendingSave, waitForPendingSave } from "../model/pendingSaves.js";
+import { useTimedToast } from "./useTimedToast.js";
 import {
   normalizeAppTheme,
   normalizeEditorPreferences,
@@ -46,41 +47,23 @@ export function useSessionList({
   const [note, setNote] = useState(null);
   const [notes, setNotes] = useState([]);
   const [trashedNotes, setTrashedNotes] = useState([]);
-  const [sessionUndoToast, setSessionUndoToast] = useState(null);
-  const sessionUndoToastTimerRef = useRef(null);
-
-  const hideSessionUndoToast = useCallback(() => {
-    if (sessionUndoToastTimerRef.current) {
-      window.clearTimeout(sessionUndoToastTimerRef.current);
-      sessionUndoToastTimerRef.current = null;
-    }
-    setSessionUndoToast(null);
-  }, []);
+  const {
+    hide: hideSessionUndoToast,
+    show: showSessionUndoToast,
+    timer: sessionUndoToastTimer,
+    toast: sessionUndoToast,
+  } = useTimedToast();
 
   const showSessionMovedToTrashToast = useCallback(({ noteId, title, source = "trash" }) => {
-    if (sessionUndoToastTimerRef.current) {
-      window.clearTimeout(sessionUndoToastTimerRef.current);
-      sessionUndoToastTimerRef.current = null;
-    }
-
-    setSessionUndoToast({
-      noteId,
-      title: normalizeTitle(title),
-      source,
-    });
-    sessionUndoToastTimerRef.current = window.setTimeout(() => {
-      setSessionUndoToast(null);
-      sessionUndoToastTimerRef.current = null;
-    }, TRASH_UNDO_TOAST_TIMEOUT_MS);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (sessionUndoToastTimerRef.current) {
-        window.clearTimeout(sessionUndoToastTimerRef.current);
-      }
-    };
-  }, []);
+    showSessionUndoToast(
+      {
+        noteId,
+        title: normalizeTitle(title),
+        source,
+      },
+      TRASH_UNDO_TOAST_TIMEOUT_MS,
+    );
+  }, [showSessionUndoToast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -511,6 +494,7 @@ export function useSessionList({
     restoreTrashedNote,
     selectNote,
     sessionUndoToast,
+    sessionUndoToastTimer,
     showSessionMovedToTrashToast,
     trashedNotes,
     undoSessionMoveToTrash,

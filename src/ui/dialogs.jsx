@@ -7,6 +7,9 @@ import {
   preventFocusLoss,
 } from "../editor/images.js";
 import {
+  usePresenceContext,
+} from "../hooks/usePresence.js";
+import {
   normalizeTitle,
 } from "../model/notes.js";
 import {
@@ -21,8 +24,10 @@ export function StickySettingsWindow({
   onThemeChange,
   onClose,
 }) {
+  const { rootProps } = usePresenceContext();
   return (
     <div
+      {...rootProps}
       className="preferences-backdrop sticky-settings-backdrop"
       role="presentation"
       onMouseDown={(event) => {
@@ -142,6 +147,7 @@ export function MoveToTrashConfirmDialog({
   const normalizedNoteTitle = normalizeTitle(noteTitle);
   const confirmButtonRef = useRef(null);
   const hasConfirmedRef = useRef(false);
+  const { isClosing, rootProps } = usePresenceContext();
 
   const confirmOnce = useCallback(() => {
     if (hasConfirmedRef.current) {
@@ -158,6 +164,9 @@ export function MoveToTrashConfirmDialog({
   }, []);
 
   useEffect(() => {
+    if (isClosing) {
+      return undefined;
+    }
     const handleKeyDown = (event) => {
       if (event.key !== "Escape" && event.key !== "Enter") {
         return;
@@ -178,10 +187,11 @@ export function MoveToTrashConfirmDialog({
     return () => {
       document.removeEventListener("keydown", handleKeyDown, true);
     };
-  }, [confirmOnce, onCancel]);
+  }, [confirmOnce, isClosing, onCancel]);
 
   return (
     <div
+      {...rootProps}
       className={`trash-confirm-backdrop ${backdropClassName}`.trim()}
       role="presentation"
       onMouseDown={(event) => {

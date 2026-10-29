@@ -64,6 +64,30 @@ function declareReferencingTokensOnBody(ownerDocument, tokens) {
 }
 
 /**
+ * Runs `update`, which applies the theme `themeId`, inside a view transition, so the window's old
+ * colours cross-fade into the new ones (src/styles/motion.css sets its timing). `update` must
+ * apply the theme synchronously. It runs at once, without a transition, where the View
+ * Transitions API is missing, under reduced motion, during an export, and when `themeId` is
+ * already applied. A view transition drops the pointer's hover while it runs, so only a theme the
+ * user picks in this window should go through here.
+ */
+export function runThemeTransition(themeId, update, ownerDocument = document) {
+  const canCrossFade =
+    typeof ownerDocument.startViewTransition === "function" &&
+    ownerDocument.documentElement.dataset.themeId !== themeId &&
+    !ownerDocument.body?.classList.contains("is-exporting") &&
+    !ownerDocument.defaultView?.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (canCrossFade) {
+    const transition = ownerDocument.startViewTransition(update);
+    // Picking another theme mid-fade skips this transition, which rejects `ready`; `update` has
+    // still run, so the skip needs no handling.
+    transition.ready.catch(() => {});
+  } else {
+    update();
+  }
+}
+
+/**
  * Runs `run` (the PDF export render) with the export theme forced onto the page. Every token
  * and `color-scheme` are set inline with priority `important` on `document.body`, which holds
  * the portalled menus and in a sticky window a copy of the note's colours, and on the

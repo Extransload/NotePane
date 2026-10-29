@@ -1,15 +1,19 @@
 /* Toasts, crop dialog, export mode and print styles. */
 
+/* Centred with auto margins rather than a transform, which its slide in and out
+   (src/styles/motion.css) would have to repeat. */
 .sticky-toast {
   position: fixed;
-  left: 50%;
+  right: 0;
+  left: 0;
   bottom: 14px;
   z-index: 30;
   display: flex;
+  width: max-content;
   min-height: 30px;
   align-items: center;
   gap: 8px;
-  transform: translateX(-50%);
+  margin: 0 auto;
   padding: 7px 12px;
   border: 1px solid color-mix(in srgb, var(--sticky-border-color) 76%, transparent);
   border-radius: 999px;
@@ -19,7 +23,6 @@
   font: 720 11px/1 var(--notepane-ui-font);
   pointer-events: auto;
   -webkit-app-region: no-drag;
-  animation: toastIn 150ms ease both;
 }
 
 .sticky-toast::before {
@@ -44,8 +47,28 @@
   background: var(--sticky-danger-color);
 }
 
+/* The message being replaced and the new one share one cell while they cross-fade. */
 .sticky-toast-message {
+  display: inline-grid;
   white-space: nowrap;
+}
+
+.sticky-toast-text {
+  grid-area: 1 / 1;
+}
+
+/* The time an Undo toast has left, drawn from its timer (StickyToastTimeBar in src/ui/overlays.jsx). */
+.sticky-toast-time {
+  position: absolute;
+  right: 14px;
+  bottom: 3px;
+  left: 14px;
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sticky-panel-text) 26%, transparent);
+  pointer-events: none;
+  transform: scaleX(var(--sticky-toast-time-left, 1));
+  transform-origin: left center;
 }
 
 .sticky-toast-action {
@@ -60,7 +83,8 @@
   transition:
     background 130ms ease,
     border-color 130ms ease,
-    transform 130ms ease;
+    transform 130ms ease,
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
 }
 
 .sticky-toast-action:hover {

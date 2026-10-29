@@ -2,6 +2,9 @@ import {
   preventFocusLoss,
 } from "../editor/images.js";
 import {
+  usePresenceContext,
+} from "../hooks/usePresence.js";
+import {
   ColorSettingsSection,
 } from "./preferencesSections.jsx";
 
@@ -14,9 +17,11 @@ export function ColorPanel({
   onClose,
 }) {
   const isStickyVariant = variant === "sticky";
+  const { rootProps } = usePresenceContext();
 
   return (
     <div
+      {...rootProps}
       className="preferences-panel color-panel editor-floating-menu"
       role="dialog"
       aria-label={isStickyVariant ? "Sticky color panel" : "Session color panel"}

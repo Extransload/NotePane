@@ -16,6 +16,9 @@ import {
   preventFocusLoss,
 } from "../editor/images.js";
 import {
+  usePresenceContext,
+} from "../hooks/usePresence.js";
+import {
   normalizeKeyboardShortcutEnabled,
   normalizeKeyboardShortcuts,
 } from "../model/keyboardShortcuts.js";
@@ -75,6 +78,7 @@ export function PreferencesWindow({
   onPurgeTrashedNote,
   onClose,
 }) {
+  const { rootProps } = usePresenceContext();
   const [activePage, setActivePage] = useState(() =>
     normalizePreferencePageId(initialPage),
   );
@@ -238,6 +242,7 @@ export function PreferencesWindow({
 
   return (
     <div
+      {...rootProps}
       className="preferences-backdrop"
       role="presentation"
       onMouseDown={(event) => {

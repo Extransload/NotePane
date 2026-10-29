@@ -178,3 +178,297 @@ body.is-exporting .color-panel,
 body.is-exporting .sticky-editor-surface {
   animation: none !important;
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Chrome motion: toasts, the exits of NotePane's own overlays, and press and hover feedback.
+
+   An overlay rendered through usePresence (src/hooks/usePresence.js) stays mounted with
+   data-state="closing" while its exit runs, and unmounts on that element's own animationend.
+   While closing it is inert and aria-hidden, and takes no pointer events. With no animation to
+   wait for (reduced motion, print, export) it unmounts at once. Only opacity, transform
+   properties and background colours move.
+   --------------------------------------------------------------------------------------------- */
+
+:root {
+  --notepane-motion-exit-duration: 120ms;
+  --notepane-motion-dialog-exit-duration: 160ms;
+  --notepane-motion-toast-in-duration: 220ms;
+  --notepane-motion-toast-out-duration: 160ms;
+  --notepane-motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --notepane-motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --notepane-motion-toast-shift: 8px;
+  --notepane-motion-press-duration: 90ms;
+  --notepane-motion-press-scale: 0.96;
+  --notepane-motion-hover-duration: 90ms;
+  --notepane-motion-theme-duration: 220ms;
+}
+
+@keyframes notepaneToastIn {
+  from {
+    opacity: 0;
+    translate: 0 var(--notepane-motion-toast-shift);
+    scale: 0.94;
+  }
+}
+
+@keyframes notepaneToastOut {
+  to {
+    opacity: 0;
+    translate: 0 var(--notepane-motion-toast-shift);
+    scale: 0.98;
+  }
+}
+
+@keyframes notepaneFadeOut {
+  to {
+    opacity: 0;
+  }
+}
+
+/* The old message is gone before the new one shows, so two lines of text never sit on top of
+   each other; both last the same time, so they leave the cell together. */
+@keyframes notepaneToastTextOut {
+  60%,
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes notepaneToastTextIn {
+  from,
+  40% {
+    opacity: 0;
+  }
+}
+
+[data-state="closing"] {
+  pointer-events: none !important;
+}
+
+/* A toast springs up from the bottom edge and sinks back before it unmounts. A toast that
+   replaces another keeps its element: the old message fades out under the new one, and the dot
+   moves to the new tone's colour. */
+.sticky-toast {
+  animation: notepaneToastIn var(--notepane-motion-toast-in-duration) var(--notepane-motion-ease-spring) both;
+}
+
+.sticky-toast[data-state="closing"] {
+  animation: notepaneToastOut var(--notepane-motion-toast-out-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+.sticky-toast::before {
+  transition: background-color var(--notepane-motion-toast-out-duration) var(--notepane-motion-ease-out);
+}
+
+.sticky-toast-text[data-state="entering"] {
+  animation: notepaneToastTextIn var(--notepane-motion-toast-out-duration) linear both;
+}
+
+.sticky-toast-text[data-state="closing"] {
+  animation: notepaneToastTextOut var(--notepane-motion-toast-out-duration) linear forwards;
+}
+
+/* A menu, panel or find bar leaves the way it came: a few pixels back toward its anchor (above it,
+   or below it for a dropdown that opened above its field) while it fades. A tooltip only fades. */
+@keyframes notepaneMenuOut {
+  to {
+    opacity: 0;
+    translate: 0 var(--notepane-menu-from-y, calc(var(--notepane-motion-shift) * -1));
+    scale: 0.98;
+  }
+}
+
+@keyframes notepaneDialogOut {
+  to {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+
+:is(
+  .session-tab-context-menu,
+  .export-format-menu,
+  .notepane-dropdown-menu,
+  .color-panel,
+  .find-bar
+)[data-state="closing"] {
+  animation: notepaneMenuOut var(--notepane-motion-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+.adaptive-tooltip[data-state="closing"] {
+  animation: notepaneFadeOut var(--notepane-motion-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+/* A dialog's backdrop is the element that waits; the dialog inside shrinks back over the same
+   time, so both are gone together. */
+:is(
+  .preferences-backdrop,
+  .trash-confirm-backdrop,
+  .search-palette-backdrop,
+  .version-history-backdrop,
+  .crop-dialog
+)[data-state="closing"] {
+  animation: notepaneFadeOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+[data-state="closing"] :is(
+  .preferences-window,
+  .markdown-import-dialog,
+  .trash-confirm-dialog,
+  .version-history-panel,
+  .crop-panel
+) {
+  animation: notepaneDialogOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+.search-palette-backdrop[data-state="closing"] .search-palette {
+  animation: notepaneMenuOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+/* Buttons and icon buttons press in. Each one's own rule lists `scale` among its transitions;
+   the scale property leaves a hover lift or a positioning transform alone. */
+:is(
+  .sidebar-toggle,
+  .session-delete-button,
+  .session-add-button,
+  .preferences-close-button,
+  .preferences-icon-button,
+  .layout-mode-button,
+  .editor-width-button,
+  .sticky-color-button,
+  .sticky-pin-button,
+  .sticky-trash-button,
+  .sidebar-reopen-button,
+  .image-tools button,
+  .crop-actions button,
+  .sticky-toast-action,
+  .find-bar-button,
+  .theme-filter-chip,
+  .preference-data-button,
+  .trash-preview-button,
+  .trash-action-button,
+  .trash-confirm-button,
+  .shortcut-recorder-button,
+  .shortcut-reset-button,
+  .template-use-button,
+  .version-history-footer button
+):active:not(:disabled) {
+  scale: var(--notepane-motion-press-scale);
+}
+
+/* Menu items and list rows that had no transition ease their hover background. */
+.session-tab-context-menu button,
+.export-format-menu button,
+.notepane-dropdown-option,
+.search-result,
+.version-history-item,
+.editor-toc-entry {
+  transition: background-color var(--notepane-motion-hover-duration) var(--notepane-motion-ease-out);
+}
+
+.find-bar-button,
+.version-history-footer button {
+  transition:
+    background-color var(--notepane-motion-hover-duration) var(--notepane-motion-ease-out),
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
+}
+
+/* The zoom gauge springs in, its fill and thumb glide to each new step, and it fades back up
+   when it times out. */
+@keyframes notepaneGaugeIn {
+  from {
+    opacity: 0;
+    translate: 0 calc(var(--notepane-motion-shift) * -1.5);
+    scale: 0.92;
+  }
+}
+
+.app-zoom-gauge {
+  animation: notepaneGaugeIn var(--notepane-motion-toast-in-duration) var(--notepane-motion-ease-spring) both;
+}
+
+.app-zoom-gauge[data-state="closing"] {
+  animation: notepaneMenuOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+.app-zoom-gauge-fill {
+  transition: transform var(--notepane-motion-panel-duration) var(--notepane-motion-ease-spring);
+}
+
+.app-zoom-gauge-thumb {
+  transition: translate var(--notepane-motion-panel-duration) var(--notepane-motion-ease-spring);
+}
+
+/* A theme change cross-fades the whole window (runThemeTransition in src/style/applyTheme.js).
+   The page under the fading snapshots keeps taking clicks. */
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--notepane-motion-theme-duration);
+  animation-timing-function: var(--notepane-motion-ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(
+    .session-tab-context-menu button,
+    .export-format-menu button,
+    .notepane-dropdown-option,
+    .search-result,
+    .version-history-item,
+    .editor-toc-entry,
+    .find-bar-button,
+    .version-history-footer button,
+    .app-zoom-gauge-fill,
+    .app-zoom-gauge-thumb
+  ) {
+    transition: none !important;
+  }
+
+  :active {
+    scale: none !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sticky-toast[data-state],
+  .sticky-toast-text[data-state],
+  [data-state="closing"],
+  [data-state="closing"] :is(
+    .preferences-window,
+    .markdown-import-dialog,
+    .trash-confirm-dialog,
+    .version-history-panel,
+    .crop-panel,
+    .search-palette
+  ) {
+    animation: none !important;
+  }
+
+  .sticky-toast::before {
+    transition: none !important;
+  }
+
+  /* The bar only moves; the toast still waits while hovered. */
+  .sticky-toast-time {
+    display: none;
+  }
+}
+
+@media print {
+  [data-state="closing"] {
+    animation: none !important;
+  }
+}
+
+body.is-exporting [data-state="closing"] {
+  animation: none !important;
+}

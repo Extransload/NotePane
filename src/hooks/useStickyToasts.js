@@ -3,24 +3,25 @@ import {
   EXPORT_TOAST_TIMEOUT_MS,
   ZOOM_GAUGE_TIMEOUT_MS,
 } from "../constants.js";
+import { useTimedToast } from "./useTimedToast.js";
 
 /**
  * Transient status shown over the editor: the export/save toast with an
  * optional action button, and the zoom gauge shown while zooming the app.
- * Both auto-dismiss on their own timer and cancel it on unmount.
+ * Both auto-dismiss on their own timer and cancel it on unmount; the toast's
+ * timer waits while `exportToastTimer.pause()` holds it (useTimedToast).
  */
 export function useStickyToasts() {
-  const [exportToast, setExportToast] = useState(null);
+  const {
+    hide: hideExportToast,
+    show: showTimedToast,
+    timer: exportToastTimer,
+    toast: exportToast,
+  } = useTimedToast();
   const [zoomGauge, setZoomGauge] = useState(null);
-  const exportToastTimerRef = useRef(null);
   const zoomGaugeTimerRef = useRef(null);
 
   const showExportToast = useCallback((message, tone = "success", options = {}) => {
-    if (exportToastTimerRef.current) {
-      window.clearTimeout(exportToastTimerRef.current);
-      exportToastTimerRef.current = null;
-    }
-
     const action =
       typeof options.onAction === "function" && options.actionLabel
         ? {
@@ -29,24 +30,8 @@ export function useStickyToasts() {
           }
         : null;
 
-    setExportToast({ action, message, tone });
-
-    const timeout = options.timeout ?? EXPORT_TOAST_TIMEOUT_MS;
-    if (timeout > 0) {
-      exportToastTimerRef.current = window.setTimeout(() => {
-        setExportToast(null);
-        exportToastTimerRef.current = null;
-      }, timeout);
-    }
-  }, []);
-
-  const hideExportToast = useCallback(() => {
-    if (exportToastTimerRef.current) {
-      window.clearTimeout(exportToastTimerRef.current);
-      exportToastTimerRef.current = null;
-    }
-    setExportToast(null);
-  }, []);
+    showTimedToast({ action, message, tone }, options.timeout ?? EXPORT_TOAST_TIMEOUT_MS);
+  }, [showTimedToast]);
 
   const showZoomGauge = useCallback((zoom) => {
     if (zoomGaugeTimerRef.current) {
@@ -64,9 +49,6 @@ export function useStickyToasts() {
 
   useEffect(() => {
     return () => {
-      if (exportToastTimerRef.current) {
-        window.clearTimeout(exportToastTimerRef.current);
-      }
       if (zoomGaugeTimerRef.current) {
         window.clearTimeout(zoomGaugeTimerRef.current);
       }
@@ -75,6 +57,7 @@ export function useStickyToasts() {
 
   return {
     exportToast,
+    exportToastTimer,
     hideExportToast,
     showExportToast,
     showZoomGauge,
