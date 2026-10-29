@@ -25,7 +25,11 @@
 - Default editor font family for every session; there is no font size setting, text size follows the app zoom
 - App zoom with `Command/Ctrl + =`, `-` and `0`, from 50% to 200%: every window zooms together, a gauge shows the zoom
   between its smallest and largest step, and the zoom persists
-- Right-click session tab context menu for per-session tab color
+- Right-click session tab context menu, opened at the pointer and kept inside the window: Rename (inline rename),
+  Duplicate (a new session with the same content, colour and "<title> copy" as its name), Open as sticky (desktop
+  tabs layout: the note opens in its own sticky window while the app stays in tabs; its tab then brings that window
+  forward, and switching the window to tabs puts the note back), Color... for the per-session tab color, and Move
+  to Trash with its confirmation
 - Sidebar tab background/accent color customization with automatic contrast text
 - Tab color wheel
 - Color brightness/value slider that is preserved when the wheel color changes

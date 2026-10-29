@@ -40,6 +40,32 @@
   background: var(--sticky-control-hover-bg);
 }
 
+.session-tab-context-menu {
+  min-width: 168px;
+  gap: 2px;
+}
+
+.session-tab-context-menu button:focus-visible {
+  outline: 2px solid var(--notepane-focus-outline);
+  outline-offset: -2px;
+}
+
+.session-tab-menu-icon {
+  flex: 0 0 auto;
+  color: var(--icon-chrome-color);
+}
+
+.session-tab-context-menu button.is-danger,
+.session-tab-context-menu button.is-danger .session-tab-menu-icon {
+  color: var(--sticky-danger-color);
+}
+
+.session-tab-menu-separator {
+  height: 1px;
+  margin: 3px 4px;
+  background: var(--sticky-border-color);
+}
+
 .export-format-menu {
   min-width: 190px;
 }

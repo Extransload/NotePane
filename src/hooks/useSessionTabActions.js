@@ -30,8 +30,9 @@ import {
 
 /**
  * The session tab commands: inline rename (a rename asked for while a double click is still
- * switching tabs included), moving a session to Trash behind its confirmation and exit animation,
- * and closing the current tab with Cmd/Ctrl+W or the app menu.
+ * switching tabs included), duplicating a session, opening one as its own sticky window, moving a
+ * session to Trash behind its confirmation and exit animation, and closing the current tab with
+ * Cmd/Ctrl+W or the app menu.
  */
 export function useSessionTabActions({
   closeCurrentWindow,
@@ -43,6 +44,7 @@ export function useSessionTabActions({
   normalizedLayoutMode,
   note,
   onDeleteNote,
+  onDuplicateNote,
   onNoteChanged,
   onPendingRenameHandled,
   onRenameRequested,
@@ -95,6 +97,58 @@ export function useSessionTabActions({
       onPendingRenameHandled();
     }
   }, [onPendingRenameHandled, selectSidebarNote]);
+
+  // Saves the open note first, so a copy of it, or of the stored note, has every edit.
+  const duplicateSessionNote = useCallback(async (sessionNote) => {
+    try {
+      await saveNow();
+      const isCurrent = sessionNote.id === note.id;
+      let markdown = sessionNote.markdown ?? "";
+      if (isCurrent) {
+        try {
+          markdown = await editor.blocksToMarkdownLossy(editor.document);
+        } catch {
+          markdown = "";
+        }
+      }
+      await onDuplicateNote({
+        ...(isCurrent ? { ...getCurrentNoteSnapshot(), theme } : sessionNote),
+        title: getSessionDisplayTitle(sessionNote),
+        markdown,
+      });
+    } catch (error) {
+      showExportToast(error.message || "Could not duplicate the session.", "error");
+    }
+  }, [
+    editor,
+    getCurrentNoteSnapshot,
+    getSessionDisplayTitle,
+    note.id,
+    onDuplicateNote,
+    saveNow,
+    showExportToast,
+    theme,
+  ]);
+
+  // Desktop tabs layout only. The note opens in its own sticky window while the app stays in tabs;
+  // when it is the open note, this window first moves to the next session (or the previous one).
+  const openSessionAsSticky = useCallback(async (sessionNote) => {
+    if (!electronApi?.openStickyNote || normalizedLayoutMode !== "tabs") {
+      return;
+    }
+    try {
+      if (sessionNote.id === note.id) {
+        const index = visibleSessionNotes.findIndex((candidate) => candidate.id === note.id);
+        const neighbour = visibleSessionNotes[index + 1] ?? visibleSessionNotes[index - 1];
+        if (!neighbour || (await selectSidebarNote(neighbour.id)) !== neighbour.id) {
+          return;
+        }
+      }
+      await electronApi.openStickyNote(sessionNote.id);
+    } catch (error) {
+      showExportToast(error.message || "Could not open the sticky window.", "error");
+    }
+  }, [normalizedLayoutMode, note.id, selectSidebarNote, showExportToast, visibleSessionNotes]);
 
   const cancelSessionRename = useCallback(() => {
     setEditingSessionId(null);
@@ -337,10 +391,13 @@ export function useSessionTabActions({
     confirmCloseCurrentTab,
     confirmDeleteSessionNote,
     draftSessionTitle,
+    duplicateSessionNote,
     editingSessionId,
+    openSessionAsSticky,
     removingSessionIds,
     requestDeleteSessionNote,
     requestSessionRename,
     selectSessionTab,
+    startSessionRename,
   };
 }

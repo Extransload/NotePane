@@ -295,6 +295,7 @@ function App({ bindTestThemeSetter }) {
   const {
     createSidebarNote,
     deleteSidebarNote,
+    duplicateSidebarNote,
     note,
     notes,
     purgeTrashedNote,
@@ -495,6 +496,7 @@ function App({ bindTestThemeSetter }) {
         setSidebarWidth={setSidebarWidth}
         onCreateNote={createSidebarNote}
         onDeleteNote={deleteSidebarNote}
+        onDuplicateNote={duplicateSidebarNote}
         onRestoreTrashedNote={restoreTrashedNote}
         onPurgeTrashedNote={purgeTrashedNote}
         onSelectNote={selectNote}
@@ -550,6 +552,7 @@ function StickyEditor({
   setSidebarWidth,
   onCreateNote,
   onDeleteNote,
+  onDuplicateNote,
   onRestoreTrashedNote,
   onPurgeTrashedNote,
   onSelectNote,
@@ -1858,11 +1861,14 @@ function StickyEditor({
     confirmCloseCurrentTab,
     confirmDeleteSessionNote,
     draftSessionTitle,
+    duplicateSessionNote,
     editingSessionId,
+    openSessionAsSticky,
     removingSessionIds,
     requestDeleteSessionNote,
     requestSessionRename,
     selectSessionTab,
+    startSessionRename,
   } = useSessionTabActions({
     closeCurrentWindow,
     closeOverlay,
@@ -1873,6 +1879,7 @@ function StickyEditor({
     normalizedLayoutMode,
     note,
     onDeleteNote,
+    onDuplicateNote,
     onNoteChanged,
     onPendingRenameHandled,
     onRenameRequested,
@@ -2680,7 +2687,28 @@ function StickyEditor({
           y={sessionTabMenu.y}
           sessionNote={sessionTabMenuNote}
           activeTheme={activeTheme}
+          canOpenAsSticky={
+            Boolean(electronApi?.openStickyNote) &&
+            normalizedLayoutMode === "tabs" &&
+            visibleSessionNotes.length > 1
+          }
+          onRename={() => {
+            closeOverlay("sessionTabMenu");
+            startSessionRename(sessionTabMenuNote);
+          }}
+          onDuplicate={() => {
+            closeOverlay("sessionTabMenu");
+            void duplicateSessionNote(sessionTabMenuNote);
+          }}
+          onOpenAsSticky={() => {
+            closeOverlay("sessionTabMenu");
+            void openSessionAsSticky(sessionTabMenuNote);
+          }}
           onOpenColor={() => openSessionColorPanel(sessionTabMenuNote.id)}
+          onMoveToTrash={() => {
+            closeOverlay("sessionTabMenu");
+            requestDeleteSessionNote(sessionTabMenuNote);
+          }}
         />
       )}
       {exportFormatMenu && (

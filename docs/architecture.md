@@ -79,7 +79,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Flushing pending saves on unmount or when main asks | `src/hooks/usePendingSaveFlush.js` |
 | Keys handled on the editor surface | `src/hooks/useEditorSurfaceShortcuts.js` |
 | Window, session and tab-mode keyboard commands | `src/hooks/useKeyboardCommands.js` |
-| Session tab rename, move to Trash, and closing the current tab | `src/hooks/useSessionTabActions.js` |
+| Session tab rename, duplicate, open as sticky, move to Trash, and closing the current tab | `src/hooks/useSessionTabActions.js` |
+| The session tab menu and the export format menu, placed at their anchor and clamped to the window | `src/ui/menus.jsx` |
 | Session tab drag and drop | `src/hooks/useSessionTabDrag.js` |
 | Export toast and zoom gauge timing | `src/hooks/useStickyToasts.js` |
 | Zoom gauge, export toast and other overlays | `src/ui/overlays.jsx` |
@@ -188,6 +189,11 @@ The app supports two layout modes.
 - `Command/Ctrl + W` moves the current sidebar session to Trash in tab session mode instead of closing the primary
   window; the confirmation and the undo toast both say so
 - Sidebar tab double-click starts inline rename
+- Open as sticky (session tab menu) calls `notes:open-sticky`: in the tabs layout, the note gets its own sticky
+  window, marked `detachedSticky`, and the app's `layoutMode` stays `tabs`. `layout-mode:get` answers `sticky` to
+  that window, layout syncs in the tabs layout keep it open, `notes:activate` from the tabs window for its note
+  brings it forward instead, and `layout-mode:update` to `tabs` from it closes it after its flush and shows the note
+  in the tabs window. Entering the sticky layout makes it an ordinary sticky window
 
 ## BlockNote configuration
 

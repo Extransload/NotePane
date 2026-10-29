@@ -1,11 +1,16 @@
 import {
+  CopyPlus,
   Download,
   FileDown,
+  PanelTopOpen,
+  PencilLine,
+  Trash2,
   Upload,
 } from "lucide-react";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -21,41 +26,149 @@ import {
 import {
   toneMatch,
 } from "../style/toneMatch.js";
+import {
+  getFloatingDropdownMenuStyle,
+} from "./FloatingDropdownMenu.jsx";
+
+/**
+ * The fixed position of a menu opened at `anchor` ({ left, top, width, height }, a pointer being
+ * a rectangle of no size): below it, or above it when there is no room below, and clamped to the
+ * viewport by the dropdown placement helper. The menu is laid out hidden first, so the helper
+ * works with its real size.
+ */
+function useAnchoredMenuStyle(menuRef, { left, top, width = 0, height = 0 }, align = "start") {
+  const [style, setStyle] = useState(null);
+
+  useLayoutEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) {
+      return;
+    }
+    const size = menu.getBoundingClientRect();
+    const { placement, ...position } = getFloatingDropdownMenuStyle(
+      {
+        getBoundingClientRect: () => ({
+          left,
+          top,
+          width,
+          height,
+          right: left + width,
+          bottom: top + height,
+        }),
+      },
+      {
+        align,
+        maxHeight: size.height,
+        maxWidth: size.width,
+        minWidth: size.width,
+        preferredWidth: size.width,
+      },
+    );
+    setStyle({ ...position, maxHeight: undefined, width: undefined });
+  }, [align, height, left, menuRef, top, width]);
+
+  return style ?? { left: 0, top: 0, visibility: "hidden" };
+}
+
+function MenuItem({ icon, children, tone, disabled = false, onSelect }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className={tone ? `is-${tone}` : undefined}
+      disabled={disabled}
+      onMouseDown={preventFocusLoss}
+      onClick={onSelect}
+    >
+      {icon}
+      <span>{children}</span>
+    </button>
+  );
+}
+
+const MENU_ICON_PROPS = {
+  className: "session-tab-menu-icon",
+  size: 14,
+  strokeWidth: 2,
+  "aria-hidden": "true",
+};
+
+// Arrow keys move between the items of an open menu, wrapping at both ends.
+function moveMenuFocus(event) {
+  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
+    return;
+  }
+  const items = [...event.currentTarget.querySelectorAll("[role='menuitem']:not(:disabled)")];
+  if (items.length === 0) {
+    return;
+  }
+  event.preventDefault();
+  const offset = event.key === "ArrowDown" ? 1 : -1;
+  const index = items.indexOf(document.activeElement);
+  const nextIndex = index < 0
+    ? (offset > 0 ? 0 : items.length - 1)
+    : (index + offset + items.length) % items.length;
+  items[nextIndex].focus();
+}
 
 export function SessionTabContextMenu({
   x,
   y,
   sessionNote,
   activeTheme,
+  canOpenAsSticky = false,
+  onRename,
+  onDuplicate,
+  onOpenAsSticky,
   onOpenColor,
+  onMoveToTrash,
 }) {
+  const menuRef = useRef(null);
+  const position = useAnchoredMenuStyle(menuRef, { left: x, top: y });
   const storedColor = resolveSessionTabAccentColor(sessionNote.theme);
   const colorPreview = storedColor ? toneMatch(storedColor, activeTheme, "mark") : undefined;
 
   return (
     <div
+      ref={menuRef}
       className="session-tab-context-menu editor-floating-menu"
       role="menu"
       aria-label={`Session options for ${getNoteDisplayTitle(sessionNote)}`}
-      style={{
-        "--session-tab-menu-x": `${x}px`,
-        "--session-tab-menu-y": `${y}px`,
-      }}
+      style={position}
       onContextMenu={(event) => event.preventDefault()}
+      onKeyDown={moveMenuFocus}
     >
-      <button
-        type="button"
-        role="menuitem"
-        onMouseDown={preventFocusLoss}
-        onClick={onOpenColor}
+      <MenuItem icon={<PencilLine {...MENU_ICON_PROPS} />} onSelect={onRename}>
+        Rename
+      </MenuItem>
+      <MenuItem icon={<CopyPlus {...MENU_ICON_PROPS} />} onSelect={onDuplicate}>
+        Duplicate
+      </MenuItem>
+      {canOpenAsSticky && (
+        <MenuItem icon={<PanelTopOpen {...MENU_ICON_PROPS} />} onSelect={onOpenAsSticky}>
+          Open as sticky
+        </MenuItem>
+      )}
+      <MenuItem
+        icon={
+          <span
+            className="session-tab-menu-color-swatch"
+            style={{ "--session-tab-menu-color": colorPreview }}
+            aria-hidden="true"
+          />
+        }
+        onSelect={onOpenColor}
       >
-        <span
-          className="session-tab-menu-color-swatch"
-          style={{ "--session-tab-menu-color": colorPreview }}
-          aria-hidden="true"
-        />
-        <span>Color...</span>
-      </button>
+        Color...
+      </MenuItem>
+      <div className="session-tab-menu-separator" role="separator" />
+      <MenuItem
+        icon={<Trash2 {...MENU_ICON_PROPS} />}
+        tone="danger"
+        onSelect={onMoveToTrash}
+      >
+        Move to Trash
+      </MenuItem>
     </div>
   );
 }
