@@ -8,6 +8,7 @@
 :root {
   --notepane-motion-toggle-duration: 180ms;
   --notepane-motion-block-enter-duration: 160ms;
+  --notepane-motion-block-move-duration: 180ms;
 }
 
 /* The chevron turns with the children opening below it. A chevron that renders already open, on

@@ -7,6 +7,7 @@ import {
   loadTemplatePreview,
   modifierShortcut,
   pastePlainText,
+  waitForEditorSelection,
 } from "../support/renderer-helpers.mjs";
 
 const FIXTURE = [
@@ -727,4 +728,95 @@ test("moves a mixed-depth selection without errors", async ({ page }) => {
   ]);
   expect(await selectedBlockTexts(page)).toEqual(["", "Echo bullet"]);
   expect(pageErrors).toEqual([]);
+});
+
+// Records each glide a block move starts: the block's text and the vertical offset it starts from.
+// Installed before the move, as the glide starts in the move's own task.
+async function recordBlockGlides(page) {
+  await page.evaluate(() => {
+    window.__blockGlides = [];
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function recordGlide(keyframes, options) {
+      if (options?.id === "notepane-block-move") {
+        window.__blockGlides.push({
+          text: this.querySelector(".bn-block-content")?.textContent.trim(),
+          fromY: Number.parseFloat(String(keyframes[0].translate).split(" ")[1]),
+        });
+      }
+      return animate.call(this, keyframes, options);
+    };
+  });
+}
+
+function readBlockGlides(page) {
+  return page.evaluate(() => window.__blockGlides.splice(0));
+}
+
+function glideOf(glides, text) {
+  return glides.find((glide) => glide.text === text);
+}
+
+// Waits for every glide to end and reports whether any block is still offset.
+function settleBlockGlides(page) {
+  return page.evaluate(async () => {
+    const blocks = [...document.querySelectorAll(".bn-editor .bn-block-outer")];
+    await Promise.all(blocks.flatMap((block) => block.getAnimations()).map((animation) => animation.finished));
+    return blocks.filter((block) => getComputedStyle(block).translate !== "none").length;
+  });
+}
+
+test("glides blocks moved by Mod+Shift+Arrow or the six-dot handle into place", async ({ page }) => {
+  await pasteLines(page, 4);
+  await expect(row(page, "Line 4")).toBeVisible();
+  await recordBlockGlides(page);
+
+  // Each selected block passes its neighbour: the moved ones start above their new place, the
+  // neighbours they passed start below it.
+  await selectTwoBlocks(page, "Line 1", "Line 3");
+  await page.keyboard.press(`Shift+${modifierShortcut("ArrowDown")}`);
+  await expect.poll(() => topLevelTexts(page)).toEqual(["Line 2", "Line 1", "Line 4", "Line 3"]);
+  const keyboardGlides = await readBlockGlides(page);
+  expect(glideOf(keyboardGlides, "Line 1")?.fromY).toBeLessThan(0);
+  expect(glideOf(keyboardGlides, "Line 3")?.fromY).toBeLessThan(0);
+  expect(glideOf(keyboardGlides, "Line 2")?.fromY).toBeGreaterThan(0);
+  expect(glideOf(keyboardGlides, "Line 4")?.fromY).toBeGreaterThan(0);
+  expect(await settleBlockGlides(page)).toBe(0);
+
+  // A block dragged down by its six-dot handle starts above its new place. Playwright's native
+  // drag stalls on this handle, so the drag runs as the browser's own drag events, which go
+  // through BlockNote's handle and ProseMirror's drop as a real drag does.
+  await row(page, "Line 4").click();
+  await waitForEditorSelection(page);
+  const sourceBox = await page.locator(".bn-editor").getByText("Line 2", { exact: true }).boundingBox();
+  await page.mouse.move(sourceBox.x + 10, sourceBox.y + sourceBox.height / 2);
+  const handle = page.locator(".bn-side-menu [data-test='dragHandle']");
+  await expect(handle).toBeVisible();
+  const targetBox = await page.locator(".bn-editor").getByText("Line 4", { exact: true }).boundingBox();
+  await handle.evaluate((icon, point) => {
+    const button = icon.closest("button");
+    const dataTransfer = new DataTransfer();
+    const fire = (target, type) => target.dispatchEvent(new DragEvent(type, {
+      bubbles: true, cancelable: true, dataTransfer, clientX: point.x, clientY: point.y,
+    }));
+    fire(button, "dragstart");
+    const target = document.elementFromPoint(point.x, point.y);
+    for (const type of ["dragenter", "dragover", "drop"]) fire(target, type);
+    fire(button, "dragend");
+  }, { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height * 0.75 });
+  await expect.poll(() => topLevelTexts(page)).toEqual(["Line 1", "Line 2", "Line 4", "Line 3"]);
+  const dragGlides = await readBlockGlides(page);
+  expect(glideOf(dragGlides, "Line 2")?.fromY).toBeLessThan(0);
+  expect(glideOf(dragGlides, "Line 1")?.fromY).toBeGreaterThan(0);
+  expect(await settleBlockGlides(page)).toBe(0);
+});
+
+test("moves blocks without the glide when reduced motion is requested", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await pasteLines(page, 3);
+  await expect(row(page, "Line 3")).toBeVisible();
+  await recordBlockGlides(page);
+  await selectTwoBlocks(page, "Line 1", "Line 2");
+  await page.keyboard.press(`Shift+${modifierShortcut("ArrowDown")}`);
+  await expect.poll(() => topLevelTexts(page)).toEqual(["Line 3", "Line 1", "Line 2"]);
+  expect(await readBlockGlides(page)).toEqual([]);
 });

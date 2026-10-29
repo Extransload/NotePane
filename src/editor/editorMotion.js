@@ -2,9 +2,9 @@ import { createExtension } from "@blocknote/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
-// Motion inside the editor content: toggles opening and closing, and blocks the user creates
-// rising in. Durations and easing are the tokens of src/styles/editor-motion.css and
-// src/styles/motion.css.
+// Motion inside the editor content: toggles opening and closing, blocks the user creates rising in,
+// and moved blocks settling into place. Durations and easing are the tokens of
+// src/styles/editor-motion.css and src/styles/motion.css.
 //
 // Everything here animates through the Web Animations API, which writes no attribute or style
 // into the DOM ProseMirror owns, so its DOM observer never sees a mutation. Nothing animates under
@@ -274,6 +274,101 @@ function createBlockEnterPlugin() {
   });
 }
 
+// Blocks moved by a drag and drop (the six-dot handle) or by Mod+Shift+ArrowUp/Down glide from
+// where they were drawn to their new place (FLIP): their positions are read before the event's own
+// handlers change the document, and each block that moved starts at its old offset and settles.
+// The blocks a move pushes aside glide too. Positions are relative to the editor, so the scroll a
+// move brings with it does not count as movement.
+const MOVABLE_BLOCK_SELECTOR = ".bn-block-outer[data-id], .notepane-column-list[data-id]";
+const BLOCK_MOVE_ANIMATION_ID = "notepane-block-move";
+
+function isBlockMoveKey(event) {
+  return (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+    event.shiftKey && (event.metaKey || event.ctrlKey) && !event.altKey;
+}
+
+function readBlockPositions(view) {
+  const origin = view.dom.getBoundingClientRect();
+  const positions = new Map();
+  for (const block of view.dom.querySelectorAll(MOVABLE_BLOCK_SELECTOR)) {
+    const rect = block.getBoundingClientRect();
+    if (rect.height > 0) {
+      positions.set(block.getAttribute("data-id"), { x: rect.left - origin.left, y: rect.top - origin.top });
+    }
+  }
+  return positions;
+}
+
+function settleMovedBlocks(view, positionsBefore) {
+  for (const block of view.dom.querySelectorAll(MOVABLE_BLOCK_SELECTOR)) {
+    for (const animation of block.getAnimations()) {
+      if (animation.id === BLOCK_MOVE_ANIMATION_ID) {
+        animation.cancel();
+      }
+    }
+  }
+  const origin = view.dom.getBoundingClientRect();
+  const viewportHeight = view.dom.ownerDocument.defaultView.innerHeight;
+  const timing = motionTiming(view.dom, "--notepane-motion-block-move-duration");
+  const moving = [];
+  for (const block of view.dom.querySelectorAll(MOVABLE_BLOCK_SELECTOR)) {
+    const before = positionsBefore.get(block.getAttribute("data-id"));
+    // A block inside one that moves travels with it.
+    if (!before || moving.some((parent) => parent.contains(block))) {
+      continue;
+    }
+    const rect = block.getBoundingClientRect();
+    const dx = before.x - (rect.left - origin.left);
+    const dy = before.y - (rect.top - origin.top);
+    if ((Math.abs(dx) < 1 && Math.abs(dy) < 1) || rect.bottom < 0 || rect.top > viewportHeight) {
+      continue;
+    }
+    moving.push(block);
+    block.animate([{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], {
+      id: BLOCK_MOVE_ANIMATION_ID,
+      ...timing,
+    });
+  }
+}
+
+function createBlockMoveView(view) {
+  const ownerDocument = view.dom.ownerDocument;
+  let positionsBefore = null;
+  let forget = 0;
+  // Capture listeners on the document run before ProseMirror's and the block handlers' own.
+  const readPositionsBeforeMove = (event) => {
+    if (event.type === "keydown" && !(isBlockMoveKey(event) && view.hasFocus())) {
+      return;
+    }
+    if (!isEditorMotionAllowed(view.dom)) {
+      return;
+    }
+    positionsBefore = readBlockPositions(view);
+    window.clearTimeout(forget);
+    // A key or drop that moved nothing leaves no positions for a later change to use.
+    forget = window.setTimeout(() => {
+      positionsBefore = null;
+    });
+  };
+  ownerDocument.addEventListener("keydown", readPositionsBeforeMove, true);
+  ownerDocument.addEventListener("drop", readPositionsBeforeMove, true);
+  return {
+    update(updatedView, previousState) {
+      if (!positionsBefore || updatedView.state.doc === previousState.doc) {
+        return;
+      }
+      const positions = positionsBefore;
+      positionsBefore = null;
+      settleMovedBlocks(updatedView, positions);
+    },
+    destroy() {
+      window.clearTimeout(forget);
+      ownerDocument.removeEventListener("keydown", readPositionsBeforeMove, true);
+      ownerDocument.removeEventListener("drop", readPositionsBeforeMove, true);
+    },
+  };
+}
+
 // Each editor gets its own plugins: a plugin's view state belongs to one editor view.
 export const EditorMotion = createExtension(() => ({
   key: "notepane-editor-motion",
@@ -283,5 +378,9 @@ export const EditorMotion = createExtension(() => ({
       view: createToggleMotionView,
     }),
     createBlockEnterPlugin(),
+    new Plugin({
+      key: new PluginKey("notepane-block-move-motion"),
+      view: createBlockMoveView,
+    }),
   ],
 }))();
