@@ -2307,6 +2307,9 @@ function StickyEditor({
                 className="session-tabs"
                 role="tablist"
                 aria-label="Note sessions"
+                // Busy while a session moves to Trash. Moving the open note shows the next one,
+                // which remounts this editor, so the flag clears only once that note is showing.
+                aria-busy={removingSessionIds.size > 0 ? "true" : undefined}
                 onDragOver={handleSessionTabsDragOver}
                 onDrop={(event) => void dropSessionTab(event)}
               >

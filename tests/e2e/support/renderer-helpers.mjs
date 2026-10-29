@@ -605,6 +605,10 @@ export async function moveSessionToTrash(page, tabIndex) {
   await moveConfirmDialog.getByRole("button", { name: /Yes, move .* to trash/ })
     .click();
   await expect(moveConfirmDialog).toHaveCount(0);
+  // The move outlasts the dialog: moving the open note remounts the editor on the next one, which
+  // drops a dialog opened meanwhile, so the next step waits for the tab list to settle.
+  await expect(page.getByRole("tablist", { name: "Note sessions" }))
+    .not.toHaveAttribute("aria-busy", "true");
 }
 
 export async function expectNewSessionButtonBelowLastTab(page) {
