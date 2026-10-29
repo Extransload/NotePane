@@ -61,8 +61,12 @@ const PREFERENCES_SECTIONS = ["General", "Editor", "Trash", "Shortcuts"];
 const TEMPLATE_IMAGE_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360"><rect width="960" height="360" fill="#1f2937"/></svg>';
 
-// Content the template lacks: more heading levels, both list kinds, inline code, a link, and
-// text and background in every named colour.
+// Content the template lacks: more heading levels, both list kinds, inline code, a link, text
+// and background in every named colour, and equations, one that KaTeX cannot parse.
+const MATH_NOTE_HTML = [
+  '<p>Area <span data-inline-math="\\pi r^2"></span> and <span data-inline-math="\\frac{"></span></p>',
+  '<div data-math-block="\\int_0^1 x^2\\,dx = \\frac{1}{3}"></div>',
+];
 const EXTRA_NOTE_HTML = [
   "<h2>Second level heading</h2>",
   "<h3>Third level heading</h3>",
@@ -71,6 +75,7 @@ const EXTRA_NOTE_HTML = [
   '<p>Run <code>npm run verify</code> and read <a href="https://example.com/notes">the guide</a>.</p>',
   `<p>${NAMED_COLOURS.map((colour) => `<span data-style-type="textColor" data-value="${colour}">text${colour}</span>`).join(" ")}</p>`,
   `<p>${NAMED_COLOURS.map((colour) => `<span data-style-type="backgroundColor" data-value="${colour}">bg${colour}</span>`).join(" ")}</p>`,
+  ...MATH_NOTE_HTML,
 ].join("");
 
 const EDITOR_SURFACE = "[data-testid='sticky-editor-surface']";
@@ -518,6 +523,8 @@ async function openTemplateNote(page, pair) {
     await expect(page.locator(`.bn-editor [data-style-type='backgroundColor'][data-value='${colour}']`)).toHaveText(`bg${colour}`);
   }
   await expect(page.locator(".bn-editor a[href='https://example.com/notes']")).toBeVisible();
+  await expect(page.locator(".bn-editor [data-testid='math-block'] .katex")).toBeVisible();
+  await expect(page.locator(".bn-editor [data-testid='inline-math'] .katex-error")).toBeVisible();
   // The paste replaced the trailing empty paragraph; put one back after it.
   await page.keyboard.press("Enter");
   await expect(page.getByRole("paragraph").filter({ hasText: /^$/ })).toHaveCount(1);

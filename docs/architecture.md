@@ -29,7 +29,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Directory | Owns | Notable files |
 | --- | --- | --- |
 | `src/` | entry point and shared constants | `main.jsx`, `constants.js` |
-| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `callout.jsx`, `calloutIconPicker.jsx`, `selection.js`, `blockSelection.js`, `blockSelectionRules.js`, `blockDragSelection.js`, `blocks.js`, `clipboard.js`, `paste.js`, `tableFocus.js`, `images.js`, `divider.jsx` |
+| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `callout.jsx`, `calloutIconPicker.jsx`, `selection.js`, `blockSelection.js`, `blockSelectionRules.js`, `blockDragSelection.js`, `blocks.js`, `clipboard.js`, `paste.js`, `tableFocus.js`, `images.js`, `divider.jsx`, `math.jsx` |
 | `src/model/` | normalising and deriving stored data | `notes.js`, `preferences.js`, `keyboardShortcuts.js` |
 | `src/style/` | themes, theme tokens, tone matching, colour maths and computed inline styles | `themes.js`, `themeTokens.js`, `toneMatch.js`, `applyTheme.js`, `themeStyles.js`, `colorMath.js` |
 | `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
@@ -56,6 +56,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Which element counts as an editor shortcut target | `src/editor/targets.js` |
 | Backspace right after a Markdown shortcut such as `- ` gives back exactly the typed marker | `src/editor/markdownShortcuts.js` |
 | Divider: the `---` / `***` shortcut (in `src/editor/schema.jsx`), its slash menu item, Markdown export as `---` | `src/editor/divider.jsx` |
+| Inline and block equations: KaTeX rendering, their editors, slash menu items, Markdown `$...$` / `$$` export and the import that reads them | `src/editor/math.jsx` |
 | BlockNote floating menu positioning and clamping | `src/editor/floatingMenus.js` |
 | Image download, crop geometry, upload | `src/editor/images.js` |
 | Pasting and dropping files: where the file block goes, its upload, one undo step for both | `src/editor/fileInsertion.js` |
@@ -95,7 +96,8 @@ module above, not in `main.jsx`.
 
 `src/styles.css` contains nothing but `@import` lines. Later files intentionally override earlier ones, so the import
 order is part of the contract and must not be rearranged. The built stylesheet is byte-identical to the previous single
-file.
+file. KaTeX's own stylesheet is imported just before `blocknote.css`, which gives equations the theme's colours; its
+fonts are bundled from the package, as the packaged renderer's `font-src 'self' data:` policy requires.
 
 ### Reference check
 

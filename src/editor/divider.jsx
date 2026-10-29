@@ -33,20 +33,26 @@ export const DividerMarkdownExport = createExtension(({ editor }) => {
   return { key: "notepane-divider-markdown" };
 })();
 
+// BlockNote leaves a block without text, such as a divider, node-selected when the slash menu
+// inserts it as the last block, so the next key typed went nowhere. As with the `---` shortcut,
+// the caret moves on to an empty paragraph below it. Returns the inserted block.
+export function insertBlockWithLineBelow(editor, block) {
+  return editor.transact(() => {
+    const inserted = insertOrUpdateBlockForSlashMenu(editor, block);
+    if (editor.getTextCursorPosition().block.id === inserted.id) {
+      const [paragraph] = editor.insertBlocks([{ type: "paragraph" }], inserted, "after");
+      editor.setTextCursorPosition(paragraph, "start");
+    }
+    return inserted;
+  });
+}
+
 // BlockNote's own Divider slash menu item, with lucide's rule icon like NotePane's other items.
-// BlockNote leaves a divider inserted as the last block node-selected, so the next key typed went
-// nowhere; as with the `---` shortcut, the caret moves on to an empty paragraph below it.
 export function setDividerSlashMenuItem(items, editor) {
   const divider = items.find((item) => item.key === "divider");
   if (!divider) {
     return;
   }
   divider.icon = <Minus size={18} />;
-  divider.onItemClick = () => editor.transact(() => {
-    const inserted = insertOrUpdateBlockForSlashMenu(editor, { type: "divider" });
-    if (editor.getTextCursorPosition().block.id === inserted.id) {
-      const [paragraph] = editor.insertBlocks([{ type: "paragraph" }], inserted, "after");
-      editor.setTextCursorPosition(paragraph, "start");
-    }
-  });
+  divider.onItemClick = () => insertBlockWithLineBelow(editor, { type: "divider" });
 }

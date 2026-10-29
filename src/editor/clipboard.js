@@ -1,5 +1,6 @@
 import { getBlocksForClipboard } from "./blocks.js";
 import { isBlockSetSelection } from "./blockSelection.js";
+import { writeMarkdownMathAsHTML } from "./math.jsx";
 import { isEditorShortcutTarget } from "./targets.js";
 import { isEditableFormTarget } from "../utils/dom.js";
 
@@ -151,13 +152,15 @@ export function normalizePastedMarkdownForBlockNote(markdown, html = "") {
   const normalizedLineEndings = String(markdown).replace(/\r\n?/g, "\n");
   const normalizedTables = normalizeWrappedMarkdownTables(normalizedLineEndings);
   const shouldPasteHTML = hasStructureMissingFromText(html, normalizedTables);
+  // Equations, which BlockNote's Markdown parser would otherwise read as text.
+  const normalizedMarkdown = writeMarkdownMathAsHTML(normalizedTables);
 
   return {
-    markdown: normalizedTables,
+    markdown: normalizedMarkdown,
     shouldPasteHTML,
     shouldPasteAsMarkdown:
       !shouldPasteHTML &&
-      (normalizedTables !== normalizedLineEndings ||
+      (normalizedMarkdown !== normalizedLineEndings ||
         containsCommonMarkdownBlockSyntax(normalizedTables)),
   };
 }

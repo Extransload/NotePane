@@ -91,6 +91,12 @@ BlockNote handles editor interaction directly.
 - Divider: a thin rule from `/divider`, or from `---` or `***` typed on an empty line; the caret moves on to
   a line below it. Backspace on the empty line below selects it and Backspace again deletes it. Markdown writes it as
   `---` and reads `---`, `***` and `___`
+- Equations, rendered with KaTeX in the theme's text colour: an inline equation (`/inline equation`) inside the text,
+  edited in a small popover opened by clicking it, where Enter or Escape commits and an emptied one is removed; and a
+  block equation (`/block equation`) in display mode, whose TeX editor opens on a click, keeps Enter as a new line
+  and commits on Escape or when focus leaves it. A source KaTeX cannot parse shows as that source in the theme's
+  error colour. Markdown writes `$...$` and `$$` blocks, and pasting or importing reads them back; `$5 and $10`
+  and code stay text
 - Table
 - File
 - Image

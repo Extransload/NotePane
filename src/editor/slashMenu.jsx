@@ -27,6 +27,7 @@ import {
   SLASH_MENU_MAX_HEIGHT,
 } from "../constants.js";
 import { setDividerSlashMenuItem } from "./divider.jsx";
+import { getMathSlashMenuItems } from "./math.jsx";
 
 export function createSlashMenuFloatingUIOptions() {
   return {
@@ -153,6 +154,8 @@ export function NotePaneSlashMenuController({ editor, onImportMarkdown }) {
       (item) => item.key === "toggle_heading_3",
     );
     items.splice(toggleHeading3Index + 1, 0, toggleHeading4);
+    // Equations join the Advanced group, after the table.
+    items.splice(items.findIndex((item) => item.key === "table") + 1, 0, ...getMathSlashMenuItems(editor));
     // Last, so `/` and Enter inserts a block rather than opening a file dialog.
     items.push(importMarkdown);
     return filterSuggestionItems(items, query);

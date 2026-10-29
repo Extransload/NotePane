@@ -20,6 +20,7 @@ import { InputRule, inputRules } from "@tiptap/pm/inputrules";
 import { TextSelection } from "@tiptap/pm/state";
 import { createCalloutBlockSpec } from "./callout.jsx";
 import { DividerMarkdownExport } from "./divider.jsx";
+import { createMathBlockSpec, inlineMathSpec } from "./math.jsx";
 import { indentCodeBlockLines } from "./codeFormatting.js";
 import {
   codeBlockOptions,
@@ -326,6 +327,10 @@ export const schema = BlockNoteSchema.create({
   blockSpecs: {
     codeBlock: createNotePaneCodeBlockSpec(),
     callout: createCalloutBlockSpec(),
+    mathBlock: createMathBlockSpec(),
+  },
+  inlineContentSpecs: {
+    inlineMath: inlineMathSpec,
   },
   styleSpecs: {
     code: notionInlineCodeStyle,

@@ -1454,3 +1454,107 @@ div:has(> .bn-formatting-toolbar.notepane-formatting-toolbar.is-table-context) {
   )::after {
   content: "Heading 4" !important;
 }
+
+
+/* ---- Math: inline and block equations (src/editor/math.jsx) ---- */
+
+/* KaTeX's stylesheet sets no colour; the equations take the editor's text colour, and a source
+   KaTeX cannot parse shows in the theme's error colour (the errorColor option sets it inline). */
+.bn-root .katex {
+  color: var(--bn-colors-editor-text);
+}
+
+.bn-root .katex-error {
+  color: var(--notepane-error-text);
+}
+
+.bn-root .notepane-math-placeholder {
+  color: var(--sticky-muted-color);
+}
+
+.bn-root .notepane-math-block {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding-block: 2px;
+}
+
+.bn-root .notepane-math-block-preview {
+  overflow-x: auto;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 150ms ease;
+}
+
+.bn-root .notepane-math-block-preview:hover,
+.bn-root .ProseMirror-selectednode .notepane-math-block-preview {
+  background: color-mix(in srgb, var(--sticky-text-color) 5%, transparent);
+}
+
+.bn-root .notepane-math-block-preview .katex-display {
+  margin: 0.4em 0;
+}
+
+.bn-root .notepane-math-block-input,
+.notepane-inline-math-input {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid var(--sticky-portal-menu-border-color);
+  border-radius: 6px;
+  outline: 0;
+  background: var(--sticky-control-bg);
+  color: var(--sticky-text-color);
+  font: 13px / 1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.bn-root .notepane-math-block-input {
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.bn-root .notepane-math-block-input:focus,
+.notepane-inline-math-input:focus {
+  border-color: var(--notepane-input-focus-border);
+  box-shadow: 0 0 0 2px var(--notepane-input-focus-ring);
+}
+
+:is(.bn-root .notepane-math-block-input, .notepane-inline-math-input)::placeholder {
+  color: var(--sticky-muted-color);
+  opacity: 1;
+}
+
+.bn-root .notepane-inline-math {
+  padding: 0 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 150ms ease;
+}
+
+.bn-root .notepane-inline-math:hover,
+.bn-root .notepane-inline-math[data-editing] {
+  background: color-mix(in srgb, var(--sticky-text-color) 7%, transparent);
+}
+
+/* The inline equation's editor opens in a portal on the body, outside the editor. */
+.notepane-inline-math-popover {
+  position: fixed;
+  z-index: 1400;
+  width: min(320px, calc(100vw - 16px));
+  padding: 6px;
+  border: 1px solid var(--sticky-portal-menu-border-color);
+  border-radius: 9px;
+  background: var(--sticky-portal-menu-bg);
+  box-shadow: var(--sticky-portal-menu-shadow);
+}
+
+.notepane-inline-math-input {
+  height: 30px;
+  padding: 0 8px;
+  background: var(--sticky-panel-bg);
+  color: var(--sticky-panel-text);
+}
