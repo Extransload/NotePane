@@ -12,6 +12,8 @@ export default defineConfig({
   },
   fullyParallel: false,
   workers: 1,
+  // A stray `test.only` must fail CI rather than silently shrink the suite.
+  forbidOnly: Boolean(process.env.CI),
   reporter: [["list"]],
   use: {
     ...devices["Desktop Chrome"],

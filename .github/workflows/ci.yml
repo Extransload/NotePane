@@ -1,0 +1,70 @@
+# Runs on every push and pull request; release.yml only runs verify:quick on a
+# tag. The Electron suite runs on macOS and Windows, the two shipped platforms.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quick:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run verify:quick
+
+  renderer:
+    needs: quick
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e:renderer
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: renderer-test-results
+          path: test-results/
+          retention-days: 7
+
+  electron:
+    needs: quick
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:unit
+      - run: npm run test:e2e:electron
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: electron-test-results-${{ matrix.os }}
+          path: test-results/
+          retention-days: 7

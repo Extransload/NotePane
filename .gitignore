@@ -4,6 +4,11 @@ release/
 .DS_Store
 *.log
 test-results/
+playwright-report/
+
+# Local scratch work and agent planning artifacts
+work/
+.superpowers/
 
 # Agent instruction files (local only)
 CLAUDE.md

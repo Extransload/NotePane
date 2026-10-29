@@ -1,4 +1,4 @@
-.PHONY: help install icons build verify run app app-mac app-win dev-web dev-app
+.PHONY: help install icons build verify verify-quick run app app-mac app-win dev-web dev-app
 
 help:
 	@echo "NotePane commands"
@@ -6,7 +6,8 @@ help:
 	@echo "  make install  Install npm dependencies"
 	@echo "  make icons    Generate PNG and ICNS app icons from assets/notepane-icon.png"
 	@echo "  make build    Build the Vite renderer"
-	@echo "  make verify   Build and run unit/static/E2E smoke checks"
+	@echo "  make verify   Full verification: static checks, build, unit and E2E suites"
+	@echo "  make verify-quick  Static checks, build, unit tests and dist check only"
 	@echo "  make run      Build and run the NotePane desktop app"
 	@echo "  make app      Build an app package for the current OS"
 	@echo "  make app-mac  Build macOS dmg and zip packages (arm64 and x64)"
@@ -28,6 +29,9 @@ build:
 
 verify:
 	npm run verify
+
+verify-quick:
+	npm run verify:quick
 
 run:
 	npm start

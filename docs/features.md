@@ -14,8 +14,8 @@
 - Editable title in sticky mode header
 - Session rename by double-clicking a sidebar tab
 - Hover-only session delete button in the sidebar tab row
-- Nine app themes: NotePane Light (default) and NotePane Dark, Catppuccin Latte, Frappé, Macchiato and Mocha, Nord,
-  Dracula and Tokyo Night
+- 52 app themes: NotePane Light (default) and NotePane Dark, Catppuccin Latte, Frappé, Macchiato and Mocha, Nord,
+  Dracula and Tokyo Night, followed by 43 palettes adapted from TablePeek
 - Theme picker in Preferences > General > App theme: preview cards that apply the theme at once to every window
 - Every colour comes from the selected theme, code block syntax colours included
 - Session and sticky colours are shown in each theme's tone (tone matching): the hue is kept, the stored colour never
@@ -111,7 +111,7 @@ Stored fields:
 - always-on-top flag
 - app-wide tabs window state: `tabsWindow.alwaysOnTop` and `tabsWindow.bounds`, apart from every note
 - note title
-- app-wide theme: `appTheme.themeId`, one of the nine theme ids, with `appTheme.mode` (`light` or `dark`, the theme's
+- app-wide theme: `appTheme.themeId`, one of the theme ids in `electron/themes.json`, with `appTheme.mode` (`light` or `dark`, the theme's
   scheme) kept so older versions fall back to the matching NotePane theme
 - app-wide layout mode: `layoutMode`, either `tabs` or `sticky`
 - app-wide editor defaults: default font family

@@ -2302,7 +2302,6 @@ test("Electron sticky windows keep independent pin and color updates", async () 
     await firstStickySettings.getByRole("button", { name: "Pastel color 5" }).click();
     await expect(firstStickyPage.getByLabel("HEX sticky color value"))
       .toHaveValue("eadcff");
-    await firstStickyPage.waitForTimeout(450);
 
     await expect.poll(() => getShellBackground(firstStickyPage))
       .toBe("rgb(234, 220, 255)");

@@ -6,6 +6,9 @@
   "description": "A local-first desktop note pane app with tabbed sessions and sticky windows.",
   "main": "electron/main.cjs",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev:web": "vite --host 127.0.0.1",
     "dev:app": "cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron .",
