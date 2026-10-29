@@ -1,4 +1,7 @@
+import { getBlocksForClipboard } from "./blocks.js";
 import { isBlockSetSelection } from "./blockSelection.js";
+import { isEditorShortcutTarget } from "./targets.js";
+import { isEditableFormTarget } from "../utils/dom.js";
 
 // A cell selection's `from`/`to` cover only its head cell; its ranges cover every cell.
 function isCellSelection(selection) {
@@ -390,4 +393,81 @@ export function collectMarkdownFence(lines, startIndex) {
 
 export function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Document copy and cut listeners for the editor's clipboard: block copies and block-set cuts
+ * written in NotePane's block formats, and text copies normalised after the editor writes them.
+ * Returns the function that removes them.
+ */
+export function installEditorClipboardListeners(editor) {
+  const copySelectedBlock = (event) => {
+    // The editor's own cut of a block set would serialise only its first
+    // run but delete every run, so a block-set cut is handled here too.
+    if (isEditableFormTarget(event.target)) {
+      return false;
+    }
+    const isBlockSetCut =
+      event.type === "cut" &&
+      isEditorShortcutTarget(event.target) &&
+      isBlockSetSelection(editor.prosemirrorView?.state.selection);
+    if (
+      (event.type !== "copy" && !isBlockSetCut) ||
+      !event.clipboardData
+    ) {
+      return false;
+    }
+
+    const selectedBlocks = getBlocksForClipboard(editor);
+    if (selectedBlocks.length === 0) {
+      return false;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    setBlocksClipboardData(editor, selectedBlocks, event.clipboardData);
+    if (isBlockSetCut) {
+      const { state } = editor.prosemirrorView;
+      editor.prosemirrorView.dispatch(
+        state.tr.deleteSelection().scrollIntoView(),
+      );
+    }
+    return true;
+  };
+
+  // Block copies must pre-empt the editor, so they run in the capture phase
+  // and stop propagation once they own the clipboard.
+  const writeSelectedBlocks = (event) => {
+    copySelectedBlock(event);
+  };
+
+  // A text selection is serialised by the editor itself, so normalising has
+  // to happen in the bubble phase, after the editor has written text/plain.
+  const normalizeEditorClipboardText = (event) => {
+    if (!isEditorShortcutTarget(event.target) || !event.clipboardData) {
+      return;
+    }
+
+    const copiedPlainText = event.clipboardData.getData("text/plain");
+    const selectedPlainText = window.getSelection()?.toString() ?? "";
+    const normalizedPlainText = normalizeCopiedEditorPlainText(
+      editor,
+      copiedPlainText,
+      selectedPlainText,
+    );
+    if (normalizedPlainText !== copiedPlainText) {
+      event.clipboardData.setData("text/plain", normalizedPlainText);
+    }
+  };
+
+  document.addEventListener("copy", writeSelectedBlocks, true);
+  document.addEventListener("cut", writeSelectedBlocks, true);
+  document.addEventListener("copy", normalizeEditorClipboardText);
+  document.addEventListener("cut", normalizeEditorClipboardText);
+  return () => {
+    document.removeEventListener("copy", writeSelectedBlocks, true);
+    document.removeEventListener("cut", writeSelectedBlocks, true);
+    document.removeEventListener("copy", normalizeEditorClipboardText);
+    document.removeEventListener("cut", normalizeEditorClipboardText);
+  };
 }

@@ -2,10 +2,6 @@ import {
   BlockDragSelection,
 } from "./editor/blockDragSelection.js";
 import {
-  isBlockSetSelection,
-  replaceBlockSelectionWithParagraph,
-} from "./editor/blockSelection.js";
-import {
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -28,12 +24,10 @@ import {
   size,
 } from "@floating-ui/react";
 import {
-  columnResizingPluginKey,
   mergeCells,
   splitCell,
 } from "prosemirror-tables";
 import {
-  Decoration,
   DecorationSet,
 } from "@tiptap/pm/view";
 import {
@@ -87,7 +81,6 @@ import {
   findBlockById,
   findImageBlockForElement,
   focusLastEditorBlock,
-  getBlocksForClipboard,
   getEditorBlockElement,
   isBlankTableSurfacePointer,
   isEmptyParagraphBlock,
@@ -96,10 +89,8 @@ import {
 } from "./editor/blocks.js";
 import {
   guardPasteSerialisation,
-  isStandaloneWebUrl,
-  normalizeCopiedEditorPlainText,
+  installEditorClipboardListeners,
   normalizePastedMarkdownForBlockNote,
-  setBlocksClipboardData,
   withSelfRemovingChangeSubscriptions,
 } from "./editor/clipboard.js";
 import {
@@ -116,13 +107,17 @@ import {
   ensurePngName,
   getCropSource,
   imageFileName,
-  isFileTransfer,
   preventFocusLoss,
   uploadFile,
   storeDataUrlAsAsset,
 } from "./editor/images.js";
 import { computeCalloutDropPosition } from "./editor/callout.jsx";
-import { FILE_INSERTION_FAILED_EVENT, FileDrop, pasteFiles } from "./editor/fileInsertion.js";
+import { FILE_INSERTION_FAILED_EVENT, FileDrop } from "./editor/fileInsertion.js";
+import { handleNotePanePaste } from "./editor/paste.js";
+import {
+  installFocusedTableCellDecorations,
+  installTableExtensionFocusRestore,
+} from "./editor/tableFocus.js";
 import { MarkdownShortcutUndo } from "./editor/markdownShortcuts.js";
 import {
   EMPTY_BLOCKS,
@@ -131,17 +126,12 @@ import {
   schema,
 } from "./editor/schema.jsx";
 import {
-  getCellSelectionEdgeDecorations,
-  getCurrentTableCellRange,
-  getFocusedTableCellSnapshot,
-  getTableCellElementForSnapshot,
   hasVisibleTextSelection,
   isCurrentTableCellContentSelected,
   isCurrentTableFullySelected,
   isCurrentTableSelection,
   moveSelectedTableCell,
   moveTableTextCursorToAdjacentCell,
-  restoreFocusedTableCell,
   selectAllBlocks,
   selectCurrentCodeBlockContent,
   selectCurrentTable,
@@ -151,11 +141,6 @@ import {
 import {
   NotePaneSlashMenuController,
 } from "./editor/slashMenu.jsx";
-import {
-  hasEditorRangeSelection,
-  isEditorShortcutTarget,
-  isSelectionInsideCodeBlock,
-} from "./editor/targets.js";
 import {
   formatShortcutTooltip,
   getSessionShortcutLabel,
@@ -619,64 +604,7 @@ function StickyEditor({
       headers: true,
     },
     uploadFile,
-    pasteHandler: ({ event, editor, defaultPasteHandler }) => {
-      // BlockNote's own file paste cannot be undone in one step (see src/editor/fileInsertion.js).
-      if (isFileTransfer(event.clipboardData)) {
-        pasteFiles(editor, [...event.clipboardData.files]);
-        return true;
-      }
-      const plainText = event.clipboardData?.getData("text/plain") ?? "";
-      if (plainText && !isSelectionInsideCodeBlock(editor)) {
-        const pasteView = editor.prosemirrorView;
-        const isBlockSet = isBlockSetSelection(pasteView?.state.selection);
-        if (
-          isStandaloneWebUrl(plainText) &&
-          (isBlockSet || hasEditorRangeSelection(editor))
-        ) {
-          // The default paste would link the selected blocks' text instead of replacing it,
-          // and insertInlineContent sees only the first run.
-          if (isBlockSet) {
-            replaceBlockSelectionWithParagraph(pasteView);
-          }
-          editor.insertInlineContent(plainText.trim(), { updateSelection: true });
-          return true;
-        }
-
-        // NotePane's own copies carry lossless blocknote/html, and VS Code
-        // copies carry their language. BlockNote handles both, so their
-        // Markdown-looking plain text must not be re-parsed here.
-        const clipboardTypes = event.clipboardData?.types ?? [];
-        if (
-          clipboardTypes.includes("blocknote/html") ||
-          clipboardTypes.includes("vscode-editor-data")
-        ) {
-          return defaultPasteHandler({
-            prioritizeMarkdownOverHTML: true,
-            plainTextAsMarkdown: true,
-          });
-        }
-
-        const normalizedPaste = normalizePastedMarkdownForBlockNote(
-          plainText,
-          event.clipboardData?.getData("text/html") ?? "",
-        );
-        if (normalizedPaste.shouldPasteHTML) {
-          return defaultPasteHandler({
-            prioritizeMarkdownOverHTML: false,
-            plainTextAsMarkdown: true,
-          });
-        }
-        if (normalizedPaste.shouldPasteAsMarkdown) {
-          editor.pasteMarkdown(normalizedPaste.markdown);
-          return true;
-        }
-      }
-
-      return defaultPasteHandler({
-        prioritizeMarkdownOverHTML: true,
-        plainTextAsMarkdown: true,
-      });
-    },
+    pasteHandler: handleNotePanePaste,
   });
   const findInNote = useFindInNote(editor);
   const { openFind } = findInNote;
@@ -688,77 +616,7 @@ function StickyEditor({
   useEffect(() => guardPasteSerialisation(editor), [editor]);
   const codeBlockToolTargets = useCodeBlockToolTargets();
 
-  useEffect(() => {
-    const copySelectedBlock = (event) => {
-      // The editor's own cut of a block set would serialise only its first
-      // run but delete every run, so a block-set cut is handled here too.
-      if (isEditableFormTarget(event.target)) {
-        return false;
-      }
-      const isBlockSetCut =
-        event.type === "cut" &&
-        isEditorShortcutTarget(event.target) &&
-        isBlockSetSelection(editor.prosemirrorView?.state.selection);
-      if (
-        (event.type !== "copy" && !isBlockSetCut) ||
-        !event.clipboardData
-      ) {
-        return false;
-      }
-
-      const selectedBlocks = getBlocksForClipboard(editor);
-      if (selectedBlocks.length === 0) {
-        return false;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-      setBlocksClipboardData(editor, selectedBlocks, event.clipboardData);
-      if (isBlockSetCut) {
-        const { state } = editor.prosemirrorView;
-        editor.prosemirrorView.dispatch(
-          state.tr.deleteSelection().scrollIntoView(),
-        );
-      }
-      return true;
-    };
-
-    // Block copies must pre-empt the editor, so they run in the capture phase
-    // and stop propagation once they own the clipboard.
-    const writeSelectedBlocks = (event) => {
-      copySelectedBlock(event);
-    };
-
-    // A text selection is serialised by the editor itself, so normalising has
-    // to happen in the bubble phase, after the editor has written text/plain.
-    const normalizeEditorClipboardText = (event) => {
-      if (!isEditorShortcutTarget(event.target) || !event.clipboardData) {
-        return;
-      }
-
-      const copiedPlainText = event.clipboardData.getData("text/plain");
-      const selectedPlainText = window.getSelection()?.toString() ?? "";
-      const normalizedPlainText = normalizeCopiedEditorPlainText(
-        editor,
-        copiedPlainText,
-        selectedPlainText,
-      );
-      if (normalizedPlainText !== copiedPlainText) {
-        event.clipboardData.setData("text/plain", normalizedPlainText);
-      }
-    };
-
-    document.addEventListener("copy", writeSelectedBlocks, true);
-    document.addEventListener("cut", writeSelectedBlocks, true);
-    document.addEventListener("copy", normalizeEditorClipboardText);
-    document.addEventListener("cut", normalizeEditorClipboardText);
-    return () => {
-      document.removeEventListener("copy", writeSelectedBlocks, true);
-      document.removeEventListener("cut", writeSelectedBlocks, true);
-      document.removeEventListener("copy", normalizeEditorClipboardText);
-      document.removeEventListener("cut", normalizeEditorClipboardText);
-    };
-  }, [editor]);
+  useEffect(() => installEditorClipboardListeners(editor), [editor]);
 
   const [title, setTitle] = useState(initialDisplayTitle);
   const editorSurfaceRef = useRef(null);
@@ -774,108 +632,15 @@ function StickyEditor({
     false,
   );
   const updateFocusedTableCell = useCallback(() => {}, []);
-  useEffect(() => {
-    const view = editor.prosemirrorView;
-    if (!view || view.isDestroyed) {
-      return undefined;
-    }
-    const decorations = (state) => {
-        const rangeDecorations = getCellSelectionEdgeDecorations(state);
-        if (
-          suppressFocusedTableCellRef.current ||
-          columnResizingPluginKey.getState(state)?.dragging
-        ) {
-          return DecorationSet.create(state.doc, rangeDecorations);
-        }
-        const selection = state.selection;
-        const isSingleCellSelection = Boolean(
-          selection.$anchorCell &&
-            selection.$headCell &&
-            selection.$anchorCell.pos === selection.$headCell.pos,
-        );
-        if (!selection.empty && !isSingleCellSelection && !pendingTableExtensionFocusRef.current) {
-          return DecorationSet.create(state.doc, rangeDecorations);
-        }
-        const preservedCell = pendingTableExtensionFocusRef.current
-          ? getTableCellElementForSnapshot(editor, pendingTableExtensionFocusRef.current)
-          : null;
-        const preservedRange = preservedCell
-          ? getCurrentTableCellRange({
-              $from: state.doc.resolve(view.posAtDOM(preservedCell, 0)),
-            })
-          : null;
-        const cellRange = preservedRange || getCurrentTableCellRange(selection);
-        const cellNode = cellRange ? state.doc.nodeAt(cellRange.cellPos) : null;
-        if (!cellRange || !cellNode) {
-          return DecorationSet.create(state.doc, rangeDecorations);
-        }
-        return DecorationSet.create(state.doc, [
-          Decoration.node(
-            cellRange.cellPos,
-            cellRange.cellPos + cellNode.nodeSize,
-            { class: "notepane-table-cell-focused" },
-          ),
-          ...rangeDecorations,
-        ]);
-      };
-    focusedTableDecorationsRef.current = decorations;
-    view.setProps({ decorations });
-    return () => {
-      if (!view.isDestroyed) {
-        view.setProps({ decorations: undefined });
-      }
-      focusedTableDecorationsRef.current = null;
-    };
-  }, [editor]);
-  useEffect(() => {
-    const isTableExtensionButton = (target) => (
-      target instanceof Element && target.closest(
-        ".bn-extend-button-add-remove-columns, .bn-extend-button-add-remove-rows",
-      )
-    );
-    const captureFocusedCellBeforeTableExtension = (event) => {
-      if (!isTableExtensionButton(event.target)) {
-        return;
-      }
-
-      pendingTableExtensionFocusRef.current = getFocusedTableCellSnapshot(editor);
-    };
-    const restoreFocusedCellAfterTableExtension = () => {
-      const pendingSnapshot = pendingTableExtensionFocusRef.current;
-      if (!pendingSnapshot) {
-        return;
-      }
-
-      window.requestAnimationFrame(() => {
-        const snapshot = pendingTableExtensionFocusRef.current;
-        pendingTableExtensionFocusRef.current = null;
-        if (snapshot && restoreFocusedTableCell(editor, snapshot)) {
-          updateFocusedTableCell();
-        }
-      });
-    };
-
-    const handleTableExtensionMouseUp = () => {
-      restoreFocusedCellAfterTableExtension();
-    };
-    const handleTableExtensionClick = (event) => {
-      if (!(event.target instanceof Element) || !event.target.closest(
-        ".bn-extend-button-add-remove-columns, .bn-extend-button-add-remove-rows",
-      )) {
-        return;
-      }
-      restoreFocusedCellAfterTableExtension();
-    };
-
-    document.addEventListener("mousedown", captureFocusedCellBeforeTableExtension, true);
-    document.addEventListener("mouseup", handleTableExtensionMouseUp, true);
-    document.addEventListener("click", handleTableExtensionClick, true);
-    return () => {
-      document.removeEventListener("mousedown", captureFocusedCellBeforeTableExtension, true);
-      document.removeEventListener("mouseup", handleTableExtensionMouseUp, true);
-      document.removeEventListener("click", handleTableExtensionClick, true);
-    };
-  }, [editor, updateFocusedTableCell]);
+  useEffect(() => installFocusedTableCellDecorations(editor, {
+    focusedTableDecorationsRef,
+    pendingTableExtensionFocusRef,
+    suppressFocusedTableCellRef,
+  }), [editor]);
+  useEffect(() => installTableExtensionFocusRestore(editor, {
+    onRestore: updateFocusedTableCell,
+    pendingTableExtensionFocusRef,
+  }), [editor, updateFocusedTableCell]);
   const updateTableCellSelectionMode = useCallback(() => {
     const selection = editor.prosemirrorView?.state.selection;
     setIsMultiTableCellSelection(

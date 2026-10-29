@@ -29,7 +29,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Directory | Owns | Notable files |
 | --- | --- | --- |
 | `src/` | entry point and shared constants | `main.jsx`, `constants.js` |
-| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `callout.jsx`, `calloutIconPicker.jsx`, `selection.js`, `blockSelection.js`, `blockSelectionRules.js`, `blockDragSelection.js`, `blocks.js`, `clipboard.js`, `images.js` |
+| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `callout.jsx`, `calloutIconPicker.jsx`, `selection.js`, `blockSelection.js`, `blockSelectionRules.js`, `blockDragSelection.js`, `blocks.js`, `clipboard.js`, `paste.js`, `tableFocus.js`, `images.js` |
 | `src/model/` | normalising and deriving stored data | `notes.js`, `preferences.js`, `keyboardShortcuts.js` |
 | `src/style/` | themes, theme tokens, tone matching, colour maths and computed inline styles | `themes.js`, `themeTokens.js`, `toneMatch.js`, `applyTheme.js`, `themeStyles.js`, `colorMath.js` |
 | `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
@@ -50,7 +50,9 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Block selection model, exactly-selected blocks, block-set indent and move | `src/editor/blockSelection.js`, `src/editor/blockSelectionRules.js` |
 | Marquee and drag selection gestures, edge auto-scroll, and the keyboard (Enter, Tab, move, delete) and IME composition routing for a block set or the whole note | `src/editor/blockDragSelection.js` |
 | Block lookup, cut, table of contents extraction | `src/editor/blocks.js` |
-| Copy/paste normalisation, block clipboard formats for copy and cut, and Markdown round-tripping | `src/editor/clipboard.js` |
+| Copy/paste normalisation, block clipboard formats for copy and cut, the document copy and cut listeners, and Markdown round-tripping | `src/editor/clipboard.js` |
+| The editor's paste handler: files, a URL over a selection, NotePane and VS Code copies, Markdown | `src/editor/paste.js` |
+| The focused table cell and cell range decorations, keeping the focused cell across add or remove row and column | `src/editor/tableFocus.js` |
 | Which element counts as an editor shortcut target | `src/editor/targets.js` |
 | Backspace right after a Markdown shortcut such as `- ` gives back exactly the typed marker | `src/editor/markdownShortcuts.js` |
 | BlockNote floating menu positioning and clamping | `src/editor/floatingMenus.js` |
