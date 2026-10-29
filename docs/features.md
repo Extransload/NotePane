@@ -83,6 +83,11 @@ BlockNote handles editor interaction directly.
   Backspace at the start of a line joins it to the text above inside the box. The
   icon comes from an emoji picker (filter, recent, random, categories) or an uploaded image, can be removed, and is
   edited from the icon or the block menu's Edit icon. A block dragged onto a callout's line or padding lands in its body
+- 2 columns: two columns of blocks side by side, from the slash menu (`/columns`), outside a column only. Dragging
+  the gutter between them resizes them in one undo step, and the ratio is saved with the note. Backspace at the start
+  of a column stays in it; in an empty column it removes the column, and the other column's blocks stay in place. A
+  marquee inside a column selects its blocks; one that also touches a block outside selects the whole layout.
+  Markdown export writes the columns' blocks one after another
 - Bullet List
 - Numbered List
 - Check List

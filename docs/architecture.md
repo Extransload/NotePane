@@ -29,7 +29,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Directory | Owns | Notable files |
 | --- | --- | --- |
 | `src/` | entry point and shared constants | `main.jsx`, `constants.js` |
-| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `callout.jsx`, `calloutIconPicker.jsx`, `selection.js`, `blockSelection.js`, `blockSelectionRules.js`, `blockDragSelection.js`, `blocks.js`, `clipboard.js`, `paste.js`, `tableFocus.js`, `images.js` |
+| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `callout.jsx`, `calloutIconPicker.jsx`, `columns.jsx`, `selection.js`, `blockSelection.js`, `blockSelectionRules.js`, `blockDragSelection.js`, `blocks.js`, `clipboard.js`, `paste.js`, `tableFocus.js`, `images.js` |
 | `src/model/` | normalising and deriving stored data | `notes.js`, `preferences.js`, `keyboardShortcuts.js` |
 | `src/style/` | themes, theme tokens, tone matching, colour maths and computed inline styles | `themes.js`, `themeTokens.js`, `toneMatch.js`, `applyTheme.js`, `themeStyles.js`, `colorMath.js` |
 | `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
@@ -44,6 +44,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Block schema, template content, custom blocks | `src/editor/schema.jsx` |
 | Callout block: Enter and Backspace in its text and body, drops into its body, Markdown export as a quote | `src/editor/callout.jsx` |
 | Callout icon picker: emoji data, recent icons, upload, remove | `src/editor/calloutIconPicker.jsx` |
+| Columns: the `columnList` and `column` nodes (the layout BlockNote core knows; `@blocknote/xl-multi-column` is GPL-3.0 and not used), the resize gutter, Backspace at a column's start, the slash menu's "2 columns" | `src/editor/columns.jsx` |
 | Text selection, table cell selection and navigation | `src/editor/selection.js` |
 | Table row and column handle menus, the table items of the six-dot block menu | `src/editor/tableHandles.jsx` |
 | Table column widths: live resize, double-click auto-fit, fit to width | `src/editor/tableColumnSizing.js` |

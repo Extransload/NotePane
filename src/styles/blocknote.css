@@ -1454,3 +1454,74 @@ div:has(> .bn-formatting-toolbar.notepane-formatting-toolbar.is-table-context) {
   )::after {
   content: "Heading 4" !important;
 }
+
+/* ==========================================================================
+   Columns (src/editor/columns.jsx)
+   A column's share of the row is its inline flex-grow. The gutter between two columns is a
+   ProseMirror widget that resizes them; the column after it keeps its own left padding for the
+   side menu of its blocks, so that menu never covers the gutter.
+   ========================================================================== */
+
+.bn-editor .notepane-column-list {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  margin: 2px 0;
+  border-radius: 2px;
+}
+
+.bn-editor .notepane-column {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.bn-editor .notepane-column-gutter {
+  position: relative;
+  flex: 0 0 16px;
+  cursor: col-resize;
+  user-select: none;
+}
+
+.bn-editor .notepane-column-gutter + .notepane-column {
+  padding-left: 48px;
+}
+
+.bn-editor .notepane-column-gutter::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background-color: transparent;
+  transition: background-color 120ms ease;
+}
+
+.bn-editor .notepane-column-gutter:hover::after,
+.notepane-column-resizing .bn-editor .notepane-column-gutter::after {
+  background-color: color-mix(in srgb, var(--sticky-text-color) 18%, transparent);
+}
+
+.notepane-column-resizing,
+.notepane-column-resizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
+.bn-editor .notepane-column-list[data-block-selected="true"] {
+  background-color: color-mix(
+    in srgb,
+    var(--sticky-note-accent-color, var(--sticky-text-color)) 4%,
+    transparent
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bn-editor .notepane-column-gutter::after {
+    transition: none;
+  }
+}

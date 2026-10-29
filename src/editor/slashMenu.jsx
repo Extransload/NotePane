@@ -14,6 +14,7 @@ import {
   size,
 } from "@floating-ui/react";
 import {
+  Columns2,
   Heading4,
   Lightbulb,
   Upload,
@@ -26,6 +27,7 @@ import {
 import {
   SLASH_MENU_MAX_HEIGHT,
 } from "../constants.js";
+import { insertTwoColumns, isSelectionInColumn } from "./columns.jsx";
 
 export function createSlashMenuFloatingUIOptions() {
   return {
@@ -151,6 +153,18 @@ export function NotePaneSlashMenuController({ editor, onImportMarkdown }) {
       (item) => item.key === "toggle_heading_3",
     );
     items.splice(toggleHeading3Index + 1, 0, toggleHeading4);
+    // Columns: offered outside a column only, since columns do not nest.
+    if (!isSelectionInColumn(editor.prosemirrorView.state)) {
+      items.splice(items.findIndex((item) => item.key === "callout") + 1, 0, {
+        title: "2 columns",
+        subtext: "Two blocks side by side",
+        aliases: ["columns", "column", "layout", "side by side", "2col", "열", "단"],
+        group: "Basic blocks",
+        icon: <Columns2 size={18} />,
+        key: "two_columns",
+        onItemClick: () => insertTwoColumns(editor),
+      });
+    }
     // Last, so `/` and Enter inserts a block rather than opening a file dialog.
     items.push(importMarkdown);
     return filterSuggestionItems(items, query);
