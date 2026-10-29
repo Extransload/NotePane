@@ -53,6 +53,8 @@
 - Toggle Tab/Sticky mode: `Command/Ctrl + Shift + T`
 - Open export menu: `Command/Ctrl + Shift + E`
 - Delayed hover tooltips for clickable controls
+- Shortcut labels read the same everywhere NotePane shows them (Preferences, tooltips, slash menu badges, the
+  formatting toolbar's merge and colour buttons): `⌘⌥⇧1` on a Mac, `Ctrl+Alt+Shift+1` elsewhere
 - Sidebar footer actions (version history, export, Preferences, layout, editor width) share one muted chrome tone;
   the theme's accent marks only the button under the pointer and a pressed toggle
 - Window bounds persistence

@@ -519,3 +519,21 @@ test("opens the slash menu upward from the lower half", async ({ page }) => {
   )).toBe(true);
   await expect(slashMenu.getByRole("option").last()).toBeInViewport();
 });
+
+test("labels slash menu shortcuts the way Preferences labels shortcuts", async ({ page }) => {
+  const isMac = process.platform === "darwin";
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await preferences.getByRole("tab", { name: "Shortcuts" }).click();
+  await expect(preferences.getByRole("button", { name: "Shortcut for New session" }))
+    .toHaveText(isMac ? "⌘T" : "Ctrl+T");
+  await preferences.getByRole("button", { name: "Close preferences" }).click();
+
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/");
+  const heading = page.locator(".bn-suggestion-menu-item").filter({
+    has: page.getByText("Heading 1", { exact: true }),
+  });
+  await expect(heading).toContainText(isMac ? "⌘⌥1" : "Ctrl+Alt+1");
+  await expect(page.locator(".bn-suggestion-menu")).not.toContainText(/ALT|-Alt-|⌘-/);
+});

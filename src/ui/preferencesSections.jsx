@@ -19,8 +19,8 @@ import {
   preventFocusLoss,
 } from "../editor/images.js";
 import {
+  formatKeyboardShortcutLabel,
   getSessionShortcutRangeLabel,
-  getShortcutLabel,
   getReservedKeyboardShortcutReason,
   keyboardShortcutFromEvent,
   normalizeKeyboardShortcutEnabled,
@@ -304,9 +304,9 @@ export function EditorPreferencesSection({
     <section className="preferences-section preferences-default-editor-section">
       <div className="preferences-section-title">Editor</div>
       <div className="preferences-section-description">
-        The font family applies to every session tab. Zoom the app with {getShortcutLabel(
+        The font family applies to every session tab. Zoom the app with {formatKeyboardShortcutLabel(
           normalizedEditorPreferences.keyboardShortcuts.zoomIn,
-        )} and {getShortcutLabel(normalizedEditorPreferences.keyboardShortcuts.zoomOut)}.
+        )} and {formatKeyboardShortcutLabel(normalizedEditorPreferences.keyboardShortcuts.zoomOut)}.
       </div>
       <div className="preference-setting-row editor-font-family-setting">
         <div>
@@ -327,7 +327,7 @@ export function EditorPreferencesSection({
           <div className="preference-setting-title">Table of contents</div>
           <div className="preferences-section-description">
             Show the right rail from heading levels in tab mode.
-            Toggle it from View or {getShortcutLabel(
+            Toggle it from View or {formatKeyboardShortcutLabel(
               normalizedEditorPreferences.keyboardShortcuts.toggleTableOfContents,
             )}.
           </div>
@@ -482,7 +482,7 @@ export function KeyboardShortcutsSection({
             shortcut === DEFAULT_KEYBOARD_SHORTCUTS[command.id];
           const shortcutLabel = command.fixedShortcut
             ? getSessionShortcutRangeLabel()
-            : getShortcutLabel(shortcut);
+            : formatKeyboardShortcutLabel(shortcut);
 
           return (
             <div

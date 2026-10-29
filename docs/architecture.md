@@ -64,7 +64,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Find in note decorations and navigation | `src/editor/findInNote.js`, `src/hooks/useFindInNote.js` |
 | Note titles, ordering, trash previews | `src/model/notes.js` |
 | Preference and font normalisation and defaults | `src/model/preferences.js` |
-| Shortcut parsing, matching, display labels | `src/model/keyboardShortcuts.js` |
+| Shortcut parsing, matching, display labels (`formatKeyboardShortcutLabel`, the one label for NotePane's and BlockNote's shortcut forms) | `src/model/keyboardShortcuts.js` |
 | Theme list, lookup and the fallback for an unknown theme id | `src/style/themes.js` (data in `electron/themes.json`) |
 | Every colour token a theme produces, derived from its palette | `src/style/themeTokens.js` |
 | Showing a user-painted colour in the theme's tone | `src/style/toneMatch.js` |

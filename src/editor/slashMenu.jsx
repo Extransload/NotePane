@@ -26,6 +26,9 @@ import {
 import {
   SLASH_MENU_MAX_HEIGHT,
 } from "../constants.js";
+import {
+  formatKeyboardShortcutLabel,
+} from "../model/keyboardShortcuts.js";
 
 export function createSlashMenuFloatingUIOptions() {
   return {
@@ -145,7 +148,10 @@ export function NotePaneSlashMenuController({ editor, onImportMarkdown }) {
         insertOrUpdateBlockForSlashMenu(editor, { type: "callout" });
       },
     };
-    const items = getDefaultReactSlashMenuItems(editor);
+    // BlockNote formats its badges itself ("⌘-ALT-1"); they take the app's labels instead.
+    const items = getDefaultReactSlashMenuItems(editor).map((item) =>
+      item.badge ? { ...item, badge: formatKeyboardShortcutLabel(item.badge) } : item,
+    );
     items.splice(items.findIndex((item) => item.key === "quote") + 1, 0, callout);
     const toggleHeading3Index = items.findIndex(
       (item) => item.key === "toggle_heading_3",
