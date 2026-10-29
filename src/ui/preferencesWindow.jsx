@@ -1,5 +1,9 @@
 import {
   Download,
+  Keyboard,
+  Settings2,
+  Trash2,
+  Type,
   Upload,
 } from "lucide-react";
 import {
@@ -23,8 +27,8 @@ import {
   listBuiltInThemes,
 } from "../style/themes.js";
 import {
-  EditorFontFamilyControl,
-} from "./EditorFontControls.jsx";
+  PreferencesCard,
+} from "./PreferencesCard.jsx";
 import {
   EditorPreferencesSection,
   KeyboardShortcutsSection,
@@ -39,10 +43,10 @@ import {
 const PICKER_THEMES = listBuiltInThemes();
 
 export const PREFERENCE_PAGES = [
-  { id: "general", label: "General" },
-  { id: "editor", label: "Editor" },
-  { id: "trash", label: "Trash" },
-  { id: "shortcuts", label: "Shortcuts" },
+  { id: "general", label: "General", Icon: Settings2 },
+  { id: "editor", label: "Editor", Icon: Type },
+  { id: "trash", label: "Trash", Icon: Trash2 },
+  { id: "shortcuts", label: "Shortcuts", Icon: Keyboard },
 ];
 
 export function normalizePreferencePageId(pageId) {
@@ -51,6 +55,10 @@ export function normalizePreferencePageId(pageId) {
     : "general";
 }
 
+/**
+ * The Preferences window: a sidebar of pages on the left and the active page on the right, which
+ * scrolls on its own. A page is its title and cards of settings (src/ui/PreferencesCard.jsx).
+ */
 export function PreferencesWindow({
   initialPage = "general",
   appThemeId,
@@ -125,138 +133,106 @@ export function PreferencesWindow({
     }
   }, [backupOperation]);
 
+  const activePageLabel = PREFERENCE_PAGES.find((page) => page.id === activePage).label;
+
   const renderActivePreferencePage = () => {
     if (activePage === "editor") {
       return (
-        <div
-          id="preferences-editor"
-          className="preferences-window-section"
-          role="tabpanel"
-          aria-labelledby="preferences-tab-editor"
-        >
-          <EditorPreferencesSection
-            editorPreferences={editorPreferences}
-            fontOptions={fontOptions}
-            onEditorPreferencesChange={onEditorPreferencesChange}
-          />
-        </div>
+        <EditorPreferencesSection
+          editorPreferences={editorPreferences}
+          fontOptions={fontOptions}
+          appFontOptions={appFontOptions}
+          onAppFontFamilyChange={updateAppFontFamily}
+          onEditorPreferencesChange={onEditorPreferencesChange}
+        />
       );
     }
 
     if (activePage === "trash") {
       return (
-        <div
-          id="preferences-trash"
-          className="preferences-window-section"
-          role="tabpanel"
-          aria-labelledby="preferences-tab-trash"
-        >
-          <TrashPreferencesSection
-            trashedNotes={trashedNotes}
-            onRestoreNote={onRestoreTrashedNote}
-            onPurgeNote={onPurgeTrashedNote}
-          />
-        </div>
+        <TrashPreferencesSection
+          trashedNotes={trashedNotes}
+          onRestoreNote={onRestoreTrashedNote}
+          onPurgeNote={onPurgeTrashedNote}
+        />
       );
     }
 
     if (activePage === "shortcuts") {
       return (
-        <div
-          id="preferences-shortcuts"
-          className="preferences-window-section"
-          role="tabpanel"
-          aria-labelledby="preferences-tab-shortcuts"
-        >
-          <KeyboardShortcutsSection
-            keyboardShortcuts={keyboardShortcuts}
-            keyboardShortcutEnabled={
-              normalizedEditorPreferences.keyboardShortcutEnabled
-            }
-            onKeyboardShortcutsChange={updateKeyboardShortcuts}
-            onKeyboardShortcutEnabledChange={updateKeyboardShortcutEnabled}
-          />
-        </div>
+        <KeyboardShortcutsSection
+          keyboardShortcuts={keyboardShortcuts}
+          keyboardShortcutEnabled={
+            normalizedEditorPreferences.keyboardShortcutEnabled
+          }
+          onKeyboardShortcutsChange={updateKeyboardShortcuts}
+          onKeyboardShortcutEnabledChange={updateKeyboardShortcutEnabled}
+        />
       );
     }
 
     return (
-      <section
-        id="preferences-general"
-        className="preferences-section preferences-window-section"
-        role="tabpanel"
-        aria-labelledby="preferences-tab-general"
-      >
-        <div className="preferences-section-title">General</div>
-        <div className="preference-setting-row app-theme-setting">
-          <div>
-            <div className="preference-setting-title">App theme</div>
-            <div className="preferences-section-description">
-              The theme applies to every window.
+      <>
+        <PreferencesCard
+          title="Appearance"
+          description="How every NotePane window looks."
+        >
+          <div className="preference-setting-row app-theme-setting">
+            <div>
+              <div className="preference-setting-title">App theme</div>
+              <div className="preferences-section-description">
+                The theme applies to every window.
+              </div>
             </div>
+            <ThemePicker
+              themeId={appThemeId}
+              themes={PICKER_THEMES}
+              onChange={onAppThemeChange}
+            />
           </div>
-          <ThemePicker
-            themeId={appThemeId}
-            themes={PICKER_THEMES}
-            onChange={onAppThemeChange}
-          />
-        </div>
-        <div className="preference-setting-row app-font-family-setting">
-          <div>
-            <div className="preference-setting-title">App font</div>
-            <div className="preferences-section-description">
-              Interface typeface for chrome, menus, and preferences.
-            </div>
-          </div>
-          <EditorFontFamilyControl
-            className="preferences-font-family-control"
-            fontFamily={normalizedEditorPreferences.appFontFamily}
-            fontOptions={appFontOptions}
-            inputAriaLabel="App font family"
-            menuButtonAriaLabel="Open app font menu"
-            optionsAriaLabel="App font family options"
-            onFontFamilyChange={updateAppFontFamily}
-          />
-        </div>
-        <div className="preferences-data-section">
-          <div className="preferences-section-title">Data</div>
-          <div className="preferences-section-description">
-            Save every active note, Trash item, and app preference in one portable
-            .notepane file. Backups work across NotePane for macOS and Windows.
-          </div>
+        </PreferencesCard>
+        <PreferencesCard
+          title="Data"
+          description="Every active note, Trash item and preference in one portable .notepane file, for NotePane on macOS and Windows."
+        >
           <div className="preference-setting-row preference-backup-row">
             <div>
               <div className="preference-setting-title">Workspace backup</div>
               <div className="preferences-section-description">
-                Import replaces the current workspace after making an automatic
-                safety backup.
+                Save the whole workspace to a file.
               </div>
             </div>
-            <div className="preference-backup-actions">
-              <button
-                type="button"
-                className="preference-data-button"
-                disabled={Boolean(backupOperation)}
-                onMouseDown={preventFocusLoss}
-                onClick={() => void runBackupOperation("export", onExportBackup)}
-              >
-                <Download size={13} aria-hidden="true" />
-                {backupOperation === "export" ? "Exporting..." : "Export backup"}
-              </button>
-              <button
-                type="button"
-                className="preference-data-button preference-data-button-import"
-                disabled={Boolean(backupOperation)}
-                onMouseDown={preventFocusLoss}
-                onClick={() => void runBackupOperation("import", onImportBackup)}
-              >
-                <Upload size={13} aria-hidden="true" />
-                {backupOperation === "import" ? "Importing..." : "Import backup"}
-              </button>
-            </div>
+            <button
+              type="button"
+              className="preference-data-button"
+              disabled={Boolean(backupOperation)}
+              onMouseDown={preventFocusLoss}
+              onClick={() => void runBackupOperation("export", onExportBackup)}
+            >
+              <Download size={13} aria-hidden="true" />
+              {backupOperation === "export" ? "Exporting..." : "Export backup"}
+            </button>
           </div>
-        </div>
-      </section>
+          <div className="preference-setting-row preference-backup-row">
+            <div>
+              <div className="preference-setting-title">Restore a backup</div>
+              <div className="preferences-section-description">
+                Import replaces the current workspace after making an automatic safety backup.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="preference-data-button preference-data-button-import"
+              disabled={Boolean(backupOperation)}
+              onMouseDown={preventFocusLoss}
+              onClick={() => void runBackupOperation("import", onImportBackup)}
+            >
+              <Upload size={13} aria-hidden="true" />
+              {backupOperation === "import" ? "Importing..." : "Import backup"}
+            </button>
+          </div>
+        </PreferencesCard>
+      </>
     );
   };
 
@@ -271,54 +247,56 @@ export function PreferencesWindow({
       }}
     >
       <div
-        className="preferences-window"
+        className="preferences-window is-two-pane"
         role="dialog"
         aria-modal="true"
         aria-label="Preferences window"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <header className="preferences-window-header">
-          <div>
-            <div className="preferences-window-title">Preferences</div>
-            <div className="preferences-window-subtitle">
-              App theme, editor typography, trash, and keyboard commands.
-            </div>
-          </div>
-          <button
-            type="button"
-            className="preferences-close-button"
-            aria-label="Close preferences"
-            onMouseDown={preventFocusLoss}
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </header>
-        <div className="preferences-window-body">
-          <nav
-            className="preferences-window-sidebar"
-            aria-label="Preferences pages"
-            role="tablist"
-          >
-            {PREFERENCE_PAGES.map((page) => (
-              <button
-                id={`preferences-tab-${page.id}`}
-                key={page.id}
-                type="button"
-                role="tab"
-                aria-selected={activePage === page.id}
-                aria-controls={`preferences-${page.id}`}
-                onMouseDown={preventFocusLoss}
-                onClick={() => setActivePage(page.id)}
-              >
-                {page.label}
-              </button>
-            ))}
-          </nav>
-          <div className="preferences-window-content">
+        <nav
+          className="preferences-window-sidebar"
+          aria-label="Preferences pages"
+          role="tablist"
+        >
+          <div className="preferences-window-title">Preferences</div>
+          {PREFERENCE_PAGES.map(({ id, label, Icon }) => (
+            <button
+              id={`preferences-tab-${id}`}
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={activePage === id}
+              aria-controls={`preferences-${id}`}
+              onMouseDown={preventFocusLoss}
+              onClick={() => setActivePage(id)}
+            >
+              <Icon className="preferences-tab-icon" size={15} strokeWidth={2} aria-hidden="true" />
+              {label}
+            </button>
+          ))}
+        </nav>
+        <section
+          id={`preferences-${activePage}`}
+          className="preferences-window-content preferences-window-section"
+          role="tabpanel"
+          aria-labelledby={`preferences-tab-${activePage}`}
+        >
+          <header className="preferences-page-header">
+            <h2 className="preferences-section-title preferences-page-title">{activePageLabel}</h2>
+            <button
+              type="button"
+              className="preferences-close-button"
+              aria-label="Close preferences"
+              onMouseDown={preventFocusLoss}
+              onClick={onClose}
+            >
+              ×
+            </button>
+          </header>
+          <div className="preferences-page-body">
             {renderActivePreferencePage()}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

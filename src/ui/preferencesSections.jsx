@@ -57,6 +57,9 @@ import {
   EditorFontFamilyControl,
 } from "./EditorFontControls.jsx";
 import {
+  PreferencesCard,
+} from "./PreferencesCard.jsx";
+import {
   CopyValueIcon,
 } from "./icons.jsx";
 
@@ -276,6 +279,8 @@ export function ColorSettingsSection({
 export function EditorPreferencesSection({
   editorPreferences,
   fontOptions,
+  appFontOptions,
+  onAppFontFamilyChange,
   onEditorPreferencesChange,
 }) {
   const normalizedEditorPreferences = normalizeEditorPreferences(editorPreferences);
@@ -301,44 +306,65 @@ export function EditorPreferencesSection({
   );
 
   return (
-    <section className="preferences-section preferences-default-editor-section">
-      <div className="preferences-section-title">Editor</div>
-      <div className="preferences-section-description">
-        The font family applies to every session tab. Zoom the app with {formatKeyboardShortcutLabel(
+    <>
+      <PreferencesCard
+        title="Typography"
+        description={`The font family applies to every session tab. Zoom the app with ${formatKeyboardShortcutLabel(
           normalizedEditorPreferences.keyboardShortcuts.zoomIn,
-        )} and {formatKeyboardShortcutLabel(normalizedEditorPreferences.keyboardShortcuts.zoomOut)}.
-      </div>
-      <div className="preference-setting-row editor-font-family-setting">
-        <div>
-          <div className="preference-setting-title">Font family</div>
-          <div className="preferences-section-description">
-            Default editor typeface.
+        )} and ${formatKeyboardShortcutLabel(normalizedEditorPreferences.keyboardShortcuts.zoomOut)}.`}
+        className="preferences-default-editor-section"
+      >
+        <div className="preference-setting-row editor-font-family-setting">
+          <div>
+            <div className="preference-setting-title">Font family</div>
+            <div className="preferences-section-description">
+              Default editor typeface.
+            </div>
           </div>
+          <EditorFontFamilyControl
+            className="preferences-font-family-control"
+            fontFamily={normalizedEditorPreferences.editorFontFamily}
+            fontOptions={fontOptions}
+            onFontFamilyChange={updateEditorPreferenceFontFamily}
+          />
         </div>
-        <EditorFontFamilyControl
-          className="preferences-font-family-control"
-          fontFamily={normalizedEditorPreferences.editorFontFamily}
-          fontOptions={fontOptions}
-          onFontFamilyChange={updateEditorPreferenceFontFamily}
-        />
-      </div>
-      <div className="preference-setting-row">
-        <div>
-          <div className="preference-setting-title">Table of contents</div>
-          <div className="preferences-section-description">
-            Show the right rail from heading levels in tab mode.
-            Toggle it from View or {formatKeyboardShortcutLabel(
-              normalizedEditorPreferences.keyboardShortcuts.toggleTableOfContents,
-            )}.
+        <div className="preference-setting-row app-font-family-setting">
+          <div>
+            <div className="preference-setting-title">App font</div>
+            <div className="preferences-section-description">
+              Interface typeface for chrome, menus, and preferences.
+            </div>
           </div>
+          <EditorFontFamilyControl
+            className="preferences-font-family-control"
+            fontFamily={normalizedEditorPreferences.appFontFamily}
+            fontOptions={appFontOptions}
+            inputAriaLabel="App font family"
+            menuButtonAriaLabel="Open app font menu"
+            optionsAriaLabel="App font family options"
+            onFontFamilyChange={onAppFontFamilyChange}
+          />
         </div>
-        <PreferenceToggleSwitch
-          checked={normalizedEditorPreferences.showTableOfContents}
-          ariaLabel="Show table of contents"
-          onChange={updateTableOfContentsVisibility}
-        />
-      </div>
-    </section>
+      </PreferencesCard>
+      <PreferencesCard title="Behaviour" description="What the editor shows around a note.">
+        <div className="preference-setting-row">
+          <div>
+            <div className="preference-setting-title">Table of contents</div>
+            <div className="preferences-section-description">
+              Show the right rail from heading levels in tab mode.
+              Toggle it from View or {formatKeyboardShortcutLabel(
+                normalizedEditorPreferences.keyboardShortcuts.toggleTableOfContents,
+              )}.
+            </div>
+          </div>
+          <PreferenceToggleSwitch
+            checked={normalizedEditorPreferences.showTableOfContents}
+            ariaLabel="Show table of contents"
+            onChange={updateTableOfContentsVisibility}
+          />
+        </div>
+      </PreferencesCard>
+    </>
   );
 }
 
@@ -471,8 +497,11 @@ export function KeyboardShortcutsSection({
   );
 
   return (
-    <section className="preferences-section preferences-shortcuts-section">
-      <div className="preferences-section-title">Keyboard shortcuts</div>
+    <PreferencesCard
+      title="Keyboard shortcuts"
+      description="Turn a command's shortcut on or off, click its keys to record new ones, or reset them."
+      className="preferences-shortcuts-section"
+    >
       <div className="shortcut-list-header" aria-hidden="true">
         <span>Command</span>
         <span>On</span>
@@ -549,6 +578,6 @@ export function KeyboardShortcutsSection({
           {shortcutError}
         </div>
       )}
-    </section>
+    </PreferencesCard>
   );
 }

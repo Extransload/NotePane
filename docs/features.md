@@ -30,7 +30,10 @@
 - Session and sticky colours are shown in each theme's tone (tone matching): the hue is kept, the stored colour never
   changes, and text on it stays readable
 - No light/dark toggle and no light/dark shortcut; `Command/Ctrl + Shift + L` is unbound
-- Preferences panel via sidebar footer button, native app menu, or `Command/Ctrl + ,`
+- Preferences panel via sidebar footer button, native app menu, or `Command/Ctrl + ,`: a sidebar of pages (General,
+  Editor, Trash, Shortcuts, each with an icon) beside the page, which scrolls on its own. A page is its title and
+  cards of settings: General has Appearance (the theme picker) and Data (backup export and import), Editor has
+  Typography (editor and app font) and Behaviour (table of contents), Trash and Shortcuts one card each
 - Preferences > Shortcuts lists every command as a 40px table row: name, on/off switch, the keys (click to record
   new ones) and Reset
 - Default editor font family for every session; there is no font size setting, text size follows the app zoom

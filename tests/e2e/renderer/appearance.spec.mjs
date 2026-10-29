@@ -362,9 +362,6 @@ test("changes editor typography globally from preferences", async ({ page }) => 
       return Math.round(descriptionRect.top - titleRect.bottom);
     });
   expect(appThemeLabelGap).toBeGreaterThanOrEqual(3);
-  const appFontRow = preferencesPanel.locator(".app-font-family-setting");
-  await expect(appFontRow.getByText("App font")).toBeVisible();
-  await expect(appFontRow.getByLabel("App font family")).toHaveValue("Inter");
   await expect(preferencesPanel.getByText("Workspace backup")).toBeVisible();
   const exportBackupButton = preferencesPanel.getByRole("button", {
     name: "Export backup",
@@ -380,6 +377,14 @@ test("changes editor typography globally from preferences", async ({ page }) => 
   await importBackupButton.click();
   await expect(page.locator(".sticky-toast-error"))
     .toHaveText("Data restore is available in the desktop app.");
+  await expect(page.locator("#preferences-editor")).toHaveCount(0);
+  await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
+  await expect(preferencesPanel.getByRole("tab", { name: "Editor" }))
+    .toHaveAttribute("aria-selected", "true");
+  // The app font sits with the editor font in the Editor page's Typography card.
+  const appFontRow = preferencesPanel.locator(".app-font-family-setting");
+  await expect(appFontRow.getByText("App font")).toBeVisible();
+  await expect(appFontRow.getByLabel("App font family")).toHaveValue("Inter");
   await appFontRow.getByLabel("App font family").fill("avenir");
   await expect(page.getByRole("listbox", { name: "App font family options" }))
     .toBeVisible();
@@ -387,10 +392,6 @@ test("changes editor typography globally from preferences", async ({ page }) => 
     maxWidth: 238,
   });
   await page.getByRole("option", { name: "Avenir" }).click();
-  await expect(page.locator("#preferences-editor")).toHaveCount(0);
-  await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
-  await expect(preferencesPanel.getByRole("tab", { name: "Editor" }))
-    .toHaveAttribute("aria-selected", "true");
   await expect(page.locator("#preferences-editor .preferences-section-title"))
     .toHaveText("Editor");
   await expect(page.getByText(/^The font family applies to every session tab\. Zoom the app with /))

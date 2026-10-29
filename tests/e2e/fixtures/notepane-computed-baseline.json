@@ -175,9 +175,9 @@
       "boxShadow": "rgba(0, 0, 0, 0.18) 0px 22px 54px 0px"
     },
     "preferences section title": {
-      "color": "rgb(120, 119, 116)",
+      "color": "rgb(55, 53, 47)",
       "backgroundColor": "rgba(0, 0, 0, 0)",
-      "borderTopColor": "rgb(120, 119, 116)",
+      "borderTopColor": "rgb(55, 53, 47)",
       "boxShadow": "none"
     }
   },
@@ -357,9 +357,9 @@
       "boxShadow": "rgba(0, 0, 0, 0.42) 0px 22px 54px 0px"
     },
     "preferences section title": {
-      "color": "rgb(165, 165, 161)",
+      "color": "rgb(241, 241, 239)",
       "backgroundColor": "rgba(0, 0, 0, 0)",
-      "borderTopColor": "rgb(165, 165, 161)",
+      "borderTopColor": "rgb(241, 241, 239)",
       "boxShadow": "none"
     }
   }

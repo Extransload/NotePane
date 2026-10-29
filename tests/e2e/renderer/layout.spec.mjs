@@ -548,3 +548,46 @@ test("turns the sidebar compact in a narrow window without losing the wide-windo
   await page.setViewportSize({ width: 1180, height: 760 });
   await expect(sidebar).toHaveAttribute("data-sidebar-state", "expanded");
 });
+
+test("lays Preferences out as a sidebar of pages beside a scrolling page of cards", async ({ page }) => {
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await expect(preferences).toBeVisible();
+  const sidebar = preferences.getByRole("tablist", { name: "Preferences pages" });
+  const sidebarBox = await sidebar.boundingBox();
+  expect(Math.round(sidebarBox.width)).toBe(180);
+  await expect(sidebar.getByRole("tab")).toHaveText(["General", "Editor", "Trash", "Shortcuts"]);
+  expect(await sidebar.locator("[role='tab'] svg").count()).toBe(4);
+
+  for (const pageName of ["General", "Editor", "Trash", "Shortcuts"]) {
+    await sidebar.getByRole("tab", { name: pageName }).click();
+    const panel = preferences.getByRole("tabpanel");
+    await expect(panel.getByRole("heading", { level: 2 })).toHaveText(pageName);
+    const layout = await panel.evaluate((element) => {
+      const cards = [...element.querySelectorAll(".preferences-card")];
+      const overflowing = cards.flatMap((card) => {
+        const cardBox = card.getBoundingClientRect();
+        return [...card.querySelectorAll("*")]
+          .filter((child) => {
+            const box = child.getBoundingClientRect();
+            return box.width > 0 && (box.left < cardBox.left - 1 || box.right > cardBox.right + 1);
+          })
+          .map((child) => child.className || child.tagName);
+      });
+      return {
+        cards: cards.map((card) => card.querySelector(".preferences-card-title")?.textContent),
+        overflowing,
+      };
+    });
+    expect(layout.cards.length, pageName).toBeGreaterThan(0);
+    expect(layout.overflowing, pageName).toEqual([]);
+  }
+
+  // The page scrolls on its own; the sidebar stays put.
+  await sidebar.getByRole("tab", { name: "General" }).click();
+  const body = preferences.locator(".preferences-page-body");
+  await body.evaluate((element) => element.scrollTo(0, element.scrollHeight));
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  expect((await sidebar.boundingBox()).y).toBe(sidebarBox.y);
+  await expect(preferences.getByRole("button", { name: "Close preferences" })).toBeInViewport();
+});

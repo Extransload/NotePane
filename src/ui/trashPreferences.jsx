@@ -21,6 +21,9 @@ import {
   getTrashPreviewLines,
 } from "../model/notes.js";
 import {
+  PreferencesCard,
+} from "./PreferencesCard.jsx";
+import {
   PermanentDeleteIcon,
   PreviewNoteIcon,
   RestoreNoteIcon,
@@ -168,11 +171,11 @@ export function TrashPreferencesSection({
     : null;
 
   return (
-    <section className="preferences-section preferences-trash-section">
-      <div className="preferences-section-title">Trash</div>
-      <div className="preferences-section-description">
-        Deleted sessions are hidden from tabs and sticky windows until restored.
-      </div>
+    <PreferencesCard
+      title="Deleted notes"
+      description="Deleted sessions are hidden from tabs and sticky windows until restored."
+      className="preferences-trash-section"
+    >
       {visibleTrashedNotes.length === 0 ? (
         <div className="trash-empty-state" role="status">
           Trash is empty.
@@ -336,7 +339,7 @@ export function TrashPreferencesSection({
           onClose={() => setPreviewTrashNoteId(null)}
         />
       )}
-    </section>
+    </PreferencesCard>
   );
 }
 
