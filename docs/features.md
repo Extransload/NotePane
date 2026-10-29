@@ -44,6 +44,8 @@
 - Toggle Tab/Sticky mode: `Command/Ctrl + Shift + T`
 - Open export menu: `Command/Ctrl + Shift + E`
 - Delayed hover tooltips for clickable controls
+- Sidebar footer actions (version history, export, Preferences, layout, editor width) share one muted chrome tone;
+  the theme's accent marks only the button under the pointer and a pressed toggle
 - Window bounds persistence
 - Editor area is explicitly non-drag so BlockNote mouse interactions remain intact
 - Single share-style export icon with PDF/Markdown format choices

@@ -2467,7 +2467,15 @@ function StickyEditor({
                   onMouseDown={preventFocusLoss}
                   onClick={() => void openVersionHistory()}
                 >
-                  <History aria-hidden="true" size={17} strokeWidth={2} />
+                  <History
+                    className="notepane-action-icon notepane-icon-history"
+                    data-icon-family="system-symbol"
+                    data-icon-pack="lucide"
+                    data-icon-tone="restore"
+                    size={24}
+                    strokeWidth={1.9}
+                    aria-hidden="true"
+                  />
                 </button>
                 <ExportPdfButton
                   shortcut={getEnabledShortcut("exportPdf")}

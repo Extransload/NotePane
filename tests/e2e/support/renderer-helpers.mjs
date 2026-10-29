@@ -739,6 +739,9 @@ export async function getActionIconColors(page) {
     };
 
     return {
+      history: readColor(
+        "[data-testid='session-sidebar-footer'] .notepane-icon-history",
+      ),
       export: readColor(
         "[data-testid='session-sidebar-footer'] .export-icon-button .notepane-action-icon",
       ),
@@ -793,10 +796,25 @@ export async function openStickyActionBar(page) {
   await expect(actionToggle).toHaveAttribute("aria-expanded", "true");
 }
 
-export function expectDistinctIconColors(iconColors) {
-  expect(new Set(Object.values(iconColors)).size).toBe(Object.keys(iconColors).length);
-  expect(iconColors.preferences).not.toBe(iconColors.export);
-  expect(iconColors.layout).not.toBe(iconColors.sidebar);
+// The sidebar footer actions share one muted chrome tone; the sidebar toggle keeps its own tone.
+export function expectFooterIconsShareOneTone(iconColors) {
+  expect(iconColors.preferences).toBeTruthy();
+  expect(iconColors.history).toBe(iconColors.preferences);
+  expect(iconColors.export).toBe(iconColors.preferences);
+  expect(iconColors.layout).toBe(iconColors.preferences);
+  expect(iconColors.sidebar).not.toBe(iconColors.preferences);
+}
+
+// A theme token resolved to the computed colour form an element's `color` reports.
+export async function resolveColorToken(page, token) {
+  return await page.evaluate((name) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${name})`;
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  }, token);
 }
 
 export async function expectSystemSymbolIcons(page) {

@@ -4,8 +4,8 @@ import {
   createBlankSession,
   expectActiveTabColor,
   expectAdaptiveTooltipPlacement,
-  expectDistinctIconColors,
   expectFloatingTypographyMenu,
+  expectFooterIconsShareOneTone,
   expectStickyPlaceholderReadable,
   expectStickyTableChromeReadable,
   expectSystemSymbolIcons,
@@ -18,6 +18,7 @@ import {
   loadTemplatePreview,
   modifierShortcut,
   openStickyActionBar,
+  resolveColorToken,
   selectAppTheme,
 } from "../support/renderer-helpers.mjs";
 
@@ -156,12 +157,28 @@ test("keeps sticky chrome outside the editable BlockNote surface", async ({ page
   expect(dragRegions.sidebarScrollbarThumb).not.toBe("rgb(255, 255, 255)");
 });
 
+test("tints a sidebar footer icon with the accent only under the pointer", async ({ page }) => {
+  const footer = page.getByTestId("session-sidebar-footer");
+  const exportIcon = footer.locator(".export-icon-button .notepane-action-icon");
+  const readColor = () => exportIcon.evaluate((icon) => getComputedStyle(icon).color);
+  const muted = await resolveColorToken(page, "--icon-chrome-color");
+  const accent = await resolveColorToken(page, "--icon-chrome-accent-color");
+  expect(accent).not.toBe(muted);
+
+  await expect.poll(readColor).toBe(muted);
+  await footer.getByRole("button", { name: "Export" }).hover();
+  await expect.poll(readColor).toBe(accent);
+  await expect(page.locator(".adaptive-tooltip")).toContainText("Export");
+  await page.mouse.move(600, 300);
+  await expect.poll(readColor).toBe(muted);
+});
+
 test("keeps light/dark mode global across sidebar sessions", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   await expect(page.locator(".brand-wordmark-image-light")).toBeVisible();
   await expect(page.locator(".brand-wordmark-image-dark")).toBeHidden();
   const lightIconColors = await getActionIconColors(page);
-  expectDistinctIconColors(lightIconColors);
+  expectFooterIconsShareOneTone(lightIconColors);
   await expectSystemSymbolIcons(page);
 
   await selectAppTheme(page, "notepane-dark");
@@ -179,10 +196,11 @@ test("keeps light/dark mode global across sidebar sessions", async ({ page }) =>
     };
   }).toEqual({
     changed: true,
-    distinct: Object.keys(lightIconColors).length,
+    // The footer's one chrome tone and the sidebar toggle's own tone.
+    distinct: 2,
   });
   const darkIconColors = await getActionIconColors(page);
-  expectDistinctIconColors(darkIconColors);
+  expectFooterIconsShareOneTone(darkIconColors);
   expect(darkIconColors.layout).not.toBe(lightIconColors.layout);
   expect(darkIconColors.sidebar).not.toBe(lightIconColors.sidebar);
   expect(darkIconColors.export).not.toBe(lightIconColors.export);

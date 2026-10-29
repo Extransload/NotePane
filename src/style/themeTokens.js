@@ -257,6 +257,9 @@ export function buildThemeTokens(theme) {
     "--default-tab-text-color": palette.text,
     "--icon-chrome-color": palette.muted,
     "--icon-chrome-active-color": palette.text,
+    // A chrome icon under the pointer or in a pressed toggle: the accent, darkened or lightened
+    // toward the text colour until it reaches 3:1 on the sidebar and the panel.
+    "--icon-chrome-accent-color": readableOn(palette.accent, [palette.sidebar, palette.panel], palette.text, 3),
     "--chrome-icon-button-bg": hexToCssRgb(glass, s("buttonBg")),
     "--chrome-icon-button-hover-bg": hexToCssRgb(hoverBase, s("buttonHover")),
     "--chrome-icon-button-active-bg": hexToCssRgb(palette.text, s("buttonActive")),

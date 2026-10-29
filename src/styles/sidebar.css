@@ -114,6 +114,19 @@
   border-radius: var(--chrome-icon-button-radius);
 }
 
+/* Every footer action takes one muted chrome tone instead of its own icon tone; the accent marks
+   only the button under the pointer and a pressed toggle. */
+.session-sidebar-footer .notepane-action-icon[data-icon-tone] {
+  --icon-tone-color: var(--icon-chrome-color);
+}
+
+.session-sidebar-footer button:hover .notepane-action-icon[data-icon-tone],
+.session-sidebar-footer button:focus-visible .notepane-action-icon[data-icon-tone],
+.session-sidebar-footer [aria-pressed="true"] .notepane-action-icon[data-icon-tone] {
+  --icon-tone-color: var(--icon-chrome-accent-color);
+  color: var(--icon-chrome-accent-color);
+}
+
 .session-sidebar-footer .editor-width-button .notepane-editor-width-icon {
   width: 18px;
   height: 18px;
