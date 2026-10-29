@@ -66,8 +66,19 @@
 - Delayed hover tooltips for clickable controls
 - Short entrance motion: menus, popovers and the colour panel fade in (the slash menu and NotePane's own menus also
   slide a few pixels from their anchor), the sidebar slides between its width and the compact rail, Preferences and
-  search fade in, and a switched note fades in. Closing stays instant, and the motion is off when the system asks for
-  reduced motion and in print and export
+  search fade in, and a switched note fades in. The motion is off when the system asks for reduced motion and in
+  print and export
+- Short exit motion for NotePane's own overlays: the session tab and export menus, dropdowns, the colour panels,
+  dialogs (Preferences, sticky settings, the trash and close confirmations, Markdown import, version history, crop),
+  the search palette, the find bar, tooltips and the zoom gauge fade back toward where they came from, and a backdrop
+  fades with its dialog. While it leaves, an overlay takes no clicks or focus and is hidden from assistive technology;
+  with reduced motion it is removed at once. BlockNote's own menus still close instantly
+- Toasts spring up from the bottom and sink away. A toast that replaces another, such as an export finishing, changes
+  its text and dot colour in place. The undo toast shows the time it has left on a thin bar, and any toast waits while
+  the pointer or keyboard focus is on it
+- Buttons press in slightly, menu items and list rows ease their hover colour, the zoom gauge springs in and glides
+  between steps, and picking a theme in Preferences cross-fades that window to the new colours (other windows switch
+  at once, and no window fades on its first paint)
 - Shortcut labels read the same everywhere NotePane shows them (Preferences, tooltips, slash menu badges, the
   formatting toolbar's merge and colour buttons): `⌘⌥⇧1` on a Mac, `Ctrl+Alt+Shift+1` elsewhere
 - Sidebar footer actions (version history, export, Preferences, layout, editor width) share one muted chrome tone;
