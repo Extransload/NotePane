@@ -36,7 +36,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
 | `src/hooks/` | stateful behaviour lifted out of `App` and `StickyEditor` | `useSessionList.js`, `useOverlayState.js`, `useNoteAppearance.js`, `useSessionTabActions.js`, `useNotePersistence.js`, `useEditorSurfaceShortcuts.js` |
 | `src/utils/` | small generic helpers | `values.js`, `dom.js`, `sessionTabAnimation.js` |
-| `src/styles/` | stylesheets, imported in cascade order | `tokens.css`, `chrome.css`, `blocknote.css` |
+| `src/styles/` | stylesheets, imported in cascade order | `tokens.css`, `chrome.css`, `blocknote.css`, `motion.css`, `editor-motion.css` |
 
 ### Where behaviour lives
 
@@ -50,6 +50,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Text selection, table cell selection and navigation | `src/editor/selection.js` |
 | Table row and column handle menus, the table items of the six-dot block menu | `src/editor/tableHandles.jsx` |
 | Table column widths: live resize, double-click auto-fit, fit to width | `src/editor/tableColumnSizing.js` |
+| How far a wide table grows right of the text column before it scrolls (a container query on `.sticky-editor-surface`) | table section of `src/styles/blocknote.css` |
+| Editor motion: toggle open and close, new blocks rising in (a ProseMirror decoration dropped with the next transaction), moved blocks gliding into place (FLIP), the checklist pop; all through the Web Animations API or decorations, never DOM writes ProseMirror would observe | `src/editor/editorMotion.js`, `src/styles/editor-motion.css` |
 | Block selection model, exactly-selected blocks, block-set indent and move | `src/editor/blockSelection.js`, `src/editor/blockSelectionRules.js` |
 | Marquee and drag selection gestures, edge auto-scroll, and the keyboard (Enter, Tab, move, delete) and IME composition routing for a block set or the whole note | `src/editor/blockDragSelection.js` |
 | Block lookup, cut, table of contents extraction | `src/editor/blocks.js` |
@@ -60,7 +62,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Backspace right after a Markdown shortcut such as `- ` gives back exactly the typed marker | `src/editor/markdownShortcuts.js` |
 | Divider: the `---` / `***` shortcut (in `src/editor/schema.jsx`), its slash menu item, Markdown export as `---` | `src/editor/divider.jsx` |
 | Inline and block equations: KaTeX rendering, their editors, slash menu items, Markdown `$...$` / `$$` export and the import that reads them | `src/editor/math.jsx` |
-| BlockNote floating menu positioning and clamping | `src/editor/floatingMenus.js` |
+| BlockNote floating menu positioning and clamping, and how its floating UI closes: the controllers' close transition, the Mantine theme for menus (`NotePaneMantineProvider`), the link toolbar controller, and the fading copy of a block menu whose side menu hid | `src/editor/floatingMenus.js` |
 | Image download, crop geometry, upload | `src/editor/images.js` |
 | Pasting and dropping files: where the file block goes, its upload, one undo step for both | `src/editor/fileInsertion.js` |
 | Code block language detection, prettifying, and Tab / Shift+Tab line indent | `src/editor/codeFormatting.js` |

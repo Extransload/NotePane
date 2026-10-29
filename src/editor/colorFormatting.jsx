@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { TableHandlesExtension } from "@blocknote/core/extensions";
 import { Combine, Copy, Crop, Download, SplitSquareHorizontal } from "lucide-react";
 import {
@@ -15,6 +15,7 @@ import {
   useExtension,
 } from "@blocknote/react";
 import { formatKeyboardShortcutLabel } from "../model/keyboardShortcuts.js";
+import { createFloatingCloseOptions } from "./floatingMenus.js";
 
 const EDITOR_COLOR_VALUES = [
   "default",
@@ -106,6 +107,11 @@ export function RecentColorFormattingToolbarController({
     ],
   );
 
+  const floatingUIOptions = useMemo(
+    () => ({ ...FORMATTING_TOOLBAR_FLOATING_OPTIONS, ...createFloatingCloseOptions() }),
+    [],
+  );
+
   if (hidden) {
     return null;
   }
@@ -113,7 +119,7 @@ export function RecentColorFormattingToolbarController({
   return (
     <FormattingToolbarController
       formattingToolbar={Toolbar}
-      floatingUIOptions={FORMATTING_TOOLBAR_FLOATING_OPTIONS}
+      floatingUIOptions={floatingUIOptions}
       portalElement={portalElement}
     />
   );

@@ -100,6 +100,8 @@ import {
   withCodeTheme,
 } from "./editor/codeHighlighter.js";
 import {
+  NotePaneLinkToolbarController,
+  NotePaneMantineProvider,
   useBlockNoteFloatingMenuGuard,
 } from "./editor/floatingMenus.js";
 import {
@@ -121,6 +123,7 @@ import {
   installTableExtensionFocusRestore,
 } from "./editor/tableFocus.js";
 import { MarkdownShortcutUndo } from "./editor/markdownShortcuts.js";
+import { EditorMotion } from "./editor/editorMotion.js";
 import {
   EMPTY_BLOCKS,
   NOTE_PANE_TEMPLATE_BLOCKS,
@@ -615,7 +618,7 @@ function StickyEditor({
 
   const editor = useCreateBlockNote({
     schema,
-    extensions: [BlockDragSelection, FindInNote, FileDrop, MarkdownShortcutUndo],
+    extensions: [BlockDragSelection, FindInNote, FileDrop, MarkdownShortcutUndo, EditorMotion],
     initialContent: initialEditorContent,
     tabBehavior: "prefer-indent",
     // BlockNote paints this onto the drop cursor element, which resolves the token itself and
@@ -2667,48 +2670,52 @@ function StickyEditor({
               </button>
             </div>
           )}
-          <BlockNoteView
-            editor={editor}
-            theme={activeTheme.scheme}
-            onChange={handleEditorChange}
-            onSelectionChange={() => {
-              window.requestAnimationFrame(() => {
-                updateFocusedTableCell();
-                updateTableCellSelectionMode();
-              });
-            }}
-            portalElements={{ default: document.body }}
-            formattingToolbar={false}
-            sideMenu={false}
-            slashMenu={false}
-            tableHandles={false}
-          >
-            <NotePaneSlashMenuController
+          <NotePaneMantineProvider>
+            <BlockNoteView
               editor={editor}
-              onImportMarkdown={() => openOverlay("markdownImport")}
-            />
-            <RecentColorFormattingToolbarController
-              recentColors={recentEditorColors}
-              onColorUsed={onEditorColorUsed}
-              onCropImage={openCropDialog}
-              onDownloadImage={downloadActiveImage}
-              onCopyImage={canCopyImageToClipboard() ? copyActiveImage : undefined}
-              activeImageBlockId={activeImageBlockId}
-              portalElement={document.body}
-              // The export menu stands for the whole note: the toolbar of a selection would sit
-              // under it, so it is hidden until the menu closes.
-              hidden={isTableCellSelectionDismissed || Boolean(exportFormatMenu)}
-            />
-            <BlockMenuHighlightController />
-            <NotePaneSideMenuController
-              recentColors={recentEditorColors}
-              onColorUsed={onEditorColorUsed}
-            />
-            <NotePaneTableHandlesController
-              recentColors={recentEditorColors}
-              onColorUsed={onEditorColorUsed}
-            />
-          </BlockNoteView>
+              theme={activeTheme.scheme}
+              onChange={handleEditorChange}
+              onSelectionChange={() => {
+                window.requestAnimationFrame(() => {
+                  updateFocusedTableCell();
+                  updateTableCellSelectionMode();
+                });
+              }}
+              portalElements={{ default: document.body }}
+              formattingToolbar={false}
+              linkToolbar={false}
+              sideMenu={false}
+              slashMenu={false}
+              tableHandles={false}
+            >
+              <NotePaneLinkToolbarController />
+              <NotePaneSlashMenuController
+                editor={editor}
+                onImportMarkdown={() => openOverlay("markdownImport")}
+              />
+              <RecentColorFormattingToolbarController
+                recentColors={recentEditorColors}
+                onColorUsed={onEditorColorUsed}
+                onCropImage={openCropDialog}
+                onDownloadImage={downloadActiveImage}
+                onCopyImage={canCopyImageToClipboard() ? copyActiveImage : undefined}
+                activeImageBlockId={activeImageBlockId}
+                portalElement={document.body}
+                // The export menu stands for the whole note: the toolbar of a selection would sit
+                // under it, so it is hidden until the menu closes.
+                hidden={isTableCellSelectionDismissed || Boolean(exportFormatMenu)}
+              />
+              <BlockMenuHighlightController />
+              <NotePaneSideMenuController
+                recentColors={recentEditorColors}
+                onColorUsed={onEditorColorUsed}
+              />
+              <NotePaneTableHandlesController
+                recentColors={recentEditorColors}
+                onColorUsed={onEditorColorUsed}
+              />
+            </BlockNoteView>
+          </NotePaneMantineProvider>
           {codeBlockToolTargets.map(({ blockId, element }) => (
             <CodeBlockTools
               key={`code-block-tools-${blockId}`}

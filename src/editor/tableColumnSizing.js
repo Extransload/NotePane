@@ -83,26 +83,28 @@ export function previewActiveTableColumnResize(editor, event) {
 }
 
 // Notion's "Fit to width": scales every column by the same factor so the table is exactly as wide
-// as the space it sits in, in one undo step.
+// as the text column it sits in, in one undo step. A wide table's scroller reaches past the column
+// (src/styles/blocknote.css), so the room is the block's width less the scroller's handle padding.
 export function fitTableToWidth(editor, blockId) {
   const view = editor?.prosemirrorView;
   const blockInfo = view ? getNodeById(blockId, view.state.doc) : null;
   const tableElement = editor?.domElement?.querySelector(
     `.bn-block-outer[data-id="${CSS.escape(blockId)}"] table`,
   );
-  const container = tableElement?.parentElement;
-  if (!blockInfo || !container) {
+  const scroller = tableElement?.closest(".tableWrapper");
+  const column = scroller?.parentElement;
+  if (!blockInfo || !column) {
     return false;
   }
 
   const renderedWidths = [...tableElement.querySelectorAll(":scope > colgroup > col")]
-    .map((column) => column.getBoundingClientRect().width);
+    .map((col) => col.getBoundingClientRect().width);
   const renderedTotal = renderedWidths.reduce((total, width) => total + width, 0);
-  const containerStyle = getComputedStyle(container);
+  const scrollerStyle = getComputedStyle(scroller);
   const availableWidth = Math.floor(
-    container.clientWidth -
-      Number.parseFloat(containerStyle.paddingLeft || "0") -
-      Number.parseFloat(containerStyle.paddingRight || "0"),
+    column.clientWidth -
+      Number.parseFloat(scrollerStyle.paddingLeft || "0") -
+      Number.parseFloat(scrollerStyle.paddingRight || "0"),
   );
   if (!(renderedTotal > 0) || !(availableWidth > 0)) {
     return false;

@@ -19,6 +19,7 @@ import { editCalloutIcon } from "./callout.jsx";
 import { getCodeBlockText } from "./codeFormatting.js";
 import { EditorColorPickerSections } from "./colorFormatting.jsx";
 import { TableBlockMenuItems } from "./tableHandles.jsx";
+import { useFadeOutWhenDetached } from "./floatingMenus.js";
 
 export function NotePaneSideMenuController({
   portalElement,
@@ -210,8 +211,15 @@ function NotePaneDragHandleMenu({
         recentColors={recentColors}
         onColorUsed={onColorUsed}
       />
+      <FadeOutWhenDetached />
     </DragHandleMenu>
   );
+}
+
+// Inside the open menu: see useFadeOutWhenDetached.
+function FadeOutWhenDetached() {
+  useFadeOutWhenDetached(".bn-drag-handle-menu");
+  return null;
 }
 
 // A callout's icon, added, changed or removed in the callout's own icon picker.

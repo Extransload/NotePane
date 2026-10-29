@@ -640,6 +640,33 @@
   overscroll-behavior-x: contain;
 }
 
+/* A top-level table grows past the text column as in Notion: it keeps its left edge on the column
+   and extends right, up to the editor surface's edge less --notepane-table-edge-gap, before it
+   scrolls. The text column is centred in the surface, a size container, so from a top-level
+   block's left edge the room to the surface's right edge is 50cqw + 50% of the block. Tables in
+   columns, lists and toggles keep to their block (the rule above), and a window too narrow for any
+   room keeps every table there. Fit to width (src/editor/tableColumnSizing.js) fits the column. */
+.sticky-editor-surface {
+  --notepane-table-edge-gap: 24px;
+  container-type: inline-size;
+}
+
+/* Beside the table of contents the editor drops its 54px right padding, which moves the column's
+   centre 27px right of the surface's, and the contents rail (44px and 28px of margin) takes the
+   surface's right edge: a table stops short of both. */
+.sticky-editor-surface.has-table-of-contents {
+  --notepane-table-edge-gap: calc(24px + 54px / 2 + 72px);
+}
+
+.bn-editor > .bn-block-group > .bn-block-outer > .bn-block > .bn-block-content[data-content-type="table"] > .tableWrapper {
+  flex: none;
+  /* As wide as the table's column widths need (its inline min-width), never narrower than the
+     column: a table with no widths set still fills the column and wraps its text. */
+  width: min-content;
+  min-width: 100%;
+  max-width: max(100%, calc(50cqw + 50% - var(--notepane-table-edge-gap)));
+}
+
 .bn-editor [data-content-type="table"] .tableWrapper-inner {
   width: 100%;
 }

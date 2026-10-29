@@ -1,0 +1,101 @@
+/* Motion inside the editor content (src/editor/editorMotion.js). Imported last, after motion.css,
+   whose easing (--notepane-motion-ease-out) and shift (--notepane-motion-shift) it reuses.
+
+   The script reads the duration tokens below, so one value drives both the CSS and the Web
+   Animations it starts. prefers-reduced-motion, print and export turn every animation here off
+   (end of file); the script checks the same conditions before it starts one. */
+
+:root {
+  --notepane-motion-toggle-duration: 180ms;
+  --notepane-motion-block-enter-duration: 160ms;
+  --notepane-motion-block-move-duration: 180ms;
+  --notepane-motion-check-duration: 160ms;
+  --notepane-motion-floating-close-duration: 110ms;
+}
+
+/* BlockNote's floating UI closes with a short fade that takes no pointer
+   (src/editor/floatingMenus.js). A closing popover is a copy of its last content whose inline style
+   has `pointer-events: none`: motion.css sets the slash menu's and the toolbar's fade with
+   !important, so the copy takes the close duration here, and the entrance animations do not play
+   again inside it. */
+div:has(> .bn-suggestion-menu)[style*="pointer-events: none"],
+div:has(> .bn-formatting-toolbar)[style*="pointer-events: none"] {
+  transition-duration: var(--notepane-motion-floating-close-duration) !important;
+}
+
+/* The table handles' popovers take no floating options, so their closing copy keeps floating-ui's
+   own close style (`opacity: 0`, 250ms). The copy of a handle whose menu was open closes like the
+   other menus and takes no pointer. */
+div[style*="opacity: 0"]:has(> .bn-table-handle-menu) {
+  transition-duration: var(--notepane-motion-floating-close-duration) !important;
+  pointer-events: none !important;
+}
+
+[style*="pointer-events: none"] > :is(.bn-suggestion-menu, .bn-formatting-toolbar),
+[style*="pointer-events: none"] :is(
+  .bn-menu-dropdown,
+  .mantine-Popover-dropdown,
+  .notepane-block-menu-subpanel,
+  .color-panel
+) {
+  animation: none !important;
+}
+
+/* The chevron turns with the children opening below it. A chevron that renders already open, on
+   note load or when the block is drawn again, has nothing to turn from. */
+.bn-editor .bn-toggle-button {
+  transition:
+    transform var(--notepane-motion-toggle-duration) var(--notepane-motion-ease-out),
+    background-color 120ms ease;
+}
+
+/* A block the user just created rises in, once: the class comes from a ProseMirror decoration that
+   is removed when this animation ends. A new block inside another new block moves with it. */
+@keyframes notepaneBlockEnter {
+  from {
+    opacity: 0;
+    translate: 0 var(--notepane-motion-shift);
+  }
+}
+
+.bn-editor .notepane-block-enter {
+  animation: notepaneBlockEnter var(--notepane-motion-block-enter-duration) var(--notepane-motion-ease-out);
+}
+
+.bn-editor .notepane-block-enter .notepane-block-enter {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  div:has(> .bn-suggestion-menu)[style*="pointer-events: none"],
+  div:has(> .bn-formatting-toolbar)[style*="pointer-events: none"],
+  div[style*="opacity: 0"]:has(> .bn-table-handle-menu) {
+    transition-duration: 0s !important;
+  }
+
+  .bn-editor .bn-toggle-button {
+    transition: none !important;
+  }
+
+  .bn-editor .notepane-block-enter {
+    animation: none !important;
+  }
+}
+
+@media print {
+  .bn-editor .bn-toggle-button {
+    transition: none !important;
+  }
+
+  .bn-editor .notepane-block-enter {
+    animation: none !important;
+  }
+}
+
+body.is-exporting .bn-editor .bn-toggle-button {
+  transition: none !important;
+}
+
+body.is-exporting .bn-editor .notepane-block-enter {
+  animation: none !important;
+}

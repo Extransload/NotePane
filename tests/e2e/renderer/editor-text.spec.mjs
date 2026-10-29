@@ -1877,3 +1877,263 @@ test("cuts a block with Command+X in the formats the editor's own copy writes", 
   await expect(editor.getByText("after the cuts", { exact: true })).toHaveCount(1);
   expect(pageErrors).toEqual([]);
 });
+
+// Records the block each rise-in animation starts on, from the page's first paint on.
+async function openPageRecordingBlockEntrances(page) {
+  await page.addInitScript(() => {
+    window.__blockEntrances = [];
+    document.addEventListener("animationstart", (event) => {
+      if (event.animationName === "notepaneBlockEnter") {
+        window.__blockEntrances.push(event.target.getAttribute("data-id"));
+      }
+    }, true);
+  });
+  await page.goto("/");
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+}
+
+function readBlockEntrances(page) {
+  return page.evaluate(() => [...window.__blockEntrances]);
+}
+
+function readEnteringBlockCount(page) {
+  return page.evaluate(() => document.querySelectorAll(".bn-editor .notepane-block-enter").length);
+}
+
+function settleBlockEntrances(page) {
+  return page.evaluate(() => Promise.all(document.getAnimations()
+    .filter((animation) => animation.animationName === "notepaneBlockEnter")
+    .map((animation) => animation.finished)));
+}
+
+function blockIdOfText(page, text) {
+  return page.locator(".bn-editor .bn-block-outer").filter({ hasText: text }).last().getAttribute("data-id");
+}
+
+test("rises in the blocks the user creates and no others", { tag: OPENS_OWN_PAGE }, async ({ page }) => {
+  await openPageRecordingBlockEntrances(page);
+  // The decoration that starts the animation is added in the transaction itself, so a block that
+  // is not rising in has no class right after the change.
+  expect(await readEnteringBlockCount(page)).toBe(0);
+
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.insertText("Typed line");
+  expect(await readEnteringBlockCount(page)).toBe(0);
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("Line from Enter");
+  const enterBlockId = await blockIdOfText(page, "Line from Enter");
+  await expect.poll(() => readBlockEntrances(page)).toEqual([enterBlockId]);
+  // Once the rise has ended, the next change drops the class, and the block does not rise again.
+  await settleBlockEntrances(page);
+  await page.keyboard.insertText(" again");
+  expect(await readEnteringBlockCount(page)).toBe(0);
+  expect(await readBlockEntrances(page)).toEqual([enterBlockId]);
+
+  // The slash menu on a line with text puts the new block below it.
+  await page.keyboard.type("/heading 2");
+  await expect(page.locator(".bn-suggestion-menu")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".bn-editor h2")).toHaveCount(1);
+  const headingBlockId = await page.locator(".bn-editor .bn-block-outer:has(h2)").last().getAttribute("data-id");
+  await expect.poll(() => readBlockEntrances(page)).toEqual([enterBlockId, headingBlockId]);
+
+  // A paste into an empty line fills that line and adds the rest below it.
+  await page.keyboard.insertText("Heading text");
+  await page.keyboard.press("Enter");
+  await waitForEditorSelection(page);
+  await pasteClipboardText(page, {
+    plainText: "Paste one\nPaste two\nPaste three",
+    html: "<p>Paste one</p><p>Paste two</p><p>Paste three</p>",
+  });
+  await expect(page.locator(".bn-editor").getByText("Paste three", { exact: true })).toBeVisible();
+  const pastedIds = [await blockIdOfText(page, "Paste two"), await blockIdOfText(page, "Paste three")];
+  await expect.poll(async () => (await readBlockEntrances(page)).slice(2)).toEqual(
+    expect.arrayContaining(pastedIds),
+  );
+  await settleBlockEntrances(page);
+
+  // Switching notes builds the editor again from the stored note: nothing rises in.
+  const entrancesBeforeSwitch = (await readBlockEntrances(page)).length;
+  const noteId = await page.evaluate(() => document.querySelector("[role='tab'][aria-selected='true']")
+    ?.closest(".session-tab-row")?.getAttribute("data-note-id"));
+  await createBlankSession(page);
+  expect(await readEnteringBlockCount(page)).toBe(0);
+  const firstTab = page.locator(`.session-tab-row[data-note-id="${noteId}"]`).getByRole("tab");
+  await firstTab.click();
+  await expect(firstTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".bn-editor")).toBeVisible();
+  expect(await readEnteringBlockCount(page)).toBe(0);
+  expect(await readBlockEntrances(page)).toHaveLength(entrancesBeforeSwitch);
+});
+
+test("adds blocks without the rise-in when reduced motion is requested", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.insertText("Still line");
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("Next still line");
+  expect(await readEnteringBlockCount(page)).toBe(0);
+  expect(await page.evaluate(() => document.getAnimations()
+    .filter((animation) => animation.animationName === "notepaneBlockEnter").length)).toBe(0);
+});
+
+// Records each checklist pop: the scales it passes through. Installed before the click, as the pop
+// starts in the click's own task.
+async function recordCheckPops(page) {
+  await page.evaluate(() => {
+    window.__checkPops = [];
+    const animate = Element.prototype.animate;
+    Element.prototype.animate = function recordPop(keyframes, options) {
+      if (options?.id === "notepane-check-pop") {
+        window.__checkPops.push(keyframes.map((keyframe) => Number(keyframe.scale)));
+      }
+      return animate.call(this, keyframes, options);
+    };
+  });
+}
+
+function readCheckPops(page) {
+  return page.evaluate(() => window.__checkPops.splice(0));
+}
+
+test("pops a checklist box when it is ticked, not when it is cleared", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const box = page.locator(".bn-editor [data-content-type='checkListItem'] input[type='checkbox']").first();
+  await expect(box).not.toBeChecked();
+  await recordCheckPops(page);
+
+  await box.click();
+  await expect(box).toBeChecked();
+  await expect.poll(() => readCheckPops(page)).toEqual([[1, 1.15, 1]]);
+
+  await box.click();
+  await expect(box).not.toBeChecked();
+  expect(await readCheckPops(page)).toEqual([]);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await box.click();
+  await expect(box).toBeChecked();
+  expect(await readCheckPops(page)).toEqual([]);
+});
+
+// Records every BlockNote floating surface that starts to close: a popover's closing copy or a
+// Mantine menu fading out (both take no pointer), and the copy NotePane fades in place of a menu its
+// popover took away. Installed before the closing action, so a short fade is never missed. A Mantine
+// menu also takes no pointer for the first frame of its opening, so a surface counts only once it
+// has been open; NotePane's copy is closing from the start.
+async function recordClosingFloatingUI(page) {
+  await page.evaluate(() => {
+    window.__closingFloatingUI = [];
+    const seen = new WeakSet();
+    const opened = new WeakSet();
+    const kinds = [
+      ["slash menu", "div:has(> .bn-suggestion-menu)"],
+      ["formatting toolbar", "div:has(> .bn-formatting-toolbar)"],
+      ["block menu copy", ".notepane-floating-menu-closing"],
+      ["block menu", ".bn-drag-handle-menu:not(.notepane-floating-menu-closing)"],
+      ["table handle menu", ".bn-table-handle-menu"],
+    ];
+    const record = () => {
+      for (const [kind, selector] of kinds) {
+        for (const element of document.querySelectorAll(selector)) {
+          const style = getComputedStyle(element);
+          if (style.pointerEvents !== "none") {
+            opened.add(element);
+            continue;
+          }
+          if (seen.has(element) || (kind !== "block menu copy" && !opened.has(element))) continue;
+          seen.add(element);
+          const fade = element.getAnimations().find((animation) => !animation.transitionProperty);
+          window.__closingFloatingUI.push({
+            kind,
+            duration: fade ? `${fade.effect.getTiming().duration}ms` : style.transitionDuration,
+            inert: element.inert,
+          });
+        }
+      }
+    };
+    new MutationObserver(record).observe(document.body, {
+      subtree: true, childList: true, attributes: true, attributeFilter: ["style", "class"],
+    });
+  });
+}
+
+function takeClosingFloatingUI(page) {
+  return page.evaluate(() => window.__closingFloatingUI.splice(0));
+}
+
+// Waits for the menu's entrance fade to end: a menu closed while it is still fainter than half
+// opacity gets no copy of its own.
+async function openTemplateBlockMenu(page, block) {
+  await block.hover();
+  await page.locator(".bn-side-menu [data-test='dragHandle']:visible").last().click();
+  const menu = page.locator(".bn-drag-handle-menu:not(.notepane-floating-menu-closing)");
+  await expect(menu).toBeVisible();
+  await menu.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+}
+
+test("closes BlockNote's floating UI with a short fade that takes no pointer", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  await recordClosingFloatingUI(page);
+  const paragraph = page.locator(".bn-editor [data-content-type='paragraph']").first();
+
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/");
+  await expect(page.locator(".bn-suggestion-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-suggestion-menu")).toHaveCount(0);
+
+  await paragraph.dblclick();
+  await expect(page.locator(".bn-formatting-toolbar")).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".bn-formatting-toolbar")).toHaveCount(0);
+
+  // Escape hides the side menu with its block menu; a copy of the menu fades in its place.
+  await openTemplateBlockMenu(page, paragraph);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-drag-handle-menu")).toHaveCount(0);
+
+  // The handle stays while the pointer is on the table, so Mantine fades the menu out itself.
+  await page.locator(".bn-editor table td").nth(4).hover();
+  await page.locator(".bn-table-handle").first().click();
+  await expect(page.locator(".bn-table-handle-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-table-handle-menu")).toHaveCount(0);
+
+  // A click on the table handle selects its cells, so a formatting toolbar may close there too.
+  // The block menu fades as NotePane's copy when the side menu goes with it, or by Mantine when the
+  // side menu stays.
+  const closing = await takeClosingFloatingUI(page);
+  const kinds = closing.map(({ kind }) => kind);
+  expect(kinds).toEqual(expect.arrayContaining(["slash menu", "formatting toolbar", "table handle menu"]));
+  expect(kinds.some((kind) => kind === "block menu copy" || kind === "block menu")).toBe(true);
+  expect(closing.filter(({ duration }) => !["0.11s", "110ms"].includes(duration))).toEqual([]);
+  expect(closing.filter(({ kind, inert }) => kind === "block menu copy" && !inert)).toEqual([]);
+});
+
+test("closes BlockNote's floating UI at once when reduced motion is requested", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  await recordClosingFloatingUI(page);
+
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/");
+  await expect(page.locator(".bn-suggestion-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-suggestion-menu")).toHaveCount(0);
+  // After typing, BlockNote shows the side menu again once the pointer selects something.
+  const paragraph = page.locator(".bn-editor [data-content-type='paragraph']").first();
+  await paragraph.dblclick();
+  await expect(page.locator(".bn-formatting-toolbar")).toBeVisible();
+  await page.keyboard.press("ArrowRight");
+  await openTemplateBlockMenu(page, paragraph);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-drag-handle-menu")).toHaveCount(0);
+
+  const closing = await takeClosingFloatingUI(page);
+  expect(closing.filter(({ kind }) => kind === "block menu copy")).toEqual([]);
+  expect(closing.filter(({ duration }) => duration !== "0s")).toEqual([]);
+});

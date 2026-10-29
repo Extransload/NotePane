@@ -601,6 +601,26 @@ test("selects a row from its handle, then duplicates and clears it in one undo s
   await expect(rows.nth(1)).toHaveText(tabsRowText);
 });
 
+// The space the editor surface keeps clear right of a wide table (src/styles/blocknote.css).
+const TABLE_EDGE_GAP = 24;
+
+// Where a table's scroller sits against its text column and the editor surface.
+function readTableExtent(table) {
+  return table.evaluate((element) => {
+    const scroller = element.closest(".tableWrapper").getBoundingClientRect();
+    const column = element.closest(".bn-block-content").getBoundingClientRect();
+    const surface = element.closest("[data-testid='sticky-editor-surface']").getBoundingClientRect();
+    return {
+      scrollerLeft: scroller.left,
+      scrollerRight: scroller.right,
+      columnLeft: column.left,
+      columnRight: column.right,
+      surfaceRight: surface.right,
+      overflowing: element.closest(".tableWrapper").scrollWidth > element.closest(".tableWrapper").clientWidth,
+    };
+  });
+}
+
 test("toggles table headers and fits the table to the editor width from the six-dot menu", async ({ page }) => {
   await loadTemplatePreview(page);
   await page.getByRole("button", { name: "Use this template" }).click();
@@ -627,7 +647,8 @@ test("toggles table headers and fits the table to the editor width from the six-
   await page.keyboard.press(modifierShortcut("Z"));
   await expect(headerCellsInSecondRow).toHaveCount(headerColumnWasOn ? 1 : 0);
 
-  // A column dragged wider than the editor scrolls the table; Fit to width brings it back.
+  // A column dragged far wider than the editor first takes the room right of the text column, up
+  // to the editor surface's edge, and scrolls past it; Fit to width brings it back to the column.
   const wrapper = page.locator(".bn-editor [data-content-type='table'] .tableWrapper").first();
   // The undo above scrolls to the selection it restores, which may be away from the table.
   await firstCell.scrollIntoViewIfNeeded();
@@ -638,12 +659,44 @@ test("toggles table headers and fits the table to the editor width from the six-
   await page.mouse.up();
   const isOverflowing = () => wrapper.evaluate((element) => element.scrollWidth > element.clientWidth);
   await expect.poll(isOverflowing).toBe(true);
+  const widened = await readTableExtent(table);
+  expect(widened.scrollerLeft).toBeCloseTo(widened.columnLeft, 0);
+  expect(widened.scrollerRight).toBeCloseTo(widened.surfaceRight - TABLE_EDGE_GAP, 0);
 
   await openBlockMenu();
   await page.locator(".bn-drag-handle-menu [role='menuitem']")
     .filter({ hasText: "Fit to width" })
     .click();
   await expect.poll(isOverflowing).toBe(false);
+  const fitted = await readTableExtent(table);
+  expect(fitted.scrollerRight).toBeCloseTo(fitted.columnRight, 0);
   await page.keyboard.press(modifierShortcut("Z"));
   await expect.poll(isOverflowing).toBe(true);
+});
+
+test("extends a widened table right of the text column, not past the editor surface", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const table = page.locator(".bn-editor table").first();
+  const before = await readTableExtent(table);
+  expect(before.scrollerRight).toBeCloseTo(before.columnRight, 0);
+
+  const firstCell = table.locator("td, th").first();
+  await firstCell.scrollIntoViewIfNeeded();
+  const cellBox = await firstCell.boundingBox();
+  await page.mouse.move(cellBox.x + cellBox.width - 1, cellBox.y + cellBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(cellBox.x + cellBox.width + 300, cellBox.y + cellBox.height / 2, { steps: 6 });
+  await page.mouse.up();
+
+  await expect.poll(async () => (await readTableExtent(table)).scrollerRight)
+    .toBeGreaterThan(before.columnRight + 50);
+  const extended = await readTableExtent(table);
+  expect(extended.scrollerLeft).toBeCloseTo(extended.columnLeft, 0);
+  expect(extended.scrollerRight).toBeLessThanOrEqual(extended.surfaceRight - TABLE_EDGE_GAP + 1);
+  expect(extended.overflowing).toBe(false);
+  // The surface itself never scrolls sideways.
+  expect(await page.getByTestId("sticky-editor-surface").evaluate((surface) => (
+    surface.scrollWidth <= surface.clientWidth
+  ))).toBe(true);
 });

@@ -691,6 +691,10 @@ test("drops an image file beside a nested line or last in the body from the call
   await dropImageFile(page, { x: box.x + box.width - 6, y: two.y + 2 });
   await expect.poll(() => bodyTypes(callout)).toEqual(["paragraph", "image", "paragraph"]);
 
+  // The dropped image rises in from a few pixels lower, over the padding the next drop aims at.
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter((animation) => animation.animationName === "notepaneBlockEnter")
+    .map((animation) => animation.finished)));
   const grownBox = await calloutBox(callout).boundingBox();
   await dropImageFile(page, { x: grownBox.x + grownBox.width / 2, y: grownBox.y + grownBox.height - 3 });
   await expect.poll(() => bodyTypes(callout)).toEqual(["paragraph", "image", "paragraph", "image"]);

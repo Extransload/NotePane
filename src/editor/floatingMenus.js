@@ -1,9 +1,155 @@
 import {
+  createElement,
   useEffect,
+  useLayoutEffect,
+  useMemo,
 } from "react";
+import { LinkToolbarController } from "@blocknote/react";
+import { MantineProvider } from "@mantine/core";
 import {
   clamp,
 } from "../utils/values.js";
+import { isEditorMotionAllowed, readMotionDuration } from "./editorMotion.js";
+
+// How BlockNote's floating UI closes: a short fade (--notepane-motion-floating-close-duration in
+// src/styles/editor-motion.css) that takes no pointer, so a click during it reaches the editor.
+//
+// BlockNote's popovers (slash menu, formatting toolbar, link toolbar) fade through floating-ui's
+// useTransitionStyles and show a copy of their last content while they close; the options below are
+// the controllers' supported way to set that close. The side menu's handles keep BlockNote's own
+// close: it hides them whenever the editor scrolls, and the next pointer move over a block brings
+// them back. The Mantine menus inside
+// them (the six-dot menu, the table handle menus, the toolbar's dropdowns) close through Mantine's
+// Transition, set by the theme of NotePaneMantineProvider.
+
+// floating-ui's own default, which BlockNote keeps for opening.
+const BLOCKNOTE_POPOVER_OPEN_DURATION = 250;
+
+function readFloatingCloseDuration() {
+  const root = document.documentElement;
+  return isEditorMotionAllowed(root)
+    ? readMotionDuration(root, "--notepane-motion-floating-close-duration")
+    : 0;
+}
+
+export function createFloatingCloseOptions() {
+  return {
+    useTransitionStylesProps: {
+      duration: { open: BLOCKNOTE_POPOVER_OPEN_DURATION, close: readFloatingCloseDuration() },
+      close: { opacity: 0, pointerEvents: "none" },
+    },
+  };
+}
+
+// Menus open at once (src/styles/motion.css fades them in) and fade out without the pointer.
+function createMantineTheme() {
+  return {
+    respectReducedMotion: true,
+    components: {
+      Popover: {
+        defaultProps: {
+          transitionProps: {
+            transition: {
+              in: { opacity: 1 },
+              out: { opacity: 0, pointerEvents: "none" },
+              transitionProperty: "opacity",
+            },
+            // Not 0: Mantine's Transition renders a zero-duration open through another branch, so
+            // the close would remount the dropdown, and an autofocused field in it (the file
+            // caption form) would take focus back from the editor while it fades.
+            duration: 1,
+            exitDuration: readFloatingCloseDuration(),
+          },
+        },
+      },
+    },
+  };
+}
+
+// BlockNoteView uses a Mantine provider of its own only when there is none above it. This one has
+// the same settings (no CSS variables on the document root, no root colour scheme attribute) plus
+// the menu transition.
+export function NotePaneMantineProvider({ children }) {
+  const theme = useMemo(createMantineTheme, []);
+  return createElement(MantineProvider, {
+    theme,
+    withCssVariables: false,
+    getRootElement: () => undefined,
+  }, children);
+}
+
+export function NotePaneLinkToolbarController() {
+  const floatingUIOptions = useMemo(createFloatingCloseOptions, []);
+  return createElement(LinkToolbarController, { floatingUIOptions });
+}
+
+const CLOSING_MENU_CLASS = "notepane-floating-menu-closing";
+
+// When BlockNote hides the side menu or the table handles while their Mantine menu is open, the
+// popover swaps in the copy of its content it took before the menu opened, so the menu would
+// vanish at once instead of fading. A copy of the menu as it last looked fades out in its place.
+// The copy takes no pointer, keyboard or accessibility focus. The copy is taken while the menu is
+// still in the document, from the opacity it has reached, and shown only if React then removed the
+// menu: a menu Mantine keeps to fade out itself, or one it already faded out, gets none.
+export function fadeOutDetachedMenu(menu) {
+  if (!menu?.isConnected || !isEditorMotionAllowed(menu)) {
+    return;
+  }
+  const style = getComputedStyle(menu);
+  const duration = readMotionDuration(menu, "--notepane-motion-floating-close-duration");
+  if (Number(style.opacity) < 0.5 || !(duration > 0)) {
+    return;
+  }
+  const rect = menu.getBoundingClientRect();
+  const copy = menu.cloneNode(true);
+  copy.inert = true;
+  copy.setAttribute("aria-hidden", "true");
+  copy.classList.add(CLOSING_MENU_CLASS);
+  for (const element of [copy, ...copy.querySelectorAll("[id]")]) {
+    element.removeAttribute("id");
+  }
+  const host = menu.closest(".bn-root") ?? menu.ownerDocument.body;
+  queueMicrotask(() => {
+    if (!menu.isConnected && host.isConnected) {
+      showClosingCopy(menu, copy, host, rect, style.opacity, duration);
+    }
+  });
+}
+
+function showClosingCopy(menu, copy, host, rect, opacity, duration) {
+  host.append(copy);
+  const containingRect = getFixedPositionContainingRect(copy);
+  for (const [property, value] of Object.entries({
+    position: "fixed",
+    left: `${rect.left - containingRect.left}px`,
+    top: `${rect.top - containingRect.top}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    "box-sizing": "border-box",
+    margin: "0",
+    transform: "none",
+    animation: "none",
+    "pointer-events": "none",
+  })) {
+    copy.style.setProperty(property, value, "important");
+  }
+  const fade = copy.animate([{ opacity }, { opacity: 0 }], {
+    duration,
+    easing: getComputedStyle(host).getPropertyValue("--notepane-motion-ease-out").trim() || "ease-out",
+    fill: "forwards",
+  });
+  fade.onfinish = () => copy.remove();
+  fade.oncancel = () => copy.remove();
+}
+
+// Rendered inside a menu's dropdown: it mounts when the menu opens and its cleanup runs before
+// React takes the dropdown out of the document.
+export function useFadeOutWhenDetached(menuSelector) {
+  useLayoutEffect(() => {
+    const menu = document.querySelector(`${menuSelector}:not(.${CLOSING_MENU_CLASS})`);
+    return () => fadeOutDetachedMenu(menu);
+  }, [menuSelector]);
+}
 
 export const FLOATING_EDITOR_MENU_MARGIN = 8;
 
@@ -125,7 +271,7 @@ export function repositionBlockNoteFloatingMenus() {
   for (const element of document.querySelectorAll(BLOCKNOTE_FLOATING_MENU_SELECTOR)) {
     if (
       !(element instanceof HTMLElement) ||
-      element.closest(".editor-floating-menu")
+      element.closest(`.editor-floating-menu, .${CLOSING_MENU_CLASS}`)
     ) {
       continue;
     }

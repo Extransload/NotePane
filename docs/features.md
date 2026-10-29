@@ -105,7 +105,15 @@ BlockNote handles editor interaction directly.
 - Table handles: a row or column handle selects its whole row or column, outlined as one rectangle, and opens
   Notion's menu: header row or column switch (first row or column), colour, insert above/below or left/right,
   duplicate (tables without merged cells), clear contents and delete
-- Table block menu (six-dot handle): fit to width, header row and header column switches
+- Table block menu (six-dot handle): fit to width (to the text column), header row and header column switches
+- Wide tables, as in Notion: a top-level table whose columns add up to more than the text column keeps its left edge
+  on the column and grows right, up to 24px short of the editor's edge (and short of the table of contents rail),
+  before it scrolls. Tables in columns, lists and toggles stay inside their block
+- Editor motion: a toggle's children open and close with their height and the chevron turns; blocks you create
+  (Enter, the slash menu, a paste, a drop) rise in once, and a loaded or switched note does not; blocks moved by drag
+  and drop or `Command/Ctrl + Shift + Up/Down` glide to their new place; a checklist box pops when it is ticked. The
+  slash menu, the formatting and link toolbars, the six-dot block menu and the table handle menus close with a short
+  fade that takes no clicks. All of it is off under reduced motion and in print and export
 - The six-dot block menu stays inside the editor: when the sidebar leaves no room on the handle's left, it opens on its
   right
 - `Command/Ctrl + A` selects all editor blocks
