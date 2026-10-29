@@ -493,16 +493,12 @@
   opacity: 0.72;
 }
 
-/* Highlighted blocks take the active theme's code theme (src/editor/codeHighlighter.js), which
-   sets the --prosemirror-highlight variables on the block; plain text blocks take the theme's
-   code tokens. Outside NotePane Light and Dark the two backgrounds are the same colour. */
+/* A code block is one surface, --sticky-code-surface (src/style/themeTokens.js), which stands a
+   clear lightness step apart from the page in every theme; highlighted text keeps the colours
+   the code theme (src/editor/codeHighlighter.js) sets as --prosemirror-highlight. */
 .bn-editor [data-content-type="codeBlock"],
-.bn-editor [data-content-type="codeBlock"] > pre,
 .bn-editor pre {
-  background-color: var(
-    --prosemirror-highlight-bg,
-    var(--sticky-code-bg)
-  ) !important;
+  background-color: var(--sticky-code-surface) !important;
   color: var(--prosemirror-highlight, var(--sticky-code-text)) !important;
 }
 
@@ -599,9 +595,12 @@
   stroke-width: 2;
 }
 
+/* Only the block paints: a pre filling the block's width would cover its inset edge down both
+   sides. */
 .bn-editor [data-content-type="codeBlock"] > pre,
 .bn-editor [data-content-type="codeBlock"] pre {
   border-radius: inherit;
+  background-color: transparent !important;
 }
 
 .bn-editor [data-content-type="codeBlock"] > div > select {

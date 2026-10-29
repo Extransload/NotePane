@@ -291,6 +291,14 @@ Code blocks are highlighted with the theme's Shiki theme: GitHub dark in NotePan
 bundled theme in the others. A theme change re-highlights the open code blocks without saving the note or touching
 undo history.
 
+A code block's background is `--sticky-code-surface` (`codeSurfaceColour` in `src/style/themeTokens.js`), the same for
+highlighted and plain blocks: the code theme's background where it already stands 0.06 OKLab lightness from the page,
+otherwise the page raised towards the code text by just enough. Most themes paint code on their page colour, which
+left a block marked only by its edge. The raise never takes the code text below 4.5:1, or below what it already reads
+at on the page, so Everforest Light, Solarized Dark and Light and Material Lighter stand apart by less or only by the
+edge. NotePane Light keeps GitHub dark's `#24292e`, and NotePane Dark takes GitHub dark dimmed's `#2d333b`. Only the
+block paints: the `pre` inside is transparent, so the block's 1px inset edge shows on every side.
+
 The theme is global for the whole app. Switching sidebar sessions or opening another sticky window does not change it.
 The main process passes the theme id in each new window's URL, and the renderer applies the theme before React mounts,
 so a window opened under a dark theme never shows a light frame. On Windows, where windows are opaque, the window

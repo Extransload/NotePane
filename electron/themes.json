@@ -107,7 +107,8 @@
       "--notepane-selection-bg": "var(--notepane-focus-ring)",
       "--notepane-link": "#0000ee",
       "--notepane-focus-outline": "var(--notepane-input-focus-border)",
-      "--notepane-control-accent-hover": "#2677c7"
+      "--notepane-control-accent-hover": "#2677c7",
+      "--sticky-code-surface": "#24292e"
     },
     "overrideReasons": [
       {
@@ -297,6 +298,12 @@
           "--notepane-control-accent-hover"
         ],
         "reason": "Mantine's primary hover is NotePane's control accent #2383e2 mixed 15% toward the text colour (#2677c7), so it matches the button it hovers; the derivation starts from the purple accent."
+      },
+      {
+        "tokens": [
+          "--sticky-code-surface"
+        ],
+        "reason": "Code blocks keep the background of GitHub dark, the code theme their highlighting is drawn for; the derivation starts from the palette's darker code background."
       }
     ],
     "noteChrome": {
@@ -488,7 +495,8 @@
       "--notepane-selection-bg": "var(--notepane-focus-ring)",
       "--notepane-link": "#9e9eff",
       "--notepane-focus-outline": "var(--notepane-input-focus-border)",
-      "--notepane-control-accent-hover": "#4294e4"
+      "--notepane-control-accent-hover": "#4294e4",
+      "--sticky-code-surface": "#2d333b"
     },
     "overrideReasons": [
       {
@@ -699,6 +707,12 @@
           "--notepane-control-accent-hover"
         ],
         "reason": "Mantine's primary hover is NotePane's control accent #2383e2 mixed 15% toward the text colour (#4294e4), so it matches the button it hovers; the derivation starts from the lavender accent."
+      },
+      {
+        "tokens": [
+          "--sticky-code-surface"
+        ],
+        "reason": "Code blocks take GitHub dark dimmed's #2d333b: GitHub dark's own #24292e, the code theme the highlighting is drawn for, sat too close to the #191919 page; the derivation starts from the palette's darker code background."
       }
     ],
     "noteChrome": {

@@ -1,7 +1,9 @@
 import {
+  getContrastRatio,
   getContrastingTextColor,
   getRelativeLuminance,
   hexToCssRgb,
+  hexToOklab,
   hexToRgb,
   mixHexColors,
   readableOn,
@@ -20,6 +22,39 @@ export const NAMED_COLOURS = ["gray", "brown", "red", "orange", "yellow", "green
 export function resolveLinkColor(theme) {
   const { overrides = {}, palette } = theme;
   return overrides["--notepane-link"] ?? readableOn(palette.blue, [palette.window], palette.text);
+}
+
+// How far a code block's lightness stands from the page, in OKLab L.
+export const CODE_SURFACE_STEP = 0.06;
+export const CODE_TEXT_CONTRAST = 4.5;
+
+/**
+ * The background of a code block, so it reads as its own surface: the code theme's background
+ * where that is already a clear step lighter or darker than the page, and otherwise the page
+ * raised towards the code text by just enough. Most themes paint code on their page colour, which
+ * left a block distinguishable only by its 1px edge. The code text never gets harder to read than
+ * 4.5:1, or than it already is on the page where a theme's code text sits below that, so on a
+ * light page with mid-grey code text the raise stops short of the full step.
+ */
+export function codeSurfaceColour(page, codeBg, codeText) {
+  const pageLightness = hexToOklab(page).l;
+  const standsApart = (colour) => Math.abs(hexToOklab(colour).l - pageLightness) >= CODE_SURFACE_STEP;
+  if (standsApart(codeBg)) {
+    return codeBg;
+  }
+  const readableFloor = Math.min(CODE_TEXT_CONTRAST, getContrastRatio(codeText, page));
+  let surface = page;
+  for (let percent = 1; percent < 50; percent += 1) {
+    const raised = mixHexColors(page, codeText, percent / 100);
+    if (getContrastRatio(codeText, raised) < readableFloor) {
+      break;
+    }
+    surface = raised;
+    if (standsApart(raised)) {
+      break;
+    }
+  }
+  return surface;
 }
 
 // Strength of derived values per scheme: [light, dark].
@@ -215,6 +250,7 @@ export function buildThemeTokens(theme) {
     "--sticky-control-hover-bg": hexToCssRgb(hoverBase, s("controlHover")),
     "--sticky-danger-color": palette.danger,
     "--sticky-code-bg": palette.codeBg,
+    "--sticky-code-surface": codeSurfaceColour(palette.window, palette.codeBg, palette.codeText),
     "--sticky-code-text": palette.codeText,
     "--sticky-code-border": hexToCssRgb(palette.codeMuted, s("codeBorder")),
     "--sticky-code-muted": palette.codeMuted,

@@ -501,6 +501,28 @@ test("the code block colour scheme follows the code background", async () => {
   }
 });
 
+test("a code block stands apart from the page as far as its text stays readable, in every theme", async () => {
+  const { buildThemeTokens, CODE_SURFACE_STEP, CODE_TEXT_CONTRAST } = await loadTokens();
+  const { listThemes } = await loadThemes();
+  const { SENTINEL_THEMES } = await import("../../src/style/sentinelThemes.js");
+  const colorMath = await loadColorMath();
+  for (const theme of [...listThemes(), ...SENTINEL_THEMES]) {
+    const tokens = buildThemeTokens(theme);
+    const surface = tokens["--sticky-code-surface"];
+    const page = tokens["--sticky-editor-bg"];
+    const apart = Math.abs(colorMath.hexToOklab(surface).l - colorMath.hexToOklab(page).l);
+    const contrast = colorMath.getContrastRatio(theme.palette.codeText, surface);
+    // Never harder to read than 4.5:1, or than on the page where the theme's code text is below it.
+    const floor = Math.min(CODE_TEXT_CONTRAST, colorMath.getContrastRatio(theme.palette.codeText, page));
+    assert.ok(contrast >= floor - 1e-9, `${theme.id} code text reads at ${contrast.toFixed(2)}:1 on ${surface}`);
+    // Short of the full step only where one more raise would take the code text below that floor.
+    if (apart < CODE_SURFACE_STEP) {
+      assert.ok(contrast < floor * 1.06,
+        `${theme.id} stops at ${apart.toFixed(3)} while its code text still reads at ${contrast.toFixed(2)}:1`);
+    }
+  }
+});
+
 // Tokens that replaced colours the stylesheets wrote as literals, which the tokens.css capture
 // predates. Each pins today's value in [NotePane Light, NotePane Dark]: the literal, or the
 // token the rule read. The dark tooltip frame was #2b2b2b, the dark chip colour.
@@ -612,6 +634,7 @@ const FLAT_SHADOW_TOKENS = {
 const ADDED_TOKENS = {
   "--sticky-callout-bg": ["rgb(55 53 47 / 0.05)", "rgb(241 241 239 / 0.08)"],
   "--icon-chrome-accent-color": ["#8b5cf6", "#c4b5fd"],
+  "--sticky-code-surface": ["#24292e", "#2d333b"],
 };
 
 // BlockNote variables whose tokens.css value never painted: BlockNote reads them only inside

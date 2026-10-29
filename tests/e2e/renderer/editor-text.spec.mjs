@@ -107,6 +107,8 @@ async function readCodeColours(page) {
       javascriptColorScheme: getComputedStyle(javascript).colorScheme,
       keyword: keyword ? getComputedStyle(keyword).color : null,
       plainBackground: getComputedStyle(plain).backgroundColor,
+      // The block alone paints: a pre painting too would cover the block's edge down its sides.
+      preBackgrounds: [...new Set(blocks.map((block) => getComputedStyle(block.querySelector("pre")).backgroundColor))],
     };
   });
 }
@@ -126,31 +128,44 @@ test("code blocks follow the theme", async ({ page }) => {
     window.__codeThemeNoReload = true;
   });
 
-  // NotePane: github-dark on a highlighted block, #0d1117 on a plain one.
+  // NotePane Light: github-dark highlighting on one GitHub dark surface, highlighted or plain.
+  const transparentPre = ["rgba(0, 0, 0, 0)"];
   const notePaneColours = {
     javascriptBackground: "rgb(36, 41, 46)",
     javascriptColorScheme: "dark",
     keyword: "rgb(249, 117, 131)",
-    plainBackground: "rgb(13, 17, 23)",
+    plainBackground: "rgb(36, 41, 46)",
+    preBackgrounds: transparentPre,
   };
   await expect.poll(() => readCodeColours(page)).toEqual(notePaneColours);
 
-  // Catppuccin Mocha: the catppuccin-mocha code theme, whose background #1e1e2e is the plain one too.
+  // Catppuccin Mocha paints code on its #1e1e2e page colour, so the block is that page raised
+  // towards the code text; the highlighting keeps the catppuccin-mocha colours.
   await selectAppTheme(page, "catppuccin-mocha");
   await expect.poll(() => readCodeColours(page)).toEqual({
-    javascriptBackground: "rgb(30, 30, 46)",
+    javascriptBackground: "rgb(44, 45, 62)",
     javascriptColorScheme: "dark",
     keyword: "rgb(203, 166, 247)",
-    plainBackground: "rgb(30, 30, 46)",
+    plainBackground: "rgb(44, 45, 62)",
+    preBackgrounds: transparentPre,
   });
 
-  // Catppuccin Latte: a light code block, so its colour scheme is light.
+  // Catppuccin Latte: a light code block, set a step darker than its #eff1f5 page.
   await selectAppTheme(page, "catppuccin-latte");
   await expect.poll(() => readCodeColours(page)).toEqual({
-    javascriptBackground: "rgb(239, 241, 245)",
+    javascriptBackground: "rgb(218, 220, 227)",
     javascriptColorScheme: "light",
     keyword: "rgb(136, 57, 239)",
-    plainBackground: "rgb(239, 241, 245)",
+    plainBackground: "rgb(218, 220, 227)",
+    preBackgrounds: transparentPre,
+  });
+
+  // NotePane Dark: GitHub dark dimmed's #2d333b, a clear step above the #191919 page.
+  await selectAppTheme(page, "notepane-dark");
+  await expect.poll(() => readCodeColours(page)).toEqual({
+    ...notePaneColours,
+    javascriptBackground: "rgb(45, 51, 59)",
+    plainBackground: "rgb(45, 51, 59)",
   });
 
   await selectAppTheme(page, "notepane-light");
@@ -211,7 +226,7 @@ test("the version history preview recolours its code blocks with the theme", { t
   await expect(block).toHaveCSS("background-color", "rgb(36, 41, 46)");
   await selectAppThemeThroughTestHook(page, "catppuccin-mocha");
   await expect(keyword).toHaveCSS("color", "rgb(203, 166, 247)");
-  await expect(block).toHaveCSS("background-color", "rgb(30, 30, 46)");
+  await expect(block).toHaveCSS("background-color", "rgb(44, 45, 62)");
   await selectAppThemeThroughTestHook(page, "notepane-light");
   await expect(keyword).toHaveCSS("color", "rgb(249, 117, 131)");
   await expect(block).toHaveCSS("background-color", "rgb(36, 41, 46)");

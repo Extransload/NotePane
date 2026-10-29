@@ -250,10 +250,14 @@ body.is-exporting .bn-editor [data-content-type] {
   color: var(--sticky-text-color) !important;
 }
 
-body.is-exporting .bn-editor [data-content-type="codeBlock"],
+body.is-exporting .bn-editor [data-content-type="codeBlock"] {
+  background-color: var(--sticky-code-bg) !important;
+  color: var(--sticky-code-text) !important;
+}
+
 body.is-exporting .bn-editor [data-content-type="codeBlock"] pre,
 body.is-exporting .bn-editor [data-content-type="codeBlock"] code {
-  background-color: var(--sticky-code-bg) !important;
+  background-color: transparent !important;
   color: var(--sticky-code-text) !important;
 }
 
