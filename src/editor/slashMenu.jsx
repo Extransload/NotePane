@@ -26,6 +26,7 @@ import {
 import {
   SLASH_MENU_MAX_HEIGHT,
 } from "../constants.js";
+import { setDividerSlashMenuItem } from "./divider.jsx";
 
 export function createSlashMenuFloatingUIOptions() {
   return {
@@ -146,6 +147,7 @@ export function NotePaneSlashMenuController({ editor, onImportMarkdown }) {
       },
     };
     const items = getDefaultReactSlashMenuItems(editor);
+    setDividerSlashMenuItem(items, editor);
     items.splice(items.findIndex((item) => item.key === "quote") + 1, 0, callout);
     const toggleHeading3Index = items.findIndex(
       (item) => item.key === "toggle_heading_3",

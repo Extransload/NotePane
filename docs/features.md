@@ -88,6 +88,9 @@ BlockNote handles editor interaction directly.
 - Check List
 - Toggle List
 - Code Block
+- Divider: a thin rule from `/divider`, or from `---` or `***` typed on an empty line; the caret moves on to
+  a line below it. Backspace on the empty line below selects it and Backspace again deletes it. Markdown writes it as
+  `---` and reads `---`, `***` and `___`
 - Table
 - File
 - Image

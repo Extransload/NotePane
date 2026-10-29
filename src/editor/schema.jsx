@@ -19,6 +19,7 @@ import { closeHistory } from "@tiptap/pm/history";
 import { InputRule, inputRules } from "@tiptap/pm/inputrules";
 import { TextSelection } from "@tiptap/pm/state";
 import { createCalloutBlockSpec } from "./callout.jsx";
+import { DividerMarkdownExport } from "./divider.jsx";
 import { indentCodeBlockLines } from "./codeFormatting.js";
 import {
   codeBlockOptions,
@@ -224,14 +225,14 @@ function createNotePaneCodeBlockSpec() {
 
 // BlockNote's `---` rule leaves the new divider node-selected, so the next key typed replaced it.
 // As in Notion, the caret moves on to an empty paragraph below the divider: the next block when it
-// is one, otherwise a new one. The rule only fires when `---` is all the block's text.
+// is one, otherwise a new one. The rule only fires when `---` (or `***`) is all the block's text.
 function createNotePaneDividerSpec() {
   const dividerShortcut = createExtension(({ editor }) => ({
     key: "notepane-divider-shortcut",
     prosemirrorPlugins: [
       inputRules({
         rules: [
-          new InputRule(/^---$/, (state, _match, start, end) => {
+          new InputRule(/^(?:---|\*\*\*)$/, (state, _match, start, end) => {
             const blockInfo = getBlockInfoFromSelection(state);
             if (
               !blockInfo.isBlockContainer ||
@@ -263,7 +264,7 @@ function createNotePaneDividerSpec() {
   }))();
   return {
     ...defaultBlockSpecs.divider,
-    extensions: [dividerShortcut],
+    extensions: [dividerShortcut, DividerMarkdownExport],
   };
 }
 
