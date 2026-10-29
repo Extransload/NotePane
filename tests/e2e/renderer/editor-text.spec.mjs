@@ -2019,11 +2019,14 @@ test("pops a checklist box when it is ticked, not when it is cleared", async ({ 
 
 // Records every BlockNote floating surface that starts to close: a popover's closing copy or a
 // Mantine menu fading out (both take no pointer), and the copy NotePane fades in place of a menu its
-// popover took away. Installed before the closing action, so a short fade is never missed.
+// popover took away. Installed before the closing action, so a short fade is never missed. A Mantine
+// menu also takes no pointer for the first frame of its opening, so a surface counts only once it
+// has been open; NotePane's copy is closing from the start.
 async function recordClosingFloatingUI(page) {
   await page.evaluate(() => {
     window.__closingFloatingUI = [];
     const seen = new WeakSet();
+    const opened = new WeakSet();
     const kinds = [
       ["slash menu", "div:has(> .bn-suggestion-menu)"],
       ["formatting toolbar", "div:has(> .bn-formatting-toolbar)"],
@@ -2035,7 +2038,11 @@ async function recordClosingFloatingUI(page) {
       for (const [kind, selector] of kinds) {
         for (const element of document.querySelectorAll(selector)) {
           const style = getComputedStyle(element);
-          if (seen.has(element) || style.pointerEvents !== "none") continue;
+          if (style.pointerEvents !== "none") {
+            opened.add(element);
+            continue;
+          }
+          if (seen.has(element) || (kind !== "block menu copy" && !opened.has(element))) continue;
           seen.add(element);
           const fade = element.getAnimations().find((animation) => !animation.transitionProperty);
           window.__closingFloatingUI.push({

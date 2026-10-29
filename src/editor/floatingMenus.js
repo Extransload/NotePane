@@ -54,7 +54,10 @@ function createMantineTheme() {
               out: { opacity: 0, pointerEvents: "none" },
               transitionProperty: "opacity",
             },
-            duration: 0,
+            // Not 0: Mantine's Transition renders a zero-duration open through another branch, so
+            // the close would remount the dropdown, and an autofocused field in it (the file
+            // caption form) would take focus back from the editor while it fades.
+            duration: 1,
             exitDuration: readFloatingCloseDuration(),
           },
         },
