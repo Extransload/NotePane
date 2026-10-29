@@ -34,8 +34,13 @@ async function showSessionUndoToast(page) {
   return undoToast;
 }
 
+// The bar redraws every frame, so it is read from a frame drawn after the pointer moved.
 const readTimeLeft = (timeBar) =>
-  timeBar.evaluate((element) => Number(element.style.getPropertyValue("--sticky-toast-time-left")));
+  timeBar.evaluate((element) => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      resolve(Number(element.style.getPropertyValue("--sticky-toast-time-left")));
+    }));
+  }));
 
 test("holds the undo toast and its time bar while the pointer rests on it", async ({ page }) => {
   await page.clock.install();
