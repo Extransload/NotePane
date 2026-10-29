@@ -44,6 +44,10 @@
 - Toggle Tab/Sticky mode: `Command/Ctrl + Shift + T`
 - Open export menu: `Command/Ctrl + Shift + E`
 - Delayed hover tooltips for clickable controls
+- Short entrance motion: menus, popovers and the colour panel fade in (the slash menu and NotePane's own menus also
+  slide a few pixels from their anchor), the sidebar slides between its width and the compact rail, Preferences and
+  search fade in, and a switched note fades in. Closing stays instant, and the motion is off when the system asks for
+  reduced motion and in print and export
 - Window bounds persistence
 - Editor area is explicitly non-drag so BlockNote mouse interactions remain intact
 - Single share-style export icon with PDF/Markdown format choices
@@ -67,6 +71,8 @@ BlockNote handles editor interaction directly.
   Notion's menu: header row or column switch (first row or column), colour, insert above/below or left/right,
   duplicate (tables without merged cells), clear contents and delete
 - Table block menu (six-dot handle): fit to width, header row and header column switches
+- The six-dot block menu stays inside the editor: when the sidebar leaves no room on the handle's left, it opens on its
+  right
 - `Command/Ctrl + A` selects all editor blocks
 - `Command/Ctrl + X` cuts/removes the current block when no text is selected
 - Search notes: `Command/Ctrl + P` searches titles and bodies of every note outside Trash and opens the chosen note at its first match

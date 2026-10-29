@@ -16,6 +16,7 @@ import {
   moveSessionToTrash,
   openStickyActionBar,
   waitForEditorSelection,
+  waitForSidebarToSettle,
 } from "../support/renderer-helpers.mjs";
 
 test.beforeEach(async ({ page }) => {
@@ -193,6 +194,7 @@ test("keeps the sidebar compact when creating a session", async ({ page }) => {
 
   await page.getByRole("button", { name: "Hide sidebar" }).click();
   await expect(sidebar).toHaveAttribute("data-sidebar-state", "compact");
+  await waitForSidebarToSettle(page);
 
   const compactWidth = await sidebar.evaluate((element) =>
     Math.round(element.getBoundingClientRect().width),
@@ -313,6 +315,7 @@ test("resizes and collapses the sidebar from its right edge", async ({ page }) =
   await expect(page.getByTestId("session-sidebar")).toHaveAttribute("data-sidebar-state", "expanded");
   await expect(page.getByTestId("session-sidebar").getByRole("button", { name: "Hide sidebar" }))
     .toBeVisible();
+  await waitForSidebarToSettle(page);
   const expandedFooterMetrics = await page.evaluate(() => {
     const footer = document.querySelector("[data-testid='session-sidebar-footer']");
     const layoutButton = footer.querySelector(".layout-mode-button");

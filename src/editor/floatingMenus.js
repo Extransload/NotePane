@@ -155,18 +155,31 @@ export function keepSubpanelInsideViewport(element) {
   }
 }
 
+// A menu fading in (src/styles/motion.css) starts transparent; it is already shown and placed.
+const MENU_ENTRANCE_ANIMATION = "notepaneMenuFadeIn";
+
+function isEnteringMenu(element) {
+  return element.getAnimations().some(
+    (animation) => animation.animationName === MENU_ENTRANCE_ANIMATION,
+  );
+}
+
+function isHiddenFloatingMenu(element, computedStyle) {
+  return (
+    computedStyle.display === "none" ||
+    computedStyle.visibility === "hidden" ||
+    (Number(computedStyle.opacity) <= 0.01 && !isEnteringMenu(element)) ||
+    element.getAttribute("aria-hidden") === "true"
+  );
+}
+
 export function isNestedBlockNoteFloatingMenu(element) {
   return Boolean(element.parentElement?.closest(BLOCKNOTE_FLOATING_MENU_SELECTOR));
 }
 
 export function keepElementInsideViewport(element) {
   const computedStyle = window.getComputedStyle(element);
-  if (
-    computedStyle.display === "none" ||
-    computedStyle.visibility === "hidden" ||
-    Number(computedStyle.opacity) <= 0.01 ||
-    element.getAttribute("aria-hidden") === "true"
-  ) {
+  if (isHiddenFloatingMenu(element, computedStyle)) {
     return;
   }
 
@@ -201,11 +214,14 @@ export function keepElementInsideViewport(element) {
     measuredHeight,
     maxHeight,
   );
-  const left = clamp(
+  let left = clamp(
     rect.left,
     margin,
     Math.max(margin, viewportWidth - desiredWidth - margin),
   );
+  if (element.matches(BLOCK_MENU_SELECTOR)) {
+    left = keepBlockMenuInsideEditorSurface(element, left, desiredWidth);
+  }
   const top = clamp(
     rect.top,
     margin,
@@ -224,14 +240,38 @@ export function keepElementInsideViewport(element) {
   setImportantStyle(element, "overflow", allowsVisibleOverflow ? "visible" : "auto");
 }
 
+const BLOCK_MENU_SELECTOR = ".bn-drag-handle-menu";
+
+// The six-dot block menu opens on the left of its handle. Beside the sidebar there is no room
+// for it there inside the editor surface, so it opens on the right of the handle instead.
+function keepBlockMenuInsideEditorSurface(element, left, width) {
+  const surface = document.querySelector(".sticky-editor-surface");
+  const sideMenu = element.closest(".bn-side-menu");
+  if (!surface || !sideMenu) {
+    return left;
+  }
+
+  const margin = FLOATING_EDITOR_MENU_MARGIN;
+  const surfaceRect = surface.getBoundingClientRect();
+  const minLeft = surfaceRect.left + margin;
+  if (left >= minLeft) {
+    return left;
+  }
+
+  const maxLeft = Math.max(
+    minLeft,
+    Math.min(surfaceRect.right, window.innerWidth) - width - margin,
+  );
+  return clamp(
+    sideMenu.getBoundingClientRect().right + FLOATING_EDITOR_MENU_GAP,
+    minLeft,
+    maxLeft,
+  );
+}
+
 export function keepNestedElementInsideViewport(element) {
   const computedStyle = window.getComputedStyle(element);
-  if (
-    computedStyle.display === "none" ||
-    computedStyle.visibility === "hidden" ||
-    Number(computedStyle.opacity) <= 0.01 ||
-    element.getAttribute("aria-hidden") === "true"
-  ) {
+  if (isHiddenFloatingMenu(element, computedStyle)) {
     return;
   }
 

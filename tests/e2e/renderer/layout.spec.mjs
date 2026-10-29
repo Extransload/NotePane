@@ -514,3 +514,63 @@ test("keeps fast typing inside React's nested update limit", async ({ page }) =>
     .toBeVisible();
   expect(errors).toEqual([]);
 });
+
+async function openFirstBlockMenu(page) {
+  const heading = page.getByRole("heading", { name: "NotePane", exact: true });
+  const rect = await heading.boundingBox();
+  await page.mouse.move(rect.x + 40, rect.y + rect.height / 2);
+  await page.locator(".bn-side-menu").getByRole("button", { name: "Open block menu" }).click();
+  const blockMenu = page.locator(".bn-drag-handle-menu:visible");
+  await expect(blockMenu).toBeVisible();
+  return blockMenu;
+}
+
+const getAnimationName = (locator) =>
+  locator.evaluate((element) => getComputedStyle(element).animationName);
+
+test("animates menus and panels open unless the system asks for reduced motion", async ({ page }) => {
+  await loadTemplatePreview(page);
+  const editorSurface = page.getByTestId("sticky-editor-surface");
+  const preferencesWindow = page.getByRole("dialog", { name: "Preferences window" });
+  const blockMenu = await openFirstBlockMenu(page);
+  expect(await getAnimationName(blockMenu)).toBe("notepaneMenuFadeIn");
+  expect(await getAnimationName(editorSurface)).toBe("notepaneMenuFadeIn");
+  await page.keyboard.press("Escape");
+  await expect(blockMenu).toHaveCount(0);
+  await page.keyboard.press(modifierShortcut(","));
+  expect(await getAnimationName(preferencesWindow)).toBe("notepaneDialogIn");
+  await preferencesWindow.getByRole("button", { name: "Close preferences" }).click();
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(await getAnimationName(editorSurface)).toBe("none");
+  await page.keyboard.press(modifierShortcut(","));
+  expect(await getAnimationName(preferencesWindow)).toBe("none");
+  await preferencesWindow.getByRole("button", { name: "Close preferences" }).click();
+  const reducedBlockMenu = await openFirstBlockMenu(page);
+  expect(await getAnimationName(reducedBlockMenu)).toBe("none");
+  await page.getByRole("menuitem", { name: "Turn into" }).click();
+  const turnIntoPanel = page.locator(".notepane-block-menu-subpanel[data-panel='turn-into']");
+  await expect(turnIntoPanel).toBeVisible();
+  expect(await getAnimationName(turnIntoPanel)).toBe("none");
+});
+
+test("opens the first block's six-dot menu inside the editor surface, clear of the sidebar", async ({ page }) => {
+  await page.setViewportSize({ width: 1180, height: 760 });
+  await loadTemplatePreview(page);
+  const blockMenu = await openFirstBlockMenu(page);
+
+  await expect.poll(() => blockMenu.evaluate((menu) => {
+    const menuRect = menu.getBoundingClientRect();
+    const surfaceRect = document.querySelector("[data-testid='sticky-editor-surface']")
+      .getBoundingClientRect();
+    const handleRect = document.querySelector(".bn-side-menu").getBoundingClientRect();
+    return {
+      insideSurface:
+        menuRect.left >= surfaceRect.left &&
+        menuRect.right <= surfaceRect.right &&
+        menuRect.top >= surfaceRect.top &&
+        menuRect.bottom <= surfaceRect.bottom,
+      rightOfHandle: menuRect.left >= handleRect.right,
+    };
+  })).toEqual({ insideSurface: true, rightOfHandle: true });
+});
