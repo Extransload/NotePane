@@ -391,17 +391,11 @@ function App({ bindTestThemeSetter }) {
     };
   }, []);
 
-  // A theme the user picks, here or in another window, cross-fades in; the stored theme read at
-  // startup does not, so a window never fades on its first paint.
-  const showAppTheme = useCallback((nextAppTheme) => {
-    runThemeTransition(nextAppTheme.themeId, () => flushSync(() => setAppTheme(nextAppTheme)));
-  }, []);
-
   useEffect(() => {
     return electronApi?.onAppThemeChanged?.((nextAppTheme) => {
-      showAppTheme(normalizeAppTheme(nextAppTheme));
+      setAppTheme(normalizeAppTheme(nextAppTheme));
     });
-  }, [showAppTheme]);
+  }, []);
 
   useEffect(() => {
     return electronApi?.onLayoutModeChanged?.((nextLayoutMode) => {
@@ -461,11 +455,23 @@ function App({ bindTestThemeSetter }) {
     };
   }, []);
 
-  const updateAppTheme = useCallback(async (themeId) => {
+  const updateAppTheme = useCallback(async (themeId, { crossFade = false } = {}) => {
     const nextAppTheme = normalizeAppTheme({ themeId });
-    showAppTheme(nextAppTheme);
+    if (crossFade) {
+      runThemeTransition(nextAppTheme.themeId, () => flushSync(() => setAppTheme(nextAppTheme)));
+    } else {
+      setAppTheme(nextAppTheme);
+    }
     await electronApi?.updateAppTheme?.(nextAppTheme);
-  }, [showAppTheme]);
+  }, []);
+
+  // A theme picked in Preferences cross-fades in this window. A view transition drops the
+  // pointer's hover for its length, so other windows, which take the change over IPC and may have
+  // a hovered menu or tooltip open, switch at once, as do the startup load and the test hook.
+  const pickAppTheme = useCallback(
+    (themeId) => updateAppTheme(themeId, { crossFade: true }),
+    [updateAppTheme],
+  );
 
   // Dev-only test hook (src/style/sentinelThemes.js); null in production.
   useEffect(() => bindTestThemeSetter?.(updateAppTheme), [bindTestThemeSetter, updateAppTheme]);
@@ -533,7 +539,7 @@ function App({ bindTestThemeSetter }) {
         onPurgeTrashedNote={purgeTrashedNote}
         onSelectNote={selectNote}
         onNoteChanged={updateNoteInList}
-        onAppThemeChanged={updateAppTheme}
+        onAppThemeChanged={pickAppTheme}
         onLayoutModeChanged={updateLayoutMode}
         onReorderNotes={reorderNotes}
         onSessionMovedToTrash={showSessionMovedToTrashToast}

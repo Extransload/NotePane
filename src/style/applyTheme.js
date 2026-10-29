@@ -68,7 +68,8 @@ function declareReferencingTokensOnBody(ownerDocument, tokens) {
  * colours cross-fade into the new ones (src/styles/motion.css sets its timing). `update` must
  * apply the theme synchronously. It runs at once, without a transition, where the View
  * Transitions API is missing, under reduced motion, during an export, and when `themeId` is
- * already applied, as when the main process echoes this window's own change back.
+ * already applied. A view transition drops the pointer's hover while it runs, so only a theme the
+ * user picks in this window should go through here.
  */
 export function runThemeTransition(themeId, update, ownerDocument = document) {
   const canCrossFade =
