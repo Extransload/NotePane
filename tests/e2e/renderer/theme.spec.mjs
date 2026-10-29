@@ -240,3 +240,43 @@ test("Preferences no longer shows the Theme mode switch", async ({ page }) => {
   await expect(preferences.getByRole("radiogroup", { name: "App theme" })).toBeVisible();
   await expect(page.getByRole("switch", { name: "Theme mode" })).toHaveCount(0);
 });
+
+test("filters the cards by scheme and name, with arrow keys inside the visible cards", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  const preferences = await openPreferences(page);
+  const picker = preferences.getByRole("radiogroup", { name: "App theme" });
+  const cards = picker.getByRole("radio");
+  const chips = preferences.getByRole("group", { name: "Theme scheme" });
+  const search = preferences.getByRole("searchbox", { name: "Filter themes" });
+  const darkThemes = THEMES.filter((theme) => theme.scheme === "dark");
+  await expect(chips.getByRole("button", { name: "All" })).toHaveAttribute("aria-pressed", "true");
+
+  await chips.getByRole("button", { name: "Dark" }).click();
+  await expect(cards).toHaveCount(darkThemes.length);
+  for (const [index, theme] of darkThemes.entries()) {
+    await expect(cards.nth(index)).toHaveAccessibleName(theme.label);
+  }
+  // NotePane Light is checked but filtered out, so the first visible card is the tab stop.
+  await expect(picker.locator("[role='radio'][tabindex='0']")).toHaveCount(1);
+  await expect(cards.first()).toHaveAttribute("tabindex", "0");
+
+  await cards.first().focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(cards.nth(1)).toBeFocused();
+  await expectAppliedTheme(page, darkThemes[1].id);
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await expect(cards.last()).toBeFocused();
+  await expectAppliedTheme(page, darkThemes.at(-1).id);
+
+  await search.fill("catppuccin");
+  await expect(cards).toHaveText(["Catppuccin Frappé", "Catppuccin Macchiato", "Catppuccin Mocha"]);
+  await search.fill("no such theme");
+  await expect(cards).toHaveCount(0);
+  await expect(preferences.getByRole("status").filter({ hasText: "No themes match." })).toBeVisible();
+
+  await search.fill("");
+  await chips.getByRole("button", { name: "All" }).click();
+  await expect(cards).toHaveCount(PICKER_LABELS.length);
+});

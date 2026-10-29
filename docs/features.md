@@ -21,7 +21,8 @@
   the breakpoint
 - 52 app themes: NotePane Light (default) and NotePane Dark, Catppuccin Latte, Frappé, Macchiato and Mocha, Nord,
   Dracula and Tokyo Night, followed by 43 palettes adapted from TablePeek
-- Theme picker in Preferences > General > App theme: preview cards that apply the theme at once to every window
+- Theme picker in Preferences > General > App theme: preview cards that apply the theme at once to every window;
+  All / Light / Dark chips and a name filter narrow the cards, and arrow keys move within the cards shown
 - Every colour comes from the selected theme, code block syntax colours included
 - Session and sticky colours are shown in each theme's tone (tone matching): the hue is kept, the stored colour never
   changes, and text on it stays readable
