@@ -75,7 +75,9 @@ BlockNote handles editor interaction directly.
 - Table block menu (six-dot handle): fit to width, header row and header column switches
 - `Command/Ctrl + A` selects all editor blocks
 - `Command/Ctrl + X` cuts/removes the current block when no text is selected
-- Search notes: `Command/Ctrl + P` searches titles and bodies of every note outside Trash and opens the chosen note at its first match
+- Search notes: `Command/Ctrl + P` searches titles and bodies of every note outside Trash and opens the chosen note at its first match.
+  The palette is as tall as its results, up to 70% of the window, and scrolls past that with the keyboard selection
+  kept in view; each result shows its match count ("7 matches") and when the note was last edited ("5 min. ago")
 - Find in note: `Command/Ctrl + F` highlights matches, steps with `Enter` / `Shift + Enter`, and expands collapsed toggles that hold the current match
 - Editor typography control with searchable font family dropdown and installed macOS font discovery where supported
 
