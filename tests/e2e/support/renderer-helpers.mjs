@@ -493,6 +493,15 @@ export async function expectAdaptiveTooltipPlacement(page, label, expectedPlacem
   });
 }
 
+// The sidebar slides between its full width and the compact rail; measure it once it rests.
+export async function waitForSidebarToSettle(page) {
+  await page.getByTestId("session-sidebar").evaluate((sidebar) =>
+    Promise.all(
+      sidebar.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => {})),
+    ),
+  );
+}
+
 export async function getHeaderHeight(page) {
   return await page.evaluate(() => {
     return document.querySelector("[data-testid='sticky-header']")

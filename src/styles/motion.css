@@ -11,6 +11,7 @@
 
 :root {
   --notepane-motion-menu-duration: 140ms;
+  --notepane-motion-panel-duration: 180ms;
   --notepane-motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --notepane-motion-shift: 4px;
 }
@@ -43,20 +44,16 @@
 }
 
 /* The slash menu and the formatting toolbar sit in a floating wrapper that BlockNote already
-   fades, over 250ms. The wrapper keeps that fade at the menu duration, and the menu only moves. */
+   fades, over 250ms. The wrapper keeps that fade at the menu duration. The slash menu also moves;
+   the toolbar remounts as the selection changes, so it only fades. */
 div:has(> .bn-suggestion-menu),
 div:has(> .bn-formatting-toolbar) {
   transition-duration: var(--notepane-motion-menu-duration) !important;
   transition-timing-function: var(--notepane-motion-ease-out) !important;
 }
 
-.bn-suggestion-menu,
-.bn-formatting-toolbar {
+.bn-suggestion-menu {
   animation: notepaneMenuSettle var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out);
-}
-
-.bn-formatting-toolbar {
-  --notepane-menu-from-y: var(--notepane-motion-shift);
 }
 
 .color-panel {
@@ -76,18 +73,68 @@ div:has(> .bn-formatting-toolbar) {
   animation-name: notepaneMenuIn;
 }
 
+@keyframes notepaneDialogIn {
+  from {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+
+/* The sidebar slides between its width and the compact rail. A drag on the resize handle sets
+   the width on every pointer move, so the width follows the pointer while the handle is held. */
+.session-sidebar {
+  transition:
+    background 160ms ease,
+    flex-basis var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out),
+    width var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out),
+    min-width var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
+}
+
+.sticky-body:has(.sidebar-resize-handle:active) .session-sidebar {
+  transition: background 160ms ease;
+}
+
+.session-sidebar:not(.is-compact) :is(
+  .brand-wordmark,
+  .session-name,
+  .session-tab-trailing,
+  .session-add-button span:last-child
+) {
+  animation: notepaneMenuFadeIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
+}
+
+.preferences-backdrop,
+.search-palette-backdrop {
+  animation: notepaneMenuFadeIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
+}
+
+.preferences-window,
+.markdown-import-dialog {
+  animation: notepaneDialogIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
+}
+
+.search-palette {
+  animation: notepaneMenuIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
+}
+
+/* StickyEditor remounts for each note, so a session switch fades the new note in. Only opacity
+   moves: the editor takes focus at once, and fixed-position children keep their frame. */
+.sticky-editor-surface {
+  animation: notepaneMenuFadeIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
+}
+
 @media (prefers-reduced-motion: reduce) {
   div:has(> .bn-suggestion-menu),
   div:has(> .bn-formatting-toolbar),
   .bn-menu-dropdown,
-  .mantine-Popover-dropdown {
+  .mantine-Popover-dropdown,
+  .session-sidebar {
     transition: none !important;
   }
 
   .bn-menu-dropdown,
   .mantine-Popover-dropdown,
   .bn-suggestion-menu,
-  .bn-formatting-toolbar,
   .notepane-block-menu-subpanel,
   .color-panel,
   .session-tab-context-menu,
@@ -95,7 +142,19 @@ div:has(> .bn-formatting-toolbar) {
   .notepane-dropdown-menu,
   .adaptive-tooltip,
   .app-zoom-gauge,
-  .sticky-toast {
+  .sticky-toast,
+  .session-sidebar :is(
+    .brand-wordmark,
+    .session-name,
+    .session-tab-trailing,
+    .session-add-button span:last-child
+  ),
+  .preferences-backdrop,
+  .search-palette-backdrop,
+  .preferences-window,
+  .markdown-import-dialog,
+  .search-palette,
+  .sticky-editor-surface {
     animation: none !important;
   }
 }
@@ -104,9 +163,9 @@ div:has(> .bn-formatting-toolbar) {
   .bn-menu-dropdown,
   .mantine-Popover-dropdown,
   .bn-suggestion-menu,
-  .bn-formatting-toolbar,
   .notepane-block-menu-subpanel,
-  .color-panel {
+  .color-panel,
+  .sticky-editor-surface {
     animation: none !important;
   }
 }
@@ -114,8 +173,8 @@ div:has(> .bn-formatting-toolbar) {
 body.is-exporting .bn-menu-dropdown,
 body.is-exporting .mantine-Popover-dropdown,
 body.is-exporting .bn-suggestion-menu,
-body.is-exporting .bn-formatting-toolbar,
 body.is-exporting .notepane-block-menu-subpanel,
-body.is-exporting .color-panel {
+body.is-exporting .color-panel,
+body.is-exporting .sticky-editor-surface {
   animation: none !important;
 }
