@@ -264,6 +264,7 @@ import {
   useTabModeShortcuts,
 } from "./hooks/useKeyboardCommands.js";
 import { useNotePersistence } from "./hooks/useNotePersistence.js";
+import { useOverlayState } from "./hooks/useOverlayState.js";
 import { EditorErrorBoundary } from "./ui/EditorErrorBoundary.jsx";
 import { usePendingSaveFlush } from "./hooks/usePendingSaveFlush.js";
 import { useSessionList } from "./hooks/useSessionList.js";
@@ -953,22 +954,32 @@ function StickyEditor({
       editorFontOptions,
     ),
   };
-  const [isColorPanelOpen, setIsColorPanelOpen] = useState(false);
-  const [isPreferencesWindowOpen, setIsPreferencesWindowOpen] = useState(false);
+  const {
+    close: closeOverlay,
+    closeExclusive: closeExclusiveOverlays,
+    closeTopmost: closeTopmostOverlay,
+    exportFormatMenu,
+    isAnyOpen: isAnyOverlayOpen,
+    isColorPanelOpen,
+    isMarkdownImportOpen,
+    isPreferencesWindowOpen,
+    isStickyActionBarOpen,
+    isStickySettingsOpen,
+    isStickyTrashConfirmOpen,
+    isVersionHistoryOpen,
+    open: openOverlay,
+    pendingSessionCloseNote,
+    pendingSessionTrashNote,
+    sessionColorPanelNoteId,
+    sessionTabMenu,
+  } = useOverlayState();
   const [preferencesInitialPage, setPreferencesInitialPage] = useState("general");
-  const [isStickySettingsOpen, setIsStickySettingsOpen] = useState(false);
-  const [isStickyTrashConfirmOpen, setIsStickyTrashConfirmOpen] = useState(false);
-  const [isStickyActionBarOpen, setIsStickyActionBarOpen] = useState(false);
   const [isDefaultTemplateSuggestionVisible, setIsDefaultTemplateSuggestionVisible] =
     useState(
       () =>
         normalizedLayoutMode === "tabs" &&
         isEmptySessionDocument(initialEditorContent),
     );
-  const [pendingSessionTrashNote, setPendingSessionTrashNote] = useState(null);
-  const [pendingSessionCloseNote, setPendingSessionCloseNote] = useState(null);
-  const [sessionTabMenu, setSessionTabMenu] = useState(null);
-  const [sessionColorPanelNoteId, setSessionColorPanelNoteId] = useState(null);
   const [isEditorActive, setIsEditorActive] = useState(false);
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [draftSessionTitle, setDraftSessionTitle] = useState("");
@@ -993,9 +1004,6 @@ function StickyEditor({
     window.addEventListener(FILE_INSERTION_FAILED_EVENT, reportFailedFile);
     return () => window.removeEventListener(FILE_INSERTION_FAILED_EVENT, reportFailedFile);
   }, [showExportToast]);
-  const [exportFormatMenu, setExportFormatMenu] = useState(null);
-  const [isMarkdownImportOpen, setIsMarkdownImportOpen] = useState(false);
-  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
   const [noteVersions, setNoteVersions] = useState([]);
   const [isVersionBusy, setIsVersionBusy] = useState(false);
   const [tableOfContentsEntries, setTableOfContentsEntries] = useState(() =>
@@ -1067,16 +1075,12 @@ function StickyEditor({
 
   useEffect(() => {
     if (normalizedLayoutMode !== "sticky") {
-      setIsStickySettingsOpen(false);
-      setIsStickyTrashConfirmOpen(false);
-      setIsStickyActionBarOpen(false);
+      closeOverlay("stickySettings", "stickyTrashConfirm", "stickyActionBar");
     }
     if (normalizedLayoutMode !== "tabs") {
-      setPendingSessionTrashNote(null);
-      setPendingSessionCloseNote(null);
-      setIsPreferencesWindowOpen(false);
+      closeOverlay("sessionTrashConfirm", "sessionCloseConfirm", "preferencesWindow");
     }
-  }, [normalizedLayoutMode, note.id]);
+  }, [closeOverlay, normalizedLayoutMode, note.id]);
 
   useEffect(() => {
     if (!pendingSessionTrashNote) {
@@ -1087,9 +1091,9 @@ function StickyEditor({
       (sessionNote) => sessionNote.id === pendingSessionTrashNote.id,
     );
     if (!stillVisible) {
-      setPendingSessionTrashNote(null);
+      closeOverlay("sessionTrashConfirm");
     }
-  }, [pendingSessionTrashNote, visibleSessionNotes]);
+  }, [closeOverlay, pendingSessionTrashNote, visibleSessionNotes]);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -1108,10 +1112,9 @@ function StickyEditor({
         return;
       }
 
-      setSessionTabMenu(null);
-      setExportFormatMenu(null);
+      closeOverlay("sessionTabMenu", "exportFormatMenu");
       if (!target.closest(".sticky-header-actions")) {
-        setIsStickyActionBarOpen(false);
+        closeOverlay("stickyActionBar");
       }
 
       if (
@@ -1125,7 +1128,7 @@ function StickyEditor({
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown, true);
     };
-  }, []);
+  }, [closeOverlay]);
 
   useEffect(() => {
     if (parsedStoredBlocks || !note.markdown?.trim()) {
@@ -1277,14 +1280,14 @@ function StickyEditor({
   }, [saveNow]);
 
   const openVersionHistory = useCallback(async () => {
-    setIsVersionHistoryOpen(true);
+    openOverlay("versionHistory");
     setIsVersionBusy(true);
     try {
       setNoteVersions(await electronApi?.listNoteVersions?.(note.id) ?? []);
     } finally {
       setIsVersionBusy(false);
     }
-  }, [note.id]);
+  }, [note.id, openOverlay]);
 
   const restoreVersion = useCallback(async (version) => {
     setIsVersionBusy(true);
@@ -1539,50 +1542,26 @@ function StickyEditor({
       return;
     }
     setPreferencesInitialPage(normalizePreferencePageId(pageId));
-    setIsColorPanelOpen(false);
-    setIsStickySettingsOpen(false);
-    setIsStickyTrashConfirmOpen(false);
-    setPendingSessionTrashNote(null);
-    setSessionTabMenu(null);
-    setSessionColorPanelNoteId(null);
-    setIsPreferencesWindowOpen(true);
-  }, [canOpenPreferences]);
+    openOverlay("preferencesWindow");
+  }, [canOpenPreferences, openOverlay]);
 
   const openPreferences = useCallback(() => {
     openPreferencesPage("general");
   }, [openPreferencesPage]);
 
   const requestNewSession = useCallback(() => {
-    setIsColorPanelOpen(false);
-    setIsStickySettingsOpen(false);
-    setIsStickyTrashConfirmOpen(false);
-    setPendingSessionTrashNote(null);
-    setSessionTabMenu(null);
-    setSessionColorPanelNoteId(null);
-    setIsPreferencesWindowOpen(false);
+    closeExclusiveOverlays();
     void onCreateNote({ template: "blank" });
-  }, [onCreateNote]);
+  }, [closeExclusiveOverlays, onCreateNote]);
 
   const openStickySettings = useCallback(() => {
-    setIsColorPanelOpen(false);
-    setIsPreferencesWindowOpen(false);
-    setIsStickyTrashConfirmOpen(false);
-    setPendingSessionTrashNote(null);
-    setSessionTabMenu(null);
-    setSessionColorPanelNoteId(null);
-    setIsStickySettingsOpen(true);
-  }, []);
+    openOverlay("stickySettings");
+  }, [openOverlay]);
 
   const toggleLayoutMode = useCallback(() => {
-    setIsColorPanelOpen(false);
-    setSessionTabMenu(null);
-    setSessionColorPanelNoteId(null);
-    setIsPreferencesWindowOpen(false);
-    setIsStickySettingsOpen(false);
-    setIsStickyTrashConfirmOpen(false);
-    setPendingSessionTrashNote(null);
+    closeExclusiveOverlays();
     void onLayoutModeChanged(normalizedLayoutMode === "tabs" ? "sticky" : "tabs");
-  }, [normalizedLayoutMode, onLayoutModeChanged]);
+  }, [closeExclusiveOverlays, normalizedLayoutMode, onLayoutModeChanged]);
 
   const openSidebar = useCallback(() => {
     setSidebarWidth((currentWidth) =>
@@ -1594,7 +1573,7 @@ function StickyEditor({
   const togglePin = useCallback(async () => {
     const nextPinned = !isPinned;
     setIsPinned(nextPinned);
-    setIsColorPanelOpen(false);
+    closeOverlay("colorPanel");
     onNoteChanged({
       ...note,
       title: normalizeTitle(title),
@@ -1626,15 +1605,15 @@ function StickyEditor({
       });
       showExportToast(error.message || "Pin failed.", "error");
     }
-  }, [isPinned, note, onNoteChanged, showExportToast, theme, title]);
+  }, [closeOverlay, isPinned, note, onNoteChanged, showExportToast, theme, title]);
 
   const closeCurrentWindow = useCallback(() => {
-    setIsStickyActionBarOpen(false);
+    closeOverlay("stickyActionBar");
     void electronApi?.closeCurrentWindow?.();
-  }, []);
+  }, [closeOverlay]);
 
   const exportNote = useCallback(async (type = "pdf") => {
-    setExportFormatMenu(null);
+    closeOverlay("exportFormatMenu");
     if (!electronApi) {
       showExportToast("Note export is available in the desktop app.", "error");
       return;
@@ -1678,15 +1657,15 @@ function StickyEditor({
         document.body.classList.remove("is-exporting");
       }
     }
-  }, [editor, hideExportToast, note.id, showExportToast, title]);
+  }, [closeOverlay, editor, hideExportToast, note.id, showExportToast, title]);
 
   const openExportFormatMenu = useCallback((event) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    setExportFormatMenu({
+    openOverlay("exportFormatMenu", {
       x: Math.round(bounds.right),
       y: Math.round(bounds.top),
     });
-  }, []);
+  }, [openOverlay]);
 
   const importMarkdownFile = useCallback(async (file) => {
     if (!file || typeof file.text !== "function") {
@@ -1729,12 +1708,12 @@ function StickyEditor({
       }
       refreshTableOfContents();
       scheduleSave();
-      setIsMarkdownImportOpen(false);
+      closeOverlay("markdownImport");
       showExportToast(`${file.name || "Markdown file"} imported`, "success");
     } catch (error) {
       throw new Error(error.message || "Markdown import failed.");
     }
-  }, [editor, refreshTableOfContents, scheduleSave, showExportToast]);
+  }, [closeOverlay, editor, refreshTableOfContents, scheduleSave, showExportToast]);
 
   const exportDataBackup = useCallback(async () => {
     if (!electronApi?.exportBackup) {
@@ -1836,7 +1815,9 @@ function StickyEditor({
 
   useChromeShortcuts({
     adjustAppZoom,
+    closeOverlay,
     openFindInNote,
+    openOverlay,
     openSearchPalette: notePalette.openPalette,
     normalizedLayoutMode,
     exportNote,
@@ -1846,34 +1827,14 @@ function StickyEditor({
     requestNewSession,
     resetAppZoom,
     saveVersionNow,
-    setExportFormatMenu,
-    setIsColorPanelOpen,
-    setIsPreferencesWindowOpen,
     setIsSidebarOpen,
-    setIsStickySettingsOpen,
-    setPendingSessionTrashNote,
-    setSessionColorPanelNoteId,
-    setSessionTabMenu,
     showExportToast,
     toggleLayoutMode,
     toggleTableOfContents,
   });
 
   useEffect(() => {
-    if (
-      !isColorPanelOpen &&
-      !isPreferencesWindowOpen &&
-      !isStickySettingsOpen &&
-       !isStickyTrashConfirmOpen &&
-       !isStickyActionBarOpen &&
-      !isVersionHistoryOpen &&
-       !pendingSessionTrashNote &&
-       !pendingSessionCloseNote &&
-      !sessionTabMenu &&
-      !sessionColorPanelNoteId
-      && !exportFormatMenu &&
-      !isMarkdownImportOpen
-    ) {
+    if (!isAnyOverlayOpen) {
       return undefined;
     }
 
@@ -1889,25 +1850,9 @@ function StickyEditor({
       ) {
         return;
       }
-      const topmostLayer = [
-        [exportFormatMenu, () => setExportFormatMenu(null)],
-        [sessionTabMenu, () => setSessionTabMenu(null)],
-        [sessionColorPanelNoteId, () => setSessionColorPanelNoteId(null)],
-        [isColorPanelOpen, () => setIsColorPanelOpen(false)],
-        [isMarkdownImportOpen, () => setIsMarkdownImportOpen(false)],
-        [pendingSessionTrashNote, () => setPendingSessionTrashNote(null)],
-        [pendingSessionCloseNote, () => setPendingSessionCloseNote(null)],
-        [isStickyTrashConfirmOpen, () => setIsStickyTrashConfirmOpen(false)],
-        [isVersionHistoryOpen, () => setIsVersionHistoryOpen(false)],
-        [isStickySettingsOpen, () => setIsStickySettingsOpen(false)],
-        [isStickyActionBarOpen, () => setIsStickyActionBarOpen(false)],
-        [isPreferencesWindowOpen, () => setIsPreferencesWindowOpen(false)],
-      ].find(([isOpen]) => Boolean(isOpen));
-      if (!topmostLayer) {
-        return;
+      if (closeTopmostOverlay()) {
+        event.preventDefault();
       }
-      event.preventDefault();
-      topmostLayer[1]();
     };
 
     document.addEventListener("keydown", handleEscape, true);
@@ -1915,6 +1860,8 @@ function StickyEditor({
       document.removeEventListener("keydown", handleEscape, true);
     };
   }, [
+    closeTopmostOverlay,
+    isAnyOverlayOpen,
     isColorPanelOpen,
     isPreferencesWindowOpen,
     isStickySettingsOpen,
@@ -2154,28 +2101,16 @@ function StickyEditor({
 
   const openSessionTabMenu = useCallback((sessionNote, event) => {
     event.preventDefault();
-    setPendingSessionTrashNote(null);
-    setSessionColorPanelNoteId(null);
-    setIsColorPanelOpen(false);
-    setIsStickySettingsOpen(false);
-    setIsPreferencesWindowOpen(false);
-    setIsStickyTrashConfirmOpen(false);
-    setSessionTabMenu({
+    openOverlay("sessionTabMenu", {
       noteId: sessionNote.id,
       x: event.clientX,
       y: event.clientY,
     });
-  }, []);
+  }, [openOverlay]);
 
   const openSessionColorPanel = useCallback((sessionNoteId) => {
-    setSessionTabMenu(null);
-    setPendingSessionTrashNote(null);
-    setSessionColorPanelNoteId(sessionNoteId);
-    setIsColorPanelOpen(false);
-    setIsStickySettingsOpen(false);
-    setIsPreferencesWindowOpen(false);
-    setIsStickyTrashConfirmOpen(false);
-  }, []);
+    openOverlay("sessionColorPanel", sessionNoteId);
+  }, [openOverlay]);
 
   useEffect(() => {
     const visibleIds = visibleSessionNotes.map((sessionNote) => sessionNote.id);
@@ -2304,15 +2239,9 @@ function StickyEditor({
       setEditingSessionId(null);
       setDraftSessionTitle("");
       setIsDraftSessionTitleDirty(false);
-      setIsColorPanelOpen(false);
-      setIsPreferencesWindowOpen(false);
-      setIsStickySettingsOpen(false);
-      setIsStickyTrashConfirmOpen(false);
-      setSessionTabMenu(null);
-      setSessionColorPanelNoteId(null);
-      setPendingSessionTrashNote(sessionNote);
+      openOverlay("sessionTrashConfirm", sessionNote);
     },
-    [removingSessionIds],
+    [openOverlay, removingSessionIds],
   );
 
   const deleteSessionNote = useCallback(
@@ -2402,13 +2331,14 @@ function StickyEditor({
     }
 
     if (hasSessionContent(currentSessionNote)) {
-      setPendingSessionCloseNote(currentSessionNote);
+      openOverlay("sessionCloseConfirm", currentSessionNote);
       return;
     }
 
     void deleteSessionNote(currentSessionNote, { source: "close" });
   }, [
     closeCurrentWindow,
+    openOverlay,
     deleteSessionNote,
     normalizedLayoutMode,
     hasSessionContent,
@@ -2423,9 +2353,9 @@ function StickyEditor({
       return;
     }
 
-    setPendingSessionCloseNote(null);
+    closeOverlay("sessionCloseConfirm");
     await deleteSessionNote(sessionNote, { source: "close" });
-  }, [deleteSessionNote, pendingSessionCloseNote]);
+  }, [closeOverlay, deleteSessionNote, pendingSessionCloseNote]);
 
   useEffect(() => {
     return electronApi?.onCloseTabRequested?.(requestCloseCurrentTab);
@@ -2437,9 +2367,9 @@ function StickyEditor({
     }
 
     if (!visibleSessionNotes.some((sessionNote) => sessionNote.id === pendingSessionCloseNote.id)) {
-      setPendingSessionCloseNote(null);
+      closeOverlay("sessionCloseConfirm");
     }
-  }, [pendingSessionCloseNote, visibleSessionNotes]);
+  }, [closeOverlay, pendingSessionCloseNote, visibleSessionNotes]);
 
   useEffect(() => {
     const handleCloseShortcut = (event) => {
@@ -2465,9 +2395,9 @@ function StickyEditor({
       return;
     }
 
-    setPendingSessionTrashNote(null);
+    closeOverlay("sessionTrashConfirm");
     await deleteSessionNote(sessionNote);
-  }, [deleteSessionNote, pendingSessionTrashNote]);
+  }, [closeOverlay, deleteSessionNote, pendingSessionTrashNote]);
 
   const getSessionTabRowClassName = useCallback(
     (sessionNote) =>
@@ -2589,14 +2519,8 @@ function StickyEditor({
       return;
     }
 
-    setIsColorPanelOpen(false);
-    setIsPreferencesWindowOpen(false);
-    setIsStickySettingsOpen(false);
-    setPendingSessionTrashNote(null);
-    setSessionTabMenu(null);
-    setSessionColorPanelNoteId(null);
-    setIsStickyTrashConfirmOpen(true);
-  }, [notes.length, showExportToast]);
+    openOverlay("stickyTrashConfirm");
+  }, [notes.length, openOverlay, showExportToast]);
 
   const moveCurrentStickyNoteToTrash = useCallback(async () => {
     if (notes.length <= 1) {
@@ -2604,16 +2528,11 @@ function StickyEditor({
       return;
     }
 
-    setIsStickyTrashConfirmOpen(false);
-    setIsColorPanelOpen(false);
-    setIsPreferencesWindowOpen(false);
-    setIsStickySettingsOpen(false);
-    setPendingSessionTrashNote(null);
-    setSessionTabMenu(null);
-    setSessionColorPanelNoteId(null);
+    closeExclusiveOverlays();
     await saveNow();
     await onDeleteNote(note.id, getCurrentNoteSnapshot());
   }, [
+    closeExclusiveOverlays,
     getCurrentNoteSnapshot,
     note.id,
     notes.length,
@@ -2794,7 +2713,7 @@ function StickyEditor({
                     closeCurrentWindow();
                     return;
                   }
-                  setIsStickyActionBarOpen(true);
+                  openOverlay("stickyActionBar");
                 }}
               >
                 {isStickyActionBarOpen ? (
@@ -3215,7 +3134,7 @@ function StickyEditor({
           >
             <NotePaneSlashMenuController
               editor={editor}
-              onImportMarkdown={() => setIsMarkdownImportOpen(true)}
+              onImportMarkdown={() => openOverlay("markdownImport")}
             />
             <RecentColorFormattingToolbarController
               recentColors={recentEditorColors}
@@ -3252,7 +3171,7 @@ function StickyEditor({
           versions={noteVersions}
           isBusy={isVersionBusy}
           scheme={activeTheme.scheme}
-          onClose={() => setIsVersionHistoryOpen(false)}
+          onClose={() => closeOverlay("versionHistory")}
           onRestore={(version) => void restoreVersion(version)}
         />
       )}
@@ -3277,7 +3196,7 @@ function StickyEditor({
       )}
       {isMarkdownImportOpen && (
         <MarkdownImportDialog
-          onClose={() => setIsMarkdownImportOpen(false)}
+          onClose={() => closeOverlay("markdownImport")}
           onImport={importMarkdownFile}
         />
       )}
@@ -3290,7 +3209,7 @@ function StickyEditor({
             normalizedLayoutMode === "sticky" ? stickyAccentColor : undefined
           }
           onChange={updateTheme}
-          onClose={() => setIsColorPanelOpen(false)}
+          onClose={() => closeOverlay("colorPanel")}
         />
       )}
       {sessionColorPanelNote && (
@@ -3308,20 +3227,20 @@ function StickyEditor({
           onChange={(nextTheme) =>
             updateSessionNoteTheme(sessionColorPanelNote.id, nextTheme)
           }
-          onClose={() => setSessionColorPanelNoteId(null)}
+          onClose={() => closeOverlay("sessionColorPanel")}
         />
       )}
       {pendingSessionTrashNote && (
         <SessionTrashConfirmDialog
           noteTitle={getSessionDisplayTitle(pendingSessionTrashNote)}
-          onCancel={() => setPendingSessionTrashNote(null)}
+          onCancel={() => closeOverlay("sessionTrashConfirm")}
           onConfirm={() => void confirmDeleteSessionNote()}
         />
       )}
       {pendingSessionCloseNote && (
         <SessionCloseConfirmDialog
           noteTitle={getSessionDisplayTitle(pendingSessionCloseNote)}
-          onCancel={() => setPendingSessionCloseNote(null)}
+          onCancel={() => closeOverlay("sessionCloseConfirm")}
           onConfirm={() => void confirmCloseCurrentTab()}
         />
       )}
@@ -3332,13 +3251,13 @@ function StickyEditor({
           activeTheme={activeTheme}
           defaultColor={stickyAccentColor}
           onThemeChange={updateTheme}
-          onClose={() => setIsStickySettingsOpen(false)}
+          onClose={() => closeOverlay("stickySettings")}
         />
       )}
       {isStickyTrashConfirmOpen && (
         <StickyTrashConfirmDialog
           noteTitle={title}
-          onCancel={() => setIsStickyTrashConfirmOpen(false)}
+          onCancel={() => closeOverlay("stickyTrashConfirm")}
           onConfirm={() => void moveCurrentStickyNoteToTrash()}
         />
       )}
@@ -3357,7 +3276,7 @@ function StickyEditor({
           onImportBackup={importDataBackup}
           onRestoreTrashedNote={onRestoreTrashedNote}
           onPurgeTrashedNote={onPurgeTrashedNote}
-          onClose={() => setIsPreferencesWindowOpen(false)}
+          onClose={() => closeOverlay("preferencesWindow")}
         />
       )}
       {exportToast && <StickyToast toast={exportToast} />}

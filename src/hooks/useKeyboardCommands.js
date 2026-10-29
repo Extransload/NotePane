@@ -16,24 +16,19 @@ import {
  */
 export function useChromeShortcuts({
   adjustAppZoom,
+  closeOverlay,
   normalizedLayoutMode,
   exportNote,
   focusEditor,
   matchesEnabledKeyboardShortcut,
   onEditorWidthChange,
   openFindInNote,
+  openOverlay,
   openSearchPalette,
   requestNewSession,
   resetAppZoom,
   saveVersionNow,
-  setExportFormatMenu,
-  setIsColorPanelOpen,
-  setIsPreferencesWindowOpen,
   setIsSidebarOpen,
-  setIsStickySettingsOpen,
-  setPendingSessionTrashNote,
-  setSessionColorPanelNoteId,
-  setSessionTabMenu,
   showExportToast,
   toggleLayoutMode,
   toggleTableOfContents,
@@ -112,13 +107,16 @@ export function useChromeShortcuts({
 
       if (matchesEnabledKeyboardShortcut(event, "exportPdf")) {
         event.preventDefault();
-        setIsColorPanelOpen(false);
-        setIsStickySettingsOpen(false);
-        setPendingSessionTrashNote(null);
-        setSessionTabMenu(null);
-        setSessionColorPanelNoteId(null);
-        setIsPreferencesWindowOpen(false);
-        setExportFormatMenu({
+        // Leaves the sticky Trash confirmation open, unlike opening an exclusive panel.
+        closeOverlay(
+          "colorPanel",
+          "stickySettings",
+          "sessionTrashConfirm",
+          "sessionTabMenu",
+          "sessionColorPanel",
+          "preferencesWindow",
+        );
+        openOverlay("exportFormatMenu", {
           x: Math.round(window.innerWidth / 2),
           y: 52,
         });
@@ -161,12 +159,14 @@ export function useChromeShortcuts({
     normalizedLayoutMode,
     matchesEnabledKeyboardShortcut,
     adjustAppZoom,
+    closeOverlay,
     exportNote,
     focusEditor,
     requestNewSession,
     toggleTableOfContents,
     onEditorWidthChange,
     openFindInNote,
+    openOverlay,
     openSearchPalette,
     resetAppZoom,
     toggleLayoutMode,

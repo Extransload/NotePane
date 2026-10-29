@@ -33,7 +33,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | `src/model/` | normalising and deriving stored data | `notes.js`, `preferences.js`, `keyboardShortcuts.js` |
 | `src/style/` | themes, theme tokens, tone matching, colour maths and computed inline styles | `themes.js`, `themeTokens.js`, `toneMatch.js`, `applyTheme.js`, `themeStyles.js`, `colorMath.js` |
 | `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
-| `src/hooks/` | stateful behaviour lifted out of `App` and `StickyEditor` | `useSessionList.js`, `useNotePersistence.js`, `useEditorSurfaceShortcuts.js` |
+| `src/hooks/` | stateful behaviour lifted out of `App` and `StickyEditor` | `useSessionList.js`, `useOverlayState.js`, `useNotePersistence.js`, `useEditorSurfaceShortcuts.js` |
 | `src/utils/` | small generic helpers | `values.js`, `dom.js`, `sessionTabAnimation.js` |
 | `src/styles/` | stylesheets, imported in cascade order | `tokens.css`, `chrome.css`, `blocknote.css` |
 
@@ -79,6 +79,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Session tab drag and drop | `src/hooks/useSessionTabDrag.js` |
 | Export toast and zoom gauge timing | `src/hooks/useStickyToasts.js` |
 | Zoom gauge, export toast and other overlays | `src/ui/overlays.jsx` |
+| Which panels, menus and confirmations are open, which ones close each other, and the order Escape closes them in | `src/hooks/useOverlayState.js` |
 
 `src/main.jsx` keeps only `App` (theme, layout and preference state, IPC subscriptions, and the session list from
 `useSessionList`) and `StickyEditor`
