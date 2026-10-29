@@ -2,6 +2,7 @@ import { createExtension } from "@blocknote/core";
 import { closeHistory } from "@tiptap/pm/history";
 import { AllSelection, Plugin, Selection, TextSelection } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import { hasPlatformModifier } from "../model/keyboardShortcuts.js";
 import { clamp } from "../utils/values.js";
 import {
   createBlockSetSelection,
@@ -228,7 +229,7 @@ function marqueeView(editor, view) {
 // Keys acting on a block set. Returns true when the key is handled and the editor must ignore it.
 function handleBlockSetKeyDown(editor, view, event) {
   // An IME composes into the DOM selection, which spans the unselected blocks between the runs.
-  if (event.isComposing || event.keyCode === 229) {
+  if (isCompositionKey(event)) {
     replaceBlockSelectionWithParagraph(view);
     return false;
   }
@@ -245,7 +246,7 @@ function handleBlockSetKeyDown(editor, view, event) {
     return true;
   }
   if ((event.key === "ArrowUp" || event.key === "ArrowDown") && event.shiftKey
-    && (event.metaKey || event.ctrlKey) && !event.altKey) {
+    && hasPlatformModifier(event) && !event.altKey) {
     event.preventDefault();
     moveBlockSelection(editor, event.key === "ArrowUp" ? -1 : 1);
     return true;
@@ -283,8 +284,14 @@ function isPlainDeleteKey(event) {
     && !(event.shiftKey || event.altKey || event.ctrlKey || event.metaKey);
 }
 
+// keyCode 229 is also what some IMEs report for a modified key that does not compose.
+function isCompositionKey(event) {
+  return (event.isComposing || event.keyCode === 229)
+    && !(event.metaKey || event.ctrlKey || event.altKey);
+}
+
 function handleWholeDocumentKeyDown(view, event) {
-  if (event.isComposing || event.keyCode === 229 || (event.key === "Enter" && !event.altKey)) {
+  if (isCompositionKey(event) || (event.key === "Enter" && !event.altKey)) {
     replaceWholeDocumentWithParagraph(view);
   }
   return false;

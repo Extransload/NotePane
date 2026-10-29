@@ -2270,22 +2270,37 @@ function StickyEditor({
       return undefined;
     }
 
+    // Escape closes the topmost layer only. A dialog or menu that handles its
+    // own Escape (confirmations, dropdowns, the crop dialog, the shortcut
+    // recorder) keeps it, so the panel beneath stays open.
     const handleEscape = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        setIsColorPanelOpen(false);
-        setIsPreferencesWindowOpen(false);
-        setIsStickySettingsOpen(false);
-        setIsStickyTrashConfirmOpen(false);
-        setIsStickyActionBarOpen(false);
-        setIsVersionHistoryOpen(false);
-        setPendingSessionTrashNote(null);
-        setPendingSessionCloseNote(null);
-        setSessionTabMenu(null);
-        setSessionColorPanelNoteId(null);
-        setExportFormatMenu(null);
-        setIsMarkdownImportOpen(false);
+      if (
+        event.key !== "Escape" ||
+        event.isComposing ||
+        isShortcutRecorderTarget(event.target) ||
+        document.querySelector(".trash-confirm-backdrop, .notepane-dropdown-menu, .crop-dialog")
+      ) {
+        return;
       }
+      const topmostLayer = [
+        [exportFormatMenu, () => setExportFormatMenu(null)],
+        [sessionTabMenu, () => setSessionTabMenu(null)],
+        [sessionColorPanelNoteId, () => setSessionColorPanelNoteId(null)],
+        [isColorPanelOpen, () => setIsColorPanelOpen(false)],
+        [isMarkdownImportOpen, () => setIsMarkdownImportOpen(false)],
+        [pendingSessionTrashNote, () => setPendingSessionTrashNote(null)],
+        [pendingSessionCloseNote, () => setPendingSessionCloseNote(null)],
+        [isStickyTrashConfirmOpen, () => setIsStickyTrashConfirmOpen(false)],
+        [isVersionHistoryOpen, () => setIsVersionHistoryOpen(false)],
+        [isStickySettingsOpen, () => setIsStickySettingsOpen(false)],
+        [isStickyActionBarOpen, () => setIsStickyActionBarOpen(false)],
+        [isPreferencesWindowOpen, () => setIsPreferencesWindowOpen(false)],
+      ].find(([isOpen]) => Boolean(isOpen));
+      if (!topmostLayer) {
+        return;
+      }
+      event.preventDefault();
+      topmostLayer[1]();
     };
 
     document.addEventListener("keydown", handleEscape, true);
@@ -2300,7 +2315,6 @@ function StickyEditor({
     isStickyActionBarOpen,
     isVersionHistoryOpen,
     pendingSessionTrashNote,
-    pendingSessionCloseNote,
     pendingSessionCloseNote,
     sessionColorPanelNoteId,
     sessionTabMenu,
@@ -3256,6 +3270,9 @@ function StickyEditor({
                           }}
                           onBlur={() => void commitSessionRename(sessionNote)}
                           onKeyDown={(event) => {
+                            if (event.nativeEvent.isComposing) {
+                              return;
+                            }
                             if (event.key === "Enter") {
                               event.preventDefault();
                               void commitSessionRename(sessionNote);

@@ -21,7 +21,7 @@ import {
 import {
   getSessionShortcutRangeLabel,
   getShortcutLabel,
-  isReservedKeyboardShortcut,
+  getReservedKeyboardShortcutReason,
   keyboardShortcutFromEvent,
   normalizeKeyboardShortcutEnabled,
   normalizeKeyboardShortcuts,
@@ -445,8 +445,9 @@ export function KeyboardShortcutsSection({
         return;
       }
 
-      if (isReservedKeyboardShortcut(capturedShortcut)) {
-        setShortcutError("Reserved for tab selection.");
+      const reservedReason = getReservedKeyboardShortcutReason(capturedShortcut);
+      if (reservedReason) {
+        setShortcutError(reservedReason);
         return;
       }
 

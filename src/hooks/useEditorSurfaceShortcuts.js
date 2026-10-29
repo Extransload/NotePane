@@ -51,7 +51,11 @@ import {
   splitCell,
 } from "prosemirror-tables";
 import {
+  hasPlatformModifier,
+} from "../model/keyboardShortcuts.js";
+import {
   useEffect,
+  useRef,
 } from "react";
 /**
  * Every capture-phase handler that the editor surface needs: toggle-list keys,
@@ -69,6 +73,13 @@ export function useEditorSurfaceShortcuts({
   setIsTableCellSelectionDismissed,
   updateFocusedTableCell,
 }) {
+  // Read through refs so the listeners register once; re-registering them
+  // moves them behind listeners added later, which changes who sees a key first.
+  const stateRef = useRef({ activeImageBlockId, isEditorActive, recentEditorColors, scheduleSave, updateFocusedTableCell });
+  useEffect(() => {
+    stateRef.current = { activeImageBlockId, isEditorActive, recentEditorColors, scheduleSave, updateFocusedTableCell };
+  }, [activeImageBlockId, isEditorActive, recentEditorColors, scheduleSave, updateFocusedTableCell]);
+
   useEffect(() => {
     const handleEditorKeyDownCapture = (event) => {
       if (
@@ -119,7 +130,7 @@ export function useEditorSurfaceShortcuts({
         return;
       }
 
-      if (!(event.metaKey || event.ctrlKey) || event.altKey) {
+      if (!hasPlatformModifier(event) || event.altKey) {
         return;
       }
 
@@ -143,7 +154,7 @@ export function useEditorSurfaceShortcuts({
         event.preventDefault();
         const sideMenu = editor.getExtension(SideMenuExtension);
         const blocks = resolveBlocksForMenuBlock(editor, sideMenu?.store.state?.block?.id);
-        void cutBlocks(editor, blocks, scheduleSave)
+        void cutBlocks(editor, blocks, stateRef.current.scheduleSave)
           .catch(() => {
             // The block can change while the clipboard write is pending; the
             // menu still has to close.
@@ -156,7 +167,7 @@ export function useEditorSurfaceShortcuts({
         return;
       }
 
-      const isEditorTarget = isEditorActive && isEditorShortcutTarget(event.target);
+      const isEditorTarget = stateRef.current.isEditorActive && isEditorShortcutTarget(event.target);
       if (!isEditorTarget) {
         if (isRepeatRecentColorShortcut) {
           return;
@@ -169,7 +180,7 @@ export function useEditorSurfaceShortcuts({
 
       if (isRepeatRecentColorShortcut) {
         event.preventDefault();
-        const recentColor = recentEditorColors[0];
+        const recentColor = stateRef.current.recentEditorColors[0];
         if (recentColor && hasEditorRangeSelection(editor)) {
           applyEditorColor(editor, recentColor);
           setIsEditorActive(true);
@@ -211,7 +222,7 @@ export function useEditorSurfaceShortcuts({
       }
 
       event.preventDefault();
-      void cutCurrentBlocks(editor, activeImageBlockId, scheduleSave);
+      void cutCurrentBlocks(editor, stateRef.current.activeImageBlockId, stateRef.current.scheduleSave);
     };
 
     const handleTextSelectionToolbarEscape = (event) => {
@@ -253,7 +264,7 @@ export function useEditorSurfaceShortcuts({
         }
         if (!isEditableFormTarget(event.target)) {
           event.preventDefault();
-          if (isEditorActive) {
+          if (stateRef.current.isEditorActive) {
             editor.focus();
           }
         }
@@ -337,7 +348,7 @@ export function useEditorSurfaceShortcuts({
     const handleTableCellMergeSplitKeyDownCapture = (event) => {
       if (
         event.key.toLowerCase() !== "m" ||
-        !(event.metaKey || event.ctrlKey) ||
+        !hasPlatformModifier(event) ||
         !event.shiftKey ||
         event.altKey ||
         !isEditorShortcutTarget(event.target)
@@ -378,13 +389,13 @@ export function useEditorSurfaceShortcuts({
       if (autoFitActiveTableColumn(editor, event.target)) {
         event.preventDefault();
         event.stopPropagation();
-        window.requestAnimationFrame(updateFocusedTableCell);
+        window.requestAnimationFrame(() => stateRef.current.updateFocusedTableCell());
       }
     };
 
     const handleTableColumnResizeMouseMoveCapture = (event) => {
       if (previewActiveTableColumnResize(editor, event)) {
-        window.requestAnimationFrame(updateFocusedTableCell);
+        window.requestAnimationFrame(() => stateRef.current.updateFocusedTableCell());
       }
     };
 
@@ -406,12 +417,5 @@ export function useEditorSurfaceShortcuts({
       window.removeEventListener("mousemove", handleTableColumnResizeMouseMoveCapture, true);
       document.removeEventListener("keydown", handleEditorTabKeyDown);
     };
-  }, [
-    activeImageBlockId,
-    editor,
-    isEditorActive,
-    recentEditorColors,
-    scheduleSave,
-    updateFocusedTableCell,
-  ]);
+  }, [editor, setIsEditorActive, setIsTableCellSelectionDismissed]);
 }

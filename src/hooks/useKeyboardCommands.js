@@ -1,4 +1,5 @@
 import {
+  hasPlatformModifier,
   isKeyboardShortcutEnabled,
   isShortcutRecorderTarget,
 } from "../model/keyboardShortcuts.js";
@@ -43,7 +44,7 @@ export function useChromeShortcuts({
         return;
       }
 
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "s") {
+      if (hasPlatformModifier(event) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "s") {
         event.preventDefault();
         void saveVersionNow().then(
           () => showExportToast("Saved", "success"),
@@ -193,7 +194,7 @@ export function useSessionNumberShortcuts({
         return;
       }
 
-      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
+      if (!hasPlatformModifier(event) || event.altKey || event.shiftKey) {
         return;
       }
 

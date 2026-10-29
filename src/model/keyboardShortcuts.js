@@ -95,7 +95,7 @@ export function matchesKeyboardShortcut(event, shortcut) {
     (parsedShortcut.key === "=" && !parsedShortcut.shift && event.shiftKey);
 
   return (
-    Boolean(event.metaKey || event.ctrlKey) === parsedShortcut.mod &&
+    hasPlatformModifier(event) === parsedShortcut.mod &&
     Boolean(event.altKey) === parsedShortcut.alt &&
     shiftMatches &&
     eventKey === parsedShortcut.key
@@ -115,7 +115,7 @@ export function keyboardShortcutFromEvent(event) {
   }
 
   const shortcut = {
-    mod: Boolean(event.metaKey || event.ctrlKey),
+    mod: hasPlatformModifier(event),
     alt: Boolean(event.altKey),
     shift: Boolean(event.shiftKey),
     key,
@@ -373,20 +373,48 @@ export function formatKeyboardShortcutValue(shortcut) {
   ].filter(Boolean).join("+");
 }
 
+// Fixed keys the recorder must refuse: the editor's own commands, which are
+// matched outside the rebindable command list.
+const FIXED_EDITOR_SHORTCUTS = new Map([
+  ["Mod+S", "Reserved for saving a version."],
+  ["Mod+A", "Reserved for selecting blocks."],
+  ["Mod+X", "Reserved for cutting a block."],
+  ["Mod+C", "Reserved for copy."],
+  ["Mod+V", "Reserved for paste."],
+  ["Mod+Z", "Reserved for undo."],
+  ["Mod+Shift+Z", "Reserved for redo."],
+  ["Mod+B", "Reserved for bold."],
+  ["Mod+I", "Reserved for italic."],
+  ["Mod+U", "Reserved for underline."],
+  ["Mod+Shift+M", "Reserved for merging table cells."],
+  ["Mod+Shift+H", "Reserved for the last used colour."],
+]);
+
 export function isReservedKeyboardShortcut(shortcut) {
+  return getReservedKeyboardShortcutReason(shortcut) !== null;
+}
+
+export function getReservedKeyboardShortcutReason(shortcut) {
   const parsedShortcut = parseKeyboardShortcut(shortcut);
-  return Boolean(
-    parsedShortcut?.mod &&
-      !parsedShortcut.alt &&
-      !parsedShortcut.shift &&
-      /^[1-9]$/.test(parsedShortcut.key),
-  );
+  if (!parsedShortcut?.mod) {
+    return null;
+  }
+  if (!parsedShortcut.alt && !parsedShortcut.shift && /^[1-9]$/.test(parsedShortcut.key)) {
+    return "Reserved for tab selection.";
+  }
+  return FIXED_EDITOR_SHORTCUTS.get(formatKeyboardShortcutValue(parsedShortcut)) ?? null;
 }
 
 export function isShortcutRecorderTarget(target) {
   return target instanceof Element && Boolean(
     target.closest(".shortcut-recorder-button"),
   );
+}
+
+// The app's command modifier: Command on a Mac, where Control belongs to the
+// system's text editing keys (Ctrl+A is "line start"), and Control elsewhere.
+export function hasPlatformModifier(event) {
+  return Boolean(isAppleRuntime() ? event.metaKey : event.ctrlKey);
 }
 
 export function isWindowsRuntime() {
