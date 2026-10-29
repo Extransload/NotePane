@@ -33,7 +33,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | `src/model/` | normalising and deriving stored data | `notes.js`, `preferences.js`, `keyboardShortcuts.js` |
 | `src/style/` | themes, theme tokens, tone matching, colour maths and computed inline styles | `themes.js`, `themeTokens.js`, `toneMatch.js`, `applyTheme.js`, `themeStyles.js`, `colorMath.js` |
 | `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
-| `src/hooks/` | stateful behaviour lifted out of `StickyEditor` | `useNotePersistence.js`, `useEditorSurfaceShortcuts.js` |
+| `src/hooks/` | stateful behaviour lifted out of `App` and `StickyEditor` | `useSessionList.js`, `useNotePersistence.js`, `useEditorSurfaceShortcuts.js` |
 | `src/utils/` | small generic helpers | `values.js`, `dom.js`, `sessionTabAnimation.js` |
 | `src/styles/` | stylesheets, imported in cascade order | `tokens.css`, `chrome.css`, `blocknote.css` |
 
@@ -71,6 +71,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | The theme picker in Preferences | `src/ui/ThemePicker.jsx` |
 | Sticky shell and session tab computed styles | `src/style/themeStyles.js` |
 | Colour conversion and contrast | `src/style/colorMath.js` |
+| The window's session list and trash: load on startup, `notes:changed` updates, create, select, reorder, move to Trash, restore, purge, the undo toast after a move to Trash | `src/hooks/useSessionList.js` |
 | Saving, debouncing, version snapshots | `src/hooks/useNotePersistence.js` |
 | Flushing pending saves on unmount or when main asks | `src/hooks/usePendingSaveFlush.js` |
 | Keys handled on the editor surface | `src/hooks/useEditorSurfaceShortcuts.js` |
@@ -79,7 +80,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Export toast and zoom gauge timing | `src/hooks/useStickyToasts.js` |
 | Zoom gauge, export toast and other overlays | `src/ui/overlays.jsx` |
 
-`src/main.jsx` keeps only `App` (session list, theme and layout state, IPC subscriptions) and `StickyEditor`
+`src/main.jsx` keeps only `App` (theme, layout and preference state, IPC subscriptions, and the session list from
+`useSessionList`) and `StickyEditor`
 (editor instance, the remaining per-note state, and the rendered tree). A new non-trivial behaviour belongs in a
 module above, not in `main.jsx`.
 
