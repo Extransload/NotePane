@@ -72,7 +72,7 @@
   dialogs (Preferences, sticky settings, the trash and close confirmations, Markdown import, version history, crop),
   the search palette, the find bar, tooltips and the zoom gauge fade back toward where they came from, and a backdrop
   fades with its dialog. While it leaves, an overlay takes no clicks or focus and is hidden from assistive technology;
-  with reduced motion it is removed at once. BlockNote's own menus still close instantly
+  with reduced motion it is removed at once. BlockNote's own menus close with a shorter fade (Editor motion, below)
 - Toasts spring up from the bottom and sink away. A toast that replaces another, such as an export finishing, changes
   its text and dot colour in place. The undo toast shows the time it has left on a thin bar, and any toast waits while
   the pointer or keyboard focus is on it
