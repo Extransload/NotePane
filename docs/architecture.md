@@ -83,6 +83,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Session tab rename, duplicate, open as sticky, move to Trash, and closing the current tab | `src/hooks/useSessionTabActions.js` |
 | The session tab menu and the export format menu, placed at their anchor and clamped to the window | `src/ui/menus.jsx` |
 | Session tab drag and drop | `src/hooks/useSessionTabDrag.js` |
+| Whether the tabs sidebar is open: the user's choice, and the compact sidebar of a narrow window | `src/hooks/useSidebarVisibility.js` |
 | Export toast and zoom gauge timing | `src/hooks/useStickyToasts.js` |
 | Zoom gauge, export toast and other overlays | `src/ui/overlays.jsx` |
 | Which panels, menus and confirmations are open, which ones close each other, and the order Escape closes them in | `src/hooks/useOverlayState.js` |

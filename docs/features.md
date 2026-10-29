@@ -14,6 +14,9 @@
 - Editable title in sticky mode header
 - Session rename by double-clicking a sidebar tab
 - Hover-only session delete button in the sidebar tab row
+- Below 760px of window width the tabs sidebar turns compact by itself and returns when the window is wider again;
+  the show/hide choice made in a wide window is kept, and one made in a narrow window lasts until the window crosses
+  the breakpoint
 - 52 app themes: NotePane Light (default) and NotePane Dark, Catppuccin Latte, Frappé, Macchiato and Mocha, Nord,
   Dracula and Tokyo Night, followed by 43 palettes adapted from TablePeek
 - Theme picker in Preferences > General > App theme: preview cards that apply the theme at once to every window

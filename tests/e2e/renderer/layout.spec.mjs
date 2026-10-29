@@ -514,3 +514,37 @@ test("keeps fast typing inside React's nested update limit", async ({ page }) =>
     .toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("turns the sidebar compact in a narrow window without losing the wide-window choice", async ({ page }) => {
+  const sidebar = page.getByTestId("session-sidebar");
+  const toggle = page.locator(".sidebar-toggle");
+  await page.setViewportSize({ width: 1180, height: 760 });
+  await expect(sidebar).toHaveAttribute("data-sidebar-state", "expanded");
+
+  await page.setViewportSize({ width: 700, height: 600 });
+  await expect(sidebar).toHaveAttribute("data-sidebar-state", "compact");
+  await expect.poll(async () => (await sidebar.boundingBox()).width).toBeLessThan(80);
+
+  // Opened by hand in the narrow window, it stays open there.
+  await toggle.click();
+  await expect(sidebar).toHaveAttribute("data-sidebar-state", "expanded");
+
+  await page.setViewportSize({ width: 1180, height: 760 });
+  await expect(sidebar).toHaveAttribute("data-sidebar-state", "expanded");
+
+  // Hidden by hand in a wide window: a narrow window keeps it compact, and the wide window
+  // still remembers it hidden.
+  await toggle.click();
+  await expect(sidebar).toHaveAttribute("data-sidebar-state", "compact");
+  await page.setViewportSize({ width: 700, height: 600 });
+  await expect(sidebar).toHaveAttribute("data-sidebar-state", "compact");
+  await page.setViewportSize({ width: 1180, height: 760 });
+  await expect(sidebar).toHaveAttribute("data-sidebar-state", "compact");
+
+  // Shown again while wide, it returns after the window was narrow and compact in between.
+  await toggle.click();
+  await page.setViewportSize({ width: 700, height: 600 });
+  await expect(sidebar).toHaveAttribute("data-sidebar-state", "compact");
+  await page.setViewportSize({ width: 1180, height: 760 });
+  await expect(sidebar).toHaveAttribute("data-sidebar-state", "expanded");
+});

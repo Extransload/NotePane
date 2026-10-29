@@ -241,6 +241,7 @@ import { useFindInNote } from "./hooks/useFindInNote.js";
 import { FindInNote, getFindSeedText } from "./editor/findInNote.js";
 import { FindBar } from "./ui/FindBar.jsx";
 import { useNoteSearchPalette } from "./hooks/useNoteSearchPalette.js";
+import { useSidebarVisibility } from "./hooks/useSidebarVisibility.js";
 import { SearchPalette } from "./ui/SearchPalette.jsx";
 import {
   useChromeShortcuts,
@@ -315,7 +316,7 @@ function App({ bindTestThemeSetter }) {
     setLayoutMode,
   });
   const [recentEditorColors, setRecentEditorColors] = useState([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const { isSidebarOpen, setIsSidebarOpen } = useSidebarVisibility();
   const [isEditorWide, setIsEditorWide] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
   const [layoutTransition, setLayoutTransition] = useState(null);
