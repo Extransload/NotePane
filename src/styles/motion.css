@@ -1,0 +1,121 @@
+/* Entrance motion for menus and panels. Imported last so it layers animations over the owning
+   files without rewriting their rules.
+
+   Only opacity and translate animate. A menu is interactive from its first frame, and nothing
+   waits for an animation before it unmounts, so closing stays instant. The BlockNote menus that
+   src/editor/floatingMenus.js places (Mantine menus and popovers, the block menu's Turn into and
+   Colors panels) only fade: they keep their box from the first frame, so placing them and
+   pointing at their items never races a moving menu.
+
+   prefers-reduced-motion, print and export turn every animation here off (end of file). */
+
+:root {
+  --notepane-motion-menu-duration: 140ms;
+  --notepane-motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --notepane-motion-shift: 4px;
+}
+
+/* A menu starts a few pixels toward its anchor, then settles. --notepane-menu-from-y says where
+   the anchor is; the default is a menu below it. */
+@keyframes notepaneMenuIn {
+  from {
+    opacity: 0;
+    translate: 0 var(--notepane-menu-from-y, calc(var(--notepane-motion-shift) * -1));
+  }
+}
+
+@keyframes notepaneMenuSettle {
+  from {
+    translate: 0 var(--notepane-menu-from-y, calc(var(--notepane-motion-shift) * -1));
+  }
+}
+
+@keyframes notepaneMenuFadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+.bn-menu-dropdown,
+.mantine-Popover-dropdown,
+.notepane-block-menu-subpanel {
+  animation: notepaneMenuFadeIn var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out);
+}
+
+/* The slash menu and the formatting toolbar sit in a floating wrapper that BlockNote already
+   fades, over 250ms. The wrapper keeps that fade at the menu duration, and the menu only moves. */
+div:has(> .bn-suggestion-menu),
+div:has(> .bn-formatting-toolbar) {
+  transition-duration: var(--notepane-motion-menu-duration) !important;
+  transition-timing-function: var(--notepane-motion-ease-out) !important;
+}
+
+.bn-suggestion-menu,
+.bn-formatting-toolbar {
+  animation: notepaneMenuSettle var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out);
+}
+
+.bn-formatting-toolbar {
+  --notepane-menu-from-y: var(--notepane-motion-shift);
+}
+
+.color-panel {
+  animation: notepaneMenuIn var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out);
+}
+
+/* NotePane's own menus already fade in with menuIn; match the easing, and move a dropdown that
+   opens above its field up from it. */
+.session-tab-context-menu,
+.export-format-menu,
+.notepane-dropdown-menu {
+  animation-timing-function: var(--notepane-motion-ease-out);
+}
+
+.notepane-dropdown-menu[data-placement="top"] {
+  --notepane-menu-from-y: var(--notepane-motion-shift);
+  animation-name: notepaneMenuIn;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  div:has(> .bn-suggestion-menu),
+  div:has(> .bn-formatting-toolbar),
+  .bn-menu-dropdown,
+  .mantine-Popover-dropdown {
+    transition: none !important;
+  }
+
+  .bn-menu-dropdown,
+  .mantine-Popover-dropdown,
+  .bn-suggestion-menu,
+  .bn-formatting-toolbar,
+  .notepane-block-menu-subpanel,
+  .color-panel,
+  .session-tab-context-menu,
+  .export-format-menu,
+  .notepane-dropdown-menu,
+  .adaptive-tooltip,
+  .app-zoom-gauge,
+  .sticky-toast {
+    animation: none !important;
+  }
+}
+
+@media print {
+  .bn-menu-dropdown,
+  .mantine-Popover-dropdown,
+  .bn-suggestion-menu,
+  .bn-formatting-toolbar,
+  .notepane-block-menu-subpanel,
+  .color-panel {
+    animation: none !important;
+  }
+}
+
+body.is-exporting .bn-menu-dropdown,
+body.is-exporting .mantine-Popover-dropdown,
+body.is-exporting .bn-suggestion-menu,
+body.is-exporting .bn-formatting-toolbar,
+body.is-exporting .notepane-block-menu-subpanel,
+body.is-exporting .color-panel {
+  animation: none !important;
+}

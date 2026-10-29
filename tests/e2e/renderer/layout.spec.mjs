@@ -514,3 +514,32 @@ test("keeps fast typing inside React's nested update limit", async ({ page }) =>
     .toBeVisible();
   expect(errors).toEqual([]);
 });
+
+async function openFirstBlockMenu(page) {
+  const heading = page.getByRole("heading", { name: "NotePane", exact: true });
+  const rect = await heading.boundingBox();
+  await page.mouse.move(rect.x + 40, rect.y + rect.height / 2);
+  await page.locator(".bn-side-menu").getByRole("button", { name: "Open block menu" }).click();
+  const blockMenu = page.locator(".bn-drag-handle-menu:visible");
+  await expect(blockMenu).toBeVisible();
+  return blockMenu;
+}
+
+const getAnimationName = (locator) =>
+  locator.evaluate((element) => getComputedStyle(element).animationName);
+
+test("animates menus open unless the system asks for reduced motion", async ({ page }) => {
+  await loadTemplatePreview(page);
+  const blockMenu = await openFirstBlockMenu(page);
+  expect(await getAnimationName(blockMenu)).toBe("notepaneMenuFadeIn");
+  await page.keyboard.press("Escape");
+  await expect(blockMenu).toHaveCount(0);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const reducedBlockMenu = await openFirstBlockMenu(page);
+  expect(await getAnimationName(reducedBlockMenu)).toBe("none");
+  await page.getByRole("menuitem", { name: "Turn into" }).click();
+  const turnIntoPanel = page.locator(".notepane-block-menu-subpanel[data-panel='turn-into']");
+  await expect(turnIntoPanel).toBeVisible();
+  expect(await getAnimationName(turnIntoPanel)).toBe("none");
+});

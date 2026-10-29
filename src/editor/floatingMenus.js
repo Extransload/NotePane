@@ -155,18 +155,31 @@ export function keepSubpanelInsideViewport(element) {
   }
 }
 
+// A menu fading in (src/styles/motion.css) starts transparent; it is already shown and placed.
+const MENU_ENTRANCE_ANIMATION = "notepaneMenuFadeIn";
+
+function isEnteringMenu(element) {
+  return element.getAnimations().some(
+    (animation) => animation.animationName === MENU_ENTRANCE_ANIMATION,
+  );
+}
+
+function isHiddenFloatingMenu(element, computedStyle) {
+  return (
+    computedStyle.display === "none" ||
+    computedStyle.visibility === "hidden" ||
+    (Number(computedStyle.opacity) <= 0.01 && !isEnteringMenu(element)) ||
+    element.getAttribute("aria-hidden") === "true"
+  );
+}
+
 export function isNestedBlockNoteFloatingMenu(element) {
   return Boolean(element.parentElement?.closest(BLOCKNOTE_FLOATING_MENU_SELECTOR));
 }
 
 export function keepElementInsideViewport(element) {
   const computedStyle = window.getComputedStyle(element);
-  if (
-    computedStyle.display === "none" ||
-    computedStyle.visibility === "hidden" ||
-    Number(computedStyle.opacity) <= 0.01 ||
-    element.getAttribute("aria-hidden") === "true"
-  ) {
+  if (isHiddenFloatingMenu(element, computedStyle)) {
     return;
   }
 
@@ -226,12 +239,7 @@ export function keepElementInsideViewport(element) {
 
 export function keepNestedElementInsideViewport(element) {
   const computedStyle = window.getComputedStyle(element);
-  if (
-    computedStyle.display === "none" ||
-    computedStyle.visibility === "hidden" ||
-    Number(computedStyle.opacity) <= 0.01 ||
-    element.getAttribute("aria-hidden") === "true"
-  ) {
+  if (isHiddenFloatingMenu(element, computedStyle)) {
     return;
   }
 
