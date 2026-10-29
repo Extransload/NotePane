@@ -307,7 +307,9 @@ keeps the selected color/opacity on that session tab.
 
 Sticky styling is applied outside the BlockNote editor:
 
-- `.sticky-header` has no title text in tab session mode.
+- `.sticky-header` shows the note's display title, centred and not editable, and the save status in tab session
+  mode. Both are text only, so the header stays one drag region. The status follows `onSaveStateChanged` from
+  `useNotePersistence`: `saving` when a write starts, `saved` after it lands, `failed` for each failed attempt.
 - `.sticky-header` contains editable title in sticky mode.
 - `.sticky-header` contains the sidebar toggle or title, drag strip, and mode-specific action controls.
 - Sticky mode uses a shorter header.

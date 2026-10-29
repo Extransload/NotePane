@@ -33,6 +33,32 @@ export function PreferenceToggleSwitch({ checked, ariaLabel, onChange }) {
   );
 }
 
+const SAVE_STATUS_LABELS = {
+  saving: "Saving...",
+  saved: "Saved",
+  failed: "Not saved - retrying",
+};
+
+// The tabs header's save status. `sequence` changes with every report, so a new "Saved" shows
+// and fades again.
+export function SaveStatus({ status, sequence }) {
+  const label = SAVE_STATUS_LABELS[status];
+  return (
+    <span
+      className="save-status"
+      role="status"
+      data-testid="save-status"
+      data-status={status}
+    >
+      {label && (
+        <span key={sequence} className="save-status-label">
+          {label}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function PreferencesButton({ shortcut, onClick }) {
   return (
     <button

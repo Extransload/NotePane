@@ -10,7 +10,9 @@
 - Sticky mode windows have per-session pastel color, opacity, pinning, layout, and editor controls in a header settings modal
 - Sticky color/opacity carries back to the sidebar session tab color when returning to Tab session mode
 - Custom NotePane shell
-- Padded draggable header with no visible title in tab session mode
+- Padded draggable header that shows, in tab session mode, the open note's title centred (the sidebar tab's text,
+  following a rename) and its save status at the right: "Saving..." while a write is in flight, a muted "Saved" that
+  fades after a moment, and "Not saved - retrying" in the danger colour while writes fail
 - Editable title in sticky mode header
 - Session rename by double-clicking a sidebar tab
 - Hover-only session delete button in the sidebar tab row

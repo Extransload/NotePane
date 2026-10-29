@@ -199,6 +199,7 @@ import {
   ExportPdfButton,
   LayoutModeSwitch,
   PreferencesButton,
+  SaveStatus,
   StickyPinButton,
   StickySettingsButton,
   StickyTrashButton,
@@ -922,7 +923,18 @@ function StickyEditor({
   }, [editor, note.markdown, parsedStoredBlocks]);
 
   const saveFailureShownRef = useRef(false);
+  // Shown in the tabs header. A "saved" report only counts after a write it followed: a save
+  // that found nothing to write leaves the status alone.
+  const [saveStatus, setSaveStatus] = useState({ status: "idle", sequence: 0 });
   const handleSaveStateChanged = useCallback((state) => {
+    setSaveStatus((current) =>
+      state.status === "saved" && current.status !== "saving" && current.status !== "failed"
+        ? current
+        : { status: state.status, sequence: current.sequence + 1 },
+    );
+    if (state.status === "saving") {
+      return;
+    }
     if (state.status === "failed") {
       saveFailureShownRef.current = true;
       const reason = String(state.error?.message || "unknown error")
@@ -2129,6 +2141,16 @@ function StickyEditor({
           onPointerDown={startHeaderWindowDrag}
         >
         <div className="sticky-drag-strip" aria-hidden="true" />
+        {normalizedLayoutMode === "tabs" && (
+          <>
+            <div className="sticky-header-title" data-testid="sticky-header-title">
+              {getSessionDisplayTitle(
+                visibleSessionNotes.find((sessionNote) => sessionNote.id === note.id) ?? note,
+              )}
+            </div>
+            <SaveStatus status={saveStatus.status} sequence={saveStatus.sequence} />
+          </>
+        )}
         <div
           className={`sticky-header-actions${
             isStickyActionBarOpen ? " is-open" : ""

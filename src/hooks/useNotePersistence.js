@@ -75,6 +75,7 @@ export function useNotePersistence({
       isEditorDirtyRef.current = false;
       return null;
     }
+    onSaveStateChanged?.({ status: "saving" });
 
     let markdown = "";
     try {
@@ -95,7 +96,7 @@ export function useNotePersistence({
       onNoteChanged(savedNote);
     }
     return savedNote ?? null;
-  }, [editor, note.id, onNoteChanged]);
+  }, [editor, note.id, onNoteChanged, onSaveStateChanged]);
 
   const waitForRetry = useCallback((delayMs) => new Promise((resolve) => {
     const run = () => {

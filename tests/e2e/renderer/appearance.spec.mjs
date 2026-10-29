@@ -1443,3 +1443,99 @@ test("writes the colour of every session tab recoloured within the save debounce
   await expect.poll(() => page.evaluate(() => window.__appearanceWrites.map((write) => write.noteId).sort()))
     .toEqual(["appearance-note-1", "appearance-note-2"]);
 });
+
+// A preload bridge with one stored note whose saves wait while `__saveBridge.holding` is set
+// until `__saveBridge.release()`, and fail while `__saveBridge.failing` is set.
+function stubSaveBridge() {
+  const now = Date.now();
+  const note = {
+    id: "save-note",
+    title: "Save probe",
+    titleManuallyEdited: true,
+    blocksJSON: null,
+    markdown: "",
+    theme: {},
+    seedDemoContent: false,
+    editorFontFamily: "system",
+    trashedAt: null,
+    sortOrder: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+  let release = null;
+  window.__saveBridge = {
+    failing: false,
+    holding: false,
+    release: () => release?.(),
+  };
+  window.blocknoteSticky = {
+    getCurrentNoteId: async () => note.id,
+    getNote: async () => note,
+    listNotes: async () => [note],
+    listTrash: async () => [],
+    getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
+    getLayoutMode: async () => "tabs",
+    getEditorPreferences: async () => ({}),
+    listFonts: async () => [],
+    saveContent: async () => {
+      if (window.__saveBridge.holding) {
+        await new Promise((resolve) => {
+          release = resolve;
+        });
+      }
+      if (window.__saveBridge.failing) {
+        throw new Error("Disk full.");
+      }
+      return undefined;
+    },
+    updateAppearance: async () => undefined,
+    onNotesChanged: () => () => {},
+  };
+}
+
+test("shows the open note's title and its save status in the tabs header", async ({ page }) => {
+  await page.addInitScript(stubSaveBridge);
+  await page.reload();
+  const header = page.getByTestId("sticky-header");
+  const title = page.getByTestId("sticky-header-title");
+  const status = page.getByTestId("save-status");
+  await expect(title).toHaveText("Save probe");
+  await expect(page.getByRole("tab").first()).toHaveText("Save probe");
+  expect(await header.evaluate((element) => getComputedStyle(element).getPropertyValue("-webkit-app-region")))
+    .toBe("drag");
+
+  await page.getByRole("tab").first().dblclick();
+  await page.getByLabel("Session name").fill("Renamed probe");
+  await page.keyboard.press("Enter");
+  await expect(title).toHaveText("Renamed probe");
+
+  await page.evaluate(() => {
+    window.__saveBridge.holding = true;
+  });
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.insertText("save status probe");
+  await expect(status).toHaveText("Saving...");
+  await page.evaluate(() => window.__saveBridge.release());
+  await expect(status).toHaveText("Saved");
+  await expect.poll(() => status.locator(".save-status-label")
+    .evaluate((label) => Number(getComputedStyle(label).opacity))).toBe(0);
+
+  await page.evaluate(() => {
+    window.__saveBridge.holding = false;
+    window.__saveBridge.failing = true;
+  });
+  await page.keyboard.insertText(" again");
+  await expect(status).toHaveText("Not saved - retrying");
+  const danger = await resolveColorToken(page, "--sticky-danger-color");
+  await expect.poll(() => status.evaluate((element) => getComputedStyle(element).color)).toBe(danger);
+  await page.evaluate(() => {
+    window.__saveBridge.failing = false;
+  });
+  // The next retry writes the note.
+  await expect(status).toHaveText("Saved");
+
+  await page.getByRole("button", { name: "Switch to Sticky windows mode" }).click();
+  await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
+  await expect(title).toHaveCount(0);
+  await expect(status).toHaveCount(0);
+});
