@@ -14,6 +14,8 @@ import {
   size,
 } from "@floating-ui/react";
 import {
+  Bookmark,
+  Columns2,
   Heading4,
   Lightbulb,
   Upload,
@@ -28,6 +30,8 @@ import {
 } from "../constants.js";
 import { setDividerSlashMenuItem } from "./divider.jsx";
 import { getMathSlashMenuItems } from "./math.jsx";
+import { insertBookmark } from "./bookmark.jsx";
+import { insertTwoColumns, isSelectionInColumn } from "./columns.jsx";
 
 export function createSlashMenuFloatingUIOptions() {
   return {
@@ -156,6 +160,29 @@ export function NotePaneSlashMenuController({ editor, onImportMarkdown }) {
     items.splice(toggleHeading3Index + 1, 0, toggleHeading4);
     // Equations join the Advanced group, after the table.
     items.splice(items.findIndex((item) => item.key === "table") + 1, 0, ...getMathSlashMenuItems(editor));
+    // Columns: offered outside a column only, since columns do not nest.
+    if (!isSelectionInColumn(editor.prosemirrorView.state)) {
+      items.splice(items.findIndex((item) => item.key === "callout") + 1, 0, {
+        title: "2 columns",
+        subtext: "Two blocks side by side",
+        aliases: ["columns", "column", "layout", "side by side", "2col", "열", "단"],
+        group: "Basic blocks",
+        icon: <Columns2 size={18} />,
+        key: "two_columns",
+        onItemClick: () => insertTwoColumns(editor),
+      });
+    }
+    // Bookmarks: after the media blocks, in their group.
+    const fileIndex = items.findIndex((item) => item.key === "file");
+    items.splice(fileIndex + 1, 0, {
+      title: "Bookmark",
+      subtext: "A card for a web page",
+      aliases: ["bookmark", "link", "url", "web", "embed", "북마크", "링크"],
+      group: items[fileIndex]?.group,
+      icon: <Bookmark size={18} />,
+      key: "bookmark",
+      onItemClick: () => insertBookmark(editor),
+    });
     // Last, so `/` and Enter inserts a block rather than opening a file dialog.
     items.push(importMarkdown);
     return filterSuggestionItems(items, query);

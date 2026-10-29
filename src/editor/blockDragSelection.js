@@ -8,6 +8,7 @@ import {
   createBlockSetSelection,
   getBlockSetIds,
   indentBlockSelection,
+  isBlockSetNode,
   isBlockSetSelection,
   moveBlockSelection,
   replaceBlockSelectionWithParagraph,
@@ -20,12 +21,15 @@ const AUTO_SCROLL_BAND = 40;
 const AUTO_SCROLL_MAX_SPEED = 18;
 const SURFACE_SELECTOR = "[data-testid='sticky-editor-surface']";
 const BLOCK_OUTER_SELECTOR = ".bn-block-outer[data-id]";
+// A column layout counts as the ancestor of the blocks in its columns, so a marquee that also
+// touches blocks outside it selects the layout whole.
+const ANCESTOR_SELECTOR = `${BLOCK_OUTER_SELECTOR}, .notepane-column-list[data-id]`;
 
 // The `{ id, ancestorIds }` record of a block's `.bn-block-outer`, ancestors outermost first.
 function blockRecord(outer) {
   const ancestorIds = [];
-  for (let parent = outer.parentElement?.closest(BLOCK_OUTER_SELECTOR); parent;
-    parent = parent.parentElement?.closest(BLOCK_OUTER_SELECTOR)) {
+  for (let parent = outer.parentElement?.closest(ANCESTOR_SELECTOR); parent;
+    parent = parent.parentElement?.closest(ANCESTOR_SELECTOR)) {
     ancestorIds.unshift(parent.dataset.id);
   }
   return { id: outer.dataset.id, ancestorIds };
@@ -336,7 +340,7 @@ export const BlockDragSelection = createExtension(({ editor }) => ({
         const ids = new Set(getBlockSetIds(state.selection));
         const decorations = [];
         state.doc.descendants((node, pos) => {
-          if (node.type.name !== "blockContainer" || !ids.has(node.attrs.id)) return;
+          if (!isBlockSetNode(node) || !ids.has(node.attrs.id)) return;
           decorations.push(Decoration.node(pos, pos + node.nodeSize, { "data-block-selected": "true" }));
           return false;
         });

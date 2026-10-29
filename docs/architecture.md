@@ -15,6 +15,7 @@
 | `electron/main.cjs` | app lifecycle, tab/sticky window orchestration, native menu, note/session create/activate/delete IPC, export/download IPC |
 | `electron/store.cjs` | local JSON persistence |
 | `electron/assetStore.cjs` | content-addressed media files under `userData/assets`, served as `notepane-asset://local/<sha256>.<ext>` |
+| `electron/bookmarkMetadata.cjs` | the `bookmarks:fetch-metadata` IPC behind a bookmark card: reads a public http(s) page's title, description, site name and preview image, refusing other schemes and loopback, private and link-local addresses (redirects included), within 5 s and 1 MB |
 | `electron/preload.cjs` | safe renderer bridge |
 | `electron/appUpdates.cjs` | update checks for a packaged app against GitHub Releases: install on quit, or offer the release page from an ad-hoc signed Mac build |
 | `electron-builder.config.cjs` | packaging, signing and publishing; `.github/workflows/release.yml` runs it on a version tag (see `docs/release.md`) |
@@ -29,7 +30,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Directory | Owns | Notable files |
 | --- | --- | --- |
 | `src/` | entry point and shared constants | `main.jsx`, `constants.js` |
-| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `callout.jsx`, `calloutIconPicker.jsx`, `selection.js`, `blockSelection.js`, `blockSelectionRules.js`, `blockDragSelection.js`, `blocks.js`, `clipboard.js`, `paste.js`, `tableFocus.js`, `images.js`, `divider.jsx`, `math.jsx` |
+| `src/editor/` | editor engine and editor behaviour, independent of React state | `schema.jsx`, `callout.jsx`, `calloutIconPicker.jsx`, `columns.jsx`, `bookmark.jsx`, `divider.jsx`, `math.jsx`, `selection.js`, `blockSelection.js`, `blockSelectionRules.js`, `blockDragSelection.js`, `blocks.js`, `clipboard.js`, `paste.js`, `tableFocus.js`, `images.js` |
 | `src/model/` | normalising and deriving stored data | `notes.js`, `preferences.js`, `keyboardShortcuts.js` |
 | `src/style/` | themes, theme tokens, tone matching, colour maths and computed inline styles | `themes.js`, `themeTokens.js`, `toneMatch.js`, `applyTheme.js`, `themeStyles.js`, `colorMath.js` |
 | `src/ui/` | presentational React components | `icons.jsx`, `controls.jsx`, `preferencesWindow.jsx`, `CropDialog.jsx` |
@@ -44,6 +45,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Block schema, template content, custom blocks | `src/editor/schema.jsx` |
 | Callout block: Enter and Backspace in its text and body, drops into its body, Markdown export as a quote | `src/editor/callout.jsx` |
 | Callout icon picker: emoji data, recent icons, upload, remove | `src/editor/calloutIconPicker.jsx` |
+| Columns: the `columnList` and `column` nodes (the layout BlockNote core knows; `@blocknote/xl-multi-column` is GPL-3.0 and not used), the resize gutter, Backspace at a column's start, the slash menu's "2 columns" | `src/editor/columns.jsx` |
+| Bookmark card: the address field, the card, opening the page, the metadata request, Markdown export as a link, the six-dot menu's Turn into bookmark | `src/editor/bookmark.jsx` (fetching in `electron/bookmarkMetadata.cjs`) |
 | Text selection, table cell selection and navigation | `src/editor/selection.js` |
 | Table row and column handle menus, the table items of the six-dot block menu | `src/editor/tableHandles.jsx` |
 | Table column widths: live resize, double-click auto-fit, fit to width | `src/editor/tableColumnSizing.js` |
@@ -215,6 +218,15 @@ The renderer uses:
 - Copy image puts the image pixels, not its URL, on the clipboard: Electron reads the URL through the same reader as download (`assets:copy-image`) and writes a native image; the browser preview writes a PNG `ClipboardItem` and hides the action when the async clipboard is unavailable.
 - Image toolbar actions resolve the clicked image's block from its rendered `.bn-block-outer[data-id]`, because identical images share one asset URL.
 - Image crop is renderer-side canvas processing; the cropped PNG is stored as an asset and replaces the block URL.
+- A bookmark card's metadata comes from the main process through `bookmarks:fetch-metadata` (preload
+  `fetchBookmarkMetadata(url)`, `electron/bookmarkMetadata.cjs`). Only http(s) addresses on public hosts are fetched:
+  the host name is resolved and refused when any address is loopback, private, link-local, CGNAT, multicast or
+  reserved, IPv4-mapped and NAT64 IPv6 included, and every redirect (at most four) is checked the same way. Each read
+  stops after 5 s; a page is read up to 1 MB and parsed with a small regular-expression reader of `<title>`, the meta
+  description and the `og:` tags. The preview image (PNG, JPEG, GIF, WebP or AVIF, up to 2 MB) is stored as an asset,
+  so the card never hot-links it. The renderer writes the fetched fields without an undo step of their own. The
+  browser preview has no bridge and shows the address alone. Clicking a card calls `window.open`, which main hands to
+  `shell.openExternal` through `openExternalUrl`.
 
 ## Themes and Preferences panel
 

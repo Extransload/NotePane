@@ -14,6 +14,7 @@ import {
 } from "@blocknote/react";
 import { ArrowRightLeft, Palette, SmilePlus, Trash2 } from "lucide-react";
 import { resolveBlocksForMenuBlock } from "./blocks.js";
+import { TurnIntoBookmarkItem } from "./bookmark.jsx";
 import { editCalloutIcon } from "./callout.jsx";
 import { getCodeBlockText } from "./codeFormatting.js";
 import { EditorColorPickerSections } from "./colorFormatting.jsx";
@@ -184,6 +185,7 @@ function NotePaneDragHandleMenu({
           </span>
         </Components.Generic.Menu.Item>
       )}
+      <TurnIntoBookmarkItem />
       <TableBlockMenuItems onPointerEnter={() => setActivePanel(null)} />
       <Components.Generic.Menu.Item
         className="bn-menu-item"

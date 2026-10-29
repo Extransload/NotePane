@@ -45,11 +45,17 @@ class BlockSetBookmark {
   }
 }
 
+// A block set holds whole blocks: blockContainers, and column layouts as one block each (see
+// src/editor/columns.jsx). The blocks inside a column are blockContainers too.
+export function isBlockSetNode(node) {
+  return node.type.name === "blockContainer" || node.type.name === "columnList";
+}
+
 export function createBlockSetSelection(doc, blockIds) {
   const wanted = new Set(blockIds);
   const spans = [];
   doc.descendants((node, pos) => {
-    if (node.type.name !== "blockContainer" || !wanted.has(node.attrs.id)) return;
+    if (!isBlockSetNode(node) || !wanted.has(node.attrs.id)) return;
     const end = pos + node.nodeSize;
     const last = spans.at(-1);
     if (last && last[1] === pos) last[1] = end;
@@ -69,7 +75,7 @@ function containerIdsIn(doc, from, to) {
   for (let pos = from; pos < to;) {
     const node = doc.nodeAt(pos);
     if (!node) break;
-    if (node.type.name === "blockContainer") ids.push(node.attrs.id);
+    if (isBlockSetNode(node)) ids.push(node.attrs.id);
     pos += node.nodeSize;
   }
   return ids;

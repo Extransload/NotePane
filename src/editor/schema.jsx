@@ -18,9 +18,11 @@ import {
 import { closeHistory } from "@tiptap/pm/history";
 import { InputRule, inputRules } from "@tiptap/pm/inputrules";
 import { TextSelection } from "@tiptap/pm/state";
+import { createBookmarkBlockSpec } from "./bookmark.jsx";
 import { createCalloutBlockSpec } from "./callout.jsx";
 import { DividerMarkdownExport } from "./divider.jsx";
 import { createMathBlockSpec, inlineMathSpec } from "./math.jsx";
+import { columnBlockSpec, columnListBlockSpec } from "./columns.jsx";
 import { indentCodeBlockLines } from "./codeFormatting.js";
 import {
   codeBlockOptions,
@@ -327,6 +329,11 @@ export const schema = BlockNoteSchema.create({
   blockSpecs: {
     codeBlock: createNotePaneCodeBlockSpec(),
     callout: createCalloutBlockSpec(),
+    // Columns (src/editor/columns.jsx).
+    columnList: columnListBlockSpec,
+    column: columnBlockSpec,
+    // Bookmark cards (src/editor/bookmark.jsx).
+    bookmark: createBookmarkBlockSpec(),
     mathBlock: createMathBlockSpec(),
   },
   inlineContentSpecs: {

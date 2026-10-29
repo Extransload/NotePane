@@ -55,6 +55,7 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
   saveAsset: (payload) => ipcRenderer.invoke("assets:save-url", payload),
   storeAsset: (payload) => ipcRenderer.invoke("assets:store", payload),
   copyImage: (payload) => ipcRenderer.invoke("assets:copy-image", payload),
+  fetchBookmarkMetadata: (url) => ipcRenderer.invoke("bookmarks:fetch-metadata", url),
   listFonts: () => ipcRenderer.invoke("fonts:list"),
   moveWindowBy: (payload) => ipcRenderer.invoke("window:move-by", payload),
   closeCurrentWindow: () => ipcRenderer.invoke("window:close-current"),

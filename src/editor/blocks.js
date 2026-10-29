@@ -65,6 +65,7 @@ export function isEmptyEditorSurfacePointer(event) {
         ".bn-side-menu",
         ".bn-table-handle",
         ".bn-table-cell-handle",
+        ".notepane-column-gutter",
         ".bn-formatting-toolbar",
         "[role='toolbar']",
         "[role='listbox']",
