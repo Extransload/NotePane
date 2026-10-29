@@ -487,6 +487,21 @@ test("selects a note that starts with a table with Command+A", async ({ page }) 
   await expect(editor.locator(".bn-block-content")).toHaveCount(1);
 });
 
+test("keeps the table when the cut shortcut is pressed with the caret in a cell", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const table = page.locator(".bn-editor table").first();
+  const rowCount = await table.locator("tr").count();
+  await page.getByRole("cell", { name: "Tabs" }).first().getByText("Tabs", { exact: true }).click();
+
+  await page.keyboard.press(modifierShortcut("X"));
+
+  await expect(table).toHaveCount(1);
+  await expect(table.locator("tr")).toHaveCount(rowCount);
+  await expect(page.getByRole("cell", { name: "Tabs" }).first()).toBeVisible();
+  await expectEditorFocused(page);
+});
+
 test("keeps the editor focused after a row handle action and Escape, so Cmd+Z undoes it", async ({ page }) => {
   await loadTemplatePreview(page);
   await page.getByRole("button", { name: "Use this template" }).click();

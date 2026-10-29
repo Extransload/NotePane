@@ -1,6 +1,6 @@
 import {
   cutBlocks,
-  cutCurrentBlocks,
+  resolveBlocksForCut,
   resolveBlocksForMenuBlock,
 } from "../editor/blocks.js";
 import {
@@ -221,8 +221,12 @@ export function useEditorSurfaceShortcuts({
         return;
       }
 
+      const blocksToCut = resolveBlocksForCut(editor, stateRef.current.activeImageBlockId);
+      if (blocksToCut.length === 0) {
+        return;
+      }
       event.preventDefault();
-      void cutCurrentBlocks(editor, stateRef.current.activeImageBlockId, stateRef.current.scheduleSave);
+      void cutBlocks(editor, blocksToCut, stateRef.current.scheduleSave);
     };
 
     const handleTextSelectionToolbarEscape = (event) => {

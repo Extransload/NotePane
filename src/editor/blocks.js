@@ -197,16 +197,11 @@ export async function cutBlocks(editor, blocks, scheduleSave) {
     return;
   }
 
-  const firstTopLevelIndex = editor.document.findIndex(
-    (block) => block.id === topLevelBlocks[0]?.id,
-  );
   // A block set can skip blocks, so the next block is the first one not cut.
+  // Blocks cut from inside a parent look among that parent's children first,
+  // then fall back to the parent itself.
   const removedIds = new Set(blocks.map((block) => block.id));
-  const nextCursorBlock =
-    firstTopLevelIndex >= 0
-      ? editor.document.slice(firstTopLevelIndex).find((block) => !removedIds.has(block.id)) ||
-        editor.document[firstTopLevelIndex - 1]
-      : null;
+  const nextCursorBlock = findCursorBlockAfterCut(editor, blocks[0], removedIds);
 
   editor.removeBlocks(blocks);
   if (nextCursorBlock) {
@@ -215,6 +210,23 @@ export async function cutBlocks(editor, blocks, scheduleSave) {
     editor.setTextCursorPosition(editor.document[0], "start");
   }
   scheduleSave();
+}
+
+function findCursorBlockAfterCut(editor, firstCutBlock, removedIds) {
+  if (!firstCutBlock) {
+    return null;
+  }
+  const parent = editor.getParentBlock(firstCutBlock.id);
+  const siblings = parent ? parent.children : editor.document;
+  const index = siblings.findIndex((block) => block.id === firstCutBlock.id);
+  if (index < 0) {
+    return null;
+  }
+  return (
+    siblings.slice(index).find((block) => !removedIds.has(block.id)) ??
+    [...siblings.slice(0, index)].reverse().find((block) => !removedIds.has(block.id)) ??
+    (parent && !removedIds.has(parent.id) ? parent : null)
+  );
 }
 
 export function resolveBlocksForCut(editor, activeImageBlockId) {
@@ -233,11 +245,34 @@ export function resolveBlocksForCut(editor, activeImageBlockId) {
     return [activeImageBlock];
   }
 
+  // A caret or cell range inside a table cuts cells, which prosemirror-tables
+  // handles; the table block itself is cut only through its handle.
+  if (isSelectionInsideTableCell(editor.prosemirrorView?.state.selection)) {
+    return [];
+  }
+
   try {
     return [editor.getTextCursorPosition().block];
   } catch {
     return [];
   }
+}
+
+function isSelectionInsideTableCell(selection) {
+  if (!selection) {
+    return false;
+  }
+  if (selection.$anchorCell && selection.$headCell) {
+    return true;
+  }
+  const { $from } = selection;
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const role = $from.node(depth).type.spec.tableRole;
+    if (role === "cell" || role === "header_cell") {
+      return true;
+    }
+  }
+  return false;
 }
 
 // A six-dot menu action takes the selected blocks, exactly those of a block set,

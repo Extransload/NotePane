@@ -1,5 +1,10 @@
 import { isBlockSetSelection } from "./blockSelection.js";
 
+// A cell selection's `from`/`to` cover only its head cell; its ranges cover every cell.
+function isCellSelection(selection) {
+  return Boolean(selection?.$anchorCell && selection?.$headCell);
+}
+
 export function isStandaloneWebUrl(text) {
   return /^https?:\/\/\S+$/i.test(String(text).trim());
 }
@@ -12,7 +17,7 @@ export function normalizeCopiedEditorPlainText(editor, clipboardText, selectedTe
       // A block set has one range per run of blocks. Every other selection,
       // a table cell selection included, is read from `from` to `to`.
       const { selection } = transaction;
-      const spans = isBlockSetSelection(selection)
+      const spans = isBlockSetSelection(selection) || isCellSelection(selection)
         ? selection.ranges.map(({ $from, $to }) => [$from.pos, $to.pos])
         : [[selection.from, selection.to]];
       let containsHardBreak = false;
@@ -316,7 +321,8 @@ export function isLogicalMarkdownTableRowComplete(
     return true;
   }
 
-  return false;
+  // A table written without edge pipes: the next line is a whole row of its own.
+  return parseMarkdownTableCells(trimmedNextLine).length >= columnCount;
 }
 
 export function parseMarkdownTableCells(line) {

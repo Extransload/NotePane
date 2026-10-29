@@ -627,6 +627,24 @@ test("replaces selected text when pasting a URL instead of turning it into link 
     .toHaveCount(0);
 });
 
+test("pastes a markdown table written without edge pipes as one row per line", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, "Name | Role\n--- | ---\nAda | Engineer\nGrace | Admiral");
+
+  await expect.poll(async () => page.evaluate(() => {
+    const table = [...document.querySelectorAll(".bn-editor table")]
+      .find((candidate) => candidate.textContent.includes("Grace"));
+    if (!table) return null;
+    return [...table.querySelectorAll("tr")].map((row) =>
+      [...row.cells].map((cell) => cell.textContent.trim()),
+    );
+  })).toEqual([
+    ["Name", "Role"],
+    ["Ada", "Engineer"],
+    ["Grace", "Admiral"],
+  ]);
+});
+
 test("pastes wrapped markdown tables without breaking table cells into paragraphs", async ({ page }) => {
   const wrappedMarkdown = `ZDR을 적용할 수 있고 입력과 출력을 모델 학습에 사용하지 않는 provider를 정리했다.
 
@@ -1648,6 +1666,28 @@ test("cuts the block selected with the six-dot handle using the cut shortcut", a
   await expectBlockTexts(editor, ["Alpha handle block", "Charlie caret block"]);
   await page.keyboard.press(modifierShortcut("Z"));
   await expectBlockTexts(editor, handleMenuBlockTexts);
+});
+
+test("cutting a nested block leaves the caret beside it, not at the top of the note", async ({ page }) => {
+  const { editor } = await typeHandleMenuBlocks(page);
+  // Bravo and Charlie become children of Alpha; the caret ends in Bravo. The caret is moved by
+  // keyboard, and each Tab waits for ProseMirror to adopt the DOM caret so it nests that block.
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowUp");
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("ArrowDown");
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Tab");
+  await expect(editor.locator(".bn-block-group .bn-block-group .bn-block-content")).toHaveCount(2);
+  await page.keyboard.press("ArrowUp");
+  await waitForEditorSelection(page);
+
+  await page.keyboard.press(modifierShortcut("X"));
+
+  await expectBlockTexts(editor, ["Alpha handle block", "Charlie caret block"]);
+  await page.keyboard.type("typed ");
+  await expect(editor.getByText("typed Charlie caret block", { exact: true })).toHaveCount(1);
 });
 
 test("cuts the six-dot menu's block after the arrow keys move through the menu", async ({ page }) => {
