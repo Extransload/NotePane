@@ -3,6 +3,9 @@ import {
   useEffect,
   useRef,
 } from "react";
+import {
+  usePresenceContext,
+} from "../hooks/usePresence.js";
 
 export function FindBar({
   query,
@@ -15,6 +18,7 @@ export function FindBar({
   onClose,
 }) {
   const inputRef = useRef(null);
+  const { rootProps } = usePresenceContext();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -46,6 +50,7 @@ export function FindBar({
 
   return (
     <div
+      {...rootProps}
       className="find-bar"
       role="search"
       aria-label="Find in note"

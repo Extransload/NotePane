@@ -259,6 +259,7 @@ import { useSessionList } from "./hooks/useSessionList.js";
 import { useSessionTabActions } from "./hooks/useSessionTabActions.js";
 import { useSessionTabDrag } from "./hooks/useSessionTabDrag.js";
 import { useStickyToasts } from "./hooks/useStickyToasts.js";
+import { Presence } from "./hooks/usePresence.js";
 import {
   animateSessionTabReorder,
   collectNewSessionTabIds,
@@ -1577,7 +1578,9 @@ function StickyEditor({
         event.key !== "Escape" ||
         event.isComposing ||
         isShortcutRecorderTarget(event.target) ||
-        document.querySelector(".trash-confirm-backdrop, .notepane-dropdown-menu, .crop-dialog")
+        document.querySelector(
+          ":is(.trash-confirm-backdrop, .notepane-dropdown-menu, .crop-dialog):not([data-state='closing'])",
+        )
       ) {
         return;
       }
@@ -2593,20 +2596,22 @@ function StickyEditor({
             }
           }}
         >
-          {findInNote.isOpen && (
-            <div className="find-bar-dock">
-              <FindBar
-                query={findInNote.query}
-                current={findInNote.current}
-                total={findInNote.total}
-                focusRequest={findInNote.focusRequest}
-                isFindShortcut={(event) => matchesEnabledKeyboardShortcut(event, "findInNote")}
-                onQueryChange={findInNote.updateQuery}
-                onStep={findInNote.step}
-                onClose={findInNote.closeFind}
-              />
-            </div>
-          )}
+          <Presence when={findInNote.isOpen}>
+            {() => (
+              <div className="find-bar-dock">
+                <FindBar
+                  query={findInNote.query}
+                  current={findInNote.current}
+                  total={findInNote.total}
+                  focusRequest={findInNote.focusRequest}
+                  isFindShortcut={(event) => matchesEnabledKeyboardShortcut(event, "findInNote")}
+                  onQueryChange={findInNote.updateQuery}
+                  onStep={findInNote.step}
+                  onClose={findInNote.closeFind}
+                />
+              </div>
+            )}
+          </Presence>
           {zoomGauge !== null && (
             <div className="app-zoom-gauge-dock">
               <AppZoomGauge zoom={zoomGauge} />
@@ -2696,160 +2701,190 @@ function StickyEditor({
           ))}
         </section>
       </div>
-      {isVersionHistoryOpen && (
-        <VersionHistoryPanel
-          versions={noteVersions}
-          isBusy={isVersionBusy}
-          scheme={activeTheme.scheme}
-          onClose={() => closeOverlay("versionHistory")}
-          onRestore={(version) => void restoreVersion(version)}
-        />
-      )}
+      <Presence when={isVersionHistoryOpen}>
+        {() => (
+          <VersionHistoryPanel
+            versions={noteVersions}
+            isBusy={isVersionBusy}
+            scheme={activeTheme.scheme}
+            onClose={() => closeOverlay("versionHistory")}
+            onRestore={(version) => void restoreVersion(version)}
+          />
+        )}
+      </Presence>
       {layoutTransition && (
         <LayoutTransitionOverlay transition={layoutTransition} />
       )}
-      {sessionTabMenu && sessionTabMenuNote && (
-        <SessionTabContextMenu
-          x={sessionTabMenu.x}
-          y={sessionTabMenu.y}
-          sessionNote={sessionTabMenuNote}
-          activeTheme={activeTheme}
-          canOpenAsSticky={
-            Boolean(electronApi?.openStickyNote) &&
-            normalizedLayoutMode === "tabs" &&
-            visibleSessionNotes.length > 1
-          }
-          onRename={() => {
-            closeOverlay("sessionTabMenu");
-            startSessionRename(sessionTabMenuNote);
-          }}
-          onDuplicate={() => {
-            closeOverlay("sessionTabMenu");
-            void duplicateSessionNote(sessionTabMenuNote);
-          }}
-          onOpenAsSticky={() => {
-            closeOverlay("sessionTabMenu");
-            void openSessionAsSticky(sessionTabMenuNote);
-          }}
-          onOpenColor={() => openSessionColorPanel(sessionTabMenuNote.id)}
-          onMoveToTrash={() => {
-            closeOverlay("sessionTabMenu");
-            requestDeleteSessionNote(sessionTabMenuNote);
-          }}
-        />
-      )}
-      {exportFormatMenu && (
-        <ExportFormatMenu
-          anchor={exportFormatMenu}
-          onExport={(type) => void exportNote(type)}
-        />
-      )}
-      {isMarkdownImportOpen && (
-        <MarkdownImportDialog
-          onClose={() => closeOverlay("markdownImport")}
-          onImport={importMarkdownFile}
-        />
-      )}
-      {isColorPanelOpen && (
-        <ColorPanel
-          theme={theme}
-          activeTheme={activeTheme}
-          variant="sticky"
-          defaultColor={
-            normalizedLayoutMode === "sticky" ? stickyAccentColor : undefined
-          }
-          onChange={updateTheme}
-          onClose={() => closeOverlay("colorPanel")}
-        />
-      )}
-      {sessionColorPanelNote && (
-        <ColorPanel
-          theme={normalizeTheme(sessionColorPanelNote.theme)}
-          activeTheme={activeTheme}
-          variant="tabs"
-          defaultColor={resolveSessionTabAccentColor(
-            sessionColorPanelNote.theme,
-            resolveStickyAccentColor(
-              sessionColorPanelNote.theme,
-              noteIndexById.get(sessionColorPanelNote.id) ?? 0,
-            ),
-          )}
-          onChange={(nextTheme) =>
-            updateSessionNoteTheme(sessionColorPanelNote.id, nextTheme)
-          }
-          onClose={() => closeOverlay("sessionColorPanel")}
-        />
-      )}
-      {pendingSessionTrashNote && (
-        <SessionTrashConfirmDialog
-          noteTitle={getSessionDisplayTitle(pendingSessionTrashNote)}
-          onCancel={() => closeOverlay("sessionTrashConfirm")}
-          onConfirm={() => void confirmDeleteSessionNote()}
-        />
-      )}
-      {pendingSessionCloseNote && (
-        <SessionCloseConfirmDialog
-          noteTitle={getSessionDisplayTitle(pendingSessionCloseNote)}
-          onCancel={() => closeOverlay("sessionCloseConfirm")}
-          onConfirm={() => void confirmCloseCurrentTab()}
-        />
-      )}
-      {isStickySettingsOpen && (
-        <StickySettingsWindow
-          noteTitle={title}
-          theme={theme}
-          activeTheme={activeTheme}
-          defaultColor={stickyAccentColor}
-          onThemeChange={updateTheme}
-          onClose={() => closeOverlay("stickySettings")}
-        />
-      )}
-      {isStickyTrashConfirmOpen && (
-        <StickyTrashConfirmDialog
-          noteTitle={title}
-          onCancel={() => closeOverlay("stickyTrashConfirm")}
-          onConfirm={() => void moveCurrentStickyNoteToTrash()}
-        />
-      )}
-      {isPreferencesWindowOpen && (
-        <PreferencesWindow
-          initialPage={preferencesInitialPage}
-          appThemeId={activeTheme.id}
-          editorPreferences={editorPreferences}
-          keyboardShortcuts={keyboardShortcuts}
-          appFontOptions={appFontOptions}
-          fontOptions={editorFontOptions}
-          trashedNotes={trashedNotes}
-          onAppThemeChange={onAppThemeChanged}
-          onEditorPreferencesChange={updateGlobalEditorPreferences}
-          onExportBackup={exportDataBackup}
-          onImportBackup={importDataBackup}
-          onRestoreTrashedNote={onRestoreTrashedNote}
-          onPurgeTrashedNote={onPurgeTrashedNote}
-          onClose={() => closeOverlay("preferencesWindow")}
-        />
-      )}
+      <Presence
+        when={sessionTabMenu && sessionTabMenuNote
+          ? { menu: sessionTabMenu, menuNote: sessionTabMenuNote }
+          : null}
+      >
+        {({ menu, menuNote }) => (
+          <SessionTabContextMenu
+            x={menu.x}
+            y={menu.y}
+            sessionNote={menuNote}
+            activeTheme={activeTheme}
+            canOpenAsSticky={
+              Boolean(electronApi?.openStickyNote) &&
+              normalizedLayoutMode === "tabs" &&
+              visibleSessionNotes.length > 1
+            }
+            onRename={() => {
+              closeOverlay("sessionTabMenu");
+              startSessionRename(menuNote);
+            }}
+            onDuplicate={() => {
+              closeOverlay("sessionTabMenu");
+              void duplicateSessionNote(menuNote);
+            }}
+            onOpenAsSticky={() => {
+              closeOverlay("sessionTabMenu");
+              void openSessionAsSticky(menuNote);
+            }}
+            onOpenColor={() => openSessionColorPanel(menuNote.id)}
+            onMoveToTrash={() => {
+              closeOverlay("sessionTabMenu");
+              requestDeleteSessionNote(menuNote);
+            }}
+          />
+        )}
+      </Presence>
+      <Presence when={exportFormatMenu}>
+        {(anchor) => (
+          <ExportFormatMenu
+            anchor={anchor}
+            onExport={(type) => void exportNote(type)}
+          />
+        )}
+      </Presence>
+      <Presence when={isMarkdownImportOpen}>
+        {() => (
+          <MarkdownImportDialog
+            onClose={() => closeOverlay("markdownImport")}
+            onImport={importMarkdownFile}
+          />
+        )}
+      </Presence>
+      <Presence when={isColorPanelOpen}>
+        {() => (
+          <ColorPanel
+            theme={theme}
+            activeTheme={activeTheme}
+            variant="sticky"
+            defaultColor={
+              normalizedLayoutMode === "sticky" ? stickyAccentColor : undefined
+            }
+            onChange={updateTheme}
+            onClose={() => closeOverlay("colorPanel")}
+          />
+        )}
+      </Presence>
+      <Presence when={sessionColorPanelNote}>
+        {(panelNote) => (
+          <ColorPanel
+            theme={normalizeTheme(panelNote.theme)}
+            activeTheme={activeTheme}
+            variant="tabs"
+            defaultColor={resolveSessionTabAccentColor(
+              panelNote.theme,
+              resolveStickyAccentColor(
+                panelNote.theme,
+                noteIndexById.get(panelNote.id) ?? 0,
+              ),
+            )}
+            onChange={(nextTheme) =>
+              updateSessionNoteTheme(panelNote.id, nextTheme)
+            }
+            onClose={() => closeOverlay("sessionColorPanel")}
+          />
+        )}
+      </Presence>
+      <Presence when={pendingSessionTrashNote}>
+        {(trashNote) => (
+          <SessionTrashConfirmDialog
+            noteTitle={getSessionDisplayTitle(trashNote)}
+            onCancel={() => closeOverlay("sessionTrashConfirm")}
+            onConfirm={() => void confirmDeleteSessionNote()}
+          />
+        )}
+      </Presence>
+      <Presence when={pendingSessionCloseNote}>
+        {(closeNote) => (
+          <SessionCloseConfirmDialog
+            noteTitle={getSessionDisplayTitle(closeNote)}
+            onCancel={() => closeOverlay("sessionCloseConfirm")}
+            onConfirm={() => void confirmCloseCurrentTab()}
+          />
+        )}
+      </Presence>
+      <Presence when={isStickySettingsOpen}>
+        {() => (
+          <StickySettingsWindow
+            noteTitle={title}
+            theme={theme}
+            activeTheme={activeTheme}
+            defaultColor={stickyAccentColor}
+            onThemeChange={updateTheme}
+            onClose={() => closeOverlay("stickySettings")}
+          />
+        )}
+      </Presence>
+      <Presence when={isStickyTrashConfirmOpen}>
+        {() => (
+          <StickyTrashConfirmDialog
+            noteTitle={title}
+            onCancel={() => closeOverlay("stickyTrashConfirm")}
+            onConfirm={() => void moveCurrentStickyNoteToTrash()}
+          />
+        )}
+      </Presence>
+      <Presence when={isPreferencesWindowOpen}>
+        {() => (
+          <PreferencesWindow
+            initialPage={preferencesInitialPage}
+            appThemeId={activeTheme.id}
+            editorPreferences={editorPreferences}
+            keyboardShortcuts={keyboardShortcuts}
+            appFontOptions={appFontOptions}
+            fontOptions={editorFontOptions}
+            trashedNotes={trashedNotes}
+            onAppThemeChange={onAppThemeChanged}
+            onEditorPreferencesChange={updateGlobalEditorPreferences}
+            onExportBackup={exportDataBackup}
+            onImportBackup={importDataBackup}
+            onRestoreTrashedNote={onRestoreTrashedNote}
+            onPurgeTrashedNote={onPurgeTrashedNote}
+            onClose={() => closeOverlay("preferencesWindow")}
+          />
+        )}
+      </Presence>
       <StickyToast toast={exportToast} timer={exportToastTimer} />
-      {notePalette.query !== null && (
-        <SearchPalette
-          query={notePalette.query}
-          results={notePalette.results}
-          activeTheme={activeTheme}
-          noteIndexById={notePalette.noteIndexById}
-          onQueryChange={notePalette.setQuery}
-          onChoose={(result) => void notePalette.chooseResult(result)}
-          onClose={notePalette.closePalette}
-        />
-      )}
+      <Presence when={notePalette.query !== null ? notePalette : null}>
+        {(palette) => (
+          <SearchPalette
+            query={palette.query}
+            results={palette.results}
+            activeTheme={activeTheme}
+            noteIndexById={palette.noteIndexById}
+            onQueryChange={palette.setQuery}
+            onChoose={(result) => void palette.chooseResult(result)}
+            onClose={palette.closePalette}
+          />
+        )}
+      </Presence>
       <AdaptiveTooltipPortal />
-      {cropState && (
-        <CropDialog
-          sourceUrl={cropState.sourceUrl}
-          initialCrop={cropState.crop}
-          onApply={applyCrop}
-          onClose={() => setCropState(null)}
-        />
-      )}
+      <Presence when={cropState}>
+        {(crop) => (
+          <CropDialog
+            sourceUrl={crop.sourceUrl}
+            initialCrop={crop.crop}
+            onApply={applyCrop}
+            onClose={() => setCropState(null)}
+          />
+        )}
+      </Presence>
     </main>
   );
 }

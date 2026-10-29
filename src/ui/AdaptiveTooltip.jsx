@@ -9,6 +9,11 @@ import {
   createPortal,
 } from "react-dom";
 import {
+  Presence,
+  useMergedRefs,
+  usePresenceContext,
+} from "../hooks/usePresence.js";
+import {
   clamp,
 } from "../utils/values.js";
 
@@ -147,18 +152,24 @@ export function AdaptiveTooltipPortal() {
     };
   }, [hideTooltip, showTooltip]);
 
-  if (!tooltip || typeof document === "undefined") {
+  if (typeof document === "undefined") {
     return null;
   }
 
-  return createPortal(
-    <AdaptiveTooltip target={tooltip.target} text={tooltip.text} />,
-    document.body,
+  return (
+    <Presence when={tooltip}>
+      {(shownTooltip) => createPortal(
+        <AdaptiveTooltip target={shownTooltip.target} text={shownTooltip.text} />,
+        document.body,
+      )}
+    </Presence>
   );
 }
 
 export function AdaptiveTooltip({ target, text }) {
   const tooltipRef = useRef(null);
+  const { rootProps } = usePresenceContext();
+  const rootRef = useMergedRefs(tooltipRef, rootProps.ref);
   const [style, setStyle] = useState({
     left: 0,
     top: 0,
@@ -195,7 +206,8 @@ export function AdaptiveTooltip({ target, text }) {
 
   return (
     <div
-      ref={tooltipRef}
+      {...rootProps}
+      ref={rootRef}
       className="adaptive-tooltip"
       data-placement={placement}
       role="tooltip"

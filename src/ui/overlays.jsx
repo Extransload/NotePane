@@ -34,6 +34,7 @@ import {
 import {
   useExitAnimation,
   usePresence,
+  usePresenceContext,
 } from "../hooks/usePresence.js";
 import {
   parseBlocksJSON,
@@ -192,6 +193,7 @@ export function AppZoomGauge({ zoom }) {
 }
 
 export function VersionHistoryPanel({ versions, isBusy, scheme, onClose, onRestore }) {
+  const { rootProps } = usePresenceContext();
   const [selectedVersionId, setSelectedVersionId] = useState(versions[0]?.id ?? null);
   const selectedVersion = versions.find((version) => version.id === selectedVersionId) ?? versions[0];
   const previewContent = useMemo(
@@ -209,7 +211,7 @@ export function VersionHistoryPanel({ versions, isBusy, scheme, onClose, onResto
   }, [previewContent, previewEditor, selectedVersion]);
 
   return createPortal(
-    <div className="version-history-backdrop" role="presentation" onMouseDown={onClose}>
+    <div {...rootProps} className="version-history-backdrop" role="presentation" onMouseDown={onClose}>
       <section
         className="version-history-panel"
         role="dialog"

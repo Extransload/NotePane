@@ -18,6 +18,10 @@ import {
   preventFocusLoss,
 } from "../editor/images.js";
 import {
+  useMergedRefs,
+  usePresenceContext,
+} from "../hooks/usePresence.js";
+import {
   getNoteDisplayTitle,
 } from "../model/notes.js";
 import {
@@ -124,13 +128,16 @@ export function SessionTabContextMenu({
   onMoveToTrash,
 }) {
   const menuRef = useRef(null);
+  const { rootProps } = usePresenceContext();
+  const rootRef = useMergedRefs(menuRef, rootProps.ref);
   const position = useAnchoredMenuStyle(menuRef, { left: x, top: y });
   const storedColor = resolveSessionTabAccentColor(sessionNote.theme);
   const colorPreview = storedColor ? toneMatch(storedColor, activeTheme, "mark") : undefined;
 
   return (
     <div
-      ref={menuRef}
+      {...rootProps}
+      ref={rootRef}
       className="session-tab-context-menu editor-floating-menu"
       role="menu"
       aria-label={`Session options for ${getNoteDisplayTitle(sessionNote)}`}
@@ -208,10 +215,13 @@ export function getExportMenuAnchor(trigger = null) {
 
 export function ExportFormatMenu({ anchor, onExport }) {
   const menuRef = useRef(null);
+  const { rootProps } = usePresenceContext();
+  const rootRef = useMergedRefs(menuRef, rootProps.ref);
   const position = useAnchoredMenuStyle(menuRef, anchor, anchor.align);
   return (
     <div
-      ref={menuRef}
+      {...rootProps}
+      ref={rootRef}
       className="export-format-menu editor-floating-menu"
       role="menu"
       aria-label="Export format"
@@ -251,8 +261,12 @@ export function MarkdownImportDialog({ onClose, onImport }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [error, setError] = useState("");
+  const { isClosing, rootProps } = usePresenceContext();
 
   useEffect(() => {
+    if (isClosing) {
+      return undefined;
+    }
     const handleKeyDown = (event) => {
       if (event.key === "Escape" && !isImporting) {
         onClose();
@@ -260,7 +274,7 @@ export function MarkdownImportDialog({ onClose, onImport }) {
     };
     document.addEventListener("keydown", handleKeyDown, true);
     return () => document.removeEventListener("keydown", handleKeyDown, true);
-  }, [isImporting, onClose]);
+  }, [isClosing, isImporting, onClose]);
 
   const importFiles = useCallback(async (files) => {
     const file = Array.from(files || []).find((candidate) => candidate instanceof File);
@@ -282,6 +296,7 @@ export function MarkdownImportDialog({ onClose, onImport }) {
 
   return (
     <div
+      {...rootProps}
       className="preferences-backdrop markdown-import-backdrop"
       role="presentation"
       onMouseDown={(event) => {

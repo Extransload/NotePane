@@ -190,7 +190,8 @@ body.is-exporting .sticky-editor-surface {
    --------------------------------------------------------------------------------------------- */
 
 :root {
-  --notepane-motion-exit-duration: 140ms;
+  --notepane-motion-exit-duration: 120ms;
+  --notepane-motion-dialog-exit-duration: 160ms;
   --notepane-motion-toast-in-duration: 220ms;
   --notepane-motion-toast-out-duration: 160ms;
   --notepane-motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -263,9 +264,75 @@ body.is-exporting .sticky-editor-surface {
   animation: notepaneToastTextOut var(--notepane-motion-toast-out-duration) linear forwards;
 }
 
+/* A menu, panel or find bar leaves the way it came: a few pixels back toward its anchor (above it,
+   or below it for a dropdown that opened above its field) while it fades. A tooltip only fades. */
+@keyframes notepaneMenuOut {
+  to {
+    opacity: 0;
+    translate: 0 var(--notepane-menu-from-y, calc(var(--notepane-motion-shift) * -1));
+    scale: 0.98;
+  }
+}
+
+@keyframes notepaneDialogOut {
+  to {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+
+:is(
+  .session-tab-context-menu,
+  .export-format-menu,
+  .notepane-dropdown-menu,
+  .color-panel,
+  .find-bar
+)[data-state="closing"] {
+  animation: notepaneMenuOut var(--notepane-motion-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+.adaptive-tooltip[data-state="closing"] {
+  animation: notepaneFadeOut var(--notepane-motion-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+/* A dialog's backdrop is the element that waits; the dialog inside shrinks back over the same
+   time, so both are gone together. */
+:is(
+  .preferences-backdrop,
+  .trash-confirm-backdrop,
+  .search-palette-backdrop,
+  .version-history-backdrop,
+  .crop-dialog
+)[data-state="closing"] {
+  animation: notepaneFadeOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+[data-state="closing"] :is(
+  .preferences-window,
+  .markdown-import-dialog,
+  .trash-confirm-dialog,
+  .version-history-panel,
+  .crop-panel
+) {
+  animation: notepaneDialogOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+.search-palette-backdrop[data-state="closing"] .search-palette {
+  animation: notepaneMenuOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sticky-toast[data-state],
-  .sticky-toast-text[data-state] {
+  .sticky-toast-text[data-state],
+  [data-state="closing"],
+  [data-state="closing"] :is(
+    .preferences-window,
+    .markdown-import-dialog,
+    .trash-confirm-dialog,
+    .version-history-panel,
+    .crop-panel,
+    .search-palette
+  ) {
     animation: none !important;
   }
 

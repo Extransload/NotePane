@@ -14,14 +14,21 @@ import {
   normalizeCrop,
   resizeCrop,
 } from "../editor/images.js";
+import {
+  usePresenceContext,
+} from "../hooks/usePresence.js";
 
 export function CropDialog({ sourceUrl, initialCrop, onApply, onClose }) {
   const imageRef = useRef(null);
   const cropInteractionRef = useRef(null);
   const [crop, setCrop] = useState(() => normalizeCrop(initialCrop));
   const [error, setError] = useState("");
+  const { isClosing, rootProps } = usePresenceContext();
 
   useEffect(() => {
+    if (isClosing) {
+      return undefined;
+    }
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
         onClose();
@@ -30,7 +37,7 @@ export function CropDialog({ sourceUrl, initialCrop, onApply, onClose }) {
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [isClosing, onClose]);
 
   const startResize = useCallback((event, handle) => {
     const point = getImagePoint(event, imageRef.current);
@@ -91,7 +98,7 @@ export function CropDialog({ sourceUrl, initialCrop, onApply, onClose }) {
   }, [crop, onApply]);
 
   return (
-    <div className="crop-dialog" role="dialog" aria-label="Crop image">
+    <div {...rootProps} className="crop-dialog" role="dialog" aria-label="Crop image">
       <div className="crop-panel">
         <div
           className="crop-image-frame"

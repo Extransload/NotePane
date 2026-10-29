@@ -19,6 +19,10 @@ import {
   preventFocusLoss,
 } from "../editor/images.js";
 import {
+  useMergedRefs,
+  usePresence,
+} from "../hooks/usePresence.js";
+import {
   clamp,
 } from "../utils/values.js";
 
@@ -38,6 +42,9 @@ export function FloatingDropdownMenu({
 }) {
   const [style, setStyle] = useState(null);
   const menuRef = useRef(null);
+  // The last position stays while the menu animates out.
+  const presence = usePresence(isOpen ? style : null);
+  const rootRef = useMergedRefs(menuRef, presence.rootProps.ref);
 
   const updatePosition = useCallback(() => {
     const anchorElement = anchorRef.current;
@@ -117,15 +124,16 @@ export function FloatingDropdownMenu({
     };
   }, [anchorRef, isOpen, onRequestClose]);
 
-  if (!isOpen || !style || typeof document === "undefined") {
+  if (!presence.isMounted || typeof document === "undefined") {
     return null;
   }
-  const { placement, ...positionStyle } = style;
+  const { placement, ...positionStyle } = presence.value;
 
   return createPortal(
     <div
-      ref={menuRef}
-      id={id}
+      {...presence.rootProps}
+      ref={rootRef}
+      id={presence.isClosing ? undefined : id}
       className={`notepane-dropdown-menu ${className} editor-floating-menu`.trim()}
       role="listbox"
       aria-label={ariaLabel}

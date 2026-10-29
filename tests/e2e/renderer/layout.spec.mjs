@@ -554,6 +554,79 @@ test("animates menus and panels open unless the system asks for reduced motion",
   expect(await getAnimationName(turnIntoPanel)).toBe("none");
 });
 
+// Resolves with how the first element matching `selector` looks when it turns
+// data-state="closing" (usePresence in src/hooks/usePresence.js). Registered before the close.
+async function watchForClosing(page, selector, innerSelector = null) {
+  await page.evaluate(({ selector, innerSelector }) => {
+    window.__closingOverlay = new Promise((resolve) => {
+      const observer = new MutationObserver(() => {
+        const element = document.querySelector(`${selector}[data-state="closing"]`);
+        if (!element) {
+          return;
+        }
+        observer.disconnect();
+        const style = getComputedStyle(element);
+        const inner = innerSelector ? element.querySelector(innerSelector) : null;
+        resolve({
+          animationName: style.animationName,
+          ariaHidden: element.getAttribute("aria-hidden"),
+          inert: element.inert,
+          innerAnimationName: inner ? getComputedStyle(inner).animationName : null,
+          pointerEvents: style.pointerEvents,
+        });
+      });
+      observer.observe(document.body, { attributeFilter: ["data-state"], attributes: true, subtree: true });
+    });
+  }, { selector, innerSelector });
+  return () => page.evaluate(() => window.__closingOverlay);
+}
+
+test("keeps a closing menu or dialog inert and hidden until its exit animation ends", async ({ page }) => {
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await expect(preferences).toBeVisible();
+  const preferencesClosing = await watchForClosing(page, ".preferences-backdrop", ".preferences-window");
+  await preferences.getByRole("button", { name: "Close preferences" }).click();
+  expect(await preferencesClosing()).toEqual({
+    animationName: "notepaneFadeOut",
+    ariaHidden: "true",
+    inert: true,
+    innerAnimationName: "notepaneDialogOut",
+    pointerEvents: "none",
+  });
+  // Role locators stop finding it at once; the element leaves once its exit has run.
+  await expect(preferences).toHaveCount(0);
+  await expect(page.locator(".preferences-backdrop")).toHaveCount(0);
+
+  await page.locator(".session-tab-row").first().click({ button: "right" });
+  const tabMenu = page.getByRole("menu", { name: /Session options/ });
+  await expect(tabMenu).toBeVisible();
+  const menuClosing = await watchForClosing(page, ".session-tab-context-menu");
+  await page.keyboard.press("Escape");
+  expect(await menuClosing()).toMatchObject({
+    animationName: "notepaneMenuOut",
+    ariaHidden: "true",
+    inert: true,
+    pointerEvents: "none",
+  });
+  await expect(tabMenu).toHaveCount(0);
+  await expect(page.locator(".session-tab-context-menu")).toHaveCount(0);
+});
+
+test("removes a closed dialog at once when the system asks for reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await expect(preferences).toBeVisible();
+  const remainsAfterClose = await page.evaluate(async () => {
+    const backdrop = document.querySelector(".preferences-backdrop");
+    backdrop.querySelector("button[aria-label='Close preferences']").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return backdrop.isConnected;
+  });
+  expect(remainsAfterClose).toBe(false);
+});
+
 test("opens the first block's six-dot menu inside the editor surface, clear of the sidebar", async ({ page }) => {
   await page.setViewportSize({ width: 1180, height: 760 });
   await loadTemplatePreview(page);

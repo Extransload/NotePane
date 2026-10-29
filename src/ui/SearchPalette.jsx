@@ -4,6 +4,9 @@ import {
   useState,
 } from "react";
 import {
+  usePresenceContext,
+} from "../hooks/usePresence.js";
+import {
   formatRelativeEditTime,
 } from "../model/notes.js";
 import {
@@ -41,6 +44,7 @@ export function SearchPalette({
 }) {
   const inputRef = useRef(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const { rootProps } = usePresenceContext();
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -97,6 +101,7 @@ export function SearchPalette({
 
   return (
     <div
+      {...rootProps}
       className="search-palette-backdrop"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
