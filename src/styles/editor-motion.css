@@ -1,0 +1,34 @@
+/* Motion inside the editor content (src/editor/editorMotion.js). Imported last, after motion.css,
+   whose easing (--notepane-motion-ease-out) and shift (--notepane-motion-shift) it reuses.
+
+   The script reads the duration tokens below, so one value drives both the CSS and the Web
+   Animations it starts. prefers-reduced-motion, print and export turn every animation here off
+   (end of file); the script checks the same conditions before it starts one. */
+
+:root {
+  --notepane-motion-toggle-duration: 180ms;
+}
+
+/* The chevron turns with the children opening below it. A chevron that renders already open, on
+   note load or when the block is drawn again, has nothing to turn from. */
+.bn-editor .bn-toggle-button {
+  transition:
+    transform var(--notepane-motion-toggle-duration) var(--notepane-motion-ease-out),
+    background-color 120ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bn-editor .bn-toggle-button {
+    transition: none !important;
+  }
+}
+
+@media print {
+  .bn-editor .bn-toggle-button {
+    transition: none !important;
+  }
+}
+
+body.is-exporting .bn-editor .bn-toggle-button {
+  transition: none !important;
+}

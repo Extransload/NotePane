@@ -760,3 +760,120 @@ test("ignores Backspace during a Korean IME composition in an empty heading togg
     "[data-content-type='heading']:has(h1):not([data-is-toggleable='true'])",
   )).toHaveCount(1);
 });
+
+async function typeToggleWithChildren(page, title, children) {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type(">");
+  await page.keyboard.press("Space");
+  await page.keyboard.insertText(title);
+  for (const child of children) {
+    await page.keyboard.press("Enter");
+    await page.keyboard.insertText(child);
+  }
+  return page.locator("[data-content-type='toggleListItem']").filter({ hasText: title });
+}
+
+// Clicks the chevron in the page and reports the motion it started, then waits for it to end and
+// reports where the children came to rest. The click and the first reading share one task, so the
+// reading never misses a short animation.
+function clickChevronAndSettle(toggle) {
+  return toggle.evaluate(async (content) => {
+    const group = content.closest(".bn-block").querySelector(":scope > .bn-block-group");
+    const button = content.querySelector(".bn-toggle-button");
+    button.click();
+    await Promise.resolve();
+    const childMotion = group.getAnimations().filter((animation) => animation.id === "notepane-toggle");
+    const chevronMotion = button.getAnimations()
+      .filter((animation) => animation.transitionProperty === "transform");
+    const lastFrame = childMotion[0]?.effect.getKeyframes().at(-1);
+    const displayWhileMoving = getComputedStyle(group).display;
+    await Promise.all([...childMotion, ...chevronMotion].map((animation) => animation.finished));
+    return {
+      childAnimations: childMotion.length,
+      chevronTransitions: chevronMotion.length,
+      displayWhileMoving,
+      lastFrameHeight: lastFrame?.height,
+      lastFrameOpacity: lastFrame ? Number(lastFrame.opacity) : undefined,
+      restingDisplay: getComputedStyle(group).display,
+      restingHeight: `${group.getBoundingClientRect().height}px`,
+    };
+  });
+}
+
+function settleToggleChildren(toggle) {
+  return toggle.evaluate(async (content) => {
+    const group = content.closest(".bn-block").querySelector(":scope > .bn-block-group");
+    await Promise.all(group.getAnimations().map((animation) => animation.finished));
+    return {
+      display: getComputedStyle(group).display,
+      height: group.getBoundingClientRect().height,
+      fullHeight: group.scrollHeight,
+    };
+  });
+}
+
+test("animates a toggle's children and chevron as it opens and closes, ending at rest", async ({ page }) => {
+  const toggle = await typeToggleWithChildren(page, "Motion toggle", ["First line", "Second line"]);
+  await expect(toggle.locator(".bn-toggle-wrapper")).toHaveAttribute("data-show-children", "true");
+
+  const closing = await clickChevronAndSettle(toggle);
+  expect(closing).toMatchObject({
+    childAnimations: 1,
+    chevronTransitions: 1,
+    displayWhileMoving: "block",
+    lastFrameHeight: "0px",
+    lastFrameOpacity: 0,
+    restingDisplay: "none",
+  });
+
+  const opening = await clickChevronAndSettle(toggle);
+  expect(opening).toMatchObject({
+    childAnimations: 1,
+    chevronTransitions: 1,
+    lastFrameOpacity: 1,
+    restingDisplay: "block",
+  });
+  // The last animated frame is the children's own height, so nothing jumps when it ends.
+  expect(opening.lastFrameHeight).toBe(opening.restingHeight);
+  await expect(page.locator(".bn-editor").getByText("Second line", { exact: true })).toBeVisible();
+});
+
+test("a toggle opened by Enter or by find in note ends fully open", async ({ page }) => {
+  const toggle = await typeToggleWithChildren(page, "Closed toggle", ["hidden needle"]);
+  await clickChevronAndSettle(toggle);
+  await expect(toggle.locator(".bn-toggle-wrapper")).toHaveAttribute("data-show-children", "false");
+
+  // Enter at the end of the title adds a first child, which opens the toggle.
+  await toggle.locator(".bn-inline-content").click();
+  await page.keyboard.press("End");
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Enter");
+  await expect(toggle.locator(".bn-toggle-wrapper")).toHaveAttribute("data-show-children", "true");
+  const openedByEnter = await settleToggleChildren(toggle);
+  expect(openedByEnter.display).toBe("block");
+  expect(openedByEnter.height).toBeGreaterThan(0);
+  expect(openedByEnter.height).toBe(openedByEnter.fullHeight);
+
+  await clickChevronAndSettle(toggle);
+  await expect(toggle.locator(".bn-toggle-wrapper")).toHaveAttribute("data-show-children", "false");
+  await page.keyboard.press(modifierShortcut("F"));
+  const findInput = page.getByRole("search", { name: "Find in note" })
+    .getByRole("textbox", { name: "Find in note" });
+  await findInput.fill("needle");
+  await findInput.press("Enter");
+  await expect(toggle.locator(".bn-toggle-wrapper")).toHaveAttribute("data-show-children", "true");
+  const openedByFind = await settleToggleChildren(toggle);
+  expect(openedByFind.display).toBe("block");
+  expect(openedByFind.height).toBe(openedByFind.fullHeight);
+  await expect(page.locator(".bn-editor").getByText("hidden needle")).toBeVisible();
+});
+
+test("opens and closes toggles without motion when reduced motion is requested", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const toggle = await typeToggleWithChildren(page, "Still toggle", ["Still child"]);
+
+  const closing = await clickChevronAndSettle(toggle);
+  expect(closing).toMatchObject({ childAnimations: 0, chevronTransitions: 0, displayWhileMoving: "none" });
+  const opening = await clickChevronAndSettle(toggle);
+  expect(opening).toMatchObject({ childAnimations: 0, chevronTransitions: 0, restingDisplay: "block" });
+});

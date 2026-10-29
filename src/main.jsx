@@ -118,6 +118,7 @@ import {
   installTableExtensionFocusRestore,
 } from "./editor/tableFocus.js";
 import { MarkdownShortcutUndo } from "./editor/markdownShortcuts.js";
+import { EditorMotion } from "./editor/editorMotion.js";
 import {
   EMPTY_BLOCKS,
   NOTE_PANE_TEMPLATE_BLOCKS,
@@ -594,7 +595,7 @@ function StickyEditor({
 
   const editor = useCreateBlockNote({
     schema,
-    extensions: [BlockDragSelection, FindInNote, FileDrop, MarkdownShortcutUndo],
+    extensions: [BlockDragSelection, FindInNote, FileDrop, MarkdownShortcutUndo, EditorMotion],
     initialContent: initialEditorContent,
     tabBehavior: "prefer-indent",
     // BlockNote paints this onto the drop cursor element, which resolves the token itself and
