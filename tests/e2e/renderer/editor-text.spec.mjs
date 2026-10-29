@@ -312,10 +312,13 @@ test("indents and dedents code lines with Tab and Shift+Tab inside the code bloc
   await expect.poll(codeText).toBe("function a() {\nreturn 1;\n}");
   expect(await codeDepth()).toBe(nestedDepth);
 
-  // A selection inside one line indents that whole line and keeps the rest.
+  // A selection inside one line indents that whole line and keeps the rest. ArrowRight leaves the
+  // caret at the end of the note, where BlockNote's trailing block swallows (Shift+)ArrowRight, so
+  // the selection keys wait until ProseMirror has taken up the caret that Home moved.
   await page.keyboard.press("ArrowRight");
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Home");
+  await waitForEditorSelection(page);
   for (let step = 0; step < "return 1;".length; step += 1) {
     await page.keyboard.press("Shift+ArrowRight");
   }
