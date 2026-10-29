@@ -51,7 +51,9 @@
 - Cycle sticky windows: `Command/Ctrl + Backtick`
 - Toggle always on top: `Command/Ctrl + Shift + P`
 - Toggle Tab/Sticky mode: `Command/Ctrl + Shift + T`
-- Open export menu: `Command/Ctrl + Shift + E`
+- Open export menu: `Command/Ctrl + Shift + E`. The menu opens at the sidebar's export button, or under the right
+  end of the header when the sidebar is not shown, and the formatting toolbar of a text selection hides while it is
+  open and comes back after
 - Delayed hover tooltips for clickable controls
 - Shortcut labels read the same everywhere NotePane shows them (Preferences, tooltips, slash menu badges, the
   formatting toolbar's merge and colour buttons): `⌘⌥⇧1` on a Mac, `Ctrl+Alt+Shift+1` elsewhere

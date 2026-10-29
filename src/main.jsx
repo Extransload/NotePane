@@ -217,6 +217,7 @@ import {
 } from "./ui/icons.jsx";
 import {
   ExportFormatMenu,
+  getExportMenuAnchor,
   MarkdownImportDialog,
   SessionTabContextMenu,
 } from "./ui/menus.jsx";
@@ -1389,11 +1390,7 @@ function StickyEditor({
   }, [closeOverlay, editor, hideExportToast, note.id, showExportToast, title]);
 
   const openExportFormatMenu = useCallback((event) => {
-    const bounds = event.currentTarget.getBoundingClientRect();
-    openOverlay("exportFormatMenu", {
-      x: Math.round(bounds.right),
-      y: Math.round(bounds.top),
-    });
+    openOverlay("exportFormatMenu", getExportMenuAnchor(event.currentTarget));
   }, [openOverlay]);
 
   const importMarkdownFile = useCallback(async (file) => {
@@ -2670,7 +2667,9 @@ function StickyEditor({
               onCopyImage={canCopyImageToClipboard() ? copyActiveImage : undefined}
               activeImageBlockId={activeImageBlockId}
               portalElement={document.body}
-              hidden={isTableCellSelectionDismissed}
+              // The export menu stands for the whole note: the toolbar of a selection would sit
+              // under it, so it is hidden until the menu closes.
+              hidden={isTableCellSelectionDismissed || Boolean(exportFormatMenu)}
             />
             <BlockMenuHighlightController />
             <NotePaneSideMenuController
@@ -2736,8 +2735,7 @@ function StickyEditor({
       )}
       {exportFormatMenu && (
         <ExportFormatMenu
-          x={exportFormatMenu.x}
-          y={exportFormatMenu.y}
+          anchor={exportFormatMenu}
           onExport={(type) => void exportNote(type)}
         />
       )}

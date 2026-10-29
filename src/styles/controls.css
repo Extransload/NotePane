@@ -1,11 +1,10 @@
 /* Menus, switches and the colour picker used by chrome and preferences. */
 
+/* Placed inline at their anchor, clamped to the window (useAnchoredMenuStyle in src/ui/menus.jsx). */
 .session-tab-context-menu,
 .export-format-menu {
   position: fixed;
   z-index: 46;
-  left: clamp(8px, var(--session-tab-menu-x, var(--export-format-menu-x)), calc(100vw - 196px));
-  top: clamp(8px, var(--session-tab-menu-y, var(--export-format-menu-y)), calc(100vh - 116px));
   display: grid;
   min-width: 148px;
   gap: 4px;

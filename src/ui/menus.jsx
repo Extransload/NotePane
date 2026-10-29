@@ -173,16 +173,50 @@ export function SessionTabContextMenu({
   );
 }
 
-export function ExportFormatMenu({ x, y, onExport }) {
+function toAnchor(element, align) {
+  const { left, top, width, height } = element.getBoundingClientRect();
+  return { left, top, width, height, align };
+}
+
+function isShown(element) {
+  const rect = element?.getBoundingClientRect();
+  return Boolean(rect && rect.width > 0 && rect.height > 0);
+}
+
+/**
+ * Where the export format menu opens: under (or over) the export button that was clicked;
+ * for the shortcut, the sidebar's export button when the sidebar shows, else the right end of
+ * the header, else the top centre of the window.
+ */
+export function getExportMenuAnchor(trigger = null) {
+  if (isShown(trigger)) {
+    return toAnchor(trigger, "start");
+  }
+  const sidebarButton = document.querySelector(
+    "[data-testid='session-sidebar-footer'] .export-icon-button",
+  );
+  if (isShown(sidebarButton)) {
+    return toAnchor(sidebarButton, "start");
+  }
+  const header = document.querySelector("[data-testid='sticky-header']");
+  if (isShown(header)) {
+    const rect = header.getBoundingClientRect();
+    return { left: rect.right - 12, top: rect.top, width: 0, height: rect.height, align: "end" };
+  }
+  return { left: window.innerWidth / 2, top: 0, width: 0, height: 0, align: "center" };
+}
+
+export function ExportFormatMenu({ anchor, onExport }) {
+  const menuRef = useRef(null);
+  const position = useAnchoredMenuStyle(menuRef, anchor, anchor.align);
   return (
     <div
+      ref={menuRef}
       className="export-format-menu editor-floating-menu"
       role="menu"
       aria-label="Export format"
-      style={{
-        "--export-format-menu-x": `${x}px`,
-        "--export-format-menu-y": `${y}px`,
-      }}
+      style={position}
+      onKeyDown={moveMenuFocus}
     >
       <button
         type="button"

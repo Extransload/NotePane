@@ -6,6 +6,9 @@ import {
 import {
   useEffect,
 } from "react";
+import {
+  getExportMenuAnchor,
+} from "../ui/menus.jsx";
 // Application-level keyboard commands. Each hook stays a separate effect and
 // is called from its original position in StickyEditor so listener
 // registration order is unchanged.
@@ -116,10 +119,7 @@ export function useChromeShortcuts({
           "sessionColorPanel",
           "preferencesWindow",
         );
-        openOverlay("exportFormatMenu", {
-          x: Math.round(window.innerWidth / 2),
-          y: 52,
-        });
+        openOverlay("exportFormatMenu", getExportMenuAnchor());
         return;
       }
 
