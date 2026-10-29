@@ -553,3 +553,24 @@ test("animates menus and panels open unless the system asks for reduced motion",
   await expect(turnIntoPanel).toBeVisible();
   expect(await getAnimationName(turnIntoPanel)).toBe("none");
 });
+
+test("opens the first block's six-dot menu inside the editor surface, clear of the sidebar", async ({ page }) => {
+  await page.setViewportSize({ width: 1180, height: 760 });
+  await loadTemplatePreview(page);
+  const blockMenu = await openFirstBlockMenu(page);
+
+  await expect.poll(() => blockMenu.evaluate((menu) => {
+    const menuRect = menu.getBoundingClientRect();
+    const surfaceRect = document.querySelector("[data-testid='sticky-editor-surface']")
+      .getBoundingClientRect();
+    const handleRect = document.querySelector(".bn-side-menu").getBoundingClientRect();
+    return {
+      insideSurface:
+        menuRect.left >= surfaceRect.left &&
+        menuRect.right <= surfaceRect.right &&
+        menuRect.top >= surfaceRect.top &&
+        menuRect.bottom <= surfaceRect.bottom,
+      rightOfHandle: menuRect.left >= handleRect.right,
+    };
+  })).toEqual({ insideSurface: true, rightOfHandle: true });
+});
