@@ -24,6 +24,7 @@ if (process.env.BLOCKNOTE_STICKY_QUIET === "1") {
 const {
   StickyStore,
   DEFAULT_KEYBOARD_SHORTCUTS,
+  normalizeBlocksJSON,
 } = require("./store.cjs");
 const { fitBoundsToWorkAreas } = require("./windowBounds.cjs");
 const {
@@ -81,6 +82,7 @@ const MAX_BACKUP_FILE_SIZE = 512 * 1024 * 1024;
 
 let store;
 let quitting = false;
+let flushedBeforeQuit = false;
 let backupOperationInProgress = false;
 const manuallyClosedStickyNoteIds = new Set();
 // Find queries waiting for a window to pick them up, keyed by window id. A
@@ -184,6 +186,8 @@ function createWindow(note, options = {}) {
     window,
     noteId: note.id,
     primary: Boolean(options.primary),
+    generation: store.getGeneration(),
+    flushedBeforeClose: false,
   });
 
   // Chromium remembers a zoom per page URL for this run, so a note window reopened after a zoom
@@ -200,7 +204,18 @@ function createWindow(note, options = {}) {
 
   window.on("moved", () => persistWindowBounds(window));
   window.on("resized", () => persistWindowBounds(window));
-  window.on("close", () => persistWindowBounds(window));
+  // Every close path (the close button, Cmd+W, note delete, layout sync) goes
+  // through here, so the renderer's pending edits are written before the page
+  // is torn down. The window closes again once the flush has been confirmed.
+  window.on("close", (event) => {
+    persistWindowBounds(window);
+    const entry = windows.get(window.id);
+    if (!entry || entry.flushedBeforeClose || window.webContents.isDestroyed()) {
+      return;
+    }
+    event.preventDefault();
+    void closeWindowAfterFlush(entry);
+  });
   window.on("closed", () => {
     const closedEntry = windows.get(window.id);
     windows.delete(window.id);
@@ -678,6 +693,42 @@ function closeWindowEntry(entry) {
   entry.window.close();
 }
 
+async function closeWindowAfterFlush(entry) {
+  const outcome = await requestEditorFlush(entry.window.webContents, EDITOR_FLUSH_TIMEOUT_MS);
+  if (entry.window.isDestroyed()) {
+    return;
+  }
+  if (!(await confirmFlushOutcomes([outcome], entry.window))) {
+    return;
+  }
+  entry.flushedBeforeClose = true;
+  entry.window.close();
+}
+
+// A flush that failed or timed out means edits are still only in the renderer.
+// Asks before going on with the action that would lose them. Test runs cannot
+// answer a dialog and keep the old behaviour of continuing.
+async function confirmFlushOutcomes(outcomes, parentWindow) {
+  const unsaved = outcomes.some((outcome) => outcome !== "done" && outcome !== "destroyed");
+  if (!unsaved || quietTestMode) {
+    return true;
+  }
+  const { response } = await dialog.showMessageBox(
+    parentWindow && !parentWindow.isDestroyed() ? parentWindow : undefined,
+    {
+      type: "warning",
+      title: "Some changes are not saved",
+      message: "NotePane could not confirm that the latest edits were written to disk.",
+      detail: "Keep editing to let it retry, or continue and lose the unsaved edits.",
+      buttons: ["Keep editing", "Discard unsaved edits"],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    },
+  );
+  return response === 1;
+}
+
 function restoreTabsModeAfterLastStickyWindowClosed(activeNoteId) {
   if (
     quitting ||
@@ -814,6 +865,16 @@ function syncWindowsForLayoutMode(activeNoteId, options = {}) {
 
 async function updateLayoutMode(layoutMode, options = {}) {
   const previousLayoutMode = store.getLayoutMode();
+  const willRecreateWindows =
+    process.platform === "win32" &&
+    (layoutMode === "sticky" || layoutMode === "tabs") &&
+    layoutMode !== previousLayoutMode;
+  if (willRecreateWindows) {
+    const outcomes = await flushEditorWindows();
+    if (!(await confirmFlushOutcomes(outcomes, getPrimaryEntry()?.window))) {
+      return previousLayoutMode;
+    }
+  }
   const nextLayoutMode = store.updateLayoutMode(layoutMode);
   const isChangingMode = previousLayoutMode !== nextLayoutMode;
   const activeNoteId = options.activeNoteId;
@@ -838,7 +899,10 @@ async function updateLayoutMode(layoutMode, options = {}) {
         previousLayoutMode !== "sticky" && nextLayoutMode === "sticky",
     };
     const targetWindows = isChangingMode && process.platform === "win32"
-      ? await recreateWindowsForLayoutMode(activeNoteId, windowSyncOptions)
+      ? await recreateWindowsForLayoutMode(activeNoteId, {
+          ...windowSyncOptions,
+          flushEditors: false,
+        })
       : syncWindowsForLayoutMode(activeNoteId, windowSyncOptions);
     broadcastLayoutMode(nextLayoutMode);
     broadcastNotesChanged();
@@ -1364,10 +1428,10 @@ function installIpcHandlers() {
     return request.noteId === getNoteIdForWebContents(event.sender) ? request : null;
   });
 
-  ipcMain.on("notes:flush-done", (event, requestId) => {
+  ipcMain.on("notes:flush-done", (event, requestId, result) => {
     const pending = pendingEditorFlushes.get(requestId);
     if (pending && pending.webContents === event.sender) {
-      pending.finish("done");
+      pending.finish(result?.ok === false ? "failed" : "done");
     }
   });
 
@@ -1376,6 +1440,14 @@ function installIpcHandlers() {
       payload?.noteId || getNoteIdForWebContents(event.sender);
     if (!resolvedNoteId) {
       return null;
+    }
+
+    if (normalizeBlocksJSON(payload?.blocksJSON) === null) {
+      throw new Error("The note content to save is not a valid block list.");
+    }
+    const senderEntry = windows.get(BrowserWindow.fromWebContents(event.sender)?.id);
+    if (senderEntry && senderEntry.generation !== store.getGeneration()) {
+      throw new Error("The workspace was replaced; this window's content is stale.");
     }
 
     const previousNote = store.getNote(resolvedNoteId);
@@ -1526,7 +1598,10 @@ function installIpcHandlers() {
       return { canceled: true, imported: false, summary };
     }
 
-    await flushEditorWindows();
+    const flushOutcomes = await flushEditorWindows();
+    if (!(await confirmFlushOutcomes(flushOutcomes, getPrimaryEntry()?.window))) {
+      return { canceled: true, imported: false, summary };
+    }
     const automaticBackupPath = path.join(
       app.getPath("userData"),
       "Backups",
@@ -1972,11 +2047,15 @@ function reportStoreLoadIssues() {
   }
 
   const details = issues
-    .map((issue) =>
-      issue.backupPath
+    .map((issue) => {
+      if (issue.kind === "note") {
+        return `The note "${issue.noteTitle}" has editor data that could not be read. ` +
+          `It opens empty; the original data is kept in ${issue.fileName} as unreadableBlocksJSON.`;
+      }
+      return issue.backupPath
         ? `${issue.fileName} was moved to:\n${issue.backupPath}`
-        : `${issue.fileName} could not be preserved (${issue.message}).`,
-    )
+        : `${issue.fileName} could not be preserved (${issue.message}).`;
+    })
     .join("\n\n");
   void dialog.showMessageBox(getPrimaryEntry()?.window ?? undefined, {
     type: "warning",
@@ -2084,12 +2163,31 @@ app.on("web-contents-created", (_event, contents) => {
   });
 });
 
-app.on("before-quit", () => {
-  quitting = true;
+// Quitting closes every window; a close that is prevented cancels the quit, so
+// the flush runs once here, before the windows are asked to close.
+app.on("before-quit", (event) => {
   for (const { window } of windows.values()) {
     persistWindowBounds(window);
   }
+  if (flushedBeforeQuit) {
+    quitting = true;
+    return;
+  }
+  event.preventDefault();
+  void flushThenQuit();
 });
+
+async function flushThenQuit() {
+  const outcomes = await flushEditorWindows();
+  if (!(await confirmFlushOutcomes(outcomes, getPrimaryEntry()?.window))) {
+    return;
+  }
+  flushedBeforeQuit = true;
+  for (const entry of windows.values()) {
+    entry.flushedBeforeClose = true;
+  }
+  app.quit();
+}
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {

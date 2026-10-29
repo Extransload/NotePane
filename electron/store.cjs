@@ -237,6 +237,9 @@ class StickyStore {
     this.historyFilePath = path.join(userDataPath, "note-history.json");
     this.history = {};
     this.loadIssues = [];
+    // Bumped when a backup replaces the workspace, so a save from a window that
+    // still shows the old workspace can be told apart and refused.
+    this.generation = 0;
     this.assets = new AssetStore(path.join(userDataPath, "assets"));
     this.state = {
       appTheme: DEFAULT_APP_THEME,
@@ -285,21 +288,26 @@ class StickyStore {
       }
 
       const timestamp = new Date().toISOString().replaceAll(":", "-");
-      if (notesNeedMigration) {
-        fs.copyFileSync(
-          this.filePath,
-          path.join(this.directoryPath, `notes.pre-assets-${timestamp}.json`),
-        );
-        this.state = { ...this.state, notes };
-        this.save();
-      }
-      if (historyNeedsMigration) {
-        fs.copyFileSync(
-          this.historyFilePath,
-          path.join(this.directoryPath, `note-history.pre-assets-${timestamp}.json`),
-        );
-        this.history = history;
-        this.saveHistory();
+      try {
+        if (notesNeedMigration) {
+          fs.copyFileSync(
+            this.filePath,
+            path.join(this.directoryPath, `notes.pre-assets-${timestamp}.json`),
+          );
+          this.state = { ...this.state, notes };
+          this.save();
+        }
+        if (historyNeedsMigration) {
+          fs.copyFileSync(
+            this.historyFilePath,
+            path.join(this.directoryPath, `note-history.pre-assets-${timestamp}.json`),
+          );
+          this.history = history;
+          this.saveHistory();
+        }
+      } catch (error) {
+        console.error("[NotePane] Failed to write the asset migration:", error);
+        return;
       }
     }
 
@@ -376,6 +384,16 @@ class StickyStore {
           ),
         ),
       };
+      for (const [index, note] of this.state.notes.entries()) {
+        if (note.unreadableBlocksJSON && !rawNotes[index]?.unreadableBlocksJSON) {
+          this.loadIssues.push({
+            kind: "note",
+            fileName: path.basename(this.filePath),
+            noteTitle: note.title,
+            message: "The note's editor data could not be read.",
+          });
+        }
+      }
       // Before the tabs window had its own record, pinning it pinned the note it showed, and at
       // launch it opened on the first listed note (getMainTabsNote in main.cjs). That note's pin
       // becomes the tabs window's, and the note keeps it for its own sticky window.
@@ -475,7 +493,8 @@ class StickyStore {
     if (!fs.existsSync(this.historyFilePath)) return;
     try {
       const parsed = JSON.parse(fs.readFileSync(this.historyFilePath, "utf8"));
-      this.history = parsed && typeof parsed.notes === "object" ? parsed.notes : {};
+      const notes = parsed?.notes;
+      this.history = notes && typeof notes === "object" && !Array.isArray(notes) ? notes : {};
     } catch (error) {
       this.backupCorruptedFile(this.historyFilePath, "note-history-corrupted", error);
       this.history = {};
@@ -865,7 +884,12 @@ class StickyStore {
       this.state = previousState;
       throw error;
     }
+    this.generation += 1;
     return this.inspectBackup(normalizedBackup);
+  }
+
+  getGeneration() {
+    return this.generation;
   }
 
   save() {
@@ -1002,6 +1026,14 @@ function normalizeNote(value, options = {}) {
   const resetLegacyAlwaysOnTop = Boolean(options.resetLegacyAlwaysOnTop);
   const editorPreferences = normalizeEditorPreferences(options.editorPreferences);
   const blocksJSON = normalizeBlocksJSON(source.blocksJSON);
+  // Editor data that no longer parses is kept beside the note instead of being
+  // dropped, so a later save cannot destroy the only copy of the content.
+  const unreadableBlocksJSON =
+    blocksJSON === null && typeof source.blocksJSON === "string" && source.blocksJSON.trim() !== ""
+      ? source.blocksJSON
+      : typeof source.unreadableBlocksJSON === "string"
+        ? source.unreadableBlocksJSON
+        : null;
   const markdown = typeof source.markdown === "string" ? source.markdown : "";
   const normalizedSourceTitle = normalizeTitle(source.title);
   const titleManuallyEdited = normalizeTitleManuallyEdited(
@@ -1017,6 +1049,7 @@ function normalizeNote(value, options = {}) {
     title,
     titleManuallyEdited,
     blocksJSON,
+    ...(unreadableBlocksJSON ? { unreadableBlocksJSON } : {}),
     markdown,
     bounds: normalizeBounds(source.bounds, {
       width: 960,
@@ -1806,4 +1839,5 @@ module.exports = {
   DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
   normalizeAppTheme,
   normalizeAppZoom,
+  normalizeBlocksJSON,
 };

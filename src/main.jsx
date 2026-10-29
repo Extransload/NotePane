@@ -272,6 +272,8 @@ import {
   useTabModeShortcuts,
 } from "./hooks/useKeyboardCommands.js";
 import { useNotePersistence } from "./hooks/useNotePersistence.js";
+import { hasPendingSave, waitForPendingSave } from "./model/pendingSaves.js";
+import { EditorErrorBoundary } from "./ui/EditorErrorBoundary.jsx";
 import { usePendingSaveFlush } from "./hooks/usePendingSaveFlush.js";
 import { useSessionTabDrag } from "./hooks/useSessionTabDrag.js";
 import { useStickyToasts } from "./hooks/useStickyToasts.js";
@@ -500,6 +502,25 @@ function App({ bindTestThemeSetter }) {
     });
   }, [clearLayoutTransition, showLayoutTransition]);
 
+  const noteRef = useRef(note);
+  useEffect(() => {
+    noteRef.current = note;
+  }, [note]);
+
+  // Showing a note whose previous editor is still writing would load the
+  // pre-save content from disk and then save it back over the edit.
+  const adoptNote = useCallback(async (candidate) => {
+    if (!candidate?.id || !hasPendingSave(candidate.id)) {
+      setNote(candidate);
+      return candidate;
+    }
+    await waitForPendingSave(candidate.id);
+    const freshNote = (await electronApi?.getNote?.(candidate.id)) ?? candidate;
+    setNotes((currentNotes) => mergeNotes(currentNotes, freshNote));
+    setNote(freshNote);
+    return freshNote;
+  }, []);
+
   useEffect(() => {
     return electronApi?.onNotesChanged?.((payload) => {
       const nextNotes = Array.isArray(payload?.notes) ? payload.notes : [];
@@ -510,19 +531,20 @@ function App({ bindTestThemeSetter }) {
       if (nextTrashedNotes) {
         setTrashedNotes(nextTrashedNotes);
       }
-      setNote((currentNote) => {
-        if (activeNote?.id) {
-          return activeNote;
-        }
-
-        return (
-          nextNotes.find((candidate) => candidate.id === currentNote?.id) ??
-          nextNotes[0] ??
-          currentNote
-        );
-      });
+      const currentNoteId = noteRef.current?.id;
+      const candidate = activeNote?.id
+        ? activeNote
+        : nextNotes.find((item) => item.id === currentNoteId) ?? nextNotes[0] ?? null;
+      if (!candidate) {
+        return;
+      }
+      if (candidate.id !== currentNoteId) {
+        void adoptNote(candidate);
+        return;
+      }
+      setNote(candidate);
     });
-  }, []);
+  }, [adoptNote]);
 
   useEffect(() => {
     if (!electronApi?.takePendingFind) {
@@ -570,12 +592,12 @@ function App({ bindTestThemeSetter }) {
         : notes.find((candidate) => candidate.id === noteId);
 
       if (nextNote) {
-        setNote(nextNote);
         setNotes((currentNotes) => mergeNotes(currentNotes, nextNote));
+        return adoptNote(nextNote);
       }
-      return nextNote ?? null;
+      return null;
     },
-    [notes],
+    [adoptNote, notes],
   );
 
   const createSidebarNote = useCallback(async (options = {}) => {
@@ -657,7 +679,7 @@ function App({ bindTestThemeSetter }) {
           setTrashedNotes(nextTrashedNotes);
         }
         if (nextNote) {
-          setNote(nextNote);
+          await adoptNote(nextNote);
         }
         return result;
       }
@@ -707,7 +729,7 @@ function App({ bindTestThemeSetter }) {
         activeNote: nextNote,
       };
     },
-    [note, notes, trashedNotes],
+    [adoptNote, note, notes, trashedNotes],
   );
 
   const restoreTrashedNote = useCallback(
@@ -731,7 +753,7 @@ function App({ bindTestThemeSetter }) {
           setTrashedNotes(nextTrashedNotes);
         }
         if (nextNote) {
-          setNote(nextNote);
+          await adoptNote(nextNote);
         }
         return {
           ...result,
@@ -765,7 +787,7 @@ function App({ bindTestThemeSetter }) {
         activeNote,
       };
     },
-    [trashedNotes],
+    [adoptNote, trashedNotes],
   );
 
   const undoSessionMoveToTrash = useCallback(async () => {
@@ -792,7 +814,7 @@ function App({ bindTestThemeSetter }) {
           setTrashedNotes(nextTrashedNotes);
         }
         if (result?.activeNote) {
-          setNote(result.activeNote);
+          await adoptNote(result.activeNote);
         }
         return;
       }
@@ -801,7 +823,7 @@ function App({ bindTestThemeSetter }) {
         currentTrashedNotes.filter((candidate) => candidate.id !== noteId),
       );
     },
-    [],
+    [adoptNote],
   );
 
   const updateNoteInList = useCallback((updatedNote) => {
@@ -864,6 +886,7 @@ function App({ bindTestThemeSetter }) {
 
   return (
     <>
+      <EditorErrorBoundary key={`boundary-${note.id}`}>
       <StickyEditor
         key={note.id}
         note={note}
@@ -900,6 +923,7 @@ function App({ bindTestThemeSetter }) {
         onRenameRequested={setPendingRenameNoteId}
         onPendingRenameHandled={() => setPendingRenameNoteId(null)}
       />
+      </EditorErrorBoundary>
       {sessionUndoToast && (
         <StickyToast
         toast={{
@@ -1519,8 +1543,24 @@ function StickyEditor({
     }
   }, [editor, note.markdown, parsedStoredBlocks]);
 
+  const saveFailureShownRef = useRef(false);
+  const handleSaveStateChanged = useCallback((state) => {
+    if (state.status === "failed") {
+      saveFailureShownRef.current = true;
+      const reason = String(state.error?.message || "unknown error")
+        .replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
+      showExportToast(`Could not save this note: ${reason} Retrying...`, "error", { timeout: 0 });
+      return;
+    }
+    if (saveFailureShownRef.current) {
+      saveFailureShownRef.current = false;
+      showExportToast("Note saved", "success");
+    }
+  }, [showExportToast]);
+
   const {
     getCurrentNoteSnapshot,
+    retrySaveNow,
     saveNow,
     saveVersionNow,
     scheduleSave,
@@ -1532,6 +1572,7 @@ function StickyEditor({
     lastSavedBlocksRef,
     note,
     onNoteChanged,
+    onSaveStateChanged: handleSaveStateChanged,
     saveRetryTimerRef,
     saveTimerRef,
     setNoteVersions,
@@ -1863,31 +1904,17 @@ function StickyEditor({
       return;
     }
 
-    if (saveTimerRef.current) {
-      window.clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-
-    const blocksJSON = JSON.stringify(editor.document);
-    let markdown = "";
-    try {
-      markdown = await editor.blocksToMarkdownLossy(editor.document);
-    } catch {
-      markdown = "";
-    }
-
-    lastSavedBlocksRef.current = blocksJSON;
-    const savedNote = await electronApi?.saveContent({
-      noteId: note.id,
-      blocksJSON,
-      markdown,
-    });
+    // The template is already in the editor; writing it marks the note as no
+    // longer a template seed. `lastSavedBlocksRef` starts empty, so the queue
+    // writes the document even though no edit was made.
+    isEditorDirtyRef.current = true;
+    const savedNote = electronApi ? await saveNow() : null;
     const nextNote = savedNote?.id
       ? savedNote
       : {
           ...note,
-          blocksJSON,
-          markdown,
+          blocksJSON: JSON.stringify(editor.document),
+          markdown: "",
           seedDemoContent: false,
           updatedAt: Date.now(),
         };
@@ -1895,7 +1922,7 @@ function StickyEditor({
     setTitle(getNoteDisplayTitle(nextNote, editor.document));
     onNoteChanged(nextNote);
     focusEditor();
-  }, [editor, focusEditor, note, onNoteChanged]);
+  }, [editor, focusEditor, note, onNoteChanged, saveNow]);
 
   // A sticky window is too small for Preferences; it opens from the tabs window only.
   const canOpenPreferences = normalizedLayoutMode !== "sticky";
@@ -3040,6 +3067,7 @@ function StickyEditor({
     isEditorDirtyRef,
     pendingAppearanceRef,
     pendingSessionAppearanceRef,
+    retrySaveNow,
     saveNow,
     saveRetryTimerRef,
     saveTimerRef,

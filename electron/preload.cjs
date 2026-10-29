@@ -5,8 +5,11 @@ const { contextBridge, ipcRenderer } = require("electron");
 // once when no editor has mounted yet.
 const flushHandlers = new Set();
 ipcRenderer.on("notes:flush-requested", async (_event, requestId) => {
-  await Promise.allSettled([...flushHandlers].map(async (handler) => handler()));
-  ipcRenderer.send("notes:flush-done", requestId);
+  const results = await Promise.allSettled([...flushHandlers].map(async (handler) => handler()));
+  const ok = results.every(
+    (result) => result.status === "fulfilled" && result.value?.ok !== false,
+  );
+  ipcRenderer.send("notes:flush-done", requestId, { ok });
 });
 
 contextBridge.exposeInMainWorld("blocknoteSticky", {

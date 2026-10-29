@@ -1076,6 +1076,55 @@ test("backs up a corrupted version history file before it is overwritten", () =>
   assert.equal(fs.readFileSync(issues[0].backupPath, "utf8"), "{broken");
 });
 
+test("keeps a note's unreadable editor data beside the note and reports it once", () => {
+  const directory = createTemporaryDirectory();
+  fs.writeFileSync(path.join(directory, "notes.json"), JSON.stringify({
+    version: 11,
+    notes: [{ id: "note-1", title: "Broken", blocksJSON: "{not json", markdown: "" }],
+  }), "utf8");
+
+  const store = createStoreQuietly(directory);
+  const issues = store.getLoadIssues();
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].kind, "note");
+  assert.equal(issues[0].noteTitle, "Broken");
+  assert.equal(store.getNote("note-1").blocksJSON, null);
+  assert.equal(store.getNote("note-1").unreadableBlocksJSON, "{not json");
+
+  store.updateContent({
+    noteId: "note-1",
+    blocksJSON: JSON.stringify([{ type: "paragraph", content: "Rewritten" }]),
+    markdown: "Rewritten",
+  });
+  const reloadedStore = createStoreQuietly(directory);
+  assert.equal(reloadedStore.getLoadIssues().length, 0);
+  assert.equal(reloadedStore.getNote("note-1").unreadableBlocksJSON, "{not json");
+  assert.match(reloadedStore.getNote("note-1").blocksJSON, /Rewritten/);
+});
+
+test("treats a version history whose notes field is null as empty", () => {
+  const directory = createTemporaryDirectory();
+  fs.writeFileSync(
+    path.join(directory, "note-history.json"),
+    JSON.stringify({ version: 1, notes: null }),
+    "utf8",
+  );
+
+  const store = createStoreQuietly(directory);
+  const note = store.createNote({ width: 900, height: 700 });
+  assert.deepEqual(store.listNoteVersions(note.id), []);
+});
+
+test("restoring a backup advances the workspace generation", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+  store.createNote({ width: 900, height: 700 });
+  assert.equal(store.getGeneration(), 0);
+
+  store.restoreBackup(store.createBackup());
+  assert.equal(store.getGeneration(), 1);
+});
+
 test("reports no load issues for a healthy store", () => {
   const directory = createTemporaryDirectory();
   new StickyStore(directory).createNote({ width: 900, height: 700 });

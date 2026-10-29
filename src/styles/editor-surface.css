@@ -766,6 +766,48 @@
   font: 13px var(--notepane-ui-font);
 }
 
+.editor-crash {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 32px;
+  color: var(--sticky-text-color);
+  font: 13px/1.5 var(--notepane-ui-font);
+  text-align: center;
+}
+
+.editor-crash-title {
+  margin: 0;
+  font: 700 16px/1.3 var(--notepane-ui-font);
+}
+
+.editor-crash-message {
+  max-width: 520px;
+  margin: 0;
+  color: var(--sticky-danger-color);
+  word-break: break-word;
+}
+
+.editor-crash-hint {
+  max-width: 520px;
+  margin: 0;
+  color: var(--sticky-muted-color);
+}
+
+.editor-crash-reload {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid var(--chrome-icon-button-border);
+  border-radius: 999px;
+  background: var(--chrome-icon-button-bg);
+  color: var(--icon-chrome-active-color);
+  font: 700 12px/1 var(--notepane-ui-font);
+  cursor: pointer;
+}
+
 .layout-transition-overlay {
   position: fixed;
   inset: 0;

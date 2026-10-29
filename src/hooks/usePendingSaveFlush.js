@@ -11,33 +11,34 @@ import {
  * Writes edits still waiting on a debounce or retry: the note content through
  * `saveNow`, and any queued appearance payloads. It runs when the editor
  * unmounts (switching notes) and when the main process asks before destroying
- * the window or replacing the workspace, which skips the unmount.
+ * the window or replacing the workspace, which skips the unmount. The result
+ * tells main whether every write landed.
  */
 export function usePendingSaveFlush({
   appearanceTimerRef,
   isEditorDirtyRef,
   pendingAppearanceRef,
   pendingSessionAppearanceRef,
+  retrySaveNow,
   saveNow,
   saveRetryTimerRef,
   saveTimerRef,
   sessionAppearanceTimerRef,
 }) {
   const saveNowRef = useRef(saveNow);
+  const retrySaveNowRef = useRef(retrySaveNow);
   useEffect(() => {
     saveNowRef.current = saveNow;
-  }, [saveNow]);
+    retrySaveNowRef.current = retrySaveNow;
+  }, [retrySaveNow, saveNow]);
 
-  const flushPendingSaves = useCallback(() => {
+  const flushPendingSaves = useCallback(async () => {
     const writes = [];
     const hasPendingContentSave = Boolean(
       saveTimerRef.current || saveRetryTimerRef.current || isEditorDirtyRef.current,
     );
-    if (saveRetryTimerRef.current) {
-      window.clearTimeout(saveRetryTimerRef.current);
-      saveRetryTimerRef.current = null;
-    }
     if (hasPendingContentSave) {
+      retrySaveNowRef.current();
       writes.push(saveNowRef.current());
     }
     for (const timerRef of [appearanceTimerRef, sessionAppearanceTimerRef]) {
@@ -52,7 +53,8 @@ export function usePendingSaveFlush({
         pendingRef.current = null;
       }
     }
-    return Promise.allSettled(writes);
+    const results = await Promise.allSettled(writes);
+    return { ok: results.every((result) => result.status === "fulfilled") };
   }, []);
 
   useEffect(() => electronApi?.onFlushRequested?.(flushPendingSaves), [flushPendingSaves]);

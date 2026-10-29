@@ -8,14 +8,23 @@ import {
   normalizeTitle,
 } from "../model/notes.js";
 import {
+  trackPendingSave,
+} from "../model/pendingSaves.js";
+import {
   useCallback,
   useRef,
 } from "react";
+
+const SAVE_DEBOUNCE_MS = 180;
+const SAVE_RETRY_BASE_MS = 1000;
+const SAVE_RETRY_MAX_MS = 5000;
+
 /**
  * Writing the note back to disk. `scheduleSave` debounces ordinary typing,
- * `saveNow` flushes immediately and retries once on failure, and
- * `saveVersionNow` snapshots a version. Writes are serialised through one
- * promise queue so a retry can never overtake a newer save.
+ * `saveNow` writes immediately and keeps retrying with a backoff until the
+ * write lands, and `saveVersionNow` snapshots a version. Writes are serialised
+ * through one promise queue so a retry can never overtake a newer save, and a
+ * flush can cut a retry wait short through `retryNowRef`.
  */
 export function useNotePersistence({
   editor,
@@ -24,12 +33,14 @@ export function useNotePersistence({
   lastSavedBlocksRef,
   note,
   onNoteChanged,
+  onSaveStateChanged,
   saveRetryTimerRef,
   saveTimerRef,
   setNoteVersions,
   setTitle,
 }) {
   const saveQueueRef = useRef(Promise.resolve());
+  const retryNowRef = useRef(null);
 
   const updateAutomaticTitleFromBlocks = useCallback(
     (blocks) => {
@@ -58,6 +69,45 @@ export function useNotePersistence({
     blocksJSON: JSON.stringify(editor.document),
   }), [editor, note]);
 
+  const performSave = useCallback(async () => {
+    const blocksJSON = JSON.stringify(editor.document);
+    if (blocksJSON === lastSavedBlocksRef.current) {
+      isEditorDirtyRef.current = false;
+      return null;
+    }
+
+    let markdown = "";
+    try {
+      markdown = await editor.blocksToMarkdownLossy(editor.document);
+    } catch {
+      markdown = "";
+    }
+
+    const savedNote = await electronApi.saveContent({
+      noteId: note.id,
+      blocksJSON,
+      markdown,
+    });
+    lastSavedBlocksRef.current = blocksJSON;
+    isEditorDirtyRef.current = JSON.stringify(editor.document) !== blocksJSON;
+    if (savedNote?.id) {
+      setTitle(getNoteDisplayTitle(savedNote, editor.document));
+      onNoteChanged(savedNote);
+    }
+    return savedNote ?? null;
+  }, [editor, note.id, onNoteChanged]);
+
+  const waitForRetry = useCallback((delayMs) => new Promise((resolve) => {
+    const run = () => {
+      window.clearTimeout(saveRetryTimerRef.current);
+      saveRetryTimerRef.current = null;
+      retryNowRef.current = null;
+      resolve();
+    };
+    saveRetryTimerRef.current = window.setTimeout(run, delayMs);
+    retryNowRef.current = run;
+  }), []);
+
   const saveNow = useCallback((options = {}) => {
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current);
@@ -66,62 +116,51 @@ export function useNotePersistence({
     if (!electronApi?.saveContent) {
       return saveQueueRef.current;
     }
+    const maxAttempts = options.throwOnError ? 1 : Infinity;
 
     const pendingSave = saveQueueRef.current.then(async () => {
-      const blocksJSON = JSON.stringify(editor.document);
-      if (blocksJSON === lastSavedBlocksRef.current) {
-        isEditorDirtyRef.current = false;
-        return;
-      }
-
-      let markdown = "";
-      try {
-        markdown = await editor.blocksToMarkdownLossy(editor.document);
-      } catch {
-        markdown = "";
-      }
-
-      const savedNote = await electronApi.saveContent({
-        noteId: note.id,
-        blocksJSON,
-        markdown,
-      });
-      lastSavedBlocksRef.current = blocksJSON;
-      isEditorDirtyRef.current = JSON.stringify(editor.document) !== blocksJSON;
-      if (savedNote?.id) {
-        setTitle(getNoteDisplayTitle(savedNote, editor.document));
-        onNoteChanged(savedNote);
-      }
-      if (isEditorDirtyRef.current) {
-        saveTimerRef.current = window.setTimeout(() => {
-          saveTimerRef.current = null;
-          void saveNow();
-        }, 180);
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          const savedNote = await performSave();
+          onSaveStateChanged?.({ status: "saved" });
+          if (isEditorDirtyRef.current) {
+            saveTimerRef.current = window.setTimeout(() => {
+              saveTimerRef.current = null;
+              void saveNow();
+            }, SAVE_DEBOUNCE_MS);
+          }
+          return savedNote;
+        } catch (error) {
+          isEditorDirtyRef.current = true;
+          onSaveStateChanged?.({ status: "failed", attempt, error });
+          if (attempt >= maxAttempts) {
+            throw error;
+          }
+          await waitForRetry(Math.min(SAVE_RETRY_BASE_MS * attempt, SAVE_RETRY_MAX_MS));
+        }
       }
     });
 
-    saveQueueRef.current = pendingSave.catch(() => {
-      isEditorDirtyRef.current = true;
-      if (saveRetryTimerRef.current) {
-        window.clearTimeout(saveRetryTimerRef.current);
-      }
-      saveRetryTimerRef.current = window.setTimeout(() => {
-        saveRetryTimerRef.current = null;
-        void saveNow();
-      }, 1000);
-    });
+    saveQueueRef.current = pendingSave.then(
+      () => undefined,
+      () => undefined,
+    );
+    return trackPendingSave(note.id, pendingSave);
+  }, [note.id, onSaveStateChanged, performSave, waitForRetry]);
 
-    return options.throwOnError ? pendingSave : saveQueueRef.current;
-  }, [editor, note.id, onNoteChanged]);
+  const retrySaveNow = useCallback(() => {
+    retryNowRef.current?.();
+  }, []);
 
   const saveVersionNow = useCallback(async () => {
     await saveNow({ throwOnError: true });
+    const blocksJSON = JSON.stringify(editor.document);
     const markdown = await editor.blocksToMarkdownLossy(editor.document);
     const version = await electronApi?.createNoteVersion?.({
       noteId: note.id,
       title: getNoteDisplayTitle(note, editor.document),
       titleManuallyEdited: isTitleManuallyEdited(note),
-      blocksJSON: JSON.stringify(editor.document),
+      blocksJSON,
       markdown,
       source: "manual",
     });
@@ -146,11 +185,12 @@ export function useNotePersistence({
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null;
       void saveNow();
-    }, 180);
+    }, SAVE_DEBOUNCE_MS);
   }, [saveNow]);
 
   return {
     getCurrentNoteSnapshot,
+    retrySaveNow,
     saveNow,
     saveVersionNow,
     scheduleSave,
