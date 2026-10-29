@@ -601,6 +601,7 @@ const DELETED_TOKENS = new Set([
 // [NotePane Light, NotePane Dark].
 const ADDED_TOKENS = {
   "--sticky-callout-bg": ["rgb(55 53 47 / 0.05)", "rgb(241 241 239 / 0.08)"],
+  "--icon-chrome-accent-color": ["#8b5cf6", "#c4b5fd"],
 };
 
 // BlockNote variables whose tokens.css value never painted: BlockNote reads them only inside
