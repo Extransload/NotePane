@@ -57,7 +57,10 @@ export function useExitAnimation(elementRef, exiting, onExited) {
  * the last payload, so the overlay can still render, and `rootProps` mark its root element
  * `data-state="closing"`, `inert` and `aria-hidden` until that element's exit animation ends
  * (src/styles/motion.css gives each overlay its exit and `pointer-events: none`). A payload that
- * arrives while closing opens the same element again.
+ * arrives while closing starts a new `generation`: Presence mounts a fresh overlay for it, so
+ * nothing the closing one held carries over (a confirmation already given, a focused field), as
+ * when closing removed an overlay at once. A caller of usePresence itself keeps its element unless
+ * it keys it with `generation`.
  *
  * Spread `rootProps` on the overlay's root element; its `ref` must reach that element.
  */
@@ -65,9 +68,13 @@ export function usePresence(value) {
   const isOpen = value !== null && value !== undefined && value !== false;
   const [retained, setRetained] = useState(isOpen ? value : null);
   const [isClosing, setIsClosing] = useState(false);
+  const [generation, setGeneration] = useState(0);
   const elementRef = useRef(null);
 
   if (isOpen && (retained !== value || isClosing)) {
+    if (isClosing) {
+      setGeneration((current) => current + 1);
+    }
     setRetained(value);
     setIsClosing(false);
   } else if (!isOpen && retained !== null && !isClosing) {
@@ -81,6 +88,7 @@ export function usePresence(value) {
   useExitAnimation(elementRef, isClosing, finishExit);
 
   return {
+    generation,
     isClosing,
     isMounted: retained !== null,
     rootProps: {
@@ -106,7 +114,11 @@ export function Presence({ when, children }) {
   if (!presence.isMounted) {
     return null;
   }
-  return createElement(PresenceContext.Provider, { value: presence }, children(presence.value));
+  return createElement(
+    PresenceContext.Provider,
+    { key: presence.generation, value: presence },
+    children(presence.value),
+  );
 }
 
 // The presence of the overlay being rendered; outside `Presence` it is always open.

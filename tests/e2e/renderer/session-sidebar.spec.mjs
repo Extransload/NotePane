@@ -799,6 +799,41 @@ test("wraps long session titles inside the trash confirmation dialog", async ({ 
   expect(["anywhere", "break-word"]).toContain(wrappingMetrics.noteOverflowWrap);
 });
 
+test("a trash confirmation opened while the previous one fades out moves its own session", async ({ page }) => {
+  await createBlankSession(page);
+  await createBlankSession(page);
+  const tabs = page.getByRole("tablist", { name: "Note sessions" }).getByRole("tab");
+  await expect(tabs).toHaveCount(3);
+  // The first two sessions are not the open one, so moving them does not remount the editor.
+  const firstRow = await page.locator(".session-tab-row").nth(0).elementHandle();
+  const secondRow = await page.locator(".session-tab-row").nth(1).elementHandle();
+  const confirmDialog = page.getByRole("dialog", { name: "Move session to trash confirmation" });
+  const yes = confirmDialog.getByRole("button", { name: /Yes, move .* to trash/ });
+
+  await firstRow.hover();
+  await (await firstRow.$(".session-delete-button")).click();
+  await expect(confirmDialog).toBeVisible();
+  // A frozen timeline holds the first confirmation in its exit while the second one opens.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Animation.enable");
+  await cdp.send("Animation.setPlaybackRate", { playbackRate: 0 });
+  await yes.click();
+  await expect(page.locator(".trash-confirm-dialog[data-state='closing'], [data-state='closing'] .trash-confirm-dialog"))
+    .toHaveCount(1);
+  await secondRow.hover();
+  await (await secondRow.$(".session-delete-button")).click();
+  await expect(confirmDialog).toBeVisible();
+  // One move at a time: in the browser build two moves in flight each write the session list they
+  // started from, so the later one would bring the earlier session back.
+  await expect(page.getByRole("tablist", { name: "Note sessions" }))
+    .not.toHaveAttribute("aria-busy", "true");
+  await yes.click();
+  await cdp.send("Animation.setPlaybackRate", { playbackRate: 1 });
+
+  await expect(tabs).toHaveCount(1);
+  await expect(confirmDialog).toHaveCount(0);
+});
+
 test("selects trash notes for bulk restore and permanent delete", async ({ page }) => {
   await createBlankSession(page);
   await createBlankSession(page);
