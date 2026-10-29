@@ -178,3 +178,113 @@ body.is-exporting .color-panel,
 body.is-exporting .sticky-editor-surface {
   animation: none !important;
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Chrome motion: toasts, the exits of NotePane's own overlays, and press and hover feedback.
+
+   An overlay rendered through usePresence (src/hooks/usePresence.js) stays mounted with
+   data-state="closing" while its exit runs, and unmounts on that element's own animationend.
+   While closing it is inert and aria-hidden, and takes no pointer events. With no animation to
+   wait for (reduced motion, print, export) it unmounts at once. Only opacity, transform
+   properties and background colours move.
+   --------------------------------------------------------------------------------------------- */
+
+:root {
+  --notepane-motion-exit-duration: 140ms;
+  --notepane-motion-toast-in-duration: 220ms;
+  --notepane-motion-toast-out-duration: 160ms;
+  --notepane-motion-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --notepane-motion-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --notepane-motion-toast-shift: 8px;
+}
+
+@keyframes notepaneToastIn {
+  from {
+    opacity: 0;
+    translate: 0 var(--notepane-motion-toast-shift);
+    scale: 0.94;
+  }
+}
+
+@keyframes notepaneToastOut {
+  to {
+    opacity: 0;
+    translate: 0 var(--notepane-motion-toast-shift);
+    scale: 0.98;
+  }
+}
+
+@keyframes notepaneFadeOut {
+  to {
+    opacity: 0;
+  }
+}
+
+/* The old message is gone before the new one shows, so two lines of text never sit on top of
+   each other; both last the same time, so they leave the cell together. */
+@keyframes notepaneToastTextOut {
+  60%,
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes notepaneToastTextIn {
+  from,
+  40% {
+    opacity: 0;
+  }
+}
+
+[data-state="closing"] {
+  pointer-events: none !important;
+}
+
+/* A toast springs up from the bottom edge and sinks back before it unmounts. A toast that
+   replaces another keeps its element: the old message fades out under the new one, and the dot
+   moves to the new tone's colour. */
+.sticky-toast {
+  animation: notepaneToastIn var(--notepane-motion-toast-in-duration) var(--notepane-motion-ease-spring) both;
+}
+
+.sticky-toast[data-state="closing"] {
+  animation: notepaneToastOut var(--notepane-motion-toast-out-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+.sticky-toast::before {
+  transition: background-color var(--notepane-motion-toast-out-duration) var(--notepane-motion-ease-out);
+}
+
+.sticky-toast-text[data-state="entering"] {
+  animation: notepaneToastTextIn var(--notepane-motion-toast-out-duration) linear both;
+}
+
+.sticky-toast-text[data-state="closing"] {
+  animation: notepaneToastTextOut var(--notepane-motion-toast-out-duration) linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sticky-toast[data-state],
+  .sticky-toast-text[data-state] {
+    animation: none !important;
+  }
+
+  .sticky-toast::before {
+    transition: none !important;
+  }
+
+  /* The bar only moves; the toast still waits while hovered. */
+  .sticky-toast-time {
+    display: none;
+  }
+}
+
+@media print {
+  [data-state="closing"] {
+    animation: none !important;
+  }
+}
+
+body.is-exporting [data-state="closing"] {
+  animation: none !important;
+}

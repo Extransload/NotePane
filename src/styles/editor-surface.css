@@ -721,17 +721,6 @@
   }
 }
 
-@keyframes toastIn {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 6px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1);
-  }
-}
-
 @keyframes fontSizeToastIn {
   from {
     opacity: 0;

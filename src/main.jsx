@@ -306,6 +306,7 @@ function App({ bindTestThemeSetter }) {
     restoreTrashedNote,
     selectNote,
     sessionUndoToast,
+    sessionUndoToastTimer,
     showSessionMovedToTrashToast,
     trashedNotes,
     undoSessionMoveToTrash,
@@ -317,6 +318,23 @@ function App({ bindTestThemeSetter }) {
     setEditorPreferences,
     setLayoutMode,
   });
+  const sessionUndoStickyToast = useMemo(
+    () =>
+      sessionUndoToast && {
+        id: sessionUndoToast.id,
+        timeout: sessionUndoToast.timeout,
+        message:
+          sessionUndoToast.source === "close"
+            ? `${sessionUndoToast.title} closed and moved to Trash.`
+            : `${sessionUndoToast.title} moved to Trash.`,
+        tone: "success",
+        action: {
+          label: "Undo",
+          onClick: () => void undoSessionMoveToTrash(),
+        },
+      },
+    [sessionUndoToast, undoSessionMoveToTrash],
+  );
   const [recentEditorColors, setRecentEditorColors] = useState([]);
   const { isSidebarOpen, setIsSidebarOpen } = useSidebarVisibility();
   const [isEditorWide, setIsEditorWide] = useState(false);
@@ -522,21 +540,7 @@ function App({ bindTestThemeSetter }) {
         onPendingRenameHandled={() => setPendingRenameNoteId(null)}
       />
       </EditorErrorBoundary>
-      {sessionUndoToast && (
-        <StickyToast
-        toast={{
-            message:
-              sessionUndoToast.source === "close"
-                ? `${sessionUndoToast.title} closed and moved to Trash.`
-                : `${sessionUndoToast.title} moved to Trash.`,
-            tone: "success",
-            action: {
-              label: "Undo",
-              onClick: () => void undoSessionMoveToTrash(),
-            },
-          }}
-        />
-      )}
+      <StickyToast toast={sessionUndoStickyToast} timer={sessionUndoToastTimer} />
     </>
   );
 }
@@ -759,6 +763,7 @@ function StickyEditor({
   const [cropState, setCropState] = useState(null);
   const {
     exportToast,
+    exportToastTimer,
     hideExportToast,
     showExportToast,
     showZoomGauge,
@@ -2824,7 +2829,7 @@ function StickyEditor({
           onClose={() => closeOverlay("preferencesWindow")}
         />
       )}
-      {exportToast && <StickyToast toast={exportToast} />}
+      <StickyToast toast={exportToast} timer={exportToastTimer} />
       {notePalette.query !== null && (
         <SearchPalette
           query={notePalette.query}

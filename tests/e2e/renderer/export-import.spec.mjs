@@ -36,6 +36,50 @@ test("opens an export format menu from the button and keyboard shortcut", async 
   await expect(page.getByRole("menu", { name: "Export format" })).toBeVisible();
 });
 
+test("cross-fades a replaced toast in its element and slides it out before it unmounts", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.getByRole("button", { name: "Export" }).click();
+  await page.getByRole("menu", { name: "Export format" }).getByRole("menuitem", { name: /Markdown/ }).click();
+  const toast = page.locator(".sticky-toast");
+  await expect(toast).toHaveClass(/sticky-toast-error/);
+  await toast.evaluate((element) => {
+    element.dataset.probe = "first";
+  });
+
+  // The save toast takes over the error toast's element: one toast, its text and dot replaced.
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.press(modifierShortcut("S"));
+  await expect(toast).toHaveClass(/sticky-toast-success/);
+  await expect(toast).toHaveCount(1);
+  await expect(toast).toHaveAttribute("data-probe", "first");
+  await expect(toast).toHaveText("Saved");
+  await expect(toast.locator(".sticky-toast-text")).toHaveCount(1);
+
+  // When it times out it stays, inert and hidden from assistive technology, while it slides out.
+  const closing = await toast.evaluate((element) => new Promise((resolve) => {
+    const observer = new MutationObserver(() => {
+      if (element.dataset.state === "closing") {
+        observer.disconnect();
+        const style = getComputedStyle(element);
+        resolve({
+          animationName: style.animationName,
+          ariaHidden: element.getAttribute("aria-hidden"),
+          inert: element.inert,
+          pointerEvents: style.pointerEvents,
+        });
+      }
+    });
+    observer.observe(element, { attributes: true, attributeFilter: ["data-state"] });
+  }));
+  expect(closing).toEqual({
+    animationName: "notepaneToastOut",
+    ariaHidden: "true",
+    inert: true,
+    pointerEvents: "none",
+  });
+  await expect(toast).toHaveCount(0);
+});
+
 test("uses transparent chrome-free styles while exporting", async ({ page }) => {
   await loadTemplatePreview(page);
   const exportStyles = await page.evaluate(() => {

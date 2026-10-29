@@ -10,8 +10,11 @@ import {
   ZoomOut,
 } from "lucide-react";
 import {
+  useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -29,20 +32,98 @@ import {
   schema,
 } from "../editor/schema.jsx";
 import {
+  useExitAnimation,
+  usePresence,
+} from "../hooks/usePresence.js";
+import {
   parseBlocksJSON,
 } from "../model/notes.js";
 import {
   normalizeLayoutMode,
 } from "../model/preferences.js";
 
-export function StickyToast({ toast }) {
+/**
+ * The toast at the bottom of the window, from useTimedToast: `toast` is `{ id, message, tone,
+ * timeout, action? }` or null. It slides in, and slides out before it unmounts. A toast that
+ * replaces another keeps the same element: the new message fades in over the old one and the dot
+ * changes colour. While the pointer or focus is on it, `timer` waits, and a toast with an action
+ * shows the time it has left on a bar.
+ */
+export function StickyToast({ toast, timer = null }) {
+  const presence = usePresence(toast);
+  if (!presence.isMounted) {
+    return null;
+  }
+  return <StickyToastSurface toast={presence.value} rootProps={presence.rootProps} timer={timer} />;
+}
+
+function StickyToastSurface({ toast, rootProps, timer }) {
+  const [shownToast, setShownToast] = useState(toast);
+  const [leavingMessage, setLeavingMessage] = useState(null);
+  if (toast !== shownToast) {
+    if (toast.id !== shownToast.id && toast.message !== shownToast.message) {
+      setLeavingMessage({ id: shownToast.id, text: shownToast.message });
+    }
+    setShownToast(toast);
+  }
+  const leavingRef = useRef(null);
+  const clearLeavingMessage = useCallback(() => setLeavingMessage(null), []);
+  useExitAnimation(leavingRef, leavingMessage?.id ?? null, clearLeavingMessage);
+
+  const holdRef = useRef({ focused: false, hovered: false });
+  const syncTimerHold = useCallback(() => {
+    if (!timer) {
+      return;
+    }
+    const { focused, hovered } = holdRef.current;
+    if (focused || hovered) {
+      timer.pause();
+    } else {
+      timer.resume();
+    }
+  }, [timer]);
+  // A toast shown while the pointer rests on the previous one waits as well.
+  useEffect(syncTimerHold, [syncTimerHold, toast.id]);
+  const setHold = (kind, isHeld) => {
+    holdRef.current[kind] = isHeld;
+    syncTimerHold();
+  };
+
   return (
     <div
+      {...rootProps}
       className={`sticky-toast sticky-toast-${toast.tone}`}
       role="status"
       aria-live="polite"
+      onPointerEnter={() => setHold("hovered", true)}
+      onPointerLeave={() => setHold("hovered", false)}
+      onFocus={() => setHold("focused", true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setHold("focused", false);
+        }
+      }}
     >
-      <span className="sticky-toast-message">{toast.message}</span>
+      <span className="sticky-toast-message">
+        <span
+          key={`message-${toast.message}`}
+          className="sticky-toast-text"
+          data-state={leavingMessage ? "entering" : undefined}
+        >
+          {toast.message}
+        </span>
+        {leavingMessage && (
+          <span
+            key={`leaving-${leavingMessage.id}`}
+            ref={leavingRef}
+            className="sticky-toast-text"
+            data-state="closing"
+            aria-hidden="true"
+          >
+            {leavingMessage.text}
+          </span>
+        )}
+      </span>
       {toast.action && (
         <button
           type="button"
@@ -53,8 +134,29 @@ export function StickyToast({ toast }) {
           {toast.action.label}
         </button>
       )}
+      {toast.action && timer && toast.timeout > 0 && (
+        <StickyToastTimeBar key={toast.id} timer={timer} />
+      )}
     </div>
   );
+}
+
+// Drawn every frame from the timer rather than by a CSS animation, so it stops exactly when the
+// timer waits and never counts as a running animation.
+function StickyToastTimeBar({ timer }) {
+  const barRef = useRef(null);
+
+  useLayoutEffect(() => {
+    let frame = 0;
+    const draw = () => {
+      barRef.current?.style.setProperty("--sticky-toast-time-left", String(timer.getRemainingFraction()));
+      frame = window.requestAnimationFrame(draw);
+    };
+    draw();
+    return () => window.cancelAnimationFrame(frame);
+  }, [timer]);
+
+  return <span ref={barRef} className="sticky-toast-time" data-testid="sticky-toast-time" aria-hidden="true" />;
 }
 
 // Shown while Cmd/Ctrl+=, - or 0 zooms the app: where the zoom sits between the smallest and the

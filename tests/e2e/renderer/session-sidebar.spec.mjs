@@ -24,6 +24,60 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
 });
 
+// The undo toast after a session moves to Trash, with its time bar.
+async function showSessionUndoToast(page) {
+  await createBlankSession(page);
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  await moveSessionToTrash(page, 1);
+  const undoToast = page.locator(".sticky-toast").filter({ hasText: "moved to Trash." });
+  await expect(undoToast).toBeVisible();
+  return undoToast;
+}
+
+const readTimeLeft = (timeBar) =>
+  timeBar.evaluate((element) => Number(element.style.getPropertyValue("--sticky-toast-time-left")));
+
+test("holds the undo toast and its time bar while the pointer rests on it", async ({ page }) => {
+  await page.clock.install();
+  await page.reload();
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  const undoToast = await showSessionUndoToast(page);
+  const timeBar = undoToast.getByTestId("sticky-toast-time");
+  await expect(timeBar).toBeVisible();
+
+  await undoToast.hover();
+  const heldTimeLeft = await readTimeLeft(timeBar);
+  expect(heldTimeLeft).toBeGreaterThan(0);
+  expect(heldTimeLeft).toBeLessThanOrEqual(1);
+  // Well past its 5.2 s timeout, the hovered toast is still there and its bar has not moved.
+  await page.clock.runFor(12_000);
+  await expect(undoToast).toBeVisible();
+  expect(await readTimeLeft(timeBar)).toBe(heldTimeLeft);
+
+  // Once the pointer leaves, the time that was left runs out.
+  await page.mouse.move(600, 300);
+  await page.clock.runFor(1_000);
+  await expect.poll(() => readTimeLeft(timeBar)).toBeLessThan(heldTimeLeft);
+  await page.clock.runFor(6_000);
+  await expect(undoToast).toHaveCount(0);
+});
+
+test("shows and removes the undo toast without motion when the system asks for reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const undoToast = await showSessionUndoToast(page);
+  expect(await undoToast.evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
+  await expect(undoToast.getByTestId("sticky-toast-time")).toBeHidden();
+
+  // Without an exit animation it unmounts in the task that hid it.
+  const remainsAfterUndo = await undoToast.evaluate(async (element) => {
+    element.querySelector(".sticky-toast-action").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return element.isConnected;
+  });
+  expect(remainsAfterUndo).toBe(false);
+  await expect(page.getByRole("tab")).toHaveCount(2);
+});
+
 test("starts with a blank first session", async ({ page }) => {
   await expect(page.getByTestId("sticky-shell")).toBeVisible();
   const isWindows = await page.evaluate(
