@@ -71,6 +71,7 @@ function createMantineTheme() {
 // the menu transition.
 export function NotePaneMantineProvider({ children }) {
   const theme = useMemo(createMantineTheme, []);
+  useEffect(() => observeClosingFloatingUI(document.body), []);
   return createElement(MantineProvider, {
     theme,
     withCssVariables: false,
@@ -81,6 +82,68 @@ export function NotePaneMantineProvider({ children }) {
 export function NotePaneLinkToolbarController() {
   const floatingUIOptions = useMemo(createFloatingCloseOptions, []);
   return createElement(LinkToolbarController, { floatingUIOptions });
+}
+
+// BlockNote's floating UI: its floating-ui popovers (the slash menu, the toolbars), known by the
+// z-index BlockNote gives them, whichever portal they render into, and the Mantine dropdowns inside
+// them or the editor (the six-dot and table handle menus, the toolbar's dropdowns).
+const BLOCKNOTE_POPOVER_SELECTOR = "[data-floating-ui-portal] > div[style*='--bn-ui-base-z-index']";
+const BLOCKNOTE_FLOATING_UI_SELECTOR = [
+  BLOCKNOTE_POPOVER_SELECTOR,
+  `:is(${BLOCKNOTE_POPOVER_SELECTOR}, .bn-root) :is(.mantine-Popover-dropdown, .mantine-Menu-dropdown)`,
+].join(", ");
+const CLOSING_INERT_ATTRIBUTE = "data-notepane-closing-inert";
+
+function takesNoPointer(element) {
+  return element.style.pointerEvents === "none";
+}
+
+// While BlockNote's floating UI fades out (the close styles above take its pointer), it is inert and
+// hidden from assistive tech too, so neither the keyboard nor a role lookup reaches what is
+// leaving. BlockNote reuses a popover's element when it reopens during the fade, and Mantine its
+// dropdown, so the marks come off as soon as the element takes the pointer again; only marks this
+// set are removed. An element that never took the pointer (BlockNote's attribution tooltip, a
+// dropdown in its first frame) is never marked.
+export function observeClosingFloatingUI(root) {
+  const seenOpen = new WeakSet();
+  const update = (element) => {
+    if (!takesNoPointer(element)) {
+      seenOpen.add(element);
+      if (element.hasAttribute(CLOSING_INERT_ATTRIBUTE)) {
+        element.removeAttribute(CLOSING_INERT_ATTRIBUTE);
+        element.inert = false;
+        element.removeAttribute("aria-hidden");
+      }
+    } else if (seenOpen.has(element) && !element.inert) {
+      element.setAttribute(CLOSING_INERT_ATTRIBUTE, "");
+      element.inert = true;
+      element.setAttribute("aria-hidden", "true");
+    }
+  };
+  const observer = new MutationObserver((records) => {
+    for (const { type, target, addedNodes } of records) {
+      const candidates = type === "attributes" ? [target] : addedNodes;
+      for (const node of candidates) {
+        if (!(node instanceof HTMLElement)) {
+          continue;
+        }
+        // A portal mounts with its popover inside it, so an added node is searched too.
+        if (node.matches(BLOCKNOTE_FLOATING_UI_SELECTOR)) {
+          update(node);
+        }
+        if (type === "childList") {
+          node.querySelectorAll(BLOCKNOTE_FLOATING_UI_SELECTOR).forEach(update);
+        }
+      }
+    }
+  });
+  observer.observe(root, {
+    subtree: true,
+    childList: true,
+    attributes: true,
+    attributeFilter: ["style"],
+  });
+  return () => observer.disconnect();
 }
 
 const CLOSING_MENU_CLASS = "notepane-floating-menu-closing";
