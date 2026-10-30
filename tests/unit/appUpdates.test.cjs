@@ -4,9 +4,21 @@ const assert = require("node:assert/strict");
 const {
   RELEASES_URL,
   UPDATE_CHECK_INTERVAL_MS,
+  compareVersions,
   resolveUpdateMode,
   startAppUpdates,
 } = require("../../electron/appUpdates.cjs");
+
+test("orders release versions by their numbers, not as text", () => {
+  assert.equal(compareVersions("0.10.0", "0.9.2"), 1);
+  assert.equal(compareVersions("0.9.2", "0.10.0"), -1);
+  assert.equal(compareVersions("1.2.3", "1.2.3"), 0);
+  assert.equal(compareVersions("v1.2.3", "1.2.3"), 0);
+  assert.equal(compareVersions("1.2", "1.2.0"), 0);
+  assert.equal(compareVersions("2.0.0", "1.99.99"), 1);
+  assert.equal(compareVersions("1.0.0-beta.1", "1.0.0"), -1);
+  assert.equal(compareVersions("1.0.0", "1.0.0-beta.1"), 1);
+});
 
 test("checks for updates only in an enabled packaged app on a platform that ships one", () => {
   const packaged = { isPackaged: true, enabled: true };
@@ -81,12 +93,60 @@ test("logs each failed check once instead of throwing or showing a dialog", asyn
   ]);
 });
 
+test("a check from the About page resolves with the newest published version", async () => {
+  for (const mode of ["auto", "notify"]) {
+    const harness = createHarness({ mode, latestVersion: "0.4.0" });
+    const startupCalls = { ...harness.updater.calls };
+    assert.equal(await harness.started.checkNow(), "0.4.0");
+    assert.equal(harness.updater.calls.checkForUpdates, startupCalls.checkForUpdates + 1, mode);
+  }
+  const noRelease = createHarness({ mode: "auto" });
+  assert.equal(await noRelease.started.checkNow(), null);
+});
+
+test("a check from the About page rejects when the check fails", async () => {
+  const harness = createHarness({ mode: "notify", failChecks: true });
+  await assert.rejects(harness.started.checkNow(), /offline/);
+});
+
+test("a check from the About page opens no dialog, now or for that version later", async () => {
+  const harness = createHarness({ mode: "notify", latestVersion: "0.4.0", dialogResponse: 0 });
+  harness.updater.checkForUpdates = () => {
+    harness.updater.calls.checkForUpdates += 1;
+    harness.updater.emit("update-available", { version: "0.4.0" });
+    return Promise.resolve({ updateInfo: { version: "0.4.0" } });
+  };
+  assert.equal(await harness.started.checkNow(), "0.4.0");
+  await harness.settle();
+  assert.equal(harness.dialogCalls.length, 0);
+
+  // The interval check finds the same version and leaves it to the About page.
+  await harness.scheduled[0].callback();
+  await harness.settle();
+  assert.equal(harness.dialogCalls.length, 0);
+  assert.deepEqual(harness.openedUrls, []);
+});
+
+test("a version the startup check offered is not offered again by the About page check", async () => {
+  const harness = createHarness({ mode: "notify", dialogResponse: 1 });
+  harness.updater.emit("update-available", { version: "0.4.0" });
+  await harness.settle();
+  assert.equal(harness.dialogCalls.length, 1);
+  harness.updater.checkForUpdates = () => {
+    harness.updater.emit("update-available", { version: "0.4.0" });
+    return Promise.resolve({ updateInfo: { version: "0.4.0" } });
+  };
+  assert.equal(await harness.started.checkNow(), "0.4.0");
+  await harness.settle();
+  assert.equal(harness.dialogCalls.length, 1);
+});
+
 test("replaces the updater's own console logging", () => {
   const harness = createHarness({ mode: "notify" });
   assert.equal(harness.updater.logger, null);
 });
 
-function createHarness({ mode, dialogResponse = 1, failChecks = false }) {
+function createHarness({ mode, dialogResponse = 1, failChecks = false, latestVersion = null }) {
   const updater = new EventEmitter();
   updater.autoDownload = true;
   updater.logger = console;
@@ -95,7 +155,7 @@ function createHarness({ mode, dialogResponse = 1, failChecks = false }) {
   const respond = (name) => {
     updater.calls[name] += 1;
     if (!failChecks) {
-      return Promise.resolve(null);
+      return Promise.resolve(latestVersion ? { updateInfo: { version: latestVersion } } : null);
     }
     const error = new Error("offline");
     updater.emit("error", error);

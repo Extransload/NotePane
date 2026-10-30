@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
   purgeNote: (noteId) => ipcRenderer.invoke("trash:purge", noteId),
   activateNote: (noteId) => ipcRenderer.invoke("notes:activate", noteId),
   openStickyNote: (noteId) => ipcRenderer.invoke("notes:open-sticky", noteId),
+  getAppInfo: () => ipcRenderer.invoke("app:info"),
+  checkForUpdates: () => ipcRenderer.invoke("app:check-for-updates"),
   getAppTheme: () => ipcRenderer.invoke("app-theme:get"),
   updateAppTheme: (payload) => ipcRenderer.invoke("app-theme:update", payload),
   getLayoutMode: () => ipcRenderer.invoke("layout-mode:get"),
