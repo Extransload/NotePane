@@ -159,7 +159,10 @@ BlockNote handles editor interaction directly.
 - Numbered List
 - Check List
 - Toggle List
-- Code Block
+- Code Block: as in Notion, its tools show only while the pointer is on the block: the language, whose menu has
+  a search field (the arrow keys and Enter, or a click, pick a language; Escape closes it), Prettify for a language
+  with a formatter, and Copy. A new code block starts in the language last picked from that menu (JavaScript until
+  one is); a language written after the three backticks still wins
 - Divider: a thin rule from `/divider`, or from `---` or `***` typed on an empty line; the caret moves on to
   a line below it. Backspace on the empty line below selects it and Backspace again deletes it. Markdown writes it as
   `---` and reads `---`, `***` and `___`

@@ -50,6 +50,9 @@ test("prettifies supported code blocks and copies code from upper-right actions"
   await expect(prettifyButton).toHaveText("Prettify");
   await expect(toolbar.getByRole("button", { name: "Copy JavaScript code" }))
     .toBeEnabled();
+  // The new block rises in; the tool bar's place is read once the block has settled.
+  await expect.poll(() => codeBlock.evaluate((element) =>
+    element.closest(".bn-block-outer").getAnimations().length)).toBe(0);
 
   const geometry = await page.evaluate(() => {
     const block = [...document.querySelectorAll("[data-content-type='codeBlock']")]
@@ -232,25 +235,108 @@ test("the version history preview recolours its code blocks with the theme", { t
   await expect(block).toHaveCSS("background-color", "rgb(36, 41, 46)");
 });
 
-test("keeps copy available when a code language has no browser formatter", async ({ page }) => {
+test("offers no Prettify for a code language without a formatter, and keeps Copy", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   await pastePlainText(page, [
-    "```python",
-    "result={'value':42}",
+    "```text",
+    "plain words",
     "```",
   ].join("\n"));
-  const pythonToolbar = page.getByRole("toolbar", {
-    name: "Python code block actions",
+  const textToolbar = page.getByRole("toolbar", {
+    name: "Plain Text code block actions",
   });
-  await expect(pythonToolbar).toBeVisible();
-  await expect(
-    pythonToolbar.getByRole("button", { name: "Prettify unavailable for Python" }),
-  ).toBeDisabled();
-  await expect(
-    pythonToolbar.getByRole("button", { name: "Prettify unavailable for Python" }),
-  ).toHaveText("Prettify");
-  await expect(pythonToolbar.getByRole("button", { name: "Copy Python code" }))
+  await expect(textToolbar).toBeAttached();
+  await expect(textToolbar.getByRole("button", { name: /Prettify/ })).toHaveCount(0);
+  await expect(textToolbar.getByRole("button", { name: "Copy Plain Text code" }))
     .toBeEnabled();
+});
+
+test("shows a code block's tools only while the pointer is on the block", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, ["```javascript", "const answer = 42;", "```"].join("\n"));
+  const codeBlock = page.locator("[data-content-type='codeBlock']")
+    .filter({ hasText: "const answer" });
+  const toolbar = page.getByRole("toolbar", { name: "JavaScript code block actions" });
+
+  await page.mouse.move(1, 1);
+  await expect(toolbar).toHaveCSS("opacity", "0");
+  await codeBlock.hover();
+  await expect(toolbar).toHaveCSS("opacity", "1");
+  await page.mouse.move(1, 1);
+  await expect(toolbar).toHaveCSS("opacity", "0");
+});
+
+test("picks a code block's language from a searchable list", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, ["```javascript", "answer = 42", "```"].join("\n"));
+  const codeBlock = page.locator("[data-content-type='codeBlock']")
+    .filter({ hasText: "answer = 42" });
+  const menu = page.getByRole("dialog", { name: "Code language" });
+  const search = menu.getByRole("combobox", { name: "Search for a language" });
+  const options = menu.getByRole("listbox", { name: "Languages" }).getByRole("option");
+
+  await codeBlock.hover();
+  await page.getByRole("button", { name: "Code language: JavaScript" }).click();
+  await expect(search).toBeFocused();
+  await expect(options.filter({ hasText: "JavaScript" })).toHaveAttribute("aria-selected", "true");
+  await search.fill("py");
+  await expect(options).toHaveText(["Python"]);
+  await search.press("Enter");
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByRole("toolbar", { name: "Python code block actions" })).toBeAttached();
+  await expectEditorFocused(page);
+
+  // The arrow keys move through the matches.
+  await codeBlock.hover();
+  await page.getByRole("button", { name: "Code language: Python" }).click();
+  await search.fill("java");
+  await expect(options).toHaveText(["Java", "JavaScript"]);
+  await search.press("ArrowDown");
+  await search.press("Enter");
+  await expect(page.getByRole("toolbar", { name: "JavaScript code block actions" })).toBeAttached();
+
+  await codeBlock.hover();
+  await page.getByRole("button", { name: "Code language: JavaScript" }).click();
+  await options.filter({ hasText: /^SQL$/ }).click();
+  await expect(page.getByRole("toolbar", { name: "SQL code block actions" })).toBeAttached();
+
+  // Escape closes the menu and keeps the language.
+  await codeBlock.hover();
+  await page.getByRole("button", { name: "Code language: SQL" }).click();
+  await expect(search).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(page.getByRole("toolbar", { name: "SQL code block actions" })).toBeAttached();
+});
+
+test("starts a new code block in the language picked last", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  // Three empty lines below the pasted code block, one for each new code block.
+  for (const key of ["Enter", "Enter", "Enter", "ArrowUp", "ArrowUp", "ArrowUp"]) {
+    await page.keyboard.press(key);
+  }
+  await pastePlainText(page, ["```javascript", "first()", "```"].join("\n"));
+  await page.locator("[data-content-type='codeBlock']").filter({ hasText: "first()" }).hover();
+  await page.getByRole("button", { name: "Code language: JavaScript" }).click();
+  await page.getByRole("combobox", { name: "Search for a language" }).fill("python");
+  await page.keyboard.press("Enter");
+  const pythonToolbars = page.getByRole("toolbar", { name: "Python code block actions" });
+  await expect(pythonToolbars).toHaveCount(1);
+
+  // Three backticks with no language, and the slash menu's code block, both start in Python.
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("``` ");
+  await expect(pythonToolbars).toHaveCount(2);
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("/code");
+  await page.locator(".bn-suggestion-menu-item").filter({ hasText: /Code Block/i }).first().click();
+  await expect(pythonToolbars).toHaveCount(3);
+
+  // A language written after the backticks still wins.
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("```sql ");
+  await expect(page.getByRole("toolbar", { name: "SQL code block actions" })).toHaveCount(1);
+  await expect(pythonToolbars).toHaveCount(3);
 });
 
 test("selects only the current code block with Command+A", async ({ page }) => {

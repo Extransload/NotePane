@@ -57,8 +57,13 @@ div:has(> .bn-link-toolbar) {
   animation: notepaneMenuSettle var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out);
 }
 
-.color-panel {
+.color-panel,
+.code-block-language-menu {
   animation: notepaneMenuIn var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out);
+}
+
+.code-block-language-menu.is-above {
+  --notepane-menu-from-y: var(--notepane-motion-shift);
 }
 
 /* The link toolbar's Copy icon fades into a check once the address is on the clipboard. */
@@ -141,6 +146,7 @@ html[data-boot="revealing"] #root {
   div:has(> .bn-link-toolbar),
   .bn-menu-dropdown,
   .mantine-Popover-dropdown,
+  .code-block-tools,
   .session-sidebar {
     transition: none !important;
   }
@@ -150,6 +156,7 @@ html[data-boot="revealing"] #root {
   .bn-suggestion-menu,
   .notepane-block-menu-subpanel,
   .color-panel,
+  .code-block-language-menu,
   .notepane-link-preview-copy svg,
   .session-tab-context-menu,
   .export-format-menu,
@@ -179,6 +186,7 @@ html[data-boot="revealing"] #root {
   .bn-suggestion-menu,
   .notepane-block-menu-subpanel,
   .color-panel,
+  .code-block-language-menu,
   .sticky-editor-surface {
     animation: none !important;
   }

@@ -670,7 +670,7 @@ const SCREEN_GROUPS = [
   },
   {
     name: "tooltips and code block tools",
-    screens: ["formatting toolbar tooltip", "code block language select", "code block tool bar"],
+    screens: ["formatting toolbar tooltip", "code block language menu", "code block tool bar"],
     async run(page, scan) {
       // BlockNote's toolbar buttons show a Mantine tooltip while hovered.
       await selectWord(page, "First bullet");
@@ -680,14 +680,17 @@ const SCREEN_GROUPS = [
       await page.keyboard.press("Escape");
       await expect(page.locator(".bn-formatting-toolbar")).toHaveCount(0);
 
-      // BlockNote fades the language select in while the code block is hovered.
+      // The code block's tool bar shows while the block is hovered; its language menu opens from it.
       const codeBlock = page.locator(".bn-editor [data-content-type='codeBlock']");
-      const languageSelect = ".bn-editor [data-content-type='codeBlock'] > div > select";
       await hoverAfterScrolling(codeBlock);
-      await scan("code block language select", { include: [languageSelect] });
+      await page.getByRole("button", { name: /^Code language: / }).click();
+      const languageMenu = page.getByRole("dialog", { name: "Code language" });
+      await expect(languageMenu).toBeVisible();
+      await scan("code block language menu", { include: [".code-block-language-menu"] });
+      await page.keyboard.press("Escape");
+      await expect(languageMenu).toHaveCount(0);
 
-      // The tool bar sits outside the code block, so hovering it hides the select again; the
-      // note screen reads the tool bar at rest, this one its hover colours.
+      // The note screen reads the tool bar at rest, this one its hover colours.
       const toolBar = page.getByRole("toolbar", { name: /code block actions$/ });
       const copyButton = toolBar.getByRole("button", { name: /^Copy .+ code$/ });
       await copyButton.hover();

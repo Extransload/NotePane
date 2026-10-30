@@ -67,6 +67,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Image download, crop geometry, upload | `src/editor/images.js` |
 | Pasting and dropping files: where the file block goes, its upload, one undo step for both | `src/editor/fileInsertion.js` |
 | Code block language detection, prettifying, and Tab / Shift+Tab line indent | `src/editor/codeFormatting.js` |
+| Code block languages: the language menu's list and search, the language a new code block starts in | `src/editor/codeLanguages.js` |
+| Code block tool bar: showing on hover, the language menu, Prettify and Copy | `src/ui/CodeBlockTools.jsx`, `src/ui/CodeLanguageMenu.jsx` |
 | Note search matching, snippets and plain-text extraction | `src/model/search.js` |
 | The note search palette: its results, match count and last-edited labels, keyboard selection | `src/ui/SearchPalette.jsx`, `src/hooks/useNoteSearchPalette.js`, `formatRelativeEditTime` in `src/model/notes.js` |
 | Find in note decorations and navigation | `src/editor/findInNote.js`, `src/hooks/useFindInNote.js` |

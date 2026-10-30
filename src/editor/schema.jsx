@@ -24,6 +24,7 @@ import { DividerMarkdownExport } from "./divider.jsx";
 import { createMathBlockSpec, inlineMathSpec } from "./math.jsx";
 import { columnBlockSpec, columnListBlockSpec } from "./columns.jsx";
 import { indentCodeBlockLines } from "./codeFormatting.js";
+import { CodeLanguageMemory } from "./codeLanguages.js";
 import {
   codeBlockOptions,
   followCodeTheme,
@@ -206,9 +207,14 @@ export const createNonDestructiveImageBlockSpec = createBlockSpec(
 // Code blocks highlighted with the active theme's code theme. Every editor built from this schema
 // (the note editor and the version history preview) follows theme changes while it is mounted.
 // BlockNote's own Tab replaces a selection with two spaces and it leaves Shift+Tab to unnest the
-// block, so both keys are NotePane's line indent instead.
+// block, so both keys are NotePane's line indent instead. A new code block starts in the language
+// picked last, so the block's own default language is empty (src/editor/codeLanguages.js).
 function createNotePaneCodeBlockSpec() {
-  const codeBlockSpec = createCodeBlockSpec({ ...codeBlockOptions, indentLineWithTab: false });
+  const codeBlockSpec = createCodeBlockSpec({
+    ...codeBlockOptions,
+    defaultLanguage: "",
+    indentLineWithTab: false,
+  });
   const followTheme = createExtension(({ editor }) => ({
     key: "notepane-code-theme",
     mount: () => followCodeTheme(editor),
@@ -222,7 +228,12 @@ function createNotePaneCodeBlockSpec() {
   });
   return {
     ...codeBlockSpec,
-    extensions: [...(codeBlockSpec.extensions ?? []), followTheme, indentLines],
+    extensions: [
+      ...(codeBlockSpec.extensions ?? []),
+      followTheme,
+      indentLines,
+      CodeLanguageMemory(),
+    ],
   };
 }
 

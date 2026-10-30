@@ -1,9 +1,11 @@
 import {
   Check,
+  ChevronDown,
   Copy,
   X,
 } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -23,20 +25,28 @@ import {
   preventFocusLoss,
 } from "../editor/images.js";
 import {
+  rememberCodeLanguage,
+} from "../editor/codeLanguages.js";
+import {
   writeClipboardText,
 } from "../style/colorMath.js";
+import { CodeLanguageMenu } from "./CodeLanguageMenu.jsx";
 
 export function CodeBlockTools({ editor, blockId, targetElement }) {
   const [copyStatus, setCopyStatus] = useState("idle");
   const [formatStatus, setFormatStatus] = useState("idle");
   const [position, setPosition] = useState(null);
+  const [isLanguageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const [isBlockHovered, setBlockHovered] = useState(false);
+  const [isToolbarHovered, setToolbarHovered] = useState(false);
+  const toolbarRef = useRef(null);
   const copyResetTimerRef = useRef(null);
   const formatResetTimerRef = useRef(null);
   const block = findBlockById(editor.document, blockId);
   const language = normalizeCodeLanguage(block?.props?.language);
   const languageLabel = getCodeLanguageLabel(language);
   const code = getCodeBlockText(block);
-  const canPrettify = Boolean(code.trim() && getCodeFormatter(language));
+  const hasFormatter = Boolean(getCodeFormatter(language));
 
   useLayoutEffect(() => {
     const editorSurface = targetElement?.closest(
@@ -79,10 +89,28 @@ export function CodeBlockTools({ editor, blockId, targetElement }) {
       });
     }
     window.addEventListener("resize", updatePosition);
+    // A new block rises in without resizing, so the tool bar is placed again once it settles.
+    editorDocument?.addEventListener("animationend", updatePosition);
     return () => {
       resizeObserver.disconnect();
       layoutObserver.disconnect();
       window.removeEventListener("resize", updatePosition);
+      editorDocument?.removeEventListener("animationend", updatePosition);
+    };
+  }, [targetElement]);
+
+  useEffect(() => {
+    if (!targetElement) {
+      return undefined;
+    }
+    const showTools = () => setBlockHovered(true);
+    const hideTools = () => setBlockHovered(false);
+    setBlockHovered(targetElement.matches(":hover"));
+    targetElement.addEventListener("pointerenter", showTools);
+    targetElement.addEventListener("pointerleave", hideTools);
+    return () => {
+      targetElement.removeEventListener("pointerenter", showTools);
+      targetElement.removeEventListener("pointerleave", hideTools);
     };
   }, [targetElement]);
 
@@ -132,14 +160,28 @@ export function CodeBlockTools({ editor, blockId, targetElement }) {
     scheduleStatusReset(formatResetTimerRef, setFormatStatus);
   };
 
-  const formatLabel = !getCodeFormatter(language)
-    ? `Prettify unavailable for ${languageLabel}`
-    : formatStatus === "working"
-      ? `Prettifying ${languageLabel} code`
-      : formatStatus === "success"
-        ? `${languageLabel} code prettified`
-        : formatStatus === "unchanged"
-          ? `${languageLabel} code is already formatted`
+  const closeLanguageMenu = useCallback(({ returnFocus = false } = {}) => {
+    setLanguageMenuOpen(false);
+    if (returnFocus) {
+      editor.focus();
+    }
+  }, [editor]);
+
+  const pickLanguage = (nextLanguage) => {
+    rememberCodeLanguage(nextLanguage);
+    setLanguageMenuOpen(false);
+    if (findBlockById(editor.document, blockId)?.props?.language !== nextLanguage) {
+      editor.updateBlock(blockId, { props: { language: nextLanguage } });
+    }
+    editor.focus();
+  };
+
+  const formatLabel = formatStatus === "working"
+    ? `Prettifying ${languageLabel} code`
+    : formatStatus === "success"
+      ? `${languageLabel} code prettified`
+      : formatStatus === "unchanged"
+        ? `${languageLabel} code is already formatted`
         : formatStatus === "error"
           ? `Could not prettify ${languageLabel} code`
           : `Prettify ${languageLabel} code`;
@@ -160,10 +202,14 @@ export function CodeBlockTools({ editor, blockId, targetElement }) {
 
   return (
     <div
-      className="code-block-tools"
+      ref={toolbarRef}
+      className={`code-block-tools${isLanguageMenuOpen ? " is-menu-open" : ""}`}
       role="toolbar"
       aria-label={`${languageLabel} code block actions`}
+      data-shown={isBlockHovered || isToolbarHovered || isLanguageMenuOpen ? "true" : undefined}
       contentEditable={false}
+      onPointerEnter={() => setToolbarHovered(true)}
+      onPointerLeave={() => setToolbarHovered(false)}
       style={{
         top: position?.top ?? 0,
         left: position?.left ?? 0,
@@ -172,16 +218,29 @@ export function CodeBlockTools({ editor, blockId, targetElement }) {
     >
       <button
         type="button"
-        className={`code-block-tool-button code-block-prettify-button is-${formatStatus}`}
-        aria-label={formatLabel}
-        data-tooltip={formatLabel}
-        title={!getCodeFormatter(language) ? formatLabel : undefined}
-        disabled={!canPrettify || formatStatus === "working"}
+        className="code-block-tool-button code-block-language-button"
+        aria-label={`Code language: ${languageLabel}`}
+        aria-haspopup="dialog"
+        aria-expanded={isLanguageMenuOpen}
         onMouseDown={preventFocusLoss}
-        onClick={() => void prettifyCodeBlock()}
+        onClick={() => setLanguageMenuOpen((isOpen) => !isOpen)}
       >
-        {formatButtonText}
+        <span>{languageLabel}</span>
+        <ChevronDown aria-hidden="true" />
       </button>
+      {hasFormatter ? (
+        <button
+          type="button"
+          className={`code-block-tool-button code-block-prettify-button is-${formatStatus}`}
+          aria-label={formatLabel}
+          data-tooltip={formatLabel}
+          disabled={!code.trim() || formatStatus === "working"}
+          onMouseDown={preventFocusLoss}
+          onClick={() => void prettifyCodeBlock()}
+        >
+          {formatButtonText}
+        </button>
+      ) : null}
       <button
         type="button"
         className={`code-block-tool-button code-block-copy-button is-${copyStatus}`}
@@ -198,6 +257,14 @@ export function CodeBlockTools({ editor, blockId, targetElement }) {
           <Copy aria-hidden="true" />
         )}
       </button>
+      {isLanguageMenuOpen ? (
+        <CodeLanguageMenu
+          language={language}
+          toolbarRef={toolbarRef}
+          onPick={pickLanguage}
+          onClose={closeLanguageMenu}
+        />
+      ) : null}
     </div>
   );
 }
