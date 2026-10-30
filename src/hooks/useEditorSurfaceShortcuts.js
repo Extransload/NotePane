@@ -69,6 +69,7 @@ import {
 // Floating menus and toolbars that close on their own Escape before Escape selects a block.
 const ESCAPE_OWNING_FLOATING_UI = [
   ".bn-suggestion-menu",
+  ".bn-grid-suggestion-menu",
   ".bn-formatting-toolbar",
   ".bn-link-toolbar",
   ".bn-menu-dropdown",
@@ -94,6 +95,7 @@ function blockContainerIdAt($pos) {
 export function useEditorSurfaceShortcuts({
   activeImageBlockId,
   editor,
+  isAnyOverlayOpen,
   isEditorActive,
   recentEditorColors,
   scheduleSave,
@@ -103,10 +105,31 @@ export function useEditorSurfaceShortcuts({
 }) {
   // Read through refs so the listeners register once; re-registering them
   // moves them behind listeners added later, which changes who sees a key first.
-  const stateRef = useRef({ activeImageBlockId, isEditorActive, recentEditorColors, scheduleSave, updateFocusedTableCell });
+  const stateRef = useRef({
+    activeImageBlockId,
+    isAnyOverlayOpen,
+    isEditorActive,
+    recentEditorColors,
+    scheduleSave,
+    updateFocusedTableCell,
+  });
   useEffect(() => {
-    stateRef.current = { activeImageBlockId, isEditorActive, recentEditorColors, scheduleSave, updateFocusedTableCell };
-  }, [activeImageBlockId, isEditorActive, recentEditorColors, scheduleSave, updateFocusedTableCell]);
+    stateRef.current = {
+      activeImageBlockId,
+      isAnyOverlayOpen,
+      isEditorActive,
+      recentEditorColors,
+      scheduleSave,
+      updateFocusedTableCell,
+    };
+  }, [
+    activeImageBlockId,
+    isAnyOverlayOpen,
+    isEditorActive,
+    recentEditorColors,
+    scheduleSave,
+    updateFocusedTableCell,
+  ]);
 
   useEffect(() => {
     const handleEditorKeyDownCapture = (event) => {
@@ -349,7 +372,8 @@ export function useEditorSurfaceShortcuts({
         event.shiftKey ||
         event.isComposing ||
         !selection ||
-        !isEditorShortcutTarget(event.target)
+        !isEditorShortcutTarget(event.target) ||
+        event.target.closest("input, textarea, select")
       ) {
         return;
       }
@@ -372,6 +396,11 @@ export function useEditorSurfaceShortcuts({
         return;
       }
 
+      // The steps below act on the note's own text, with no app overlay open over it.
+      if (!view.dom.contains(event.target) || stateRef.current.isAnyOverlayOpen) {
+        return;
+      }
+
       if (isBlockSetSelection(selection)) {
         claimEscape();
         view.dispatch(view.state.tr.setSelection(Selection.near(selection.$from)));
@@ -385,8 +414,7 @@ export function useEditorSurfaceShortcuts({
       // A menu or toolbar open over the text closes on its own Escape first; a copy fading out
       // after it closed is inert.
       const isFloatingUiOpen = [...document.querySelectorAll(ESCAPE_OWNING_FLOATING_UI)].some(
-        (element) =>
-          isVisibleElement(element) && !element.closest("[inert], [style*='pointer-events: none']"),
+        (element) => isVisibleElement(element) && !element.closest("[inert]"),
       );
 
       if ((selection.empty || !isFloatingUiOpen) && selectCurrentTableCell(editor)) {
@@ -423,7 +451,9 @@ export function useEditorSurfaceShortcuts({
         !(selection instanceof TextSelection) ||
         !selection.empty ||
         selection.$from.parent.type.name !== "codeBlock" ||
-        !isEditorShortcutTarget(event.target)
+        !(event.target instanceof Element) ||
+        !editor.prosemirrorView.dom.contains(event.target) ||
+        event.target.closest("input, textarea, select")
       ) {
         return;
       }

@@ -339,6 +339,19 @@ test("starts a new code block in the language picked last", async ({ page }) => 
   await expect(pythonToolbars).toHaveCount(3);
 });
 
+test("deletes in the language search while the caret sits at the start of its code block", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("``` ");
+  await page.keyboard.type("x");
+  await page.keyboard.press("Home");
+  await page.locator(".bn-editor [data-content-type='codeBlock']").hover();
+  await page.getByRole("button", { name: /^Code language: / }).click();
+  const search = page.getByRole("combobox", { name: "Search for a language" });
+  await search.fill("py");
+  await search.press("Backspace");
+  await expect(search).toHaveValue("p");
+});
+
 test("keeps a code block on Backspace and Delete at its edges, and removes it once Escape selects it", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   await page.keyboard.type("``` ");

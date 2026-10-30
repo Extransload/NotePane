@@ -645,9 +645,11 @@ const SCREEN_GROUPS = [
       await page.locator(".bn-formatting-toolbar").getByRole("button", { name: "Colors" }).click();
       await expect(page.locator(".bn-color-picker-dropdown")).toBeVisible();
       await scan("colour menu", { include: [".bn-color-picker-dropdown"] });
+      // The first Escape closes the colour menu and the toolbar; the second selects the block, which
+      // keeps the toolbar hidden.
       await page.keyboard.press("Escape");
       await page.keyboard.press("Escape");
-      await expect(page.locator(".bn-formatting-toolbar")).toHaveCount(0);
+      await expect(page.locator(".bn-formatting-toolbar")).toBeHidden();
 
       // The last cell shows the row and column handles and both extend buttons.
       await hoverAfterScrolling(page.getByRole("cell", { name: "Export PDF" }).last());

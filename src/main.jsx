@@ -1651,6 +1651,7 @@ function StickyEditor({
   useEditorSurfaceShortcuts({
     activeImageBlockId,
     editor,
+    isAnyOverlayOpen,
     isEditorActive,
     recentEditorColors,
     scheduleSave,
