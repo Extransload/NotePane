@@ -1,5 +1,6 @@
 import {
   Download,
+  Info,
   Keyboard,
   Settings2,
   Trash2,
@@ -30,6 +31,9 @@ import {
   listBuiltInThemes,
 } from "../style/themes.js";
 import {
+  AboutPreferencesSection,
+} from "./aboutPreferences.jsx";
+import {
   PreferencesCard,
 } from "./PreferencesCard.jsx";
 import {
@@ -50,6 +54,7 @@ export const PREFERENCE_PAGES = [
   { id: "editor", label: "Editor", Icon: Type },
   { id: "trash", label: "Trash", Icon: Trash2 },
   { id: "shortcuts", label: "Shortcuts", Icon: Keyboard },
+  { id: "about", label: "About", Icon: Info },
 ];
 
 export function normalizePreferencePageId(pageId) {
@@ -160,6 +165,10 @@ export function PreferencesWindow({
           onPurgeNote={onPurgeTrashedNote}
         />
       );
+    }
+
+    if (activePage === "about") {
+      return <AboutPreferencesSection />;
     }
 
     if (activePage === "shortcuts") {

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import fs from "node:fs";
 import {
   clickLastEmptyParagraph,
   createBlankSession,
@@ -1615,3 +1616,155 @@ test("lists keyboard shortcuts as dense aligned rows", async ({ page }) => {
   // One column of switches, as in a table.
   expect(new Set(layout.map((row) => row.toggleLeft)).size).toBe(1);
 });
+
+const PACKAGE_VERSION = JSON.parse(
+  fs.readFileSync(new URL("../../../package.json", import.meta.url), "utf8"),
+).version;
+const RELEASES_URL = "https://github.com/Extransload/NotePane/releases";
+
+async function openAboutPage(page) {
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await expect(preferences.getByRole("tab").last()).toHaveText("About");
+  await preferences.getByRole("tab", { name: "About" }).click();
+  return preferences.getByRole("tabpanel", { name: "About" });
+}
+
+test("shows NotePane, its version and what it is on the About page", async ({ page }) => {
+  const about = await openAboutPage(page);
+  await expect(about.getByRole("heading", { name: "About", level: 2 })).toBeVisible();
+  await expect(about.getByRole("heading", { name: "NotePane", level: 3 })).toBeAttached();
+  await expect(about.locator(".brand-wordmark-image:visible")).toHaveCount(1);
+  await expect(about.getByTestId("about-version")).toHaveText(`Version ${PACKAGE_VERSION}`);
+  const description = about.getByTestId("about-description");
+  await expect(description).toContainText("built on BlockNote");
+  await expect(description).toContainText("tabs in one window");
+  await expect(description).toContainText("sticky notes");
+  await expect(description).toContainText("stays on this computer");
+  await expect(description).toContainText("works offline");
+  // The browser preview runs no Electron.
+  await expect(about.getByTestId("about-runtime")).toHaveCount(0);
+  await expect(about.getByRole("link", { name: "Release notes" })).toHaveAttribute("href", RELEASES_URL);
+
+  await about.getByRole("button", { name: "Check for updates" }).click();
+  await expect(about.getByTestId("update-status")).toHaveText("Update checks run in the installed app");
+  await expect(about.getByRole("link", { name: "Download" })).toHaveCount(0);
+});
+
+// A desktop bridge with one note whose update check waits until `__updateCheck.release()`, then
+// answers with `result`.
+function stubAboutBridge({ updateMode, result }) {
+  const note = {
+    id: "about-note",
+    title: "About probe",
+    titleManuallyEdited: true,
+    blocksJSON: null,
+    markdown: "",
+    theme: {},
+    seedDemoContent: false,
+    editorFontFamily: "system",
+    trashedAt: null,
+    sortOrder: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  let release = null;
+  window.__updateCheck = { release: () => release?.() };
+  window.blocknoteSticky = {
+    getCurrentNoteId: async () => note.id,
+    getNote: async () => note,
+    listNotes: async () => [note],
+    listTrash: async () => [],
+    getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
+    getLayoutMode: async () => "tabs",
+    getEditorPreferences: async () => ({}),
+    listFonts: async () => [],
+    saveContent: async () => undefined,
+    updateAppearance: async () => undefined,
+    onNotesChanged: () => () => {},
+    getAppInfo: async () => ({
+      version: "1.4.0",
+      electronVersion: "43.8.4",
+      chromiumVersion: "150.0.7000.1",
+      updateMode,
+    }),
+    checkForUpdates: async () => {
+      await new Promise((resolve) => {
+        release = resolve;
+      });
+      return result;
+    },
+  };
+}
+
+for (const { name, updateMode, result, status, detail, download } of [
+  {
+    name: "offers the release page for a newer version the app cannot install itself",
+    updateMode: "notify",
+    result: { status: "available", mode: "notify", version: "1.5.0" },
+    status: "NotePane 1.5.0 is available",
+    detail: null,
+    download: `${RELEASES_URL}/tag/v1.5.0`,
+  },
+  {
+    name: "says a newer version installs when NotePane quits",
+    updateMode: "auto",
+    result: { status: "available", mode: "auto", version: "1.5.0" },
+    status: "NotePane 1.5.0 is available",
+    detail: "It downloads in the background and installs when NotePane quits.",
+    download: null,
+  },
+  {
+    name: "says the running version is up to date",
+    updateMode: "auto",
+    result: { status: "up-to-date", mode: "auto", version: "1.4.0" },
+    status: "NotePane 1.4.0 is up to date",
+    detail: null,
+    download: null,
+  },
+  {
+    name: "says a failed check could not run, with the reason",
+    updateMode: "notify",
+    result: { status: "error", mode: "notify", message: "net::ERR_INTERNET_DISCONNECTED" },
+    status: "Could not check for updates",
+    detail: "net::ERR_INTERNET_DISCONNECTED",
+    download: null,
+  },
+]) {
+  test(`About page update check ${name}`, async ({ page }) => {
+    await page.addInitScript(stubAboutBridge, { updateMode, result });
+    await page.reload();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    const about = await openAboutPage(page);
+    await expect(about.getByTestId("about-version")).toHaveText("Version 1.4.0");
+    await expect(about.getByTestId("about-runtime")).toHaveText("Electron 43.8.4 · Chromium 150.0.7000.1");
+
+    const checkButton = about.getByRole("button", { name: "Check for updates" });
+    const statusLine = about.getByTestId("update-status");
+    await checkButton.click();
+    await expect(statusLine).toHaveText("Checking for updates…");
+    await expect(checkButton).toBeDisabled();
+    await page.evaluate(() => window.__updateCheck.release());
+
+    await expect(statusLine).toHaveText(status);
+    await expect(checkButton).toBeEnabled();
+    const detailLine = about.locator(".about-update-detail");
+    if (detail) {
+      await expect(detailLine).toHaveText(detail);
+    } else {
+      await expect(detailLine).toHaveCount(0);
+    }
+    if (result.status === "error") {
+      await expect(statusLine).toHaveAttribute("title", detail);
+      const danger = await resolveColorToken(page, "--sticky-danger-color");
+      await expect.poll(() => statusLine.evaluate((element) => getComputedStyle(element).color)).toBe(danger);
+    }
+    const downloadLink = about.getByRole("link", { name: "Download" });
+    if (download) {
+      await expect(downloadLink).toHaveAttribute("href", download);
+      await expect(downloadLink).toHaveAttribute("target", "_blank");
+    } else {
+      await expect(downloadLink).toHaveCount(0);
+    }
+  });
+}

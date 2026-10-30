@@ -37,6 +37,35 @@ test("Electron test windows stay out of sight", async () => {
   }
 });
 
+test("Electron About page shows the app version and leaves update checks to the installed app", async () => {
+  const electronApp = await launchApp(createTemporaryDirectory("notepane-about-"));
+
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    const { version, electronVersion, chromiumVersion } = await electronApp.evaluate(({ app }) => ({
+      version: app.getVersion(),
+      electronVersion: process.versions.electron,
+      chromiumVersion: process.versions.chrome,
+    }));
+
+    await page.bringToFront();
+    await page.keyboard.press(modifierShortcut(","));
+    const preferences = page.getByRole("dialog", { name: "Preferences window" });
+    await preferences.getByRole("tab", { name: "About" }).click();
+    const about = preferences.getByRole("tabpanel", { name: "About" });
+    await expect(about.getByTestId("about-version")).toHaveText(`Version ${version}`);
+    await expect(about.getByTestId("about-runtime"))
+      .toHaveText(`Electron ${electronVersion} · Chromium ${chromiumVersion}`);
+
+    // A test build is unpackaged, so the main process runs no update check.
+    await about.getByRole("button", { name: "Check for updates" }).click();
+    await expect(about.getByTestId("update-status")).toHaveText("Update checks run in the installed app");
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron app opens a sticky window and persists editor content", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   const exportDirectory = createTemporaryDirectory("notepane-export-");

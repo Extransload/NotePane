@@ -31,9 +31,15 @@
   changes, and text on it stays readable
 - No light/dark toggle and no light/dark shortcut; `Command/Ctrl + Shift + L` is unbound
 - Preferences panel via sidebar footer button, native app menu, or `Command/Ctrl + ,`: a sidebar of pages (General,
-  Editor, Trash, Shortcuts, each with an icon) beside the page, which scrolls on its own. A page is its title and
+  Editor, Trash, Shortcuts, About, each with an icon) beside the page, which scrolls on its own. A page is its title and
   cards of settings: General has Appearance (the theme picker) and Data (backup export and import), Editor has
   Typography (editor and app font) and Behaviour (table of contents), Trash and Shortcuts one card each
+- Preferences > About: the NotePane wordmark, "Version x.y.z", a short description of the app and, in the desktop
+  app, the Electron and Chromium versions. Its Updates card has **Check for updates**, with a status line (checking,
+  up to date, "NotePane x.y.z is available" with a **Download** link to the release on an unsigned Mac build or "installs
+  when NotePane quits" where the app updates itself, "Update checks run in the installed app" in development, test
+  builds and the browser preview, or "Could not check for updates" with the reason), and a **Release notes** link to
+  the GitHub releases page
 - Preferences > Shortcuts lists every command as a 40px table row: name, on/off switch, the keys (click to record
   new ones) and Reset
 - Default editor font family for every session; there is no font size setting, text size follows the app zoom

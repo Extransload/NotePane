@@ -55,7 +55,7 @@ const ALLOWLIST = [
 ];
 
 const NAMED_COLOURS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
-const PREFERENCES_SECTIONS = ["General", "Editor", "Trash", "Shortcuts"];
+const PREFERENCES_SECTIONS = ["General", "Editor", "Trash", "Shortcuts", "About"];
 
 // The template's image is remote; serve a local one so the note never waits on the network.
 const TEMPLATE_IMAGE_SVG =
