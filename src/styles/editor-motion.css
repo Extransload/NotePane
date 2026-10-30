@@ -15,11 +15,12 @@
 
 /* BlockNote's floating UI closes with a short fade that takes no pointer
    (src/editor/floatingMenus.js). A closing popover is a copy of its last content whose inline style
-   has `pointer-events: none`: motion.css sets the slash menu's and the toolbar's fade with
+   has `pointer-events: none`: motion.css sets the slash menu's and the toolbars' fade with
    !important, so the copy takes the close duration here, and the entrance animations do not play
    again inside it. */
 div:has(> .bn-suggestion-menu)[style*="pointer-events: none"],
-div:has(> .bn-formatting-toolbar)[style*="pointer-events: none"] {
+div:has(> .bn-formatting-toolbar)[style*="pointer-events: none"],
+div:has(> .bn-link-toolbar)[style*="pointer-events: none"] {
   transition-duration: var(--notepane-motion-floating-close-duration) !important;
 }
 
@@ -32,6 +33,7 @@ div[style*="opacity: 0"]:has(> .bn-table-handle-menu) {
 }
 
 [style*="pointer-events: none"] > :is(.bn-suggestion-menu, .bn-formatting-toolbar),
+[style*="pointer-events: none"] > .bn-link-toolbar svg,
 [style*="pointer-events: none"] :is(
   .bn-menu-dropdown,
   .mantine-Popover-dropdown,
@@ -69,6 +71,7 @@ div[style*="opacity: 0"]:has(> .bn-table-handle-menu) {
 @media (prefers-reduced-motion: reduce) {
   div:has(> .bn-suggestion-menu)[style*="pointer-events: none"],
   div:has(> .bn-formatting-toolbar)[style*="pointer-events: none"],
+  div:has(> .bn-link-toolbar)[style*="pointer-events: none"],
   div[style*="opacity: 0"]:has(> .bn-table-handle-menu) {
     transition-duration: 0s !important;
   }

@@ -868,6 +868,128 @@ test("shows an opaque compact link form and creates the selected-text link", asy
     .toHaveAttribute("href", "https://example.com");
 });
 
+const PREVIEW_LINK_URL = "https://example.com/api/v1/reference/verification-status?draft=true&format=json";
+
+async function addLinkParagraph(page, url = PREVIEW_LINK_URL) {
+  await clickLastEmptyParagraph(page);
+  await pasteClipboardText(page, {
+    plainText: "Read the verification API before you ship.",
+    html: `<p>Read <a href="${url}">the verification API</a> before you ship.</p>`,
+  });
+  const link = page.locator(`.bn-editor a[href='${url}']`);
+  await expect(link).toHaveText("the verification API");
+  return link;
+}
+
+// BlockNote learns which link is hovered on its first mouseover and floating-ui opens the toolbar
+// on a later move inside it, so the pointer moves onto the link in steps, as a hand does.
+async function hoverLinkToolbar(page, link) {
+  await link.scrollIntoViewIfNeeded();
+  const box = await link.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y - 24);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
+  const toolbar = page.locator(".bn-link-toolbar");
+  await expect(toolbar).toBeVisible();
+  return toolbar;
+}
+
+test("shows a link's address under it with Copy and Edit, as in Notion", async ({ page }) => {
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const link = await addLinkParagraph(page);
+  const toolbar = await hoverLinkToolbar(page, link);
+
+  const address = toolbar.getByRole("button", { name: `Open ${PREVIEW_LINK_URL}` });
+  await expect(address).toHaveText(PREVIEW_LINK_URL);
+  await expect(address).toHaveAttribute("title", PREVIEW_LINK_URL);
+  await expect(toolbar.getByRole("button", { name: "Edit", exact: true })).toBeVisible();
+  const layout = await address.evaluate((button, anchor) => {
+    const text = button.querySelector(".notepane-link-preview-address");
+    return {
+      toolbarTop: button.closest(".bn-link-toolbar").getBoundingClientRect().top,
+      linkBottom: anchor.getBoundingClientRect().bottom,
+      textOverflow: getComputedStyle(text).textOverflow,
+      isTruncated: text.scrollWidth > text.clientWidth,
+      lineCount: Math.round(text.getBoundingClientRect().height / parseFloat(getComputedStyle(text).lineHeight)),
+    };
+  }, await link.elementHandle());
+  expect(layout.toolbarTop).toBeGreaterThan(layout.linkBottom);
+  expect(layout).toMatchObject({ textOverflow: "ellipsis", isTruncated: true, lineCount: 1 });
+
+  await toolbar.getByRole("button", { name: "Copy link" }).click();
+  await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(PREVIEW_LINK_URL);
+  await expect(toolbar.getByRole("button", { name: "Link copied" })).toBeVisible();
+
+  // The address opens the link, as BlockNote's Open button did.
+  await page.evaluate(() => {
+    window.__openedLinks = [];
+    window.open = (url, target) => {
+      window.__openedLinks.push({ url, target });
+      return null;
+    };
+  });
+  await address.click();
+  expect(await page.evaluate(() => window.__openedLinks))
+    .toEqual([{ url: PREVIEW_LINK_URL, target: "_blank" }]);
+
+  // The caret inside the link shows it too, with the pointer elsewhere.
+  await page.mouse.move(5, 5);
+  await expect(toolbar).toHaveCount(0);
+  const paragraph = page.locator(".bn-editor .bn-inline-content").filter({ hasText: "before you ship." });
+  const paragraphBox = await paragraph.boundingBox();
+  await paragraph.click({ position: { x: paragraphBox.width - 4, y: paragraphBox.height / 2 } });
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Home");
+  for (let index = 0; index < 8; index += 1) await page.keyboard.press("ArrowRight");
+  await page.mouse.move(5, 5);
+  await expect(page.locator(".bn-link-toolbar")).toBeVisible();
+  await expect(page.locator(".bn-link-toolbar").getByRole("button", { name: `Open ${PREVIEW_LINK_URL}` }))
+    .toBeVisible();
+});
+
+test("edits a link's address and text from the link toolbar's Edit form", async ({ page }) => {
+  const link = await addLinkParagraph(page);
+  const toolbar = await hoverLinkToolbar(page, link);
+  await toolbar.getByRole("button", { name: "Edit", exact: true }).click();
+
+  const form = page.locator(".notepane-link-edit-form");
+  const urlInput = form.getByPlaceholder("Edit URL");
+  await expect(urlInput).toHaveValue(PREVIEW_LINK_URL);
+  await expect(form.getByPlaceholder("Edit title")).toHaveValue("the verification API");
+  await urlInput.fill("example.org/changed");
+  await form.getByPlaceholder("Edit title").fill("the changed guide");
+  await urlInput.press("Enter");
+
+  await expect(page.locator(".bn-editor").getByRole("link", { name: "the changed guide" }))
+    .toHaveAttribute("href", "https://example.org/changed");
+  await expect(page.locator(`.bn-editor a[href='${PREVIEW_LINK_URL}']`)).toHaveCount(0);
+});
+
+test("removes a link from the link toolbar's Edit form and keeps its text", async ({ page }) => {
+  const link = await addLinkParagraph(page);
+  const toolbar = await hoverLinkToolbar(page, link);
+  await toolbar.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.locator(".notepane-link-edit-form").getByRole("button", { name: "Remove link" }).click();
+
+  await expect(page.locator(`.bn-editor a[href='${PREVIEW_LINK_URL}']`)).toHaveCount(0);
+  await expect(page.locator(".bn-editor").getByText("Read the verification API before you ship."))
+    .toBeVisible();
+  await expect(page.locator(".bn-link-toolbar")).toHaveCount(0);
+});
+
+test("shows the link toolbar and its copy check without motion when reduced motion is requested", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const link = await addLinkParagraph(page);
+  const toolbar = await hoverLinkToolbar(page, link);
+  expect(await toolbar.evaluate((element) => getComputedStyle(element.parentElement).transitionDuration))
+    .toBe("0s");
+
+  await toolbar.getByRole("button", { name: "Copy link" }).click();
+  const check = toolbar.getByRole("button", { name: "Link copied" }).locator("svg");
+  await expect(check).toBeVisible();
+  expect(await check.evaluate((element) => getComputedStyle(element).animationName)).toBe("none");
+});
+
 test("renders Command+E inline code with Notion-like styling and composable colors", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   await page.keyboard.type("InlineCode");

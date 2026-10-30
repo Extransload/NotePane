@@ -104,7 +104,10 @@ BlockNote handles editor interaction directly.
 - Block drag/drop
 - Block nesting
 - Formatting toolbar
-- Link toolbar
+- Link toolbar, as in Notion: pointing at a link, or putting the caret inside one, shows a small box under it with the
+  link's address on one line (cut short with an ellipsis; the full address is its tooltip, and clicking it opens the
+  link), Copy (puts the address on the clipboard and briefly shows a check) and Edit, whose form changes the address
+  and the text and has Remove link
 - Table handles: a row or column handle selects its whole row or column, outlined as one rectangle, and opens
   Notion's menu: header row or column switch (first row or column), colour, insert above/below or left/right,
   duplicate (tables without merged cells), clear contents and delete

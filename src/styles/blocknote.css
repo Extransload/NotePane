@@ -1028,6 +1028,115 @@ body:has(.bn-table-handle-menu) .bn-formatting-toolbar {
   color: var(--sticky-panel-muted) !important;
 }
 
+/* The link toolbar (src/editor/linkToolbar.jsx), as in Notion: the link's address on one line, then
+   Copy and Edit. */
+.bn-toolbar.bn-link-toolbar.notepane-link-preview {
+  display: flex;
+  max-width: min(380px, calc(100vw - 16px));
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid var(--sticky-portal-menu-border-color);
+  border-radius: 9px;
+  background: var(--sticky-portal-menu-bg);
+  box-shadow: var(--sticky-portal-menu-shadow);
+  color: var(--sticky-panel-text);
+}
+
+.notepane-link-preview-url {
+  display: flex;
+  min-width: 0;
+  height: 28px;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sticky-panel-text);
+  font: 500 12px/1.2 var(--notepane-ui-font);
+  cursor: pointer;
+}
+
+.notepane-link-preview-url:hover {
+  background: var(--sticky-portal-menu-hover-bg);
+}
+
+.notepane-link-preview-url svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--sticky-panel-muted);
+}
+
+.notepane-link-preview-address {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notepane-link-preview :is(.mantine-ActionIcon-root, .mantine-Button-root) {
+  height: 28px;
+  min-height: 28px;
+  flex: none;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--sticky-panel-text) !important;
+}
+
+.notepane-link-preview :is(.mantine-ActionIcon-root, .mantine-Button-root):hover {
+  background: var(--sticky-portal-menu-hover-bg) !important;
+}
+
+.notepane-link-preview .mantine-ActionIcon-root {
+  width: 28px;
+  min-width: 28px;
+}
+
+.notepane-link-preview .mantine-ActionIcon-root svg {
+  width: 15px;
+  height: 15px;
+}
+
+.notepane-link-preview .notepane-link-preview-copy.is-success {
+  color: var(--notepane-success) !important;
+}
+
+.notepane-link-preview .mantine-Button-root {
+  padding-inline: 8px;
+  font: 500 12px/1 var(--notepane-ui-font);
+}
+
+/* Edit's form: the address and the text, then Remove link. */
+.notepane-link-remove-button {
+  display: flex;
+  width: 100%;
+  height: 30px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sticky-panel-text);
+  font: 500 12px/1.2 var(--notepane-ui-font);
+  cursor: pointer;
+}
+
+.notepane-link-remove-button:hover {
+  background: var(--sticky-portal-menu-hover-bg);
+}
+
+.notepane-link-remove-button svg {
+  width: 14px;
+  height: 14px;
+  color: var(--sticky-panel-muted);
+}
+
 .bn-color-picker-dropdown :is(.mantine-UnstyledButton-root, .mantine-ActionIcon-root) {
   border-color: var(--sticky-portal-menu-border-color, var(--bn-colors-border)) !important;
   color: var(--sticky-panel-text) !important;

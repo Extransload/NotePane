@@ -43,11 +43,12 @@
   animation: notepaneMenuFadeIn var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out);
 }
 
-/* The slash menu and the formatting toolbar sit in a floating wrapper that BlockNote already
-   fades, over 250ms. The wrapper keeps that fade at the menu duration. The slash menu also moves;
-   the toolbar remounts as the selection changes, so it only fades. */
+/* The slash menu and the formatting and link toolbars sit in a floating wrapper that BlockNote
+   already fades, over 250ms. The wrapper keeps that fade at the menu duration. The slash menu also
+   moves; the toolbars remount as the selection or the hovered link changes, so they only fade. */
 div:has(> .bn-suggestion-menu),
-div:has(> .bn-formatting-toolbar) {
+div:has(> .bn-formatting-toolbar),
+div:has(> .bn-link-toolbar) {
   transition-duration: var(--notepane-motion-menu-duration) !important;
   transition-timing-function: var(--notepane-motion-ease-out) !important;
 }
@@ -58,6 +59,11 @@ div:has(> .bn-formatting-toolbar) {
 
 .color-panel {
   animation: notepaneMenuIn var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out);
+}
+
+/* The link toolbar's Copy icon fades into a check once the address is on the clipboard. */
+.notepane-link-preview-copy:is(.is-success, .is-error) svg {
+  animation: notepaneMenuFadeIn var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out);
 }
 
 /* NotePane's own menus already fade in with menuIn; match the easing, and move a dropdown that
@@ -132,6 +138,7 @@ html[data-boot="revealing"] #root {
 @media (prefers-reduced-motion: reduce) {
   div:has(> .bn-suggestion-menu),
   div:has(> .bn-formatting-toolbar),
+  div:has(> .bn-link-toolbar),
   .bn-menu-dropdown,
   .mantine-Popover-dropdown,
   .session-sidebar {
@@ -143,6 +150,7 @@ html[data-boot="revealing"] #root {
   .bn-suggestion-menu,
   .notepane-block-menu-subpanel,
   .color-panel,
+  .notepane-link-preview-copy svg,
   .session-tab-context-menu,
   .export-format-menu,
   .notepane-dropdown-menu,
