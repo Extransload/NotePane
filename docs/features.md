@@ -108,6 +108,8 @@ BlockNote handles editor interaction directly.
 - Table handles: a row or column handle selects its whole row or column, outlined as one rectangle, and opens
   Notion's menu: header row or column switch (first row or column), colour, insert above/below or left/right,
   duplicate (tables without merged cells), clear contents and delete
+- A table handle's row or column goes with Delete or Backspace while its menu is open, and one Cmd+Z brings it
+  back; cells selected another way, even a whole row, only have their contents cleared
 - Table block menu (six-dot handle): fit to width (to the text column), header row and header column switches
 - Column resizing, as in Notion: dragging a column border changes only that column, and the table is as wide as its
   columns add up to, narrower than the text column too. A new table fills the text column until its first resize,

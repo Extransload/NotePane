@@ -528,6 +528,71 @@ test("keeps the editor focused after a row handle action and Escape, so Cmd+Z un
   await expect(rows).toHaveCount(rowCount);
 });
 
+async function openTableHandleMenu(page, orientation) {
+  await page.getByRole("cell", { name: "Tabs" }).first().getByText("Tabs", { exact: true }).click();
+  const handles = page.locator(".bn-table-handle:visible");
+  await expect(handles).toHaveCount(2);
+  // The row handle sits left of the row, the column handle above the column.
+  const lefts = await handles.evaluateAll((elements) => (
+    elements.map((element) => element.getBoundingClientRect().left)
+  ));
+  const rowHandleIndex = lefts.indexOf(Math.min(...lefts));
+  await handles.nth(orientation === "row" ? rowHandleIndex : 1 - rowHandleIndex).click();
+  await expect(page.locator(".bn-table-handle-menu")).toBeVisible();
+}
+
+test("Delete removes the row a handle selected, and one Cmd+Z brings it back", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const table = page.locator(".bn-editor table").first();
+  const rows = table.locator("tr");
+  const rowCount = await rows.count();
+
+  await openTableHandleMenu(page, "row");
+  await page.keyboard.press("Delete");
+  await expect(rows).toHaveCount(rowCount - 1);
+  await expect(table.getByRole("cell", { name: "Tabs" })).toHaveCount(0);
+  await expect(page.locator(".bn-table-handle-menu [role='menuitem']")).toHaveCount(0);
+
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect(rows).toHaveCount(rowCount);
+  await expect(table.getByRole("cell", { name: "Tabs" })).toHaveCount(1);
+});
+
+test("Backspace removes the column a handle selected", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const firstRowCells = page.locator(".bn-editor table").first().locator("tr").first()
+    .locator("th, td");
+  const columnCount = await firstRowCells.count();
+
+  await openTableHandleMenu(page, "column");
+  await page.keyboard.press("Backspace");
+  await expect(firstRowCells).toHaveCount(columnCount - 1);
+  await expect(page.locator(".bn-table-handle-menu [role='menuitem']")).toHaveCount(0);
+});
+
+test("Delete clears cells selected without a handle, even a whole row of them", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const table = page.locator(".bn-editor table").first();
+  const rows = table.locator("tr");
+  const rowCount = await rows.count();
+  const tabsCells = rows.filter({ hasText: "Tabs" }).locator("td, th");
+  const cellCount = await tabsCells.count();
+  const first = await tabsCells.first().boundingBox();
+  const last = await tabsCells.last().boundingBox();
+  await page.mouse.move(first.x + 12, first.y + first.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(last.x + last.width - 12, last.y + last.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect(table.locator(".selectedCell")).toHaveCount(cellCount);
+
+  await page.keyboard.press("Delete");
+  await expect(rows).toHaveCount(rowCount);
+  await expect(table.getByText("Tabs", { exact: true })).toHaveCount(0);
+});
+
 test("shows the formatting toolbar again for text selected by keyboard after Escape on table cells", async ({ page }) => {
   await loadTemplatePreview(page);
   await page.getByRole("button", { name: "Use this template" }).click();

@@ -29,6 +29,7 @@ import {
   previewActiveTableColumnResize,
   startActiveTableColumnResize,
 } from "../editor/tableColumnSizing.js";
+import { deleteTableHandleLine } from "../editor/tableLineDelete.js";
 import {
   hasEditorRangeSelection,
   isDragHandleMenuTarget,
@@ -416,6 +417,32 @@ export function useEditorSurfaceShortcuts({
       }
     };
 
+    // With a table handle's menu open, Delete or Backspace removes its row or column, whether the
+    // editor or the menu has focus.
+    const handleTableLineDeleteKeyDownCapture = (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const inEditor = Boolean(target && editor.prosemirrorView?.dom.contains(target));
+      const inHandleMenu = Boolean(
+        target?.closest(".bn-table-handle-menu") && !target.closest("input, textarea"),
+      );
+      if (
+        (event.key !== "Delete" && event.key !== "Backspace") ||
+        event.isComposing ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey ||
+        (!inEditor && !inHandleMenu)
+      ) {
+        return;
+      }
+      if (deleteTableHandleLine(editor)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    document.addEventListener("keydown", handleTableLineDeleteKeyDownCapture, true);
     document.addEventListener("keydown", handleEditorKeyDownCapture, true);
     document.addEventListener("keydown", handleTextSelectionToolbarEscape, true);
     document.addEventListener("keydown", handleTableCellArrowKeyDownCapture, true);
@@ -427,6 +454,7 @@ export function useEditorSurfaceShortcuts({
     window.addEventListener("mouseup", handleTableColumnResizeMouseUpCapture, true);
     document.addEventListener("keydown", handleEditorTabKeyDown);
     return () => {
+      document.removeEventListener("keydown", handleTableLineDeleteKeyDownCapture, true);
       document.removeEventListener("keydown", handleEditorKeyDownCapture, true);
       document.removeEventListener("keydown", handleTextSelectionToolbarEscape, true);
       document.removeEventListener("keydown", handleTableCellArrowKeyDownCapture, true);
