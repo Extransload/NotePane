@@ -106,6 +106,9 @@ BlockNote handles editor interaction directly.
   Notion's menu: header row or column switch (first row or column), colour, insert above/below or left/right,
   duplicate (tables without merged cells), clear contents and delete
 - Table block menu (six-dot handle): fit to width (to the text column), header row and header column switches
+- Column resizing, as in Notion: dragging a column border changes only that column, and the table is as wide as its
+  columns add up to, narrower than the text column too. A new table fills the text column until its first resize,
+  which keeps every other column at its drawn width; one Cmd+Z undoes a resize
 - Wide tables, as in Notion: a top-level table whose columns add up to more than the text column keeps its left edge
   on the column and grows right, up to 24px short of the editor's edge (and short of the table of contents rail),
   before it scrolls. Tables in columns, lists and toggles stay inside their block

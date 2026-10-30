@@ -660,8 +660,8 @@
 
 .bn-editor > .bn-block-group > .bn-block-outer > .bn-block > .bn-block-content[data-content-type="table"] > .tableWrapper {
   flex: none;
-  /* As wide as the table's column widths need (its inline min-width), never narrower than the
-     column: a table with no widths set still fills the column and wraps its text. */
+  /* As wide as the table needs, never narrower than the column: a table narrower than the column
+     keeps its left edge on it, and a table with no widths set fills it and wraps its text. */
   width: min-content;
   min-width: 100%;
   max-width: max(100%, calc(50cqw + 50% - var(--notepane-table-edge-gap)));
@@ -671,9 +671,32 @@
   width: 100%;
 }
 
+/* As in Notion, a table is as wide as its columns add up to, narrower than the text column too;
+   BlockNote's width: auto would squeeze a wide table's columns into its scroller instead. A table
+   with a column nobody sized, such as a new one, fills its block; the first column resize gives
+   every column its drawn width (src/editor/tableColumnSizing.js). */
 .bn-editor [data-content-type="table"] table {
-  width: 100% !important;
+  width: max-content !important;
   max-width: none;
+}
+
+.bn-editor [data-content-type="table"] table:not(.notepane-table-column-resizing):has(> tbody > tr > :is(td, th):not([colwidth])) {
+  width: 100% !important;
+}
+
+/* While a column border is dragged, the table is drawn from the drag's widths, which
+   prosemirror-tables' own preview of the dragged column does not overwrite. */
+.bn-editor [data-content-type="table"] table.notepane-table-column-resizing {
+  width: var(--notepane-table-width) !important;
+  min-width: 0 !important;
+}
+
+.bn-editor [data-content-type="table"] table.notepane-table-column-resizing > colgroup > col {
+  width: var(--notepane-column-width) !important;
+}
+
+.bn-editor [data-content-type="table"] table.notepane-table-column-resizing :is(td, th) {
+  min-width: 0 !important;
 }
 
 .bn-editor th,

@@ -25,7 +25,9 @@ import {
 } from "../editor/selection.js";
 import {
   autoFitActiveTableColumn,
+  finishActiveTableColumnResize,
   previewActiveTableColumnResize,
+  startActiveTableColumnResize,
 } from "../editor/tableColumnSizing.js";
 import {
   hasEditorRangeSelection,
@@ -397,8 +399,19 @@ export function useEditorSurfaceShortcuts({
       }
     };
 
+    // Window capture listeners run before prosemirror-tables' own drag handlers.
+    const handleTableColumnResizeMouseDownCapture = (event) => {
+      startActiveTableColumnResize(editor, event);
+    };
+
     const handleTableColumnResizeMouseMoveCapture = (event) => {
       if (previewActiveTableColumnResize(editor, event)) {
+        window.requestAnimationFrame(() => stateRef.current.updateFocusedTableCell());
+      }
+    };
+
+    const handleTableColumnResizeMouseUpCapture = (event) => {
+      if (finishActiveTableColumnResize(editor, event)) {
         window.requestAnimationFrame(() => stateRef.current.updateFocusedTableCell());
       }
     };
@@ -409,7 +422,9 @@ export function useEditorSurfaceShortcuts({
     document.addEventListener("keydown", handleTableCellModeEscapeKeyDownCapture, true);
     document.addEventListener("keydown", handleTableCellMergeSplitKeyDownCapture, true);
     document.addEventListener("dblclick", handleTableColumnDoubleClickCapture, true);
+    window.addEventListener("mousedown", handleTableColumnResizeMouseDownCapture, true);
     window.addEventListener("mousemove", handleTableColumnResizeMouseMoveCapture, true);
+    window.addEventListener("mouseup", handleTableColumnResizeMouseUpCapture, true);
     document.addEventListener("keydown", handleEditorTabKeyDown);
     return () => {
       document.removeEventListener("keydown", handleEditorKeyDownCapture, true);
@@ -418,7 +433,9 @@ export function useEditorSurfaceShortcuts({
       document.removeEventListener("keydown", handleTableCellModeEscapeKeyDownCapture, true);
       document.removeEventListener("keydown", handleTableCellMergeSplitKeyDownCapture, true);
       document.removeEventListener("dblclick", handleTableColumnDoubleClickCapture, true);
+      window.removeEventListener("mousedown", handleTableColumnResizeMouseDownCapture, true);
       window.removeEventListener("mousemove", handleTableColumnResizeMouseMoveCapture, true);
+      window.removeEventListener("mouseup", handleTableColumnResizeMouseUpCapture, true);
       document.removeEventListener("keydown", handleEditorTabKeyDown);
     };
   }, [editor, setIsEditorActive, setIsTableCellSelectionDismissed]);
