@@ -17,7 +17,7 @@
 | `electron/assetStore.cjs` | content-addressed media files under `userData/assets`, served as `notepane-asset://local/<sha256>.<ext>` |
 | `electron/bookmarkMetadata.cjs` | the `bookmarks:fetch-metadata` IPC behind a bookmark card: reads a public http(s) page's title, description, site name and preview image, refusing other schemes and loopback, private and link-local addresses (redirects included), within 5 s and 1 MB |
 | `electron/preload.cjs` | safe renderer bridge |
-| `electron/appUpdates.cjs` | update checks for a packaged app against GitHub Releases: install on quit, or offer the release page from an ad-hoc signed Mac build |
+| `electron/appUpdates.cjs` | update checks for a packaged app against GitHub Releases: install on quit, or offer the release page from an ad-hoc signed Mac build; `checkNow()` behind the About page's `app:check-for-updates` IPC, and `compareVersions` |
 | `electron-builder.config.cjs` | packaging, signing and publishing; `.github/workflows/release.yml` runs it on a version tag (see `docs/release.md`) |
 | `electron/themes.json` | the theme definitions (palette, code theme, overrides), the single source read by the renderer (`src/style/themes.js`) and the main process (`electron/windowTheme.cjs`, `electron/store.cjs`) |
 | `src/main.jsx` | composition only: the `App` shell and the `StickyEditor` component that wires everything below together |
@@ -85,6 +85,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Code block syntax colours per theme, re-highlighting on a theme change | `src/editor/codeHighlighter.js` |
 | The theme picker in Preferences | `src/ui/ThemePicker.jsx` |
 | The Preferences window: its page sidebar, page header and the cards each page is made of | `src/ui/preferencesWindow.jsx`, `src/ui/PreferencesCard.jsx`, `src/ui/preferencesSections.jsx`, `src/ui/trashPreferences.jsx` |
+| Preferences > About: version, description, Electron/Chromium versions, the manual update check (`app:info`, `app:check-for-updates`) | `src/ui/aboutPreferences.jsx` |
 | Sticky shell and session tab computed styles | `src/style/themeStyles.js` |
 | Colour conversion and contrast | `src/style/colorMath.js` |
 | The window's session list and trash: load on startup, `notes:changed` updates, create, select, reorder, move to Trash, restore, purge, the undo toast after a move to Trash | `src/hooks/useSessionList.js` |

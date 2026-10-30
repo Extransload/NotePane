@@ -34,7 +34,7 @@ const {
 } = require("./windowTheme.cjs");
 const { readAssetFromUrl } = require("./assetSources.cjs");
 const { fetchBookmarkMetadata } = require("./bookmarkMetadata.cjs");
-const { resolveUpdateMode, startAppUpdates } = require("./appUpdates.cjs");
+const { compareVersions, resolveUpdateMode, startAppUpdates } = require("./appUpdates.cjs");
 const packageInfo = require("../package.json");
 
 const APP_NAME = "NotePane";
@@ -85,6 +85,9 @@ let store;
 let quitting = false;
 let flushedBeforeQuit = false;
 let backupOperationInProgress = false;
+// Set once the app is ready (startAppUpdates); null while update checks are off.
+let updateMode = "off";
+let appUpdates = null;
 const manuallyClosedStickyNoteIds = new Set();
 // Find queries waiting for a window to pick them up, keyed by window id. A
 // window that is still loading cannot receive `find:open` yet, so it pulls its
@@ -1228,6 +1231,30 @@ function installIpcHandlers() {
     return store.getAppTheme();
   });
 
+  // Preferences > About: what is running, and a check for a newer release.
+  ipcMain.handle("app:info", () => ({
+    version: app.getVersion(),
+    electronVersion: process.versions.electron,
+    chromiumVersion: process.versions.chrome,
+    updateMode,
+  }));
+
+  ipcMain.handle("app:check-for-updates", async () => {
+    if (!appUpdates) {
+      return { status: "off", mode: updateMode };
+    }
+    try {
+      const latestVersion = await appUpdates.checkNow();
+      if (!latestVersion) {
+        return { status: "error", mode: updateMode, message: "No published release was found." };
+      }
+      const status = compareVersions(latestVersion, app.getVersion()) > 0 ? "available" : "up-to-date";
+      return { status, mode: updateMode, version: status === "available" ? latestVersion : app.getVersion() };
+    } catch (error) {
+      return { status: "error", mode: updateMode, message: String(error?.message ?? error) };
+    }
+  });
+
   ipcMain.handle("app-theme:update", (_event, payload) => {
     const appTheme = store.updateAppTheme(payload);
     broadcastAppTheme(appTheme);
@@ -2179,13 +2206,14 @@ app.whenReady().then(() => {
 
   syncWindowsForLayoutMode();
   reportStoreLoadIssues();
-  startAppUpdates({
-    mode: resolveUpdateMode({
-      isPackaged: app.isPackaged && !quietTestMode,
-      enabled: packageInfo.notepane?.updates === true,
-      platform: process.platform,
-      macAutoUpdate: Boolean(packageInfo.notepane?.macAutoUpdate),
-    }),
+  updateMode = resolveUpdateMode({
+    isPackaged: app.isPackaged && !quietTestMode,
+    enabled: packageInfo.notepane?.updates === true,
+    platform: process.platform,
+    macAutoUpdate: Boolean(packageInfo.notepane?.macAutoUpdate),
+  });
+  appUpdates = startAppUpdates({
+    mode: updateMode,
     loadUpdater: () => require("electron-updater").autoUpdater,
     dialog,
     shell,

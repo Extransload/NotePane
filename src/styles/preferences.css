@@ -1462,3 +1462,77 @@
     transition: none;
   }
 }
+
+/* Preferences > About (src/ui/aboutPreferences.jsx): the wordmark and version, what NotePane is,
+   and the update check. */
+.about-card {
+  gap: 10px;
+  padding: 18px 16px 16px;
+}
+
+.about-identity {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.about-identity .brand-wordmark {
+  height: 38px;
+}
+
+.about-identity .brand-wordmark-image {
+  width: 148px;
+  max-height: 38px;
+}
+
+.about-version {
+  color: var(--sticky-panel-muted);
+  font: 640 11px/1.2 var(--notepane-ui-font);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.about-description {
+  margin: 0;
+  color: var(--sticky-panel-text);
+  font: 520 12px/1.55 var(--notepane-ui-font);
+}
+
+.about-runtime {
+  color: var(--sticky-panel-muted);
+  font: 560 10px/1.3 var(--notepane-ui-font);
+  font-variant-numeric: tabular-nums;
+}
+
+.about-update-text {
+  min-width: 0;
+}
+
+.about-update-status.is-error {
+  color: var(--sticky-danger-color);
+}
+
+.about-update-status-text {
+  display: inline-block;
+  animation: notepaneMenuFadeIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
+}
+
+.about-update-detail {
+  overflow-wrap: anywhere;
+}
+
+a.preference-data-button {
+  text-decoration: none;
+}
+
+.about-update-icon.is-spinning {
+  animation: layoutTransitionSpin 720ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .about-update-status-text,
+  .about-update-icon.is-spinning {
+    animation: none;
+  }
+}

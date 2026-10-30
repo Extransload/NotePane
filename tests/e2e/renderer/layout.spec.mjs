@@ -728,10 +728,10 @@ test("lays Preferences out as a sidebar of pages beside a scrolling page of card
   const sidebar = preferences.getByRole("tablist", { name: "Preferences pages" });
   const sidebarBox = await sidebar.boundingBox();
   expect(Math.round(sidebarBox.width)).toBe(180);
-  await expect(sidebar.getByRole("tab")).toHaveText(["General", "Editor", "Trash", "Shortcuts"]);
-  expect(await sidebar.locator("[role='tab'] svg").count()).toBe(4);
+  await expect(sidebar.getByRole("tab")).toHaveText(["General", "Editor", "Trash", "Shortcuts", "About"]);
+  expect(await sidebar.locator("[role='tab'] svg").count()).toBe(5);
 
-  for (const pageName of ["General", "Editor", "Trash", "Shortcuts"]) {
+  for (const pageName of ["General", "Editor", "Trash", "Shortcuts", "About"]) {
     await sidebar.getByRole("tab", { name: pageName }).click();
     const panel = preferences.getByRole("tabpanel");
     await expect(panel.getByRole("heading", { level: 2 })).toHaveText(pageName);

@@ -67,6 +67,13 @@ note data; GitHub sees an ordinary download request.
 - **macOS, unsigned build:** macOS only lets an app replace itself when it is signed with a Developer ID, so the app
   shows "NotePane x.y.z is available" with a **Download** button that opens the release page.
 
+Preferences > About has **Check for updates**, which runs the same check at once (`checkNow()` through the
+`app:check-for-updates` IPC) and shows the result on the page: up to date, a newer version (with a **Download** link to
+its release on an unsigned Mac build, or a note that it installs when NotePane quits where the app updates itself), or
+the reason a check failed. A version found this way opens no dialog, and a version the startup check already offered
+is not offered again. In development, test builds and the browser preview the page says "Update checks run in the
+installed app". Versions are compared by their numbers (`compareVersions`), so 0.10.0 is newer than 0.9.2.
+
 ## Signing
 
 Without signing, both systems warn on first launch:
