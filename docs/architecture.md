@@ -63,6 +63,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Divider: the `---` / `***` shortcut (in `src/editor/schema.jsx`), its slash menu item, Markdown export as `---` | `src/editor/divider.jsx` |
 | Inline and block equations: KaTeX rendering, their editors, slash menu items, Markdown `$...$` / `$$` export and the import that reads them | `src/editor/math.jsx` |
 | BlockNote floating menu positioning and clamping, and how its floating UI closes: the controllers' close transition, the Mantine theme for menus (`NotePaneMantineProvider`), the link toolbar controller, and the fading copy of a block menu whose side menu hid | `src/editor/floatingMenus.js` |
+| Link toolbar content: the address, Copy, Edit and its form with Remove link | `src/editor/linkToolbar.jsx` |
 | Image download, crop geometry, upload | `src/editor/images.js` |
 | Pasting and dropping files: where the file block goes, its upload, one undo step for both | `src/editor/fileInsertion.js` |
 | Code block language detection, prettifying, and Tab / Shift+Tab line indent | `src/editor/codeFormatting.js` |

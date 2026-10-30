@@ -10,6 +10,7 @@ import {
   clamp,
 } from "../utils/values.js";
 import { isEditorMotionAllowed, readMotionDuration } from "./editorMotion.js";
+import { NotePaneLinkToolbar } from "./linkToolbar.jsx";
 
 // How BlockNote's floating UI closes: a short fade (--notepane-motion-floating-close-duration in
 // src/styles/editor-motion.css) that takes no pointer, so a click during it reaches the editor.
@@ -79,9 +80,20 @@ export function NotePaneMantineProvider({ children }) {
   }, children);
 }
 
+// The link toolbar opens under its link, as in Notion, and above it where there is no room below.
+function createLinkToolbarOptions() {
+  return {
+    ...createFloatingCloseOptions(),
+    useFloatingOptions: { placement: "bottom-start" },
+  };
+}
+
 export function NotePaneLinkToolbarController() {
-  const floatingUIOptions = useMemo(createFloatingCloseOptions, []);
-  return createElement(LinkToolbarController, { floatingUIOptions });
+  const floatingUIOptions = useMemo(createLinkToolbarOptions, []);
+  return createElement(LinkToolbarController, {
+    floatingUIOptions,
+    linkToolbar: NotePaneLinkToolbar,
+  });
 }
 
 // BlockNote's floating UI: its floating-ui popovers (the slash menu, the toolbars), known by the
