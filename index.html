@@ -4,6 +4,61 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>NotePane</title>
+    <style>
+      /* A reloading window keeps its look: public/boot.js paints the shell's last background and
+         corners under the app, which stays hidden until src/hooks/useReloadReveal.js fades it in.
+         A start slower than a moment shows a small spinner. */
+      html[data-boot]::before {
+        content: "";
+        position: fixed;
+        z-index: -1;
+        inset: 0;
+        border-radius: var(--notepane-boot-radius);
+        background: var(--notepane-boot-background);
+        pointer-events: none;
+      }
+
+      html[data-boot="reload"]::after {
+        content: "";
+        position: fixed;
+        top: calc(50% - 8px);
+        left: calc(50% - 8px);
+        box-sizing: border-box;
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--notepane-boot-foreground);
+        border-right-color: transparent;
+        border-radius: 50%;
+        opacity: 0;
+        animation:
+          notepane-boot-spin 0.8s linear infinite,
+          notepane-boot-show 0.2s ease-out 0.6s forwards;
+        pointer-events: none;
+      }
+
+      html[data-boot="reload"] #root {
+        opacity: 0;
+      }
+
+      @keyframes notepane-boot-spin {
+        to {
+          transform: rotate(1turn);
+        }
+      }
+
+      @keyframes notepane-boot-show {
+        to {
+          opacity: 0.4;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html[data-boot="reload"]::after {
+          animation: notepane-boot-show 1ms linear 0.6s forwards;
+        }
+      }
+    </style>
+    <script src="./boot.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -79,6 +79,9 @@
 - Buttons press in slightly, menu items and list rows ease their hover colour, the zoom gauge springs in and glides
   between steps, and picking a theme in Preferences cross-fades that window to the new colours (other windows switch
   at once, and no window fades on its first paint)
+- A reload (Cmd/Ctrl+R) keeps the window's colours: the new page paints the shell's last background and corners from
+  its first frame, and the whole app fades in once the note shows (at once with reduced motion); a start slower than
+  a moment shows a small spinner
 - Shortcut labels read the same everywhere NotePane shows them (Preferences, tooltips, slash menu badges, the
   formatting toolbar's merge and colour buttons): `⌘⌥⇧1` on a Mac, `Ctrl+Alt+Shift+1` elsewhere
 - Sidebar footer actions (version history, export, Preferences, layout, editor width) share one muted chrome tone;

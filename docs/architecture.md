@@ -77,6 +77,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Showing a user-painted colour in the theme's tone | `src/style/toneMatch.js` |
 | Applying a theme to the document, the first-paint theme, the export theme | `src/style/applyTheme.js` |
 | Applying the selected theme in a window, code theme included | `src/hooks/useAppliedTheme.js` |
+| A reload's first frames: the shell's last paint under the app, then the app's fade-in | `public/boot.js`, `index.html`, `src/hooks/useReloadReveal.js` |
 | Code block syntax colours per theme, re-highlighting on a theme change | `src/editor/codeHighlighter.js` |
 | The theme picker in Preferences | `src/ui/ThemePicker.jsx` |
 | The Preferences window: its page sidebar, page header and the cards each page is made of | `src/ui/preferencesWindow.jsx`, `src/ui/PreferencesCard.jsx`, `src/ui/preferencesSections.jsx`, `src/ui/trashPreferences.jsx` |

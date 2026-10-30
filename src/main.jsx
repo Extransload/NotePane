@@ -262,6 +262,7 @@ import { useNotePersistence } from "./hooks/useNotePersistence.js";
 import { useOverlayState } from "./hooks/useOverlayState.js";
 import { EditorErrorBoundary } from "./ui/EditorErrorBoundary.jsx";
 import { usePendingSaveFlush } from "./hooks/usePendingSaveFlush.js";
+import { useReloadReveal } from "./hooks/useReloadReveal.js";
 import { useSessionList } from "./hooks/useSessionList.js";
 import { useSessionTabActions } from "./hooks/useSessionTabActions.js";
 import { useSessionTabDrag } from "./hooks/useSessionTabDrag.js";
@@ -515,8 +516,14 @@ function App({ bindTestThemeSetter }) {
     await electronApi?.updateEditorPreferences?.(normalizedEditorPreferences);
   }, []);
 
+  useReloadReveal(Boolean(note));
+
   if (!note) {
-    return <div className="loading">Loading BlockNote…</div>;
+    return (
+      <div className="loading">
+        <span>Loading…</span>
+      </div>
+    );
   }
 
   return (

@@ -756,6 +756,17 @@
   font: 13px var(--notepane-ui-font);
 }
 
+/* Only a start slower than a moment says that it is loading. */
+.loading > span {
+  animation: notepaneMenuFadeIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out) 600ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading > span {
+    animation-duration: 1ms;
+  }
+}
+
 .editor-crash {
   display: grid;
   width: 100%;

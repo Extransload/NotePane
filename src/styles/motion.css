@@ -123,6 +123,12 @@ div:has(> .bn-formatting-toolbar) {
   animation: notepaneMenuFadeIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
 }
 
+/* A reloaded window's app fades in over the paint public/boot.js put under it
+   (src/hooks/useReloadReveal.js). */
+html[data-boot="revealing"] #root {
+  animation: notepaneMenuFadeIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   div:has(> .bn-suggestion-menu),
   div:has(> .bn-formatting-toolbar),

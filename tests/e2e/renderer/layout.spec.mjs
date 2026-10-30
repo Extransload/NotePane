@@ -627,6 +627,41 @@ test("removes a closed dialog at once when the system asks for reduced motion", 
   expect(remainsAfterClose).toBe(false);
 });
 
+test("a reload keeps the window's colours until the app shows again", async ({ page }) => {
+  const shellBackground = await page.locator(".sticky-shell")
+    .evaluate((shell) => getComputedStyle(shell).backgroundColor);
+  let releaseApp;
+  const appHeld = new Promise((resolve) => {
+    releaseApp = resolve;
+  });
+  // Holding the app's script keeps the reloaded page at the paint it starts with.
+  const appScript = /\/src\/main\.jsx(\?|$)/;
+  await page.route(appScript, async (route) => {
+    await appHeld;
+    await route.continue();
+  });
+  await page.reload({ waitUntil: "commit" });
+  const html = page.locator("html");
+  await expect(html).toHaveAttribute("data-boot", "reload");
+  expect(await page.evaluate(() => ({
+    paint: getComputedStyle(document.documentElement, "::before").backgroundColor,
+    app: getComputedStyle(document.getElementById("root")).opacity,
+  }))).toEqual({ paint: shellBackground, app: "0" });
+
+  releaseApp();
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  await expect(html).not.toHaveAttribute("data-boot");
+  await page.unroute(appScript);
+});
+
+test("a reloaded window shows its app at once when the system asks for reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  await expect(page.locator("html")).not.toHaveAttribute("data-boot");
+  expect(await page.locator("#root").evaluate((app) => app.getAnimations().length)).toBe(0);
+});
+
 test("opens the first block's six-dot menu inside the editor surface, clear of the sidebar", async ({ page }) => {
   await page.setViewportSize({ width: 1180, height: 760 });
   await loadTemplatePreview(page);
