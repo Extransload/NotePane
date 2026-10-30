@@ -210,11 +210,8 @@ export const createNonDestructiveImageBlockSpec = createBlockSpec(
 // block, so both keys are NotePane's line indent instead. A new code block starts in the language
 // picked last, so the block's own default language is empty (src/editor/codeLanguages.js).
 function createNotePaneCodeBlockSpec() {
-  const codeBlockSpec = createCodeBlockSpec({
-    ...codeBlockOptions,
-    defaultLanguage: "",
-    indentLineWithTab: false,
-  });
+  const notePaneOptions = { defaultLanguage: "", indentLineWithTab: false };
+  const codeBlockSpec = createCodeBlockSpec({ ...codeBlockOptions, ...notePaneOptions });
   const followTheme = createExtension(({ editor }) => ({
     key: "notepane-code-theme",
     mount: () => followCodeTheme(editor),
