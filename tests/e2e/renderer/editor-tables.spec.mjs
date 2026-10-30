@@ -681,12 +681,15 @@ test("extends a widened table right of the text column, not past the editor surf
   const before = await readTableExtent(table);
   expect(before.scrollerRight).toBeCloseTo(before.columnRight, 0);
 
+  // The other columns keep their width, so the table widens by the drag: half the room right of
+  // the text column.
+  const room = before.surfaceRight - TABLE_EDGE_GAP - before.columnRight;
   const firstCell = table.locator("td, th").first();
   await firstCell.scrollIntoViewIfNeeded();
   const cellBox = await firstCell.boundingBox();
   await page.mouse.move(cellBox.x + cellBox.width - 1, cellBox.y + cellBox.height / 2);
   await page.mouse.down();
-  await page.mouse.move(cellBox.x + cellBox.width + 300, cellBox.y + cellBox.height / 2, { steps: 6 });
+  await page.mouse.move(cellBox.x + cellBox.width + Math.round(room / 2), cellBox.y + cellBox.height / 2, { steps: 6 });
   await page.mouse.up();
 
   await expect.poll(async () => (await readTableExtent(table)).scrollerRight)
@@ -699,4 +702,97 @@ test("extends a widened table right of the text column, not past the editor surf
   expect(await page.getByTestId("sticky-editor-surface").evaluate((surface) => (
     surface.scrollWidth <= surface.clientWidth
   ))).toBe(true);
+});
+
+// The width of each of a table's columns and of the table, as drawn.
+function readColumnWidths(table) {
+  return table.evaluate((element) => ({
+    table: element.getBoundingClientRect().width,
+    columns: [...element.querySelectorAll(":scope > colgroup > col")]
+      .map((col) => col.getBoundingClientRect().width),
+  }));
+}
+
+// Drags the right border of `cell`'s column by `distance` pixels.
+async function dragColumnBorder(page, cell, distance) {
+  await cell.scrollIntoViewIfNeeded();
+  const box = await cell.boundingBox();
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width - 1, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 1 + distance, y, { steps: 6 });
+  await page.mouse.up();
+}
+
+function expectWidthsClose(actual, expected) {
+  expect(actual.columns).toHaveLength(expected.columns.length);
+  actual.columns.forEach((width, index) => {
+    expect(Math.abs(width - expected.columns[index])).toBeLessThanOrEqual(1);
+  });
+  expect(Math.abs(actual.table - expected.table)).toBeLessThanOrEqual(2);
+}
+
+// As in Notion: shrinking a column of a table nobody resized narrows the table by as much, while
+// the other columns keep their width, and one Cmd+Z restores the table that fills the column.
+test("shrinks only the dragged column of a new table, and one Cmd+Z restores it", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const table = page.locator(".bn-editor table").first();
+  const firstCell = table.locator("tr").first().locator("td, th").first();
+  await firstCell.click();
+  await waitForEditorSelection(page);
+  const before = await readColumnWidths(table);
+  const extentBefore = await readTableExtent(table);
+  expect(extentBefore.scrollerRight).toBeCloseTo(extentBefore.columnRight, 0);
+  const readTableEdges = () => table.evaluate((element) => ({
+    left: element.getBoundingClientRect().left,
+    right: element.getBoundingClientRect().right,
+    columnRight: element.closest(".bn-block-content").getBoundingClientRect().right,
+  }));
+  const edgesBefore = await readTableEdges();
+
+  await dragColumnBorder(page, firstCell, -90);
+  const expected = {
+    table: before.table - 90,
+    columns: [before.columns[0] - 90, ...before.columns.slice(1)],
+  };
+  await expect.poll(async () => (await readColumnWidths(table)).table)
+    .toBeLessThan(before.table - 80);
+  expectWidthsClose(await readColumnWidths(table), expected);
+  // Narrower than the text column, with its left edge where it was.
+  const shrunk = await readTableEdges();
+  expect(shrunk.right).toBeLessThan(shrunk.columnRight - 80);
+  expect(shrunk.left).toBeCloseTo(edgesBefore.left, 0);
+
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect.poll(async () => (await readColumnWidths(table)).table)
+    .toBeGreaterThan(before.table - 2);
+  expectWidthsClose(await readColumnWidths(table), before);
+});
+
+test("shrinks only the dragged column of a resized table", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const table = page.locator(".bn-editor table").first();
+  const middleCell = table.locator("tr").first().locator("td, th").nth(1);
+  await middleCell.click();
+  await waitForEditorSelection(page);
+
+  const initial = await readColumnWidths(table);
+  await dragColumnBorder(page, middleCell, 40);
+  await expect.poll(async () => (await readColumnWidths(table)).table)
+    .toBeGreaterThan(initial.table + 30);
+  const resized = await readColumnWidths(table);
+  expectWidthsClose(resized, {
+    table: initial.table + 40,
+    columns: [initial.columns[0], initial.columns[1] + 40, initial.columns[2]],
+  });
+
+  await dragColumnBorder(page, middleCell, -100);
+  await expect.poll(async () => (await readColumnWidths(table)).table)
+    .toBeLessThan(resized.table - 90);
+  expectWidthsClose(await readColumnWidths(table), {
+    table: resized.table - 100,
+    columns: [resized.columns[0], resized.columns[1] - 100, resized.columns[2]],
+  });
 });

@@ -4,7 +4,6 @@ import {
 import {
   TableMap,
   columnResizingPluginKey,
-  updateColumnsOnResize,
 } from "prosemirror-tables";
 
 const MIN_AUTO_FIT_COLUMN_WIDTH = 35;
@@ -36,7 +35,8 @@ export function autoFitActiveTableColumn(editor, eventTarget) {
   }
 
   const column = getTableColumnAtCellPosition(view.state.doc, cellPosition);
-  if (!column) {
+  const widths = readDrawnColumnWidths(tableElement, column.table);
+  if (!widths) {
     return false;
   }
   const width = measureAutoFitColumnWidth(
@@ -47,39 +47,155 @@ export function autoFitActiveTableColumn(editor, eventTarget) {
   if (!Number.isFinite(width)) {
     return false;
   }
-  return updateTableColumnWidth(view, cellPosition, width);
+  widths[column.index] = width;
+  return dispatchColumnWidths(view, column.tableStart - 1, widths);
 }
 
-export function previewActiveTableColumnResize(editor, event) {
+// Notion resizes one column at a time: the other columns keep the width they are drawn at and the
+// table is as wide as its columns add up to. A table nobody resized has no column widths and fills
+// its block (src/styles/blocknote.css), so a drag gives every column its drawn width in the same
+// transaction as the dragged one, and one undo restores the table. prosemirror-tables previews a
+// drag on the dragged column alone and commits only that column, so NotePane draws the drag from
+// CSS variables its preview does not touch (the session class) and commits it before
+// prosemirror-tables does: the window capture listeners in src/hooks/useEditorSurfaceShortcuts.js.
+const columnResizeSessions = new WeakMap();
+const COLUMN_RESIZE_SESSION_CLASS = "notepane-table-column-resizing";
+
+// On mousedown, before prosemirror-tables starts the drag on a column border it hovers.
+export function startActiveTableColumnResize(editor, event) {
   const view = editor?.prosemirrorView;
   const pluginState = view
     ? columnResizingPluginKey.getState(view.state)
     : null;
-  if (!view || !pluginState?.dragging || pluginState.activeHandle < 0) {
+  if (
+    !view?.editable ||
+    !pluginState ||
+    pluginState.activeHandle < 0 ||
+    pluginState.dragging ||
+    !(event.target instanceof Node) ||
+    !view.dom.contains(event.target)
+  ) {
     return false;
   }
 
-  const width = Math.max(
-    MIN_AUTO_FIT_COLUMN_WIDTH,
-    pluginState.dragging.startWidth + event.clientX - pluginState.dragging.startX,
-  );
-  const column = getTableColumnAtCellPosition(
-    view.state.doc,
-    pluginState.activeHandle,
-  );
+  endColumnResizeSession(view);
+  const column = getTableColumnAtCellPosition(view.state.doc, pluginState.activeHandle);
   const tableElement = findTableElementAtPosition(view, column.tableStart);
-  if (!tableElement?.firstChild) {
+  const widths = tableElement ? readDrawnColumnWidths(tableElement, column.table) : null;
+  if (!widths) {
     return false;
   }
-  updateColumnsOnResize(
-    column.table,
-    tableElement.firstChild,
+  const session = {
     tableElement,
-    120,
-    column.index,
-    width,
-  );
+    tablePosition: column.tableStart - 1,
+    columnIndex: column.index,
+    startX: event.clientX,
+    widths,
+  };
+  columnResizeSessions.set(view, session);
+  tableElement.classList.add(COLUMN_RESIZE_SESSION_CLASS);
+  drawColumnResizeSession(session, widths);
   return true;
+}
+
+export function previewActiveTableColumnResize(editor, event) {
+  const view = editor?.prosemirrorView;
+  const session = view ? columnResizeSessions.get(view) : null;
+  if (!session) {
+    return false;
+  }
+  if (!columnResizingPluginKey.getState(view.state)?.dragging) {
+    endColumnResizeSession(view);
+    return false;
+  }
+  // The button came up outside the window, where no mouseup reaches it.
+  if (event.buttons === 0) {
+    return finishActiveTableColumnResize(editor, event);
+  }
+  drawColumnResizeSession(session, getDraggedColumnWidths(session, event));
+  return true;
+}
+
+// On mouseup, before prosemirror-tables commits the dragged column alone: commits every column in
+// one transaction that also ends the drag, so prosemirror-tables has nothing left to commit. A
+// click on a border that does not move it changes nothing.
+export function finishActiveTableColumnResize(editor, event) {
+  const view = editor?.prosemirrorView;
+  const session = view ? columnResizeSessions.get(view) : null;
+  if (!session) {
+    return false;
+  }
+  const transaction = event.clientX === session.startX
+    ? view.state.tr
+    : buildColumnWidthsTransaction(
+      view.state,
+      session.tablePosition,
+      getDraggedColumnWidths(session, event),
+    );
+  if (!transaction) {
+    endColumnResizeSession(view);
+    return false;
+  }
+  if (columnResizingPluginKey.getState(view.state)?.dragging) {
+    transaction.setMeta(columnResizingPluginKey, { setDragging: null });
+  }
+  view.dispatch(transaction);
+  endColumnResizeSession(view);
+  return true;
+}
+
+function getDraggedColumnWidths(session, event) {
+  const widths = session.widths.slice();
+  widths[session.columnIndex] = Math.max(
+    MIN_AUTO_FIT_COLUMN_WIDTH,
+    session.widths[session.columnIndex] + event.clientX - session.startX,
+  );
+  return widths;
+}
+
+function drawColumnResizeSession({ tableElement }, widths) {
+  const cols = tableElement.querySelectorAll(":scope > colgroup > col");
+  widths.forEach((width, index) => {
+    cols[index]?.style.setProperty("--notepane-column-width", `${width}px`);
+  });
+  tableElement.style.setProperty(
+    "--notepane-table-width",
+    `${widths.reduce((total, width) => total + width, 0)}px`,
+  );
+}
+
+function endColumnResizeSession(view) {
+  const session = columnResizeSessions.get(view);
+  if (!session) {
+    return;
+  }
+  columnResizeSessions.delete(view);
+  const { tableElement } = session;
+  tableElement.classList.remove(COLUMN_RESIZE_SESSION_CLASS);
+  tableElement.style.removeProperty("--notepane-table-width");
+  tableElement.querySelectorAll(":scope > colgroup > col").forEach((col) => {
+    col.style.removeProperty("--notepane-column-width");
+  });
+}
+
+// Every column's width as the table draws it: the width the document gives it, else its rendered
+// width rounded down, so the columns never add up to more than the table they replace.
+function readDrawnColumnWidths(tableElement, table) {
+  const cols = [...tableElement.querySelectorAll(":scope > colgroup > col")];
+  const map = TableMap.get(table);
+  if (cols.length !== map.width) {
+    return null;
+  }
+  const documentWidths = [];
+  table.firstChild?.forEach((cell) => {
+    for (let index = 0; index < cell.attrs.colspan; index += 1) {
+      documentWidths.push(cell.attrs.colwidth?.[index] || 0);
+    }
+  });
+  return cols.map((col, index) => documentWidths[index] || Math.max(
+    MIN_AUTO_FIT_COLUMN_WIDTH,
+    Math.floor(col.getBoundingClientRect().width),
+  ));
 }
 
 // Notion's "Fit to width": scales every column by the same factor so the table is exactly as wide
@@ -101,10 +217,16 @@ export function fitTableToWidth(editor, blockId) {
     .map((col) => col.getBoundingClientRect().width);
   const renderedTotal = renderedWidths.reduce((total, width) => total + width, 0);
   const scrollerStyle = getComputedStyle(scroller);
+  // The table's outer border adds to its columns' widths.
+  const tableBorderWidth = Math.max(
+    0,
+    Math.ceil(tableElement.getBoundingClientRect().width - renderedTotal),
+  );
   const availableWidth = Math.floor(
     column.clientWidth -
       Number.parseFloat(scrollerStyle.paddingLeft || "0") -
-      Number.parseFloat(scrollerStyle.paddingRight || "0"),
+      Number.parseFloat(scrollerStyle.paddingRight || "0") -
+      tableBorderWidth,
   );
   if (!(renderedTotal > 0) || !(availableWidth > 0)) {
     return false;
@@ -118,7 +240,7 @@ export function fitTableToWidth(editor, blockId) {
     0,
     availableWidth - widths.reduce((total, width) => total + width, 0),
   );
-  return updateTableColumnWidths(view, blockInfo.posBeforeNode + 1, widths);
+  return dispatchColumnWidths(view, blockInfo.posBeforeNode + 1, widths);
 }
 
 function getTableColumnAtCellPosition(doc, cellPosition) {
@@ -234,18 +356,28 @@ function findTableElementAtPosition(view, tableStart) {
   return node instanceof HTMLTableElement ? node : null;
 }
 
-function updateTableColumnWidths(view, tablePosition, widths) {
-  const table = view.state.doc.nodeAt(tablePosition);
-  if (table?.type.spec.tableRole !== "table") {
+function dispatchColumnWidths(view, tablePosition, widths) {
+  const transaction = buildColumnWidthsTransaction(view.state, tablePosition, widths);
+  if (!transaction?.docChanged) {
     return false;
+  }
+  view.dispatch(transaction);
+  return true;
+}
+
+// One transaction giving every column of the table at `tablePosition` its width in `widths`.
+function buildColumnWidthsTransaction(state, tablePosition, widths) {
+  const table = state.doc.nodeAt(tablePosition);
+  if (table?.type.spec.tableRole !== "table") {
+    return null;
   }
   const map = TableMap.get(table);
   if (map.width !== widths.length) {
-    return false;
+    return null;
   }
 
   const tableStart = tablePosition + 1;
-  const transaction = view.state.tr;
+  const transaction = state.tr;
   for (const relativePosition of new Set(map.map)) {
     const cell = table.nodeAt(relativePosition);
     const firstColumn = map.colCount(relativePosition);
@@ -259,53 +391,5 @@ function updateTableColumnWidths(view, tablePosition, widths) {
     });
   }
 
-  if (!transaction.docChanged) {
-    return false;
-  }
-  view.dispatch(transaction);
-  findTableElementAtPosition(view, tableStart)
-    ?.style.setProperty("width", "auto", "important");
-  return true;
-}
-
-function updateTableColumnWidth(view, cellPosition, width) {
-  const { index, map, table, tableStart } = getTableColumnAtCellPosition(
-    view.state.doc,
-    cellPosition,
-  );
-  const transaction = view.state.tr;
-  for (let row = 0; row < map.height; row += 1) {
-    const mapIndex = row * map.width + index;
-    if (row > 0 && map.map[mapIndex] === map.map[mapIndex - map.width]) {
-      continue;
-    }
-
-    const relativePosition = map.map[mapIndex];
-    const cell = table.nodeAt(relativePosition);
-    if (!cell) {
-      continue;
-    }
-    const widthIndex = cell.attrs.colspan === 1
-      ? 0
-      : index - map.colCount(relativePosition);
-    const columnWidths = cell.attrs.colwidth
-      ? cell.attrs.colwidth.slice()
-      : Array(cell.attrs.colspan).fill(0);
-    if (columnWidths[widthIndex] === width) {
-      continue;
-    }
-    columnWidths[widthIndex] = width;
-    transaction.setNodeMarkup(tableStart + relativePosition, null, {
-      ...cell.attrs,
-      colwidth: columnWidths,
-    });
-  }
-
-  if (!transaction.docChanged) {
-    return false;
-  }
-  view.dispatch(transaction);
-  const tableElement = findTableElementAtPosition(view, tableStart);
-  tableElement?.style.setProperty("width", "auto", "important");
-  return true;
+  return transaction;
 }
