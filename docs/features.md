@@ -162,7 +162,15 @@ BlockNote handles editor interaction directly.
 - Code Block: as in Notion, its tools show only while the pointer is on the block: the language, whose menu has
   a search field (the arrow keys and Enter, or a click, pick a language; Escape closes it), Prettify for a language
   with a formatter, and Copy. A new code block starts in the language last picked from that menu (JavaScript until
-  one is); a language written after the three backticks still wins
+  one is); a language written after the three backticks still wins. Prettify formats, offline and inside the app:
+  JavaScript, JSX, TypeScript, TSX, JSON, JSON with Comments, CSS, PostCSS, SCSS, Less, HTML, Vue, Vue HTML,
+  Markdown, MDX, YAML, GraphQL, PHP, XML, Svelte and GLSL (Prettier and its plugins); C, C++, Objective C, Java
+  and C# (clang-format); Python (Ruff); Lua (StyLua); Shell (shfmt); LaTeX (tex-fmt); Rust (rustfmt); Swift
+  (swift-format); Ruby (Syntax Tree); SQL (sql-formatter); Sass (sass-formatter); and JSON Lines, one value per
+  line. Each formatter loads the first time its language is prettified. Code a formatter cannot parse stays as it
+  was and the button shows Failed. Plain Text, RegExp, Mermaid, Ruby Haml, Pug, Julia, R, Haskell, Scala, Kotlin,
+  WebAssembly and WGSL have no Prettify (the reasons are `CODE_LANGUAGES_WITHOUT_FORMATTER` in
+  `src/editor/codeFormatting.js`)
 - Divider: a thin rule from `/divider`, or from `---` or `***` typed on an empty line; the caret moves on to
   a line below it. Backspace on the empty line below selects it and Backspace again deletes it. Markdown writes it as
   `---` and reads `---`, `***` and `___`

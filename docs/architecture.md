@@ -66,7 +66,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Link toolbar content: the address, Copy, Edit and its form with Remove link | `src/editor/linkToolbar.jsx` |
 | Image download, crop geometry, upload | `src/editor/images.js` |
 | Pasting and dropping files: where the file block goes, its upload, one undo step for both | `src/editor/fileInsertion.js` |
-| Code block language detection, prettifying, and Tab / Shift+Tab line indent | `src/editor/codeFormatting.js` |
+| Code block language detection, prettifying, and Tab / Shift+Tab line indent; which formatter each language uses and why the others have none | `src/editor/codeFormatting.js` |
+| The code block formatters that are not Prettier plugins, most of them WebAssembly, each loaded on first use. Their `.wasm` is inlined into its lazy chunk as a data: URL (`build.assetsInlineLimit` in `vite.config.js`) because the packaged renderer's file:// page cannot fetch a file beside it, and the CSP's `script-src` allows `'wasm-unsafe-eval'` to compile it | `src/editor/codeFormatEngines.js` |
 | Code block languages: the language menu's list and search, the language a new code block starts in | `src/editor/codeLanguages.js` |
 | Code block tool bar: showing on hover, the language menu, Prettify and Copy | `src/ui/CodeBlockTools.jsx`, `src/ui/CodeLanguageMenu.jsx` |
 | Note search matching, snippets and plain-text extraction | `src/model/search.js` |
