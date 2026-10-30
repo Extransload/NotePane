@@ -1671,6 +1671,31 @@ test("copies only the highlighted text of a keyboard selection across blocks", a
   expect(copied.plainText).not.toContain("delta");
 });
 
+test("keeps the + and six-dot handles clear of the block's highlight", async ({ page }) => {
+  await loadTemplatePreview(page);
+  const paragraph = page.locator(".bn-editor").getByText("Objective:", { exact: true });
+  const blockId = await paragraph.evaluate((element) =>
+    element.closest(".bn-block-outer").dataset.id,
+  );
+  const highlight = page.locator(`.bn-block-outer[data-id="${blockId}"] > .bn-block`);
+  await paragraph.scrollIntoViewIfNeeded();
+  await paragraph.click();
+  const paragraphBox = await paragraph.boundingBox();
+  await page.mouse.move(paragraphBox.x - 24, paragraphBox.y + paragraphBox.height / 2);
+  const handle = page.getByRole("button", { name: "Open block menu" });
+  await handle.click();
+  await expect(page.locator(".bn-drag-handle-menu:visible")).toBeVisible();
+  await expect(highlight).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+
+  // The highlight is the block box, which starts 8px left of the text; the handles stay a few
+  // pixels clear of it.
+  const highlightBox = await highlight.boundingBox();
+  const handleBox = await handle.boundingBox();
+  const gap = highlightBox.x - (handleBox.x + handleBox.width);
+  expect(gap).toBeGreaterThanOrEqual(4);
+  expect(gap).toBeLessThanOrEqual(10);
+});
+
 test("cuts the block under the caret after the six-dot handle menu is dismissed", async ({ page }) => {
   await createBlankSession(page);
   await clickLastEmptyParagraph(page);

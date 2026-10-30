@@ -756,6 +756,13 @@
     box-shadow 150ms ease;
 }
 
+/* The + and six-dot handles keep a gap from the block box, whose selection and six-dot menu
+   highlight start 8px left of the text. BlockNote places the side menu against the block box, so
+   padding on that side moves the handles left. */
+.bn-side-menu {
+  padding-inline-end: 6px;
+}
+
 @keyframes blockMenuSelectionIn {
   from {
     background-color: transparent;
