@@ -540,6 +540,11 @@ test("Escape widens the caret in a cell to the cell, its row, the table, then no
   await expect(selectedBlocks).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest(".bn-editor"))))
     .toBe(false);
+  // Nothing selected draws no cell's focus ring; a click in a cell brings it back.
+  const focusedCells = page.locator(".bn-editor .notepane-table-cell-focused");
+  await expect(focusedCells).toHaveCount(0);
+  await tabsCell.getByText("Tabs", { exact: true }).click();
+  await expect(focusedCells).toHaveCount(1);
 });
 
 test("keeps the editor focused after a row handle action and Escape, so Cmd+Z undoes it", async ({ page }) => {

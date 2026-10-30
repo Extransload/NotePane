@@ -30,6 +30,7 @@ import {
   previewActiveTableColumnResize,
   startActiveTableColumnResize,
 } from "../editor/tableColumnSizing.js";
+import { selectionDismissedKey } from "../editor/tableFocus.js";
 import { deleteTableHandleLine } from "../editor/tableLineDelete.js";
 import {
   hasEditorRangeSelection,
@@ -403,7 +404,11 @@ export function useEditorSurfaceShortcuts({
 
       if (isBlockSetSelection(selection)) {
         claimEscape();
-        view.dispatch(view.state.tr.setSelection(Selection.near(selection.$from)));
+        view.dispatch(
+          view.state.tr
+            .setSelection(Selection.near(selection.$from))
+            .setMeta(selectionDismissedKey, true),
+        );
         view.dom.blur();
         return;
       }

@@ -1,3 +1,5 @@
+import { createExtension } from "@blocknote/core";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import { columnResizingPluginKey } from "prosemirror-tables";
 import {
@@ -7,6 +9,24 @@ import {
   getTableCellElementForSnapshot,
   restoreFocusedTableCell,
 } from "./selection.js";
+
+// Set by the Escape that leaves nothing selected (src/hooks/useEditorSurfaceShortcuts.js) until the
+// selection or the document changes, so the caret it leaves in a table cell draws no focus ring.
+export const selectionDismissedKey = new PluginKey("notepaneSelectionDismissed");
+
+export const SelectionDismissed = createExtension(() => ({
+  key: "notepane-selection-dismissed",
+  prosemirrorPlugins: [
+    new Plugin({
+      key: selectionDismissedKey,
+      state: {
+        init: () => false,
+        apply: (tr, isDismissed) => tr.getMeta(selectionDismissedKey)
+          ?? (tr.selectionSet || tr.docChanged ? false : isDismissed),
+      },
+    }),
+  ],
+}))();
 
 /**
  * Marks the table cell holding the caret with `notepane-table-cell-focused` and draws the
@@ -27,6 +47,7 @@ export function installFocusedTableCellDecorations(editor, {
     const rangeDecorations = getCellSelectionEdgeDecorations(state);
     if (
       suppressFocusedTableCellRef.current ||
+      selectionDismissedKey.getState(state) ||
       columnResizingPluginKey.getState(state)?.dragging
     ) {
       return DecorationSet.create(state.doc, rangeDecorations);
