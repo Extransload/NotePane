@@ -1187,8 +1187,18 @@ function StickyEditor({
 
   // Cmd/Ctrl+=, - and 0 zoom the whole app as Notion does; Electron applies the stored zoom to every
   // window. The gauge also shows at either end, so a press that cannot zoom further still answers.
+  // The zoom this window asked for last. A press that comes before the stored zoom's round trip
+  // through the main process steps from it, so every press takes its step.
+  const requestedAppZoomRef = useRef(null);
+  useEffect(() => {
+    if (requestedAppZoomRef.current === normalizedEditorPreferences.appZoom) {
+      requestedAppZoomRef.current = null;
+    }
+  }, [normalizedEditorPreferences.appZoom]);
+
   const setAppZoom = useCallback(
     (nextAppZoom) => {
+      requestedAppZoomRef.current = nextAppZoom;
       updateGlobalEditorPreferences({
         ...normalizedEditorPreferences,
         appZoom: nextAppZoom,
@@ -1207,7 +1217,9 @@ function StickyEditor({
 
   const adjustAppZoom = useCallback(
     (direction) => {
-      setAppZoom(stepAppZoom(normalizedEditorPreferences.appZoom, direction));
+      setAppZoom(
+        stepAppZoom(requestedAppZoomRef.current ?? normalizedEditorPreferences.appZoom, direction),
+      );
     },
     [normalizedEditorPreferences.appZoom, setAppZoom],
   );
