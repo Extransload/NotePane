@@ -113,6 +113,10 @@ BlockNote handles editor interaction directly.
   duplicate (tables without merged cells), clear contents and delete
 - A table handle's row or column goes with Delete or Backspace while its menu is open, and one Cmd+Z brings it
   back; cells selected another way, even a whole row, only have their contents cleared
+- Escape widens the selection a step at a time, as in Notion: the caret in a table cell selects the cell, then its
+  row, then the table; the caret or text in any other block, a code block included, selects that block; and Escape on
+  a selected block leaves nothing selected. The editor keeps focus until that last step, which lets go of it, so
+  Cmd+Z there waits for a click back in
 - Table block menu (six-dot handle): fit to width (to the text column), header row and header column switches
 - Column resizing, as in Notion: dragging a column border changes only that column, and the table is as wide as its
   columns add up to, narrower than the text column too. A new table fills the text column until its first resize,
@@ -170,7 +174,8 @@ BlockNote handles editor interaction directly.
   line. Each formatter loads the first time its language is prettified. Code a formatter cannot parse stays as it
   was and the button shows Failed. Plain Text, RegExp, Mermaid, Ruby Haml, Pug, Julia, R, Haskell, Scala, Kotlin,
   WebAssembly and WGSL have no Prettify (the reasons are `CODE_LANGUAGES_WITHOUT_FORMATTER` in
-  `src/editor/codeFormatting.js`)
+  `src/editor/codeFormatting.js`). Backspace at the start of a code block, or Delete in an empty one, leaves the
+  block; Escape selects it, and Delete or Backspace then removes it
 - Divider: a thin rule from `/divider`, or from `---` or `***` typed on an empty line; the caret moves on to
   a line below it. Backspace on the empty line below selects it and Backspace again deletes it. Markdown writes it as
   `---` and reads `---`, `***` and `___`

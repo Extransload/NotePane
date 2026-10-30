@@ -21,6 +21,33 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
 });
 
+test("Escape selects the block under the caret, a code block too, then lets go of it", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, FIXTURE);
+  const selectedBlocks = page.locator(".bn-editor [data-block-selected='true']");
+  const editorHasFocus = () => page.evaluate(() => Boolean(document.activeElement?.closest(".bn-editor")));
+
+  await page.locator(".bn-editor").getByText("Bravo paragraph", { exact: true }).click();
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Escape");
+  await expect(selectedBlocks).toHaveCount(1);
+  await expect(selectedBlocks).toHaveText("Bravo paragraph");
+  await expectEditorFocused(page);
+  await page.keyboard.press("Escape");
+  await expect(selectedBlocks).toHaveCount(0);
+  await expect.poll(editorHasFocus).toBe(false);
+
+  await page.locator(".bn-editor [data-content-type='codeBlock'] code").click();
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Escape");
+  await expect(selectedBlocks).toHaveCount(1);
+  await expect(selectedBlocks.locator("[data-content-type='codeBlock']")).toHaveCount(1);
+  await expectEditorFocused(page);
+  await page.keyboard.press("Escape");
+  await expect(selectedBlocks).toHaveCount(0);
+  await expect.poll(editorHasFocus).toBe(false);
+});
+
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

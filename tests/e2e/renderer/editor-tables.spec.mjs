@@ -57,7 +57,16 @@ test("focuses table cells without changing their drag selection behavior", async
     boxShadow: "none",
   });
 
-  // A second Escape selects the table block, as in Notion, and the editor keeps focus for Cmd+Z.
+  // A second Escape selects the cell's row and a third the table block, as in Notion, and the
+  // editor keeps focus for Cmd+Z.
+  await page.keyboard.press("Escape");
+  const tabsRowCells = page.locator(".bn-editor tr")
+    .filter({ has: page.getByRole("cell", { name: "Tabs", exact: true }) })
+    .first()
+    .locator("td, th");
+  const rowCellCount = await tabsRowCells.count();
+  await expect(page.locator(".bn-editor .selectedCell")).toHaveCount(rowCellCount);
+  await expect(tabsRowCells.and(page.locator(".selectedCell"))).toHaveCount(rowCellCount);
   await page.keyboard.press("Escape");
   await expect(page.locator(".bn-editor .selectedCell")).toHaveCount(0);
   await expect(page.locator(".bn-editor [data-block-selected] table")).toHaveCount(1);
@@ -65,6 +74,7 @@ test("focuses table cells without changing their drag selection behavior", async
   await expect(page.locator(".bn-formatting-toolbar:visible")).toHaveCount(0);
 
   await activeCell.getByText("Tabs", { exact: true }).click();
+  await waitForEditorSelection(page);
   await page.keyboard.press("Escape");
   const nextCell = page.getByRole("cell", {
     name: "Drafting, comparing, and organizing sessions",
@@ -87,6 +97,7 @@ test("focuses table cells without changing their drag selection behavior", async
   });
 
   await activeCell.getByText("Tabs", { exact: true }).click();
+  await waitForEditorSelection(page);
   await page.keyboard.press("Escape");
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(".bn-editor .selectedCell"))
@@ -500,6 +511,35 @@ test("keeps the table when the cut shortcut is pressed with the caret in a cell"
   await expect(table.locator("tr")).toHaveCount(rowCount);
   await expect(page.getByRole("cell", { name: "Tabs" }).first()).toBeVisible();
   await expectEditorFocused(page);
+});
+
+test("Escape widens the caret in a cell to the cell, its row, the table, then nothing", async ({ page }) => {
+  await loadTemplatePreview(page);
+  await page.getByRole("button", { name: "Use this template" }).click();
+  const tabsCell = page.getByRole("cell", { name: "Tabs", exact: true }).first();
+  const tabsRowCells = page.locator(".bn-editor tr")
+    .filter({ has: page.getByRole("cell", { name: "Tabs", exact: true }) })
+    .first()
+    .locator("td, th");
+  const selectedCells = page.locator(".bn-editor .selectedCell");
+  const selectedBlocks = page.locator(".bn-editor [data-block-selected='true']");
+  await tabsCell.getByText("Tabs", { exact: true }).click();
+  await waitForEditorSelection(page);
+  const rowCellCount = await tabsRowCells.count();
+
+  await page.keyboard.press("Escape");
+  await expect(selectedCells).toHaveText(["Tabs"]);
+  await page.keyboard.press("Escape");
+  await expect(selectedCells).toHaveCount(rowCellCount);
+  await expect(tabsRowCells.and(page.locator(".selectedCell"))).toHaveCount(rowCellCount);
+  await page.keyboard.press("Escape");
+  await expect(selectedCells).toHaveCount(0);
+  await expect(selectedBlocks.locator("table")).toHaveCount(1);
+  await expectEditorFocused(page);
+  await page.keyboard.press("Escape");
+  await expect(selectedBlocks).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest(".bn-editor"))))
+    .toBe(false);
 });
 
 test("keeps the editor focused after a row handle action and Escape, so Cmd+Z undoes it", async ({ page }) => {

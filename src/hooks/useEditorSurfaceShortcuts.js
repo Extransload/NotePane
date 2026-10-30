@@ -5,6 +5,7 @@ import {
 } from "../editor/blocks.js";
 import {
   createBlockSetSelection,
+  isBlockSetSelection,
 } from "../editor/blockSelection.js";
 import {
   applyEditorColor,
@@ -50,6 +51,11 @@ import {
   SideMenuExtension,
 } from "@blocknote/core/extensions";
 import {
+  Selection,
+  TextSelection,
+} from "@tiptap/pm/state";
+import {
+  CellSelection,
   mergeCells,
   splitCell,
 } from "prosemirror-tables";
@@ -60,9 +66,28 @@ import {
   useEffect,
   useRef,
 } from "react";
+// Floating menus and toolbars that close on their own Escape before Escape selects a block.
+const ESCAPE_OWNING_FLOATING_UI = [
+  ".bn-suggestion-menu",
+  ".bn-formatting-toolbar",
+  ".bn-link-toolbar",
+  ".bn-menu-dropdown",
+  ".mantine-Popover-dropdown",
+].join(", ");
+
+function blockContainerIdAt($pos) {
+  for (let depth = $pos.depth; depth > 0; depth -= 1) {
+    if ($pos.node(depth).type.name === "blockContainer") {
+      return $pos.node(depth).attrs.id;
+    }
+  }
+  return null;
+}
+
 /**
  * Every capture-phase handler that the editor surface needs: toggle-list keys,
  * table cell navigation and merge/split, the text selection toolbar escape,
+ * Escape's widening selection, a code block's edge keys,
  * column auto-fit on double click, and Tab handling. They are registered as a
  * single unit so their capture order stays fixed.
  */
@@ -308,7 +333,12 @@ export function useEditorSurfaceShortcuts({
       }
     };
 
-    const handleTableCellModeEscapeKeyDownCapture = (event) => {
+    // Escape widens the selection a step at a time, as in Notion. The caret in a table cell
+    // selects the cell, then its row, then the table; the caret or text in any other block, a code
+    // block included, selects that block; and a selected block lets go, leaving nothing selected
+    // and the editor without focus. Until then the editor keeps focus, so Cmd+Z works straight
+    // away, after a row or column handle action too.
+    const handleEscapeKeyDownCapture = (event) => {
       const view = editor.prosemirrorView;
       const selection = view?.state.selection;
       if (
@@ -317,38 +347,98 @@ export function useEditorSurfaceShortcuts({
         event.ctrlKey ||
         event.altKey ||
         event.shiftKey ||
+        event.isComposing ||
+        !selection ||
         !isEditorShortcutTarget(event.target)
       ) {
         return;
       }
-
-      // Escape from selected cells selects the table block, as in Notion. The editor keeps focus,
-      // so Cmd+Z works straight away, after a row or column handle action too.
-      if (selection?.$anchorCell && selection?.$headCell) {
+      const claimEscape = () => {
         event.preventDefault();
         event.stopPropagation();
-        const { $anchorCell } = selection;
-        let depth = $anchorCell.depth;
-        while (depth > 0 && $anchorCell.node(depth).type.name !== "blockContainer") {
-          depth -= 1;
-        }
-        const tableBlock = createBlockSetSelection(view.state.doc, [$anchorCell.node(depth).attrs.id]);
-        if (tableBlock) {
-          view.dispatch(view.state.tr.setSelection(tableBlock));
+      };
+
+      if (selection.$anchorCell && selection.$headCell) {
+        claimEscape();
+        const isOneCell = selection.$anchorCell.pos === selection.$headCell.pos;
+        const nextSelection = isOneCell && !selection.isRowSelection()
+          ? CellSelection.rowSelection(selection.$anchorCell)
+          : createBlockSetSelection(view.state.doc, [blockContainerIdAt(selection.$anchorCell)]);
+        if (nextSelection) {
+          view.dispatch(view.state.tr.setSelection(nextSelection));
         }
         setIsTableCellSelectionDismissed(true);
         setIsEditorActive(true);
         return;
       }
 
-      if (!selection?.empty) {
+      if (isBlockSetSelection(selection)) {
+        claimEscape();
+        view.dispatch(view.state.tr.setSelection(Selection.near(selection.$from)));
+        view.dom.blur();
         return;
       }
 
-      if (selectCurrentTableCell(editor)) {
+      if (!(selection instanceof TextSelection)) {
+        return;
+      }
+      // A menu or toolbar open over the text closes on its own Escape first; a copy fading out
+      // after it closed is inert.
+      const isFloatingUiOpen = [...document.querySelectorAll(ESCAPE_OWNING_FLOATING_UI)].some(
+        (element) =>
+          isVisibleElement(element) && !element.closest("[inert], [style*='pointer-events: none']"),
+      );
+
+      if ((selection.empty || !isFloatingUiOpen) && selectCurrentTableCell(editor)) {
+        claimEscape();
+        setIsEditorActive(true);
+        return;
+      }
+      if (isFloatingUiOpen) {
+        return;
+      }
+
+      const blockIds = selection.$from.sameParent(selection.$to)
+        ? [blockContainerIdAt(selection.$from)]
+        : (editor.getSelection()?.blocks ?? []).map(({ id }) => id);
+      const blockSelection = createBlockSetSelection(view.state.doc, blockIds);
+      if (blockSelection) {
+        claimEscape();
+        view.dispatch(view.state.tr.setSelection(blockSelection));
+        setIsEditorActive(true);
+      }
+    };
+
+    // As in Notion, Backspace at the start of a code block and Delete in an empty one leave the
+    // block as it is; Escape selects the block, and Delete or Backspace then removes it.
+    const handleCodeBlockEdgeKeyDownCapture = (event) => {
+      const selection = editor.prosemirrorView?.state.selection;
+      if (
+        (event.key !== "Backspace" && event.key !== "Delete") ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey ||
+        event.isComposing ||
+        !(selection instanceof TextSelection) ||
+        !selection.empty ||
+        selection.$from.parent.type.name !== "codeBlock" ||
+        !isEditorShortcutTarget(event.target)
+      ) {
+        return;
+      }
+      const { $from } = selection;
+      const { state } = editor.prosemirrorView;
+      // Backspace right after "```" gives the typed text back (src/editor/markdownShortcuts.js).
+      if (
+        event.key === "Backspace" &&
+        state.plugins.some((plugin) => plugin.spec.isInputRules && plugin.getState(state))
+      ) {
+        return;
+      }
+      if (event.key === "Backspace" ? $from.parentOffset === 0 : $from.parent.content.size === 0) {
         event.preventDefault();
         event.stopPropagation();
-        setIsEditorActive(true);
       }
     };
 
@@ -443,10 +533,11 @@ export function useEditorSurfaceShortcuts({
     };
 
     document.addEventListener("keydown", handleTableLineDeleteKeyDownCapture, true);
+    document.addEventListener("keydown", handleCodeBlockEdgeKeyDownCapture, true);
     document.addEventListener("keydown", handleEditorKeyDownCapture, true);
     document.addEventListener("keydown", handleTextSelectionToolbarEscape, true);
     document.addEventListener("keydown", handleTableCellArrowKeyDownCapture, true);
-    document.addEventListener("keydown", handleTableCellModeEscapeKeyDownCapture, true);
+    document.addEventListener("keydown", handleEscapeKeyDownCapture, true);
     document.addEventListener("keydown", handleTableCellMergeSplitKeyDownCapture, true);
     document.addEventListener("dblclick", handleTableColumnDoubleClickCapture, true);
     window.addEventListener("mousedown", handleTableColumnResizeMouseDownCapture, true);
@@ -455,10 +546,11 @@ export function useEditorSurfaceShortcuts({
     document.addEventListener("keydown", handleEditorTabKeyDown);
     return () => {
       document.removeEventListener("keydown", handleTableLineDeleteKeyDownCapture, true);
+      document.removeEventListener("keydown", handleCodeBlockEdgeKeyDownCapture, true);
       document.removeEventListener("keydown", handleEditorKeyDownCapture, true);
       document.removeEventListener("keydown", handleTextSelectionToolbarEscape, true);
       document.removeEventListener("keydown", handleTableCellArrowKeyDownCapture, true);
-      document.removeEventListener("keydown", handleTableCellModeEscapeKeyDownCapture, true);
+      document.removeEventListener("keydown", handleEscapeKeyDownCapture, true);
       document.removeEventListener("keydown", handleTableCellMergeSplitKeyDownCapture, true);
       document.removeEventListener("dblclick", handleTableColumnDoubleClickCapture, true);
       window.removeEventListener("mousedown", handleTableColumnResizeMouseDownCapture, true);

@@ -339,6 +339,31 @@ test("starts a new code block in the language picked last", async ({ page }) => 
   await expect(pythonToolbars).toHaveCount(3);
 });
 
+test("keeps a code block on Backspace and Delete at its edges, and removes it once Escape selects it", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("``` ");
+  const codeBlocks = page.locator(".bn-editor [data-content-type='codeBlock']");
+  await expect(codeBlocks).toHaveCount(1);
+
+  // Past the Backspace that gives the three backticks back, with the block empty again.
+  await page.keyboard.type("x");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.press("Delete");
+  await expect(codeBlocks).toHaveCount(1);
+
+  await page.keyboard.type("x = 1");
+  await page.keyboard.press("Home");
+  await page.keyboard.press("Backspace");
+  await expect(codeBlocks.locator("code")).toHaveText("x = 1");
+
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-editor [data-block-selected='true'] [data-content-type='codeBlock']"))
+    .toHaveCount(1);
+  await page.keyboard.press("Delete");
+  await expect(codeBlocks).toHaveCount(0);
+});
+
 test("selects only the current code block with Command+A", async ({ page }) => {
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await clickLastEmptyParagraph(page);
