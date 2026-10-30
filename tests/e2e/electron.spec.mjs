@@ -2625,6 +2625,70 @@ test("Electron moves a sticky window when dragging its header", async () => {
   }
 });
 
+// The packaged renderer runs from file://, where fetch() of a file beside the page fails and the CSP
+// governs WebAssembly. One code block per WebAssembly formatter, each loading its module its own
+// way: a fetched data: URL (clang-format), Vite's ?init helper (ruff, StyLua, shfmt, tex-fmt), and
+// a brotli-compressed artifact expanded by brotli-dec-wasm (rustfmt, swift-format, Syntax Tree).
+test("prettifies WebAssembly-formatted code blocks in the built app", async () => {
+  const cases = [
+    { language: "c", label: "C", input: "int main(){return 0;}", output: "int main() { return 0; }" },
+    {
+      language: "python",
+      label: "Python",
+      input: "result={'value':42}",
+      output: "result = {\"value\": 42}",
+    },
+    { language: "lua", label: "Lua", input: "local x={1,2}", output: "local x = { 1, 2 }" },
+    { language: "shellscript", label: "Shell", input: "if true;then echo hi;fi", output: "if true; then echo hi; fi" },
+    {
+      language: "latex",
+      label: "LaTeX",
+      input: "\\begin{itemize}\n\\item a\n\\end{itemize}",
+      output: "\\begin{itemize}\n  \\item a\n\\end{itemize}",
+    },
+    { language: "rust", label: "Rust", input: "fn main(){let x=1;}", output: "fn main() {\n    let x = 1;\n}" },
+    { language: "swift", label: "Swift", input: "let x=[1,2]", output: "let x = [1, 2]" },
+    { language: "ruby", label: "Ruby", input: "def f(a,b) a+b end", output: "def f(a, b)\n  a + b\nend" },
+  ];
+  const userDataDirectory = createTemporaryDirectory("notepane-code-format-");
+  writeInitialNotes(userDataDirectory, [{
+    id: "code-note",
+    title: "Code note",
+    blocksJSON: JSON.stringify(cases.map(({ language, input }) => ({
+      id: `code-${language}`,
+      type: "codeBlock",
+      props: { language },
+      content: [{ type: "text", text: input, styles: {} }],
+      children: [],
+    }))),
+    createdAt: 1,
+    updatedAt: 1,
+  }]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    expect(new URL(page.url()).protocol).toBe("file:");
+    // WebAssembly compilation is the one thing script-src adds to 'self'.
+    const scriptSource = await page.evaluate(() =>
+      document.querySelector('meta[http-equiv="Content-Security-Policy"]').getAttribute("content")
+        .split(";").map((directive) => directive.trim()).find((directive) => directive.startsWith("script-src")));
+    expect(scriptSource).toBe("script-src 'self' 'wasm-unsafe-eval'");
+    await expect(page.locator("[data-content-type='codeBlock']")).toHaveCount(cases.length);
+    for (const { language, label, output } of cases) {
+      const codeBlock = page.locator(`.bn-block-outer[data-id='code-${language}'] [data-content-type='codeBlock']`);
+      await codeBlock.hover();
+      const toolbar = page.getByRole("toolbar", { name: `${label} code block actions`, exact: true });
+      await toolbar.getByRole("button", { name: `Prettify ${label} code`, exact: true }).click();
+      await expect(toolbar.getByRole("button", { name: `${label} code prettified`, exact: true }))
+        .toHaveText("Formatted");
+      expect(await codeBlock.locator("code").evaluate((code) => code.textContent)).toBe(output);
+    }
+  } finally {
+    await electronApp.close();
+  }
+});
+
 async function launchApp(userDataDirectory, exportDirectory, extraEnvironment = {}) {
   return electron.launch({
     args: ["."],

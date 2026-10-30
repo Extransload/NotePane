@@ -1,6 +1,7 @@
 import {
   codeBlockOptions,
 } from "@blocknote/code-block";
+import { loadCodeFormatEngine } from "./codeFormatEngines.js";
 
 export const CODE_FORMAT_LANGUAGE_ALIASES = {
   js: "javascript",
@@ -29,6 +30,44 @@ export const CODE_FORMATTERS = {
   mdx: { parser: "mdx", plugins: ["markdown"] },
   yaml: { parser: "yaml", plugins: ["yaml"] },
   graphql: { parser: "graphql", plugins: ["graphql"] },
+  // "auto", the plugin's default, looks for composer.json through Node's process and fs. PHP's
+  // coding standard (PSR-12) indents by four spaces.
+  php: { parser: "php", plugins: ["php"], options: { phpVersion: "8.5", tabWidth: 4 } },
+  // Prettier's XML default keeps every whitespace run, which leaves minified XML on one line.
+  xml: { parser: "xml", plugins: ["xml"], options: { xmlWhitespaceSensitivity: "ignore" } },
+  svelte: { parser: "svelte", plugins: ["svelte", "babel", "estree", "postcss"] },
+  glsl: { parser: "glsl-parser", plugins: ["glsl"] },
+  c: { engine: "clangFormat", fileName: "main.c", style: "Google" },
+  cpp: { engine: "clangFormat", fileName: "main.cpp", style: "Google" },
+  "objective-c": { engine: "clangFormat", fileName: "main.m", style: "Google" },
+  java: { engine: "clangFormat", fileName: "Main.java", style: "Google" },
+  csharp: { engine: "clangFormat", fileName: "Main.cs", style: "Microsoft" },
+  python: { engine: "ruff" },
+  lua: { engine: "stylua" },
+  shellscript: { engine: "shfmt" },
+  latex: { engine: "texFmt" },
+  rust: { engine: "rustfmt" },
+  swift: { engine: "swiftFormat" },
+  ruby: { engine: "syntaxTree" },
+  sql: { engine: "sqlFormatter" },
+  sass: { engine: "sassFormatter" },
+};
+
+// The code block languages without Prettify, each with the reason. Every language the code block
+// offers is either in CODE_FORMATTERS or here (tests/unit/codeFormatting.test.cjs checks it).
+export const CODE_LANGUAGES_WITHOUT_FORMATTER = {
+  text: "Plain text has no syntax to format.",
+  regexp: "A regular expression has no layout to format, and its whitespace is significant.",
+  mermaid: "There is no Mermaid formatter.",
+  haml: "HAML is formatted only by Ruby tools (haml-lint), with no browser build.",
+  pug: "@prettier/plugin-pug runs only in Node: it reads process.env when it loads and imports node:util.",
+  julia: "JuliaFormatter runs only in Julia.",
+  r: "R formatters (styler, air) have no browser or WebAssembly build.",
+  haskell: "Ormolu and Fourmolu have no published WebAssembly or JavaScript build.",
+  scala: "scalafmt has no maintained JavaScript or WebAssembly build.",
+  kotlin: "The one WebAssembly Kotlin formatter, @scalar/kotlin-fmt, requires Node 24.15, so the engine-strict install on Node 22 refuses it.",
+  wasm: "There is no WebAssembly text formatter that keeps comments.",
+  wgsl: "The one WGSL formatter, @wasm-fmt/wgslfmt 0.1.0, breaks code: it joins `@vertex fn` into `@vertexfn`.",
 };
 
 export const CODE_FORMAT_PLUGIN_LOADERS = {
@@ -40,6 +79,10 @@ export const CODE_FORMAT_PLUGIN_LOADERS = {
   markdown: () => import("prettier/plugins/markdown"),
   yaml: () => import("prettier/plugins/yaml"),
   graphql: () => import("prettier/plugins/graphql"),
+  php: () => import("@prettier/plugin-php/standalone"),
+  xml: () => import("@prettier/plugin-xml"),
+  svelte: () => import("prettier-plugin-svelte/browser"),
+  glsl: () => import("prettier-plugin-glsl"),
 };
 
 export const loadedCodeFormatPlugins = new Map();
@@ -131,6 +174,11 @@ export async function formatCodeForLanguage(code, language) {
     return formatJsonLines(code);
   }
 
+  if (formatter.engine) {
+    const format = await loadCodeFormatEngine(formatter.engine);
+    return normalizeFormattedCode(await format(code, formatter));
+  }
+
   const [{ format }, plugins] = await Promise.all([
     import("prettier/standalone"),
     Promise.all(formatter.plugins.map(loadCodeFormatPlugin)),
@@ -141,7 +189,15 @@ export async function formatCodeForLanguage(code, language) {
     printWidth: 100,
     tabWidth: 2,
     useTabs: false,
+    ...formatter.options,
   });
+  return normalizeFormattedCode(formattedCode);
+}
+
+function normalizeFormattedCode(formattedCode) {
+  if (typeof formattedCode !== "string") {
+    throw new Error("The formatter returned no code.");
+  }
   return formattedCode.replace(/\r\n?/g, "\n").replace(/\n$/, "");
 }
 
@@ -151,7 +207,11 @@ export function loadCodeFormatPlugin(pluginName) {
     if (!loader) {
       throw new Error(`Unknown code format plugin: ${pluginName}`);
     }
-    loadedCodeFormatPlugins.set(pluginName, loader());
+    // Plugins published with a default export (php, xml, svelte) are that object.
+    loadedCodeFormatPlugins.set(
+      pluginName,
+      loader().then((plugin) => plugin.default ?? plugin),
+    );
   }
   return loadedCodeFormatPlugins.get(pluginName);
 }
