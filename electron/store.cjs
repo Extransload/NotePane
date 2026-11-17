@@ -1905,10 +1905,11 @@ function normalizeTheme(value, fallback = DEFAULT_NOTE_THEME) {
       : fallbackTheme.tabTextColor ?? DEFAULT_NOTE_THEME.tabTextColor;
 
   return {
-    tabTextColor: normalizeHexColor(
-      source.tabTextColor,
-      migratedTabTextColor,
-    ),
+    // "No color" sends an explicit null, which clears the colour; a missing value keeps the
+    // previous one.
+    tabTextColor: source.tabTextColor === null
+      ? null
+      : normalizeHexColor(source.tabTextColor, migratedTabTextColor),
     tabTextOpacity: normalizeOpacity(
       source.tabTextOpacity,
       fallbackTheme.tabTextOpacity,

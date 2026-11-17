@@ -268,6 +268,22 @@ test("derives note titles from content until the title is manually edited", () =
   assert.equal(store.getNote(note.id).title, "Manual title");
 });
 
+test("No color clears a session's tab colour, and leaving the colour out keeps it", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+  const note = store.createNote({ width: 900, height: 700 });
+
+  store.updateAppearance(note.id, { theme: { tabTextColor: "#ffd7e8", tabTextOpacity: 1 } });
+  assert.equal(store.getNote(note.id).theme.tabTextColor, "#ffd7e8");
+
+  store.updateAppearance(note.id, { theme: { tabTextOpacity: 1 } });
+  assert.equal(store.getNote(note.id).theme.tabTextColor, "#ffd7e8");
+
+  store.updateAppearance(note.id, { theme: { tabTextColor: null, tabTextOpacity: 1 } });
+  assert.equal(store.getNote(note.id).theme.tabTextColor, null);
+  assert.equal(new StickyStore(directory).getNote(note.id).theme.tabTextColor, null);
+});
+
 test("updates the global app theme from dark back to light", () => {
   const directory = createTemporaryDirectory();
   const store = new StickyStore(directory);

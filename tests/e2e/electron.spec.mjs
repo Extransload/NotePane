@@ -234,15 +234,15 @@ test("a reloaded window starts with the theme chosen after it opened", async () 
   }
 });
 
-test("a TablePeek theme persists across a restart", async () => {
+test("a theme adapted from TablePeek persists across a restart", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-theme-");
   const firstRun = await launchApp(userDataDirectory);
   try {
     const page = await firstRun.firstWindow();
     await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
-    await chooseAppTheme(page, "tablepeek-dark");
+    await chooseAppTheme(page, "aura-dark");
     await expect.poll(() => readStoredAppTheme(userDataDirectory))
-      .toEqual({ themeId: "tablepeek-dark", mode: "dark" });
+      .toEqual({ themeId: "aura-dark", mode: "dark" });
   } finally {
     await firstRun.close();
   }
@@ -251,11 +251,43 @@ test("a TablePeek theme persists across a restart", async () => {
   try {
     const page = await secondRun.firstWindow();
     await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
-    expect(readStoredAppTheme(userDataDirectory)).toEqual({ themeId: "tablepeek-dark", mode: "dark" });
-    await expect(page.locator("html")).toHaveAttribute("data-theme-id", "tablepeek-dark");
-    expect(await readRootToken(page, "--sticky-shell-bg")).toBe(themePalette("tablepeek-dark").window);
+    expect(readStoredAppTheme(userDataDirectory)).toEqual({ themeId: "aura-dark", mode: "dark" });
+    await expect(page.locator("html")).toHaveAttribute("data-theme-id", "aura-dark");
+    expect(await readRootToken(page, "--sticky-shell-bg")).toBe(themePalette("aura-dark").window);
   } finally {
     await secondRun.close();
+  }
+});
+
+// "No color" in the tab menu stores no colour, and the tab stays plain after a restart.
+test("No color clears a tab's colour and it stays cleared", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-tab-color-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "alpha", title: "Alpha", createdAt: 1, updatedAt: 1 },
+  ]);
+  let electronApp = await launchApp(userDataDirectory);
+  try {
+    const page = await electronApp.firstWindow();
+    const tab = page.locator(".session-tab-row").first();
+    await expect(tab).toBeVisible();
+    await tab.click({ button: "right" });
+    await page.getByRole("group", { name: "Tab color" }).getByRole("button", { name: "Pastel color 2" }).click();
+    await expect.poll(() => readStoredNote(userDataDirectory, "alpha").theme?.tabTextColor).toBe("#ffd7e8");
+
+    await tab.click({ button: "right" });
+    await page.getByRole("group", { name: "Tab color" }).getByRole("button", { name: "No color" }).click();
+    await expect.poll(() => readStoredNote(userDataDirectory, "alpha").theme?.tabTextColor).toBeNull();
+    await expect(tab).toHaveClass(/\bis-plain\b/);
+  } finally {
+    await electronApp.close();
+  }
+
+  electronApp = await launchApp(userDataDirectory);
+  try {
+    const page = await electronApp.firstWindow();
+    await expect(page.locator(".session-tab-row").first()).toHaveClass(/\bis-plain\b/);
+  } finally {
+    await electronApp.close();
   }
 });
 
