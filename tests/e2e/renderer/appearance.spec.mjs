@@ -1662,7 +1662,8 @@ test("shows NotePane, its version and what it is on the About page", async ({ pa
 });
 
 // A desktop bridge with one note whose update check waits until `__updateCheck.release()`, then
-// answers with `result`.
+// answers with `result`. `__appUpdate.emit(state)` reports the Mac self-updater's state, and
+// `__appUpdate.calls` records Restart to update and the release page.
 function stubAboutBridge({ updateMode, result }) {
   const note = {
     id: "about-note",
@@ -1680,6 +1681,15 @@ function stubAboutBridge({ updateMode, result }) {
   };
   let release = null;
   window.__updateCheck = { release: () => release?.() };
+  const updateListeners = new Set();
+  let updateState = { status: updateMode === "self" ? "idle" : "off" };
+  window.__appUpdate = {
+    calls: [],
+    emit: (state) => {
+      updateState = state;
+      updateListeners.forEach((listener) => listener(state));
+    },
+  };
   window.blocknoteSticky = {
     getCurrentNoteId: async () => note.id,
     getNote: async () => note,
@@ -1704,17 +1714,27 @@ function stubAboutBridge({ updateMode, result }) {
       });
       return result;
     },
+    getAppUpdateState: async () => updateState,
+    onAppUpdateState: (listener) => {
+      updateListeners.add(listener);
+      return () => updateListeners.delete(listener);
+    },
+    installAppUpdate: async () => {
+      window.__appUpdate.calls.push("install");
+    },
+    openUpdateRelease: async (version) => {
+      window.__appUpdate.calls.push(`release ${version}`);
+    },
   };
 }
 
-for (const { name, updateMode, result, status, detail, download } of [
+for (const { name, updateMode, result, status, detail } of [
   {
-    name: "offers the release page for a newer version the app cannot install itself",
-    updateMode: "notify",
-    result: { status: "available", mode: "notify", version: "1.5.0" },
+    name: "says a newer version downloads by itself on a Mac",
+    updateMode: "self",
+    result: { status: "available", mode: "self", version: "1.5.0" },
     status: "NotePane 1.5.0 is available",
-    detail: null,
-    download: `${RELEASES_URL}/tag/v1.5.0`,
+    detail: "It downloads in the background, then Restart to update installs it.",
   },
   {
     name: "says a newer version installs when NotePane quits",
@@ -1722,7 +1742,6 @@ for (const { name, updateMode, result, status, detail, download } of [
     result: { status: "available", mode: "auto", version: "1.5.0" },
     status: "NotePane 1.5.0 is available",
     detail: "It downloads in the background and installs when NotePane quits.",
-    download: null,
   },
   {
     name: "says the running version is up to date",
@@ -1730,15 +1749,13 @@ for (const { name, updateMode, result, status, detail, download } of [
     result: { status: "up-to-date", mode: "auto", version: "1.4.0" },
     status: "NotePane 1.4.0 is up to date",
     detail: null,
-    download: null,
   },
   {
     name: "says a failed check could not run, with the reason",
-    updateMode: "notify",
-    result: { status: "error", mode: "notify", message: "net::ERR_INTERNET_DISCONNECTED" },
+    updateMode: "self",
+    result: { status: "error", mode: "self", message: "net::ERR_INTERNET_DISCONNECTED" },
     status: "Could not check for updates",
     detail: "net::ERR_INTERNET_DISCONNECTED",
-    download: null,
   },
 ]) {
   test(`About page update check ${name}`, async ({ page }) => {
@@ -1769,12 +1786,44 @@ for (const { name, updateMode, result, status, detail, download } of [
       const danger = await resolveColorToken(page, "--sticky-danger-color");
       await expect.poll(() => statusLine.evaluate((element) => getComputedStyle(element).color)).toBe(danger);
     }
-    const downloadLink = about.getByRole("link", { name: "Download" });
-    if (download) {
-      await expect(downloadLink).toHaveAttribute("href", download);
-      await expect(downloadLink).toHaveAttribute("target", "_blank");
-    } else {
-      await expect(downloadLink).toHaveCount(0);
-    }
+    await expect(about.getByRole("button", { name: "Restart to update" })).toHaveCount(0);
+    await expect(about.getByRole("button", { name: "Download" })).toHaveCount(0);
   });
 }
+
+// The Mac build downloads a release by itself; once it is in, Restart to update shows in the
+// tabs header and on the About page, and either one starts the install.
+test("a downloaded release offers Restart to update in the header and on the About page", async ({ page }) => {
+  await page.addInitScript(stubAboutBridge, { updateMode: "self", result: null });
+  await page.reload();
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  const pill = page.getByRole("button", { name: "Restart to update to NotePane 1.5.0" });
+  await page.evaluate(() => window.__appUpdate.emit({ status: "downloading", version: "1.5.0" }));
+  await expect(pill).toHaveCount(0);
+
+  const about = await openAboutPage(page);
+  const statusLine = about.getByTestId("update-status");
+  await expect(statusLine).toHaveText("Downloading NotePane 1.5.0…");
+  await page.evaluate(() => window.__appUpdate.emit({ status: "ready", version: "1.5.0" }));
+  await expect(statusLine).toHaveText("NotePane 1.5.0 is ready");
+  await about.getByRole("button", { name: "Restart to update" }).click();
+  await expect.poll(() => page.evaluate(() => window.__appUpdate.calls)).toEqual(["install"]);
+
+  await page.keyboard.press("Escape");
+  await expect(pill).toBeVisible();
+  await pill.click();
+  await expect.poll(() => page.evaluate(() => window.__appUpdate.calls)).toEqual(["install", "install"]);
+});
+
+test("a copy that cannot replace itself offers the release page instead", async ({ page }) => {
+  await page.addInitScript(stubAboutBridge, { updateMode: "self", result: null });
+  await page.reload();
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  await page.evaluate(() => window.__appUpdate.emit({ status: "manual", version: "1.5.0" }));
+  await page.getByRole("button", { name: "Download NotePane 1.5.0" }).click();
+  const about = await openAboutPage(page);
+  await expect(about.getByTestId("update-status")).toHaveText("NotePane 1.5.0 is available");
+  await about.getByRole("button", { name: "Download" }).click();
+  await expect.poll(() => page.evaluate(() => window.__appUpdate.calls))
+    .toEqual(["release 1.5.0", "release 1.5.0"]);
+});

@@ -18,7 +18,8 @@
 | `electron/assetOpen.cjs` | Open from the media menu: a web address goes to the browser, anything else opens as a copy named after its block in the temp folder, limited to media files so a note cannot launch a program (`assets:open`; `assets:reveal` shows a linked local file in Finder) |
 | `electron/bookmarkMetadata.cjs` | the `bookmarks:fetch-metadata` IPC behind a bookmark card: reads a public http(s) page's title, description, site name and preview image, refusing other schemes and loopback, private and link-local addresses (redirects included), within 5 s and 1 MB |
 | `electron/preload.cjs` | safe renderer bridge |
-| `electron/appUpdates.cjs` | update checks for a packaged app against GitHub Releases: install on quit, or offer the release page from an ad-hoc signed Mac build; `checkNow()` behind the About page's `app:check-for-updates` IPC, and `compareVersions` |
+| `electron/appUpdates.cjs` | update checks for a packaged app against GitHub Releases: install on quit (Windows, a Developer ID Mac build), or hand each newer release to the Mac self-updater; `checkNow()` behind the About page's `app:check-for-updates` IPC, and `compareVersions` |
+| `electron/macSelfUpdate.cjs` | the ad-hoc signed Mac build updating itself as TablePeek does: download the release zip, check its SHA-512 and version, and on "Restart to update" swap the bundle in with a detached script after the app quits; IPC `app-update:get-state`, `app-update:install`, `app-update:open-release` and the `app-update:state` broadcast in `electron/main.cjs` |
 | `electron-builder.config.cjs` | packaging, signing and publishing; `.github/workflows/release.yml` runs it on a version tag (see `docs/release.md`) |
 | `scripts/homebrew-cask.mjs` | the Homebrew cask for a published release; `.github/workflows/homebrew.yml` pushes it to `Extransload/homebrew-tap` |
 | `electron/themes.json` | the theme definitions (palette, code theme, overrides), the single source read by the renderer (`src/style/themes.js`) and the main process (`electron/windowTheme.cjs`, `electron/store.cjs`) |
@@ -97,7 +98,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | The look settings (`editorPreferences.look`): defaults, ranges, surface presets, built-in background pictures; the store keeps a twin normaliser and keeps background pictures through asset clean-up | `src/model/look.js`, `electron/store.cjs` |
 | Applying the look: attributes and `--look-*` variables on `<html>` (`useLookStyles`, its pure half `getLookStyles`) and the rules that read them; the default look changes nothing on screen | `src/hooks/useLookStyles.js`, `src/styles/look.css` |
 | Picking a background picture: `look:pick-background` stores the file as an asset (at most 32 MB) | `electron/main.cjs`, `electron/preload.cjs` |
-| Preferences > About: version, description, Electron/Chromium versions, the manual update check (`app:info`, `app:check-for-updates`) | `src/ui/aboutPreferences.jsx` |
+| Preferences > About: version, description, Electron/Chromium versions, the manual update check (`app:info`, `app:check-for-updates`), and the Mac self-updater's download and Restart to update | `src/ui/aboutPreferences.jsx` |
+| "Restart to update" in the tabs header once a release has downloaded, or the release page for a copy that cannot replace itself | `src/ui/UpdatePill.jsx`, `src/hooks/useAppUpdate.js`, update pill section of `src/styles/chrome.css` |
 | Sticky shell and session tab computed styles | `src/style/themeStyles.js` |
 | Colour conversion and contrast | `src/style/colorMath.js` |
 | The window's session list and trash: load on startup, `notes:changed` updates, create, select, reorder, move to Trash, restore, purge, the undo toast after a move to Trash | `src/hooks/useSessionList.js` |

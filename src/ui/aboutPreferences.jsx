@@ -17,6 +17,9 @@ import {
   preventFocusLoss,
 } from "../editor/images.js";
 import {
+  useAppUpdate,
+} from "../hooks/useAppUpdate.js";
+import {
   NotePaneWordmark,
 } from "./icons.jsx";
 import {
@@ -38,7 +41,7 @@ function describeUpdateCheck(update) {
         text: `NotePane ${update.version} is available`,
         detail: update.mode === "auto"
           ? "It downloads in the background and installs when NotePane quits."
-          : null,
+          : "It downloads in the background, then Restart to update installs it.",
       };
     case "off":
       return { text: "Update checks run in the installed app" };
@@ -49,6 +52,35 @@ function describeUpdateCheck(update) {
   }
 }
 
+// What the Mac self-updater (useAppUpdate) has to say, when it is past a plain check: a download
+// on its way, a release ready to install, or one this copy cannot install itself.
+function describeSelfUpdate(selfUpdate) {
+  switch (selfUpdate.status) {
+    case "downloading":
+      return { text: `Downloading NotePane ${selfUpdate.version}…` };
+    case "ready":
+      return {
+        text: `NotePane ${selfUpdate.version} is ready`,
+        detail: "Restart to start using it. Your notes are saved first.",
+      };
+    case "installing":
+      return { text: "Restarting to update…" };
+    case "manual":
+      return {
+        text: `NotePane ${selfUpdate.version} is available`,
+        detail: "This copy cannot replace itself: it runs from the disk image or from a folder you cannot write to. Download it from its release page.",
+      };
+    case "error":
+      return {
+        text: `Could not download NotePane ${selfUpdate.version}`,
+        detail: selfUpdate.message,
+        tone: "error",
+      };
+    default:
+      return null;
+  }
+}
+
 /**
  * Preferences > About: the wordmark, the running version, what NotePane is, and a manual update
  * check. The browser preview has no bridge, so it shows the package version and no update check.
@@ -56,6 +88,7 @@ function describeUpdateCheck(update) {
 export function AboutPreferencesSection() {
   const [appInfo, setAppInfo] = useState(null);
   const [update, setUpdate] = useState({ status: "idle" });
+  const { update: selfUpdate, installUpdate, openRelease } = useAppUpdate();
 
   useEffect(() => {
     if (!electronApi?.getAppInfo) {
@@ -90,8 +123,9 @@ export function AboutPreferencesSection() {
 
   const version = appInfo?.version ?? PACKAGE_VERSION;
   const checking = update.status === "checking";
-  const { text, detail, tone } = describeUpdateCheck(update);
-  const offersDownload = update.status === "available" && update.mode === "notify";
+  const selfDescription = checking ? null : describeSelfUpdate(selfUpdate);
+  const shownStatus = selfDescription ? selfUpdate.status : update.status;
+  const { text, detail, tone } = selfDescription ?? describeUpdateCheck(update);
 
   return (
     <>
@@ -125,27 +159,37 @@ export function AboutPreferencesSection() {
               }`}
               role="status"
               data-testid="update-status"
-              data-update-status={update.status}
+              data-update-status={shownStatus}
               title={tone === "error" ? detail : undefined}
             >
-              <span key={update.status} className="about-update-status-text">{text}</span>
+              <span key={shownStatus} className="about-update-status-text">{text}</span>
             </div>
             {detail && (
               <div className="preferences-section-description about-update-detail">{detail}</div>
             )}
           </div>
           <div className="preference-backup-actions">
-            {offersDownload && (
-              <a
+            {selfUpdate.status === "ready" && (
+              <button
+                type="button"
                 className="preference-data-button"
-                href={`${RELEASES_URL}/tag/v${update.version}`}
-                target="_blank"
-                rel="noreferrer"
                 onMouseDown={preventFocusLoss}
+                onClick={installUpdate}
+              >
+                <RefreshCw size={13} aria-hidden="true" />
+                Restart to update
+              </button>
+            )}
+            {selfUpdate.status === "manual" && (
+              <button
+                type="button"
+                className="preference-data-button"
+                onMouseDown={preventFocusLoss}
+                onClick={openRelease}
               >
                 <Download size={13} aria-hidden="true" />
                 Download
-              </a>
+              </button>
             )}
             <button
               type="button"

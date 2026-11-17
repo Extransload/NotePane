@@ -4,10 +4,10 @@
 const RELEASES_URL = "https://github.com/Extransload/NotePane/releases";
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
-// "auto" downloads in the background and installs on quit. "notify" only
-// offers the release page: Squirrel.Mac installs an update only into an app
-// signed with a Developer ID, so an ad-hoc signed Mac build cannot update
-// itself. The build records which kind it is in package.json `notepane`.
+// "auto" downloads in the background and installs on quit (Windows, and a Mac build signed with
+// a Developer ID). "self" is the ad-hoc signed Mac build, which Squirrel.Mac will not update:
+// electron/macSelfUpdate.cjs downloads the release and swaps it in on "Restart to update". The
+// build records which kind it is in package.json `notepane`.
 function resolveUpdateMode({ isPackaged, enabled, platform, macAutoUpdate }) {
   if (!isPackaged || !enabled) {
     return "off";
@@ -16,7 +16,7 @@ function resolveUpdateMode({ isPackaged, enabled, platform, macAutoUpdate }) {
     return "auto";
   }
   if (platform === "darwin") {
-    return macAutoUpdate ? "auto" : "notify";
+    return macAutoUpdate ? "auto" : "self";
   }
   return "off";
 }
@@ -46,8 +46,7 @@ function compareVersions(left, right) {
 function startAppUpdates({
   mode,
   loadUpdater,
-  dialog,
-  shell,
+  onUpdateAvailable = () => {},
   log = console,
   schedule = setInterval,
 }) {
@@ -62,38 +61,10 @@ function startAppUpdates({
   updater.logger = null;
   updater.autoDownload = mode === "auto";
   updater.on("error", warn);
-
-  // A check started from Preferences > About shows its result on that page, so it opens no
-  // dialog; the version counts as offered, and no later check offers it again.
-  let manualChecks = 0;
-
-  if (mode === "notify") {
-    const offeredVersions = new Set();
-    updater.on("update-available", ({ version }) => {
-      if (offeredVersions.has(version)) {
-        return;
-      }
-      offeredVersions.add(version);
-      if (manualChecks > 0) {
-        return;
-      }
-      void dialog
-        .showMessageBox({
-          type: "info",
-          message: `NotePane ${version} is available`,
-          detail: "Download it from the release page and replace the copy in Applications.",
-          buttons: ["Download", "Later"],
-          defaultId: 0,
-          cancelId: 1,
-        })
-        .then(({ response }) => {
-          if (response === 0) {
-            return shell.openExternal(`${RELEASES_URL}/tag/v${version}`);
-          }
-          return undefined;
-        })
-        .catch(warn);
-    });
+  if (mode === "self") {
+    // Every check that finds a newer release, the About page's included, hands it on; the
+    // self-updater fetches each release once.
+    updater.on("update-available", (updateInfo) => onUpdateAvailable(updateInfo));
   }
 
   // A failed check also emits "error", which already logged it.
@@ -103,16 +74,11 @@ function startAppUpdates({
     return Promise.resolve(pending).catch(() => {});
   };
   // Resolves with the newest published version (which can be the running one), or null when
-  // the updater returns no release; a failed check rejects. In "auto" mode a newer release
-  // downloads as it does after the startup check.
+  // the updater returns no release; a failed check rejects. A newer release downloads as it does
+  // after the startup check.
   const checkNow = async () => {
-    manualChecks += 1;
-    try {
-      const result = await updater.checkForUpdates();
-      return result?.updateInfo?.version ?? null;
-    } finally {
-      manualChecks -= 1;
-    }
+    const result = await updater.checkForUpdates();
+    return result?.updateInfo?.version ?? null;
   };
   void check();
   const timer = schedule(check, UPDATE_CHECK_INTERVAL_MS);

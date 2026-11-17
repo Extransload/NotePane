@@ -71,8 +71,9 @@ cask "notepane" do
     strategy :github_latest
   end
 
-  # No auto_updates: an ad-hoc signed Mac build cannot replace itself, so the
-  # app only links to the release and \`brew upgrade\` installs it.
+  # The app downloads each release and swaps it in itself (electron/macSelfUpdate.cjs), so
+  # \`brew upgrade\` leaves it alone unless asked with --greedy.
+  auto_updates true
   depends_on arch: :arm64
   depends_on macos: :monterey
 

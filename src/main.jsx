@@ -262,6 +262,8 @@ import { useEditorSurfaceShortcuts } from "./hooks/useEditorSurfaceShortcuts.js"
 import { useSmoothCaret } from "./hooks/useSmoothCaret.js";
 import { useLaunchIntro } from "./hooks/useLaunchIntro.js";
 import { LaunchIntro } from "./ui/LaunchIntro.jsx";
+import { useAppUpdate } from "./hooks/useAppUpdate.js";
+import { UpdatePill } from "./ui/UpdatePill.jsx";
 import { useFindInNote } from "./hooks/useFindInNote.js";
 import { FindInNote, getFindSeedText } from "./editor/findInNote.js";
 import { FindBar } from "./ui/FindBar.jsx";
@@ -1701,6 +1703,7 @@ function StickyEditor({
 
   useSmoothCaret(editor, editorSurfaceRef, normalizedEditorPreferences);
   const { isLaunchIntroVisible, finishLaunchIntro } = useLaunchIntro();
+  const { update: appUpdate, installUpdate, openRelease } = useAppUpdate();
 
   useEditorSurfaceShortcuts({
     activeImageBlockId,
@@ -2474,6 +2477,7 @@ function StickyEditor({
               )}
             </div>
             <SaveStatus status={saveStatus.status} sequence={saveStatus.sequence} />
+            <UpdatePill update={appUpdate} onInstall={installUpdate} onOpenRelease={openRelease} />
           </>
         )}
         <div

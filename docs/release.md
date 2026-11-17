@@ -64,15 +64,21 @@ note data; GitHub sees an ordinary download request.
 
 - **Windows:** the update downloads in the background and installs when the app quits.
 - **macOS, signed build:** the same.
-- **macOS, unsigned build:** macOS only lets an app replace itself when it is signed with a Developer ID, so the app
-  shows "NotePane x.y.z is available" with a **Download** button that opens the release page.
+- **macOS, unsigned build:** Squirrel.Mac only updates an app signed with a Developer ID, so the app updates itself as
+  TablePeek does (`electron/macSelfUpdate.cjs`): it downloads the release's `-arm64-mac.zip` named in
+  `latest-mac.yml`, checks its SHA-512 against the one listed there, unpacks it with `ditto` and checks its version.
+  Then **Restart to update** appears in the tabs window's header and in Preferences > About (the sticky layout asks in
+  a dialog). It saves the notes and quits; a detached script waits for the app to end, copies the new bundle beside
+  the old one, swaps them (putting the old one back if the swap fails) and opens NotePane. A copy that cannot be
+  replaced (run from the disk image, translocated by Gatekeeper, or in a folder the user cannot write) offers the
+  release page instead. Versions before 0.5.1 only open the release page, so they need one manual update. The
+  Homebrew cask says `auto_updates true`, so `brew upgrade` leaves the app's own updates alone.
 
 Preferences > About has **Check for updates**, which runs the same check at once (`checkNow()` through the
-`app:check-for-updates` IPC) and shows the result on the page: up to date, a newer version (with a **Download** link to
-its release on an unsigned Mac build, or a note that it installs when NotePane quits where the app updates itself), or
-the reason a check failed. A version found this way opens no dialog, and a version the startup check already offered
-is not offered again. In development, test builds and the browser preview the page says "Update checks run in the
-installed app". Versions are compared by their numbers (`compareVersions`), so 0.10.0 is newer than 0.9.2.
+`app:check-for-updates` IPC) and shows the result on the page: up to date, a newer version (downloading, then
+**Restart to update** on a Mac, or a note that it installs when NotePane quits on Windows), or the reason a check
+failed. In development, test builds and the browser preview the page says "Update checks run in the installed app".
+Versions are compared by their numbers (`compareVersions`), so 0.10.0 is newer than 0.9.2.
 
 ## Signing
 

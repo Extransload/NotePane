@@ -35,6 +35,14 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
   getAppInfo: () => ipcRenderer.invoke("app:info"),
   checkForUpdates: () => ipcRenderer.invoke("app:check-for-updates"),
   takeLaunchIntro: () => ipcRenderer.invoke("app:take-launch-intro"),
+  getAppUpdateState: () => ipcRenderer.invoke("app-update:get-state"),
+  installAppUpdate: () => ipcRenderer.invoke("app-update:install"),
+  openUpdateRelease: (version) => ipcRenderer.invoke("app-update:open-release", version),
+  onAppUpdateState: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on("app-update:state", listener);
+    return () => ipcRenderer.removeListener("app-update:state", listener);
+  },
   getAppTheme: () => ipcRenderer.invoke("app-theme:get"),
   updateAppTheme: (payload) => ipcRenderer.invoke("app-theme:update", payload),
   getLayoutMode: () => ipcRenderer.invoke("layout-mode:get"),

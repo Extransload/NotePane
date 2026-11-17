@@ -2,7 +2,6 @@ const { EventEmitter } = require("events");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
-  RELEASES_URL,
   UPDATE_CHECK_INTERVAL_MS,
   compareVersions,
   resolveUpdateMode,
@@ -27,7 +26,7 @@ test("checks for updates only in an enabled packaged app on a platform that ship
   assert.equal(resolveUpdateMode({ ...packaged, platform: "linux", macAutoUpdate: true }), "off");
   assert.equal(resolveUpdateMode({ ...packaged, platform: "win32", macAutoUpdate: false }), "auto");
   assert.equal(resolveUpdateMode({ ...packaged, platform: "darwin", macAutoUpdate: true }), "auto");
-  assert.equal(resolveUpdateMode({ ...packaged, platform: "darwin", macAutoUpdate: false }), "notify");
+  assert.equal(resolveUpdateMode({ ...packaged, platform: "darwin", macAutoUpdate: false }), "self");
 });
 
 test("never loads the updater when updates are off", () => {
@@ -51,41 +50,30 @@ test("downloads and installs automatically, and checks again on an interval", as
   assert.equal(harness.updater.calls.checkForUpdates, 0);
   assert.deepEqual(harness.scheduled.map(({ delay }) => delay), [UPDATE_CHECK_INTERVAL_MS]);
   assert.equal(harness.scheduled[0].unrefCalled, true);
-  assert.equal(harness.dialogCalls.length, 0);
 });
 
-test("points to the release page when the app cannot install updates itself", async () => {
-  const harness = createHarness({ mode: "notify", dialogResponse: 0 });
+test("hands each release a check finds to the Mac self-updater, which downloads it", async () => {
+  const harness = createHarness({ mode: "self" });
   assert.equal(harness.updater.autoDownload, false);
   assert.equal(harness.updater.calls.checkForUpdates, 1);
   assert.equal(harness.updater.calls.checkForUpdatesAndNotify, 0);
 
-  harness.updater.emit("update-available", { version: "0.2.0" });
-  await harness.settle();
-  assert.equal(harness.dialogCalls.length, 1);
-  assert.match(harness.dialogCalls[0].message, /NotePane 0\.2\.0 is available/);
-  assert.deepEqual(harness.dialogCalls[0].buttons, ["Download", "Later"]);
-  assert.deepEqual(harness.openedUrls, [`${RELEASES_URL}/tag/v0.2.0`]);
-
-  // The same version is offered once per run, however often the interval check finds it.
-  harness.updater.emit("update-available", { version: "0.2.0" });
-  await harness.settle();
-  assert.equal(harness.dialogCalls.length, 1);
+  const updateInfo = { version: "0.2.0", files: [] };
+  harness.updater.emit("update-available", updateInfo);
+  harness.updater.emit("update-available", updateInfo);
+  assert.deepEqual(harness.available, [updateInfo, updateInfo]);
 });
 
-test("opens nothing when the user chooses Later", async () => {
-  const harness = createHarness({ mode: "notify", dialogResponse: 1 });
+test("Windows hands nothing to the Mac self-updater", () => {
+  const harness = createHarness({ mode: "auto" });
   harness.updater.emit("update-available", { version: "0.2.0" });
-  await harness.settle();
-  assert.equal(harness.dialogCalls.length, 1);
-  assert.deepEqual(harness.openedUrls, []);
+  assert.deepEqual(harness.available, []);
 });
 
-test("logs each failed check once instead of throwing or showing a dialog", async () => {
+test("logs each failed check once instead of throwing", async () => {
   const harness = createHarness({ mode: "auto", failChecks: true });
   await harness.started.check();
   await harness.settle();
-  assert.equal(harness.dialogCalls.length, 0);
   // One startup check and one explicit check, each reported once.
   assert.deepEqual(harness.warnings, [
     "Update check failed: offline",
@@ -94,7 +82,7 @@ test("logs each failed check once instead of throwing or showing a dialog", asyn
 });
 
 test("a check from the About page resolves with the newest published version", async () => {
-  for (const mode of ["auto", "notify"]) {
+  for (const mode of ["auto", "self"]) {
     const harness = createHarness({ mode, latestVersion: "0.4.0" });
     const startupCalls = { ...harness.updater.calls };
     assert.equal(await harness.started.checkNow(), "0.4.0");
@@ -105,48 +93,16 @@ test("a check from the About page resolves with the newest published version", a
 });
 
 test("a check from the About page rejects when the check fails", async () => {
-  const harness = createHarness({ mode: "notify", failChecks: true });
+  const harness = createHarness({ mode: "self", failChecks: true });
   await assert.rejects(harness.started.checkNow(), /offline/);
 });
 
-test("a check from the About page opens no dialog, now or for that version later", async () => {
-  const harness = createHarness({ mode: "notify", latestVersion: "0.4.0", dialogResponse: 0 });
-  harness.updater.checkForUpdates = () => {
-    harness.updater.calls.checkForUpdates += 1;
-    harness.updater.emit("update-available", { version: "0.4.0" });
-    return Promise.resolve({ updateInfo: { version: "0.4.0" } });
-  };
-  assert.equal(await harness.started.checkNow(), "0.4.0");
-  await harness.settle();
-  assert.equal(harness.dialogCalls.length, 0);
-
-  // The interval check finds the same version and leaves it to the About page.
-  await harness.scheduled[0].callback();
-  await harness.settle();
-  assert.equal(harness.dialogCalls.length, 0);
-  assert.deepEqual(harness.openedUrls, []);
-});
-
-test("a version the startup check offered is not offered again by the About page check", async () => {
-  const harness = createHarness({ mode: "notify", dialogResponse: 1 });
-  harness.updater.emit("update-available", { version: "0.4.0" });
-  await harness.settle();
-  assert.equal(harness.dialogCalls.length, 1);
-  harness.updater.checkForUpdates = () => {
-    harness.updater.emit("update-available", { version: "0.4.0" });
-    return Promise.resolve({ updateInfo: { version: "0.4.0" } });
-  };
-  assert.equal(await harness.started.checkNow(), "0.4.0");
-  await harness.settle();
-  assert.equal(harness.dialogCalls.length, 1);
-});
-
 test("replaces the updater's own console logging", () => {
-  const harness = createHarness({ mode: "notify" });
+  const harness = createHarness({ mode: "self" });
   assert.equal(harness.updater.logger, null);
 });
 
-function createHarness({ mode, dialogResponse = 1, failChecks = false, latestVersion = null }) {
+function createHarness({ mode, failChecks = false, latestVersion = null }) {
   const updater = new EventEmitter();
   updater.autoDownload = true;
   updater.logger = console;
@@ -164,25 +120,13 @@ function createHarness({ mode, dialogResponse = 1, failChecks = false, latestVer
   updater.checkForUpdates = () => respond("checkForUpdates");
   updater.checkForUpdatesAndNotify = () => respond("checkForUpdatesAndNotify");
 
-  const dialogCalls = [];
-  const openedUrls = [];
+  const available = [];
   const warnings = [];
   const scheduled = [];
   const started = startAppUpdates({
     mode,
     loadUpdater: () => updater,
-    dialog: {
-      showMessageBox: (options) => {
-        dialogCalls.push(options);
-        return Promise.resolve({ response: dialogResponse });
-      },
-    },
-    shell: {
-      openExternal: (url) => {
-        openedUrls.push(url);
-        return Promise.resolve();
-      },
-    },
+    onUpdateAvailable: (updateInfo) => available.push(updateInfo),
     log: { warn: (message) => warnings.push(message) },
     schedule: (callback, delay) => {
       const timer = {
@@ -201,8 +145,7 @@ function createHarness({ mode, dialogResponse = 1, failChecks = false, latestVer
   return {
     updater,
     started,
-    dialogCalls,
-    openedUrls,
+    available,
     warnings,
     scheduled,
     settle: () => new Promise((resolve) => setImmediate(resolve)),

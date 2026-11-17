@@ -2,7 +2,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { fileURLToPath } = require("url");
-const { execFile } = require("child_process");
+const { execFile, spawn } = require("child_process");
 const { promisify } = require("util");
 const {
   app,
@@ -13,6 +13,7 @@ const {
   nativeImage,
   shell,
   dialog,
+  net,
   protocol,
   screen,
 } = require("electron");
@@ -43,7 +44,13 @@ const {
   writeExportEntries,
 } = require("./noteExport.cjs");
 const { fetchBookmarkMetadata } = require("./bookmarkMetadata.cjs");
-const { compareVersions, resolveUpdateMode, startAppUpdates } = require("./appUpdates.cjs");
+const {
+  RELEASES_URL,
+  compareVersions,
+  resolveUpdateMode,
+  startAppUpdates,
+} = require("./appUpdates.cjs");
+const { createMacSelfUpdater } = require("./macSelfUpdate.cjs");
 const packageInfo = require("../package.json");
 
 const APP_NAME = "NotePane";
@@ -112,6 +119,12 @@ let backupOperationInProgress = false;
 // Set once the app is ready (startAppUpdates); null while update checks are off.
 let updateMode = "off";
 let appUpdates = null;
+// The Mac build's own updater ("self" mode); null elsewhere.
+let selfUpdater = null;
+// Set by "Restart to update": the quit that follows starts the installer.
+let installUpdateOnQuit = false;
+// Versions the sticky layout has already been told about in a dialog.
+const announcedUpdateVersions = new Set();
 const manuallyClosedStickyNoteIds = new Set();
 // Find queries waiting for a window to pick them up, keyed by window id. A
 // window that is still loading cannot receive `find:open` yet, so it pulls its
@@ -1280,6 +1293,15 @@ function installIpcHandlers() {
       return { status, mode: updateMode, version: status === "available" ? latestVersion : app.getVersion() };
     } catch (error) {
       return { status: "error", mode: updateMode, message: String(error?.message ?? error) };
+    }
+  });
+
+  // The Mac self-updater's state, "Restart to update", and the release page for a download by hand.
+  ipcMain.handle("app-update:get-state", () => selfUpdater?.getState() ?? { status: "off" });
+  ipcMain.handle("app-update:install", () => installAppUpdate());
+  ipcMain.handle("app-update:open-release", (_event, version) => {
+    if (typeof version === "string" && /^\d+\.\d+\.\d+/.test(version)) {
+      openReleasePage(version);
     }
   });
 
@@ -2470,11 +2492,23 @@ app.whenReady().then(() => {
     platform: process.platform,
     macAutoUpdate: Boolean(packageInfo.notepane?.macAutoUpdate),
   });
+  if (updateMode === "self") {
+    selfUpdater = createMacSelfUpdater({
+      releasesUrl: RELEASES_URL,
+      execPath: process.execPath,
+      arch: process.arch,
+      pid: process.pid,
+      tempDir: app.getPath("temp"),
+      fetch: (url) => net.fetch(url),
+      run: (command, args) => execFileAsync(command, args),
+      spawnDetached: (command, args) => spawn(command, args, { detached: true, stdio: "ignore" }).unref(),
+      onState: handleAppUpdateState,
+    });
+  }
   appUpdates = startAppUpdates({
     mode: updateMode,
     loadUpdater: () => require("electron-updater").autoUpdater,
-    dialog,
-    shell,
+    onUpdateAvailable: (updateInfo) => void selfUpdater?.prepare(updateInfo),
   });
 
   app.on("activate", () => {
@@ -2535,6 +2569,11 @@ app.on("before-quit", (event) => {
 async function flushThenQuit() {
   const outcomes = await flushEditorWindows();
   if (!(await confirmFlushOutcomes(outcomes, getPrimaryEntry()?.window))) {
+    // The quit was called off, so the update waits for the next "Restart to update".
+    if (installUpdateOnQuit) {
+      installUpdateOnQuit = false;
+      selfUpdater?.markReady();
+    }
     return;
   }
   flushedBeforeQuit = true;
@@ -2542,6 +2581,67 @@ async function flushThenQuit() {
     entry.flushedBeforeClose = true;
   }
   app.quit();
+}
+
+// "Restart to update": the windows flush and close as for any quit, then the installer starts
+// and swaps the new app in once this process has ended.
+app.on("will-quit", () => {
+  if (installUpdateOnQuit) {
+    selfUpdater?.launchInstaller();
+  }
+});
+
+// The self-updater's state reaches every window: the tabs window's "Restart to update" and
+// Settings > About. The sticky layout has no place for it, so a release that is ready, or one to
+// download by hand, is offered there once in a dialog.
+function handleAppUpdateState(state) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send("app-update:state", state);
+    }
+  }
+  const offer = state.status === "ready" || state.status === "manual";
+  if (!offer || store.getLayoutMode() !== "sticky" || announcedUpdateVersions.has(state.version)) {
+    return;
+  }
+  announcedUpdateVersions.add(state.version);
+  const ready = state.status === "ready";
+  void dialog
+    .showMessageBox({
+      type: "info",
+      message: `NotePane ${state.version} is ${ready ? "ready" : "available"}`,
+      detail: ready
+        ? "Restart NotePane to start using it. Your notes are saved first."
+        : "This copy of NotePane cannot replace itself. Download the new version from its release page.",
+      buttons: [ready ? "Restart to Update" : "Download", "Later"],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    .then(({ response }) => {
+      if (response !== 0) {
+        return;
+      }
+      if (ready) {
+        installAppUpdate();
+      } else {
+        openReleasePage(state.version);
+      }
+    })
+    .catch(() => {});
+}
+
+function installAppUpdate() {
+  if (!selfUpdater?.isReady() || installUpdateOnQuit) {
+    return false;
+  }
+  installUpdateOnQuit = true;
+  selfUpdater.markInstalling();
+  app.quit();
+  return true;
+}
+
+function openReleasePage(version) {
+  openExternalUrl(`${RELEASES_URL}/tag/v${version}`);
 }
 
 app.on("window-all-closed", () => {

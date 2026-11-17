@@ -41,10 +41,12 @@
   numbers, shortcuts, new tab colour and colour strength
 - Preferences > About: the NotePane wordmark, "Version x.y.z", a short description of the app and, in the desktop
   app, the Electron and Chromium versions. Its Updates card has **Check for updates**, with a status line (checking,
-  up to date, "NotePane x.y.z is available" with a **Download** link to the release on an unsigned Mac build or "installs
-  when NotePane quits" where the app updates itself, "Update checks run in the installed app" in development, test
-  builds and the browser preview, or "Could not check for updates" with the reason), and a **Release notes** link to
-  the GitHub releases page
+  up to date, "NotePane x.y.z is available", "installs when NotePane quits" on Windows, "Update checks run in the
+  installed app" in development, test builds and the browser preview, or "Could not check for updates" with the
+  reason), and a **Release notes** link to the GitHub releases page
+- Updates on a Mac as in TablePeek: a newer release downloads by itself, then **Restart to update** shows in the tabs
+  window's header and on the About page (the sticky layout asks in a dialog). It saves the notes, quits, swaps the new
+  app in and opens it. A copy run from the disk image or a folder it cannot write offers the release page instead
 - Preferences > Shortcuts lists every command as a 40px table row: name, on/off switch, the keys (click to record
   new ones) and Reset
 - Default editor font family for every session; there is no font size setting, text size follows the app zoom

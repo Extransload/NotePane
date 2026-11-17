@@ -63,6 +63,67 @@
   }
 }
 
+/* "Restart to update" (src/ui/UpdatePill.jsx), at the right of the tabs header: an accent pill
+   that washes in once a release has downloaded. */
+.update-pill {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  margin-left: auto;
+  padding: 0 11px;
+  border: 1px solid color-mix(in srgb, var(--notepane-control-accent) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--notepane-control-accent) 14%, transparent);
+  color: var(--sticky-text-color);
+  font: 650 12px/1 var(--notepane-ui-font);
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  animation: updatePillIn 520ms var(--notepane-motion-ease-out, ease-out) both;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.update-pill:hover:not(:disabled) {
+  border-color: var(--notepane-control-accent);
+  background: color-mix(in srgb, var(--notepane-control-accent) 24%, transparent);
+}
+
+.update-pill:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.update-pill svg {
+  color: var(--notepane-control-accent);
+}
+
+.update-pill .is-spinning {
+  animation: updatePillSpin 900ms linear infinite;
+}
+
+@keyframes updatePillIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--notepane-control-accent) 30%, transparent);
+  }
+}
+
+@keyframes updatePillSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-pill,
+  .update-pill .is-spinning {
+    animation: none;
+  }
+}
+
 /* Without motion, "Saved" disappears at once when the fade would end. */
 @media (prefers-reduced-motion: reduce) {
   .save-status[data-status="saved"] .save-status-label {
