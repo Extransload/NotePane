@@ -85,6 +85,8 @@ export const DEFAULT_LOOK = Object.freeze({
     menus: Object.freeze({ fill: null, opacity: 88, blur: 24, border: "hairline" }),
     settings: Object.freeze({ fill: null, opacity: 92, blur: 24, border: "hairline" }),
   }),
+  // Over a background that shows through, text gets a soft halo of the window colour.
+  readableText: true,
   tabs: Object.freeze({
     style: "outline",
     height: "regular",
@@ -96,21 +98,17 @@ export const DEFAULT_LOOK = Object.freeze({
   }),
 });
 
-const presetAreas = (values) =>
-  Object.freeze(
-    Object.fromEntries(
-      LOOK_AREAS.map((area, index) =>
-        [area, Object.freeze({ opacity: values[index][0], blur: values[index][1] })],
-      ),
-    ),
-  );
-
-// Opacity and blur for every area at once; fill and border stay as the user set them.
-export const SURFACE_PRESETS = Object.freeze({
-  solid: presetAreas([[100, 0], [100, 0], [100, 0], [100, 0], [100, 0]]),
-  frosted: presetAreas([[55, 24], [45, 20], [72, 16], [70, 24], [78, 30]]),
-  clear: presetAreas([[22, 6], [15, 6], [38, 0], [55, 14], [62, 18]]),
-});
+// Settings > Look > Background sets every area at once, as Tern's Material and Opacity do:
+// Solid hides the background, Frosted blurs what shows through, Clear leaves it sharp.
+export const SURFACE_MATERIALS = ["solid", "frosted", "clear"];
+// Frosted's blur for each area; the editor, which holds the text, the least.
+const FROSTED_BLUR = { sidebar: 24, header: 20, editor: 12, menus: 24, settings: 30 };
+// Menus and Settings carry small text over whatever lies under them, so they stay at least this
+// opaque.
+const FLOATING_AREAS = ["menus", "settings"];
+const FLOATING_MIN_OPACITY = 80;
+// The opacity Frosted and Clear start from after Solid, which keeps no opacity of its own.
+export const DEFAULT_SURFACE_OPACITY = DEFAULT_LOOK.surfaces.sidebar.opacity;
 
 const asObject = (value) => (value && typeof value === "object" && !Array.isArray(value) ? value : {});
 
@@ -237,23 +235,52 @@ export function normalizeLook(value) {
     surfaces: Object.fromEntries(
       LOOK_AREAS.map((area) => [area, normalizeSurface(surfaces[area], DEFAULT_LOOK.surfaces[area])]),
     ),
+    readableText: normalizeBoolean(source.readableText, DEFAULT_LOOK.readableText),
     tabs: normalizeTabs(source.tabs),
   };
 }
 
-// The look with every area's opacity and blur taken from the named preset.
-export function applySurfacePreset(look, presetName) {
-  const normalized = normalizeLook(look);
-  const preset = Object.hasOwn(SURFACE_PRESETS, presetName) ? SURFACE_PRESETS[presetName] : null;
-  if (!preset) {
-    return normalized;
-  }
+// The surfaces as Settings shows them: their material, the opacity of the window's own areas,
+// and their border, all read from the sidebar.
+export function getSurfaceStyle(look) {
+  const { surfaces } = normalizeLook(look);
+  const { sidebar } = surfaces;
+  const material = LOOK_AREAS.every((area) => surfaces[area].opacity === 100)
+    ? "solid"
+    : sidebar.blur > 0
+      ? "frosted"
+      : "clear";
   return {
+    material,
+    opacity: sidebar.opacity === 100 ? DEFAULT_SURFACE_OPACITY : sidebar.opacity,
+    border: sidebar.border,
+  };
+}
+
+// The look with every area set from one material, opacity and border. An area's own fill goes,
+// as Settings no longer sets areas one by one.
+export function applySurfaceStyle(look, { material, opacity, border }) {
+  const normalized = normalizeLook(look);
+  const current = getSurfaceStyle(normalized);
+  const chosenMaterial = SURFACE_MATERIALS.includes(material) ? material : current.material;
+  const chosenOpacity = normalizeNumber(opacity, current.opacity, 0, 100, 1);
+  const chosenBorder = normalizeChoice(border, ["none", "hairline", "strong"], current.border);
+  return normalizeLook({
     ...normalized,
     surfaces: Object.fromEntries(
-      LOOK_AREAS.map((area) => [area, { ...normalized.surfaces[area], ...preset[area] }]),
+      LOOK_AREAS.map((area) => [area, {
+        fill: null,
+        opacity: chosenMaterial === "solid"
+          ? 100
+          : FLOATING_AREAS.includes(area)
+            ? Math.max(chosenOpacity, FLOATING_MIN_OPACITY)
+            : chosenOpacity,
+        blur: chosenMaterial === "frosted" ? FROSTED_BLUR[area] : 0,
+        // The editor has no edge of its own to draw a border on.
+        border: area === "editor" ? "none" : chosenBorder,
+      }]),
     ),
-  };
+  });
 }
 
 // The URL a background picture value points at: a built-in picture's bundled file, or the

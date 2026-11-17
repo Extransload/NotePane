@@ -316,3 +316,15 @@ html[data-tab-strength] .session-tab-row:not(.is-plain):hover {
 html[data-tab-strength] .session-tab-row:not(.is-plain).active {
   background: color-mix(in srgb, var(--session-tab-active-bg) var(--look-tab-strength), transparent);
 }
+
+/* Keep text readable (look.readableText): while the background shows through, the text of the
+   window's own areas gets a soft halo of the window colour, so it stays legible over a bright or
+   busy picture. The muted labels move halfway to the text colour. */
+html[data-look-readable] .session-sidebar,
+html[data-look-readable] .sticky-header,
+html[data-look-readable] .sticky-editor-surface {
+  --sticky-muted-color: color-mix(in srgb, var(--sticky-text-color) 50%, var(--sticky-panel-muted));
+  text-shadow:
+    0 0 1px color-mix(in srgb, var(--sticky-effective-bg) 90%, transparent),
+    0 0 8px color-mix(in srgb, var(--sticky-effective-bg) 85%, transparent);
+}

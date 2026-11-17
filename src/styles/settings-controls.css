@@ -140,8 +140,6 @@
   .settings-slider-step,
   .settings-swatch,
   .settings-position-grid button,
-  .settings-area-picker button,
-  .settings-surface-preset,
   .settings-picture-tile,
   .settings-picture-remove,
   .settings-button,
@@ -402,126 +400,6 @@
   background: var(--notepane-control-accent);
 }
 
-/* Area picker: five tiles naming the parts of the window. */
-.settings-area-picker {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-  padding: 12px;
-}
-
-.settings-area-picker button {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 10px 4px;
-  border: 1px solid var(--sticky-border-color);
-  border-radius: calc(10px * var(--look-radius-scale, 1));
-  background: var(--sticky-panel-bg);
-  color: var(--sticky-panel-text);
-  font: 500 12px/1.2 var(--notepane-ui-font);
-  cursor: pointer;
-}
-
-.settings-area-picker button:hover {
-  background: var(--sticky-control-hover-bg);
-}
-
-.settings-area-picker button span {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.settings-area-picker svg {
-  width: 18px;
-  height: 18px;
-  color: var(--sticky-panel-muted);
-}
-
-.settings-area-picker button[aria-checked="true"] {
-  border-color: transparent;
-  box-shadow: 0 0 0 2px var(--notepane-control-accent);
-}
-
-.settings-area-picker button[aria-checked="true"] svg {
-  color: var(--notepane-control-accent);
-}
-
-/* Surface presets: small window sketches over the built-in picture, a sidebar and an editor
-   panel drawn at each preset's opacity and blur. */
-.settings-surface-presets {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  padding: 12px;
-}
-
-.settings-surface-preset {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-  padding: 8px 8px 10px;
-  border: 1px solid var(--sticky-border-color);
-  border-radius: calc(10px * var(--look-radius-scale, 1));
-  background: var(--sticky-panel-bg);
-  color: var(--sticky-panel-text);
-  font: 600 13px/1.25 var(--notepane-ui-font);
-  text-align: left;
-  cursor: pointer;
-}
-
-.settings-surface-preset:hover {
-  background: var(--sticky-control-hover-bg);
-}
-
-.settings-surface-preset[aria-pressed="true"] {
-  border-color: transparent;
-  box-shadow: 0 0 0 2px var(--notepane-control-accent);
-}
-
-.settings-surface-preset small {
-  color: var(--sticky-panel-muted);
-  font: 400 11.5px/1.3 var(--notepane-ui-font);
-}
-
-.settings-surface-preset-demo {
-  position: relative;
-  height: 46px;
-  margin-bottom: 5px;
-  overflow: hidden;
-  border-radius: calc(7px * var(--look-radius-scale, 1));
-  background-color: var(--sticky-control-hover-bg);
-  background-position: center;
-  background-size: cover;
-}
-
-.settings-surface-preset-demo i,
-.settings-surface-preset-demo b {
-  position: absolute;
-  top: 6px;
-  bottom: 6px;
-  border-radius: calc(5px * var(--look-radius-scale, 1));
-}
-
-.settings-surface-preset-demo i {
-  left: 6px;
-  width: 34%;
-  background: color-mix(in srgb, var(--sticky-sidebar-bg) var(--preset-side-opacity), transparent);
-  backdrop-filter: blur(var(--preset-side-blur));
-}
-
-.settings-surface-preset-demo b {
-  right: 6px;
-  left: calc(34% + 10px);
-  background: color-mix(in srgb, var(--sticky-editor-bg) var(--preset-main-opacity), transparent);
-  backdrop-filter: blur(var(--preset-main-blur));
-}
-
 /* Picture tiles: 16:10 thumbnails, the chosen one ringed in the accent, and a + tile last. */
 .settings-picture-tiles,
 .settings-picture-choices {
@@ -699,9 +577,5 @@
 @media (max-width: 760px) {
   .settings-row-text {
     max-width: 56%;
-  }
-
-  .settings-area-picker {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

@@ -6,7 +6,6 @@ import {
   Image as ImageIcon,
   Info,
   Keyboard,
-  Layers,
   Search,
   SlidersHorizontal,
   Sun,
@@ -51,7 +50,6 @@ import {
 import {
   BackgroundLookPage,
   FontsLookPage,
-  SurfacesLookPage,
   TabsLookPage,
   ThemeLookPage,
 } from "./lookPreferences.jsx";
@@ -82,7 +80,6 @@ export const PREFERENCE_PAGE_GROUPS = [
       { id: "theme", label: "Theme", Icon: Sun },
       { id: "fonts", label: "Fonts", Icon: Type },
       { id: "background", label: "Background", Icon: ImageIcon },
-      { id: "surfaces", label: "Surfaces", Icon: Layers },
       { id: "tabs", label: "Tabs", Icon: AppWindow },
     ],
   },
@@ -109,9 +106,10 @@ export const PREFERENCE_PAGES = PREFERENCE_PAGE_GROUPS.flatMap(({ label, pages }
 const DEFAULT_PREFERENCE_PAGE_ID = "theme";
 
 // Pages that were merged into others keep opening where their settings went: the app theme left
-// General for Theme.
+// General for Theme, and Surfaces became the Window group of Background.
 const RENAMED_PREFERENCE_PAGES = {
   general: "theme",
+  surfaces: "background",
 };
 
 export function normalizePreferencePageId(pageId) {
@@ -162,11 +160,10 @@ export const SETTINGS_INDEX = [
   { page: "background", id: "backgroundTint", title: "Tint", description: "Wash the background with a colour.", keywords: "tint overlay colour color wash" },
   { page: "background", id: "backgroundBehindStickies", title: "Behind sticky notes", description: "Show the background in sticky note windows too.", keywords: "sticky notes windows background" },
   { page: "background", id: "backgroundDimInDark", title: "Dim in dark mode", description: "Darken the background while the theme is dark.", keywords: "dim dark mode night background" },
-  { page: "surfaces", id: "surfaceFill", title: "Fill", description: "The colour of the chosen area.", keywords: "surface fill colour color area sidebar title bar editor menus" },
-  { page: "surfaces", id: "surfaceOpacity", title: "Opacity", description: "How much of the background shows through the area.", keywords: "opacity transparency transparent see-through glass surface" },
-  { page: "surfaces", id: "surfaceBlur", title: "Blur", description: "How strongly the area frosts the background.", keywords: "blur frosted glass surface" },
-  { page: "surfaces", id: "surfaceBorder", title: "Border", description: "The line around the area.", keywords: "border outline hairline edge line" },
-  { page: "surfaces", id: "surfaceApplyAll", title: "Same for every area", description: "Copy the chosen area's settings to every area.", keywords: "apply all areas copy surfaces" },
+  { page: "background", id: "surfaceMaterial", title: "Material", description: "Solid, frosted or clear glass over the background.", keywords: "material glass frosted clear solid surfaces transparent see-through window" },
+  { page: "background", id: "surfaceOpacity", title: "Opacity", description: "How much the window hides the background.", keywords: "opacity transparency transparent see-through glass surfaces window" },
+  { page: "background", id: "surfaceBorder", title: "Border", description: "The line round the sidebar, title bar and menus.", keywords: "border outline hairline edge line surfaces" },
+  { page: "background", id: "readableText", title: "Keep text readable", description: "A soft halo behind text over a background.", keywords: "readable contrast legibility halo text shadow" },
   { page: "tabs", id: "tabStyle", title: "Tab style", description: "How tabs without their own colour are drawn.", keywords: "tabs plain outline filled style" },
   { page: "tabs", id: "tabHeight", title: "Tab height", description: "Compact, regular or tall tabs.", keywords: "tabs height compact tall size" },
   { page: "tabs", id: "tabRadius", title: "Tab corner radius", description: "How round tabs are.", keywords: "tabs radius corners rounded" },
@@ -539,8 +536,6 @@ export function PreferencesWindow({
             onPickBackground={onPickBackground}
           />
         );
-      case "surfaces":
-        return <SurfacesLookPage look={look} onLookChange={updateLook} />;
       case "tabs":
         return <TabsLookPage look={look} onLookChange={updateLook} />;
       case "trash":

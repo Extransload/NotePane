@@ -31,14 +31,15 @@
   changes, and text on it stays readable
 - No light/dark toggle and no light/dark shortcut; `Command/Ctrl + Shift + L` is unbound
 - Settings window via sidebar footer button, native app menu, or `Command/Ctrl + ,`: a floating window like Tern's,
-  with a search field and pages grouped under App (Editor), Look (Theme, Fonts, Background, Surfaces, Tabs), Data
+  with a search field and pages grouped under App (Editor), Look (Theme, Fonts, Background, Tabs), Data
   (Trash, Backup) and System (Shortcuts, About). Search (`Command/Ctrl + F` while open) finds any setting and opens
   its page; holding the eye button hides the window to show the app behind it
 - Look: accent colour and corner shape; editor font, size, line height, letter spacing, block spacing, text width,
   heading font and weight, code font, size and ligatures; a background (colour, gradient or picture, with fit,
-  position, blur, brightness, saturation and tint); per area (sidebar, title bar, editor, menus, settings) fill,
-  opacity, blur and border over that background, with Solid / Frosted / Clear presets; tab style, height, radius,
-  numbers, shortcuts, new tab colour and colour strength
+  position, blur, brightness, saturation and tint) and, on the same page as Tern sets its window, the window over it:
+  Material (Solid, Frosted or Clear), one Opacity for every area (menus and Settings stay at least 80%), Border, and
+  Keep text readable (a soft halo behind text while the background shows through, on by default); tab style,
+  height, radius, numbers, shortcuts, new tab colour and colour strength
 - Preferences > About: the NotePane wordmark, "Version x.y.z", a short description of the app and, in the desktop
   app, the Electron and Chromium versions. Its Updates card has **Check for updates**, with a status line (checking,
   up to date, "NotePane x.y.z is available", "installs when NotePane quits" on Windows, "Update checks run in the

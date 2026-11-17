@@ -27,22 +27,37 @@ test("the default look leaves the app as it was", async ({ page }) => {
   expect(await rootVariable(page, "--look-editor-size")).toBe("");
 });
 
-test("a background picture shows through frosted areas", async ({ page }) => {
+test("a background picture shows through frosted glass, and text stays readable", async ({ page }) => {
   await openLookPage(page, "Background");
   await settings(page).getByRole("radio", { name: "Picture" }).click();
   await expect.poll(() => rootAttribute(page, "data-backdrop")).toBe("picture");
   expect(await rootVariable(page, "--look-backdrop-image")).toContain("dawn");
 
-  await openLookPage(page, "Surfaces");
-  await settings(page).getByRole("button", { name: /^Frosted/ }).click();
-  await expect.poll(() => rootVariable(page, "--look-sidebar-opacity")).toBe("55%");
+  // The same page sets the window over it: one material and one opacity for every area.
+  const window = settings(page).locator("[data-setting-id='surfaceMaterial']");
+  await window.getByRole("radio", { name: "Clear" }).click();
+  await settings(page).getByRole("button", { name: "Decrease Window opacity" }).click();
+  // One step down from the default 72%.
+  await expect.poll(() => rootVariable(page, "--look-sidebar-opacity")).toBe("67%");
+  expect(await rootVariable(page, "--look-sidebar-filter")).toBe("none");
+  expect(await rootVariable(page, "--look-menus-opacity")).toBe("80%");
   // The sidebar's own fill gives way to the layer drawn from these variables.
   await expect.poll(() => page.getByTestId("session-sidebar")
     .evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+  // Text over it gets a halo, until Keep text readable is turned off.
+  expect(await rootAttribute(page, "data-look-readable")).toBe("");
+  await expect.poll(() => page.getByTestId("session-sidebar")
+    .evaluate((element) => getComputedStyle(element).textShadow)).not.toBe("none");
+  await settings(page).getByRole("switch", { name: "Keep text readable" }).click();
+  await expect.poll(() => rootAttribute(page, "data-look-readable")).toBeNull();
+
+  // Solid hides the background and the opacity with it.
+  await window.getByRole("radio", { name: "Solid" }).click();
+  await expect.poll(() => rootVariable(page, "--look-sidebar-opacity")).toBe("100%");
+  await expect(settings(page).locator("[data-setting-id='surfaceOpacity']")).toHaveCount(0);
 
   // Going back to no background draws every area solid again.
-  await openLookPage(page, "Background");
-  await settings(page).getByRole("radio", { name: "None" }).click();
+  await settings(page).locator("[data-setting-id='backgroundType']").getByRole("radio", { name: "None" }).click();
   await expect.poll(() => rootAttribute(page, "data-backdrop")).toBeNull();
 });
 

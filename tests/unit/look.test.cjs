@@ -140,19 +140,27 @@ test("normalizeLook clamps, snaps and validates", async () => {
   assert.equal(normalizeLook({ accentColor: "#ABCDEF" }).accentColor, "#abcdef");
 });
 
-test("applySurfacePreset sets opacity and blur and keeps fill and border", async () => {
-  const { SURFACE_PRESETS, applySurfacePreset, normalizeLook } = await loadLook();
+test("applySurfaceStyle sets every area from one material, opacity and border", async () => {
+  const { applySurfaceStyle, getSurfaceStyle, normalizeLook, DEFAULT_LOOK } = await loadLook();
+  // The default look reads as frosted at the sidebar's opacity.
+  assert.deepEqual(getSurfaceStyle(DEFAULT_LOOK), { material: "frosted", opacity: 72, border: "hairline" });
+
   const look = normalizeLook({ surfaces: { sidebar: { fill: "#aabbcc", border: "strong" } } });
-  const frosted = applySurfacePreset(look, "frosted");
-  assert.deepEqual(frosted.surfaces.sidebar, { fill: "#aabbcc", opacity: 55, blur: 24, border: "strong" });
-  assert.deepEqual(frosted.surfaces.settings, { fill: null, opacity: 78, blur: 30, border: "hairline" });
-  for (const area of Object.keys(SURFACE_PRESETS.solid)) {
-    assert.deepEqual(
-      { opacity: applySurfacePreset(look, "solid").surfaces[area].opacity, blur: applySurfacePreset(look, "solid").surfaces[area].blur },
-      { opacity: 100, blur: 0 },
-    );
-  }
-  assert.deepEqual(applySurfacePreset(look, "unknown"), look);
+  const clear = applySurfaceStyle(look, { material: "clear", opacity: 30, border: "none" });
+  assert.deepEqual(clear.surfaces.sidebar, { fill: null, opacity: 30, blur: 0, border: "none" });
+  // Menus and Settings stay legible, and the editor draws no border.
+  assert.equal(clear.surfaces.menus.opacity, 80);
+  assert.equal(clear.surfaces.editor.border, "none");
+  assert.deepEqual(getSurfaceStyle(clear), { material: "clear", opacity: 30, border: "none" });
+
+  const frosted = applySurfaceStyle(clear, { material: "frosted" });
+  assert.deepEqual(getSurfaceStyle(frosted), { material: "frosted", opacity: 30, border: "none" });
+  assert.ok(Object.values(frosted.surfaces).every((surface) => surface.blur > 0));
+
+  // Solid hides the background everywhere; going back to glass starts from the default opacity.
+  const solid = applySurfaceStyle(frosted, { material: "solid" });
+  assert.ok(Object.values(solid.surfaces).every((surface) => surface.opacity === 100 && surface.blur === 0));
+  assert.deepEqual(getSurfaceStyle(solid), { material: "solid", opacity: 72, border: "none" });
 });
 
 test("getNextCycledTabColor takes the pastel after the newest coloured session", async () => {

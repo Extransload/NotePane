@@ -31,6 +31,11 @@ const DARK_SCHEME_DIMMING = 2 / 3;
 
 const STRONG_BORDER = "color-mix(in srgb, var(--sticky-text-color) 32%, transparent)";
 
+// The window's own areas, whose text "Keep text readable" looks after once one of them lets this
+// much of the background through.
+const READABLE_AREAS = ["sidebar", "header", "editor"];
+const READABLE_BELOW_OPACITY = 90;
+
 /**
  * The attributes and custom properties that src/styles/look.css reads for `look`. A typography
  * variable is only set when its value differs from DEFAULT_LOOK: the stylesheet falls back to
@@ -38,7 +43,7 @@ const STRONG_BORDER = "color-mix(in srgb, var(--sticky-text-color) 32%, transpar
  * decides whether a sticky window shows the backdrop (background.behindStickies).
  */
 export function getLookStyles(look, { scheme = "light", layoutMode = "tabs" } = {}) {
-  const { accentColor, corners, fonts, background, surfaces, tabs } = normalizeLook(look);
+  const { accentColor, corners, fonts, background, surfaces, readableText, tabs } = normalizeLook(look);
   const defaults = DEFAULT_LOOK;
   const attributes = {
     "data-look-corners": corners,
@@ -110,6 +115,10 @@ export function getLookStyles(look, { scheme = "light", layoutMode = "tabs" } = 
         attributes[`data-look-${area}-border`] = surface.border;
         properties[`--look-${area}-border`] = surface.border === "none" ? "transparent" : STRONG_BORDER;
       }
+    }
+    // Text over a background that shows through gets a soft halo (look.css).
+    if (readableText && READABLE_AREAS.some((area) => surfaces[area].opacity < READABLE_BELOW_OPACITY)) {
+      attributes["data-look-readable"] = "";
     }
   }
 

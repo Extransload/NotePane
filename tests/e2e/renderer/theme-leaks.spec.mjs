@@ -64,7 +64,6 @@ const PREFERENCES_SECTIONS = [
   "Theme",
   "Fonts",
   "Background",
-  "Surfaces",
   "Tabs",
   "Trash",
   "Backup",

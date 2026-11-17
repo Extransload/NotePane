@@ -1,11 +1,6 @@
 import {
-  AppWindow,
-  FileText,
-  Layers,
   Minus,
-  PanelLeft,
   Plus,
-  Settings,
 } from "lucide-react";
 import {
   useEffect,
@@ -17,7 +12,6 @@ import {
 } from "../editor/images.js";
 import {
   BACKGROUND_POSITIONS,
-  LOOK_AREAS,
 } from "../model/look.js";
 import {
   isHexColor,
@@ -363,44 +357,6 @@ export function PositionGrid({ label, value, onChange }) {
             onClick={() => onChange(position)}
             {...bindRadio(index)}
           />
-        );
-      })}
-    </div>
-  );
-}
-
-// The five areas a Look can paint, in LOOK_AREAS order, with the names the Surfaces page shows.
-export const LOOK_AREA_OPTIONS = [
-  { value: "sidebar", label: "Sidebar", Icon: PanelLeft },
-  { value: "header", label: "Title bar", Icon: AppWindow },
-  { value: "editor", label: "Editor", Icon: FileText },
-  { value: "menus", label: "Menus", Icon: Layers },
-  { value: "settings", label: "Settings", Icon: Settings },
-].filter((option) => LOOK_AREAS.includes(option.value));
-
-export function AreaPicker({ value, onChange }) {
-  const bindRadio = useRadioKeys(
-    LOOK_AREA_OPTIONS.map((option) => option.value),
-    value,
-    onChange,
-  );
-  return (
-    <div className="settings-area-picker" role="radiogroup" aria-label="Area">
-      {LOOK_AREA_OPTIONS.map(({ value: area, label, Icon }, index) => {
-        const checked = area === value;
-        return (
-          <button
-            key={area}
-            type="button"
-            role="radio"
-            aria-checked={checked ? "true" : "false"}
-            onMouseDown={preventFocusLoss}
-            onClick={() => onChange(area)}
-            {...bindRadio(index)}
-          >
-            <Icon aria-hidden="true" />
-            <span>{label}</span>
-          </button>
         );
       })}
     </div>

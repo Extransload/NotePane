@@ -2101,6 +2101,7 @@ const DEFAULT_LOOK = Object.freeze({
     menus: Object.freeze({ fill: null, opacity: 88, blur: 24, border: "hairline" }),
     settings: Object.freeze({ fill: null, opacity: 92, blur: 24, border: "hairline" }),
   }),
+  readableText: true,
   tabs: Object.freeze({
     style: "outline",
     height: "regular",
@@ -2207,6 +2208,7 @@ function normalizeLook(value) {
         }];
       }),
     ),
+    readableText: normalizeLookBoolean(source.readableText, DEFAULT_LOOK.readableText),
     tabs: {
       style: normalizeLookChoice(tabs.style, ["plain", "outline", "filled"], defaultTabs.style),
       height: normalizeLookChoice(tabs.height, ["compact", "regular", "tall"], defaultTabs.height),

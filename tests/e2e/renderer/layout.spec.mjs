@@ -721,7 +721,6 @@ const PREFERENCE_PAGE_NAMES = [
   "Theme",
   "Fonts",
   "Background",
-  "Surfaces",
   "Tabs",
   "Trash",
   "Backup",

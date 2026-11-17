@@ -17,9 +17,9 @@ import {
   BUILTIN_BACKGROUNDS,
   DEFAULT_LOOK,
   LOOK_ACCENTS,
-  LOOK_AREAS,
-  SURFACE_PRESETS,
-  applySurfacePreset,
+  SURFACE_MATERIALS,
+  applySurfaceStyle,
+  getSurfaceStyle,
 } from "../model/look.js";
 import {
   normalizeEditorFontFamily,
@@ -32,9 +32,7 @@ import {
   EditorFontFamilyControl,
 } from "./EditorFontControls.jsx";
 import {
-  AreaPicker,
   ColorInput,
-  LOOK_AREA_OPTIONS,
   PositionGrid,
   Segmented,
   SettingRow,
@@ -59,15 +57,6 @@ const formatEm = (value) => `${value.toFixed(2)}em`;
 
 const DEFAULT_PICTURE = BUILTIN_BACKGROUNDS[0]?.id ?? DEFAULT_LOOK.background.picture;
 const MAX_USER_PICTURES = 12;
-
-// The theme token each area is painted with when its fill follows the theme.
-const AREA_THEME_TOKENS = {
-  sidebar: "--sticky-sidebar-bg",
-  header: "--sticky-header-bg",
-  editor: "--sticky-editor-bg",
-  menus: "--sticky-portal-menu-bg",
-  settings: "--sticky-panel-bg",
-};
 
 // A custom colour starts from what the user sees now: the theme's value of the token when it
 // resolves to a plain #rrggbb, else the given fallback.
@@ -470,10 +459,17 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
   };
 
   const hasBackground = background.type !== "none";
+  const surfaceStyle = getSurfaceStyle(look);
+  const defaultSurfaceStyle = getSurfaceStyle(DEFAULT_LOOK);
+  const setSurfaceStyle = (patch) => onLookChange(applySurfaceStyle(look, { ...surfaceStyle, ...patch }));
+  const resetSurfaceStyle = (key) => ({
+    changed: surfaceStyle[key] !== defaultSurfaceStyle[key],
+    onReset: () => setSurfaceStyle({ [key]: defaultSurfaceStyle[key] }),
+  });
 
   return (
     <div className="look-page">
-      <SettingsGroup label="Fill">
+      <SettingsGroup label="Background">
         <SettingRow
           id="backgroundType"
           title="Background"
@@ -614,6 +610,68 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
           </>
         )}
       </SettingsGroup>
+      <SettingsGroup
+        label="Window"
+        note={hasBackground ? null : "These show once there is a background above."}
+      >
+        <SettingRow
+          id="surfaceMaterial"
+          title="Material"
+          description="What the window is made of, over the background."
+          {...resetSurfaceStyle("material")}
+        >
+          <Segmented
+            label="Material"
+            value={surfaceStyle.material}
+            options={MATERIAL_OPTIONS}
+            onChange={(material) => setSurfaceStyle({ material })}
+          />
+        </SettingRow>
+        {surfaceStyle.material !== "solid" && (
+          <SettingRow
+            id="surfaceOpacity"
+            title="Opacity"
+            description="How much the window hides the background. Menus and Settings stay at least 80%."
+            {...resetSurfaceStyle("opacity")}
+          >
+            <Slider
+              label="Window opacity"
+              value={surfaceStyle.opacity}
+              min={10}
+              max={95}
+              step={5}
+              format={formatPercent}
+              onChange={(opacity) => setSurfaceStyle({ opacity })}
+            />
+          </SettingRow>
+        )}
+        <SettingRow
+          id="surfaceBorder"
+          title="Border"
+          description="The line round the sidebar, title bar and menus."
+          {...resetSurfaceStyle("border")}
+        >
+          <Segmented
+            label="Border"
+            value={surfaceStyle.border}
+            options={BORDER_OPTIONS}
+            onChange={(border) => setSurfaceStyle({ border })}
+          />
+        </SettingRow>
+        <SettingRow
+          id="readableText"
+          title="Keep text readable"
+          description="While the background shows through, text gets a soft halo of the window colour."
+          changed={look.readableText !== DEFAULT_LOOK.readableText}
+          onReset={() => onLookChange({ ...look, readableText: DEFAULT_LOOK.readableText })}
+        >
+          <Switch
+            label="Keep text readable"
+            checked={look.readableText}
+            onChange={(readableText) => onLookChange({ ...look, readableText })}
+          />
+        </SettingRow>
+      </SettingsGroup>
       {hasBackground && (
         <>
           <SettingsGroup label="Adjust">
@@ -713,207 +771,14 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
   );
 }
 
-const SURFACE_PRESET_TILES = [
-  { name: "solid", label: "Solid", description: "No see-through." },
-  { name: "frosted", label: "Frosted", description: "Blurred glass." },
-  { name: "clear", label: "Clear", description: "Mostly see-through." },
-];
+const MATERIAL_LABELS = { solid: "Solid", frosted: "Frosted", clear: "Clear" };
+const MATERIAL_OPTIONS = SURFACE_MATERIALS.map((value) => ({ value, label: MATERIAL_LABELS[value] }));
 
-const SURFACE_FILL_OPTIONS = [
-  { value: "theme", label: "Theme" },
-  { value: "custom", label: "Custom" },
-];
-
-const SURFACE_BORDER_OPTIONS = [
+const BORDER_OPTIONS = [
   { value: "none", label: "None" },
   { value: "hairline", label: "Hairline" },
   { value: "strong", label: "Strong" },
 ];
-
-function matchesSurfacePreset(surfaces, preset) {
-  return LOOK_AREAS.every(
-    (area) =>
-      surfaces[area].opacity === preset[area].opacity && surfaces[area].blur === preset[area].blur,
-  );
-}
-
-export function SurfacesLookPage({ look, onLookChange }) {
-  const pageRef = useRef(null);
-  const [area, setArea] = useState(LOOK_AREAS[0]);
-  const surface = look.surfaces[area];
-  const defaults = DEFAULT_LOOK.surfaces[area];
-  const areaLabel = LOOK_AREA_OPTIONS.find((option) => option.value === area)?.label ?? area;
-  const hasBackground = look.background.type !== "none";
-  // The editor area has no edge of its own to draw a border on.
-  const hasBorder = area !== "editor";
-
-  const setSurface = (patch) =>
-    onLookChange({
-      ...look,
-      surfaces: { ...look.surfaces, [area]: { ...surface, ...patch } },
-    });
-
-  const resetSurface = (...keys) => ({
-    changed: keys.some((key) => surface[key] !== defaults[key]),
-    onReset: () => setSurface(Object.fromEntries(keys.map((key) => [key, defaults[key]]))),
-  });
-
-  const applyToAllAreas = () => {
-    onLookChange({
-      ...look,
-      surfaces: Object.fromEntries(
-        LOOK_AREAS.map((target) => [
-          target,
-          {
-            ...look.surfaces[target],
-            fill: surface.fill,
-            opacity: surface.opacity,
-            blur: surface.blur,
-            // The border only travels from an area that has one, to the areas that draw one.
-            ...(hasBorder && target !== "editor" ? { border: surface.border } : {}),
-          },
-        ]),
-      ),
-    });
-  };
-
-  const presetThumb = BUILTIN_BACKGROUNDS[0]?.thumb;
-
-  return (
-    <div ref={pageRef} className="look-page">
-      <SettingsGroup
-        label="Presets"
-        note={
-          hasBackground
-            ? "Sets every area's opacity and blur at once. Fine-tune each area below."
-            : "Opacity and blur show over a background. Pick one under Background."
-        }
-      >
-        <div className="settings-surface-presets">
-          {SURFACE_PRESET_TILES.map(({ name, label, description }) => {
-            const preset = SURFACE_PRESETS[name];
-            return (
-              <button
-                key={name}
-                type="button"
-                className="settings-surface-preset"
-                aria-pressed={matchesSurfacePreset(look.surfaces, preset) ? "true" : "false"}
-                onMouseDown={preventFocusLoss}
-                onClick={() => onLookChange(applySurfacePreset(look, name))}
-              >
-                <span
-                  className="settings-surface-preset-demo"
-                  aria-hidden="true"
-                  style={{
-                    backgroundImage: presetThumb ? cssUrl(presetThumb) : undefined,
-                    "--preset-side-opacity": `${preset.sidebar.opacity}%`,
-                    "--preset-side-blur": `${preset.sidebar.blur / 3}px`,
-                    "--preset-main-opacity": `${preset.editor.opacity}%`,
-                    "--preset-main-blur": `${preset.editor.blur / 3}px`,
-                  }}
-                >
-                  <i />
-                  <b />
-                </span>
-                <span className="settings-surface-preset-label">{label}</span>
-                <small>{description}</small>
-              </button>
-            );
-          })}
-        </div>
-      </SettingsGroup>
-      <SettingsGroup label="Area">
-        <AreaPicker value={area} onChange={setArea} />
-      </SettingsGroup>
-      <SettingsGroup label={areaLabel}>
-        <SettingRow
-          id="surfaceFill"
-          title="Fill"
-          description="The theme's colour for this area, or your own."
-          {...resetSurface("fill")}
-        >
-          <div className="settings-inline">
-            {surface.fill != null && (
-              <ColorInput
-                label={`${areaLabel} fill color`}
-                value={surface.fill}
-                onChange={(fill) => setSurface({ fill })}
-              />
-            )}
-            <Segmented
-              label={`${areaLabel} fill`}
-              value={surface.fill == null ? "theme" : "custom"}
-              options={SURFACE_FILL_OPTIONS}
-              onChange={(choice) =>
-                setSurface({
-                  fill:
-                    choice === "theme"
-                      ? null
-                      : readThemeColor(
-                          pageRef.current,
-                          AREA_THEME_TOKENS[area],
-                          DEFAULT_LOOK.background.color,
-                        ),
-                })
-              }
-            />
-          </div>
-        </SettingRow>
-        <SettingRow id="surfaceOpacity" title="Opacity" {...resetSurface("opacity")}>
-          <Slider
-            label={`${areaLabel} opacity`}
-            value={surface.opacity}
-            min={0}
-            max={100}
-            step={1}
-            format={formatPercent}
-            onChange={(opacity) => setSurface({ opacity })}
-          />
-        </SettingRow>
-        <SettingRow
-          id="surfaceBlur"
-          title="Blur"
-          description="Blurs what shows through from behind."
-          {...resetSurface("blur")}
-        >
-          <Slider
-            label={`${areaLabel} blur`}
-            value={surface.blur}
-            min={0}
-            max={40}
-            step={1}
-            format={formatPx}
-            onChange={(blur) => setSurface({ blur })}
-          />
-        </SettingRow>
-        {hasBorder && (
-          <SettingRow id="surfaceBorder" title="Border" {...resetSurface("border")}>
-            <Segmented
-              label={`${areaLabel} border`}
-              value={surface.border}
-              options={SURFACE_BORDER_OPTIONS}
-              onChange={(border) => setSurface({ border })}
-            />
-          </SettingRow>
-        )}
-        <SettingRow
-          id="surfaceApplyAll"
-          title="Same for every area"
-          description="Copies these values to the other four areas."
-        >
-          <button
-            type="button"
-            className="settings-button"
-            onMouseDown={preventFocusLoss}
-            onClick={applyToAllAreas}
-          >
-            Apply to all
-          </button>
-        </SettingRow>
-      </SettingsGroup>
-    </div>
-  );
-}
 
 const TAB_STYLE_OPTIONS = [
   { value: "plain", label: "Plain" },
