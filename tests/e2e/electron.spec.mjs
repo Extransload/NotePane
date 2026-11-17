@@ -325,6 +325,10 @@ test("Cmd/Ctrl+= zooms every window, and the zoom persists", async () => {
   try {
     const tabsPage = await electronApp.firstWindow();
     await expect(tabsPage.getByTestId("sticky-editor-surface")).toBeVisible();
+    // The editor shows a frame before React runs its effects, and the shortcut listener is one of
+    // them. The smooth caret is added by another effect of the same mount, and React runs those
+    // together, so once it is there the listener is too and the press cannot be missed.
+    await expect(tabsPage.locator(".smooth-caret")).toBeAttached();
     await tabsPage.keyboard.press(modifierShortcut("="));
     await expect(tabsPage.getByRole("meter", { name: "Zoom" }))
       .toHaveAttribute("aria-valuetext", "110%");
@@ -364,6 +368,53 @@ test("Cmd/Ctrl+= zooms every window, and the zoom persists", async () => {
     }
     await expect.poll(() => readZooms(electronApp)).toEqual([50, 50]);
     await expectWindowButtonsAt(electronApp, 1);
+  } finally {
+    await electronApp.close();
+  }
+});
+
+// The intro plays once per launch in the tabs window: not in a window opened later, and not at all
+// once Settings turns it off.
+test("Electron plays the launch intro once per launch, unless it is turned off", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-intro-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", createdAt: 2, updatedAt: 2 },
+  ]);
+  const introEnvironment = { BLOCKNOTE_STICKY_LAUNCH_INTRO: "1" };
+
+  let electronApp = await launchApp(userDataDirectory, undefined, introEnvironment);
+  try {
+    const tabsPage = await electronApp.firstWindow();
+    const intro = tabsPage.getByTestId("launch-intro");
+    await expect(intro).toBeVisible();
+    await tabsPage.keyboard.press("Escape");
+    await expect(intro).toHaveCount(0, { timeout: 1500 });
+
+    // A window opened afterwards starts without it.
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    const secondPage = await getStickyPageByNoteId(electronApp, "second-note");
+    await expect(secondPage.getByTestId("sticky-editor-surface")).toBeVisible();
+    await expect(secondPage.getByTestId("launch-intro")).toHaveCount(0);
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+  } finally {
+    await electronApp.close();
+  }
+
+  const notesPath = path.join(userDataDirectory, "notes.json");
+  const stored = JSON.parse(fs.readFileSync(notesPath, "utf8"));
+  stored.editorPreferences = { ...stored.editorPreferences, launchIntro: false };
+  fs.writeFileSync(notesPath, JSON.stringify(stored), "utf8");
+  electronApp = await launchApp(userDataDirectory, undefined, introEnvironment);
+  try {
+    const tabsPage = await electronApp.firstWindow();
+    await expect(tabsPage.getByTestId("sticky-editor-surface")).toBeVisible();
+    await expect(tabsPage.locator(".smooth-caret")).toBeAttached();
+    // The window asked for the intro as it mounted; main answers in order, so once a later call
+    // returns, that answer has arrived too.
+    await tabsPage.evaluate(() => window.blocknoteSticky.getAppInfo());
+    await tabsPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve())));
+    await expect(tabsPage.getByTestId("launch-intro")).toHaveCount(0);
   } finally {
     await electronApp.close();
   }

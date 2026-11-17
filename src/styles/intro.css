@@ -1,0 +1,246 @@
+/* The launch intro (src/ui/LaunchIntro.jsx): three windows fly in from round the window and
+   stack into the mark, the mark's box is drawn round them and filled, the dots light, then the
+   name is written out and a light crosses "Pane". It all lies over a blur of the app, takes no
+   pointer events, and clears with a short fade. The parts of the mark are the groups of
+   assets/notepane-icon.svg in order: the tile, the back, middle and front windows, then the
+   three dots. Reduced motion never mounts it (useLaunchIntro). */
+.launch-intro {
+  /* The mark's own lilac (the dots in assets/notepane-icon.svg), for the box drawn round it. */
+  --launch-intro-outline: #d5b5e6;
+  --launch-intro-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --launch-intro-settle: cubic-bezier(0.34, 1.36, 0.64, 1);
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--sticky-effective-bg) 70%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(1.1);
+  backdrop-filter: blur(24px) saturate(1.1);
+  pointer-events: none;
+  user-select: none;
+  animation: launch-intro-veil-in 0.28s ease-out both;
+}
+
+.launch-intro.is-leaving {
+  animation: launch-intro-veil-out 0.42s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.launch-intro.is-leaving .launch-intro-lockup {
+  animation: launch-intro-lockup-out 0.42s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.launch-intro-lockup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.launch-intro-mark {
+  position: relative;
+  width: 112px;
+  height: 116px;
+  /* The mark's own lilac, as in the approved mockup, whatever the theme's accent. */
+  filter: drop-shadow(0 20px 44px color-mix(in srgb, var(--launch-intro-outline) 60%, transparent));
+  animation: launch-intro-land 0.36s ease-out 1.52s both;
+}
+
+.launch-intro-icon,
+.launch-intro-icon svg,
+.launch-intro-outline {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.launch-intro-outline {
+  position: absolute;
+  inset: 0;
+}
+
+.launch-intro-icon svg > g,
+.launch-intro-icon svg > path {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+/* The tile fills in once its box has been drawn. */
+.launch-intro-icon svg > g:nth-of-type(1) {
+  animation: launch-intro-fill 0.4s ease-out 1.4s both;
+}
+
+.launch-intro-icon svg > g:nth-of-type(2) {
+  animation: launch-intro-fly-back 0.9s var(--launch-intro-spring) 0.04s both;
+}
+
+.launch-intro-icon svg > g:nth-of-type(3) {
+  animation: launch-intro-fly-middle 0.9s var(--launch-intro-spring) 0.1s both;
+}
+
+.launch-intro-icon svg > g:nth-of-type(4) {
+  animation: launch-intro-fly-front 0.9s var(--launch-intro-spring) 0.16s both;
+}
+
+.launch-intro-icon svg > path {
+  animation: launch-intro-dot 0.34s var(--launch-intro-settle) both;
+}
+
+.launch-intro-icon svg > path:nth-of-type(1) {
+  animation-delay: 1.5s;
+}
+
+.launch-intro-icon svg > path:nth-of-type(2) {
+  animation-delay: 1.57s;
+}
+
+.launch-intro-icon svg > path:nth-of-type(3) {
+  animation-delay: 1.64s;
+}
+
+/* The box, drawn once round from the top centre, then gone as the tile fills. */
+.launch-intro-outline path {
+  stroke: var(--launch-intro-outline);
+  stroke-width: 12;
+  stroke-linecap: round;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  animation:
+    launch-intro-draw 0.62s cubic-bezier(0.65, 0, 0.35, 1) 0.92s both,
+    launch-intro-veil-out 0.45s ease-out 1.62s forwards;
+}
+
+.launch-intro-name {
+  margin-top: 26px;
+  padding: 0 6px 6px;
+  color: var(--sticky-text-color);
+  font-family: var(--notepane-display-font);
+  font-size: 62px;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+  animation: launch-intro-write 0.7s cubic-bezier(0.65, 0, 0.35, 1) 1.5s both;
+}
+
+.launch-intro-name-pane {
+  /* The wordmark's purple, with a light that crosses it once. */
+  background-image: linear-gradient(100deg, #8a63f6 0%, #b46cf0 40%, #f3e6ff 50%, #b46cf0 60%, #8a63f6 100%);
+  background-position: 100% 0;
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: launch-intro-shine 0.9s ease-in-out 2.05s both;
+}
+
+@keyframes launch-intro-veil-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes launch-intro-veil-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes launch-intro-lockup-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96) translateY(-6px);
+    filter: blur(4px);
+  }
+}
+
+@keyframes launch-intro-fill {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes launch-intro-fly-back {
+  0% {
+    opacity: 0;
+    transform: translate(420%, -260%) scale(2.2) rotate(9deg);
+  }
+
+  25% {
+    opacity: 1;
+  }
+}
+
+@keyframes launch-intro-fly-middle {
+  0% {
+    opacity: 0;
+    transform: translate(-460%, 120%) scale(2.4) rotate(-10deg);
+  }
+
+  25% {
+    opacity: 1;
+  }
+}
+
+@keyframes launch-intro-fly-front {
+  0% {
+    opacity: 0;
+    transform: translate(60%, 420%) scale(2.6) rotate(6deg);
+  }
+
+  25% {
+    opacity: 1;
+  }
+}
+
+@keyframes launch-intro-land {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  40% {
+    transform: scale(0.965, 0.95);
+  }
+}
+
+@keyframes launch-intro-dot {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+}
+
+@keyframes launch-intro-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes launch-intro-write {
+  from {
+    opacity: 0.2;
+    clip-path: inset(0 100% 0 0);
+  }
+
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes launch-intro-shine {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: 0 0;
+  }
+}
+
+@media print {
+  .launch-intro {
+    display: none;
+  }
+}

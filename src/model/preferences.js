@@ -82,6 +82,16 @@ export function normalizeEditorPreferences(
       typeof source.showTableOfContents === "boolean"
         ? source.showTableOfContents
         : Boolean(fallbackSource.showTableOfContents),
+    // On unless turned off; a stored file from before the setting has none.
+    smoothCaret:
+      typeof source.smoothCaret === "boolean"
+        ? source.smoothCaret
+        : fallbackSource.smoothCaret !== false,
+    // On unless turned off, like smoothCaret.
+    launchIntro:
+      typeof source.launchIntro === "boolean"
+        ? source.launchIntro
+        : fallbackSource.launchIntro !== false,
     ...normalizeKeyboardShortcutPreferences(source, fallbackSource),
     // A partial update without a look keeps the previous one.
     look: normalizeLook(source.look ?? fallbackSource.look),

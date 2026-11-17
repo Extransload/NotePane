@@ -2439,3 +2439,161 @@ test("closes BlockNote's floating UI at once when reduced motion is requested", 
   expect(closing.filter(({ kind }) => kind === "block menu copy")).toEqual([]);
   expect(closing.filter(({ duration }) => duration !== "0s")).toEqual([]);
 });
+
+const TRANSPARENT = "rgba(0, 0, 0, 0)";
+
+// The drawn caret (src/editor/smoothCaret.js) beside the native caret's place: the rect of the
+// collapsed DOM selection, which is where the browser paints its own caret.
+async function readSmoothCaret(page) {
+  return await page.evaluate(() => {
+    const caret = document.querySelector(".sticky-editor-surface .smooth-caret");
+    const editor = document.querySelector(".sticky-editor-surface .bn-editor");
+    const selection = window.getSelection();
+    const range = selection.rangeCount ? selection.getRangeAt(0) : null;
+    const native = range ? (range.getClientRects()[0] ?? range.getBoundingClientRect()) : null;
+    const drawn = caret && !caret.hidden ? caret.getBoundingClientRect() : null;
+    return {
+      shown: Boolean(drawn),
+      nativeCaretColor: getComputedStyle(editor).caretColor,
+      transitionDuration: caret ? getComputedStyle(caret).transitionDuration : null,
+      offset: drawn && native
+        ? Math.max(
+          Math.abs(drawn.left + drawn.width / 2 - native.left),
+          Math.abs(drawn.top - native.top),
+          Math.abs(drawn.bottom - native.bottom),
+        )
+        : null,
+    };
+  });
+}
+
+async function expectSmoothCaretAtSelection(page) {
+  await expect.poll(async () => {
+    const { shown, nativeCaretColor, offset } = await readSmoothCaret(page);
+    return shown && nativeCaretColor === TRANSPARENT && offset <= 2;
+  }).toBe(true);
+}
+
+async function expectNativeCaret(page) {
+  await expect.poll(async () => {
+    const { shown, nativeCaretColor } = await readSmoothCaret(page);
+    return { shown, nativeCaretTransparent: nativeCaretColor === TRANSPARENT };
+  }).toEqual({ shown: false, nativeCaretTransparent: false });
+}
+
+test("draws a smooth caret at the typed text, and gives the native caret back for a range or an IME composition", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("Smooth caret");
+  await expectSmoothCaretAtSelection(page);
+  // Only a small move glides; the caret is aria-hidden and takes no pointer.
+  const caret = page.locator(".smooth-caret");
+  await expect(caret).toHaveAttribute("aria-hidden", "true");
+  await expect(caret).toHaveCSS("pointer-events", "none");
+  await expect(caret).toHaveCSS("transition-duration", "0.045s");
+  // Solid while it moves, blinking once it rests.
+  await expect(caret).toHaveClass(/\bis-blinking\b/);
+
+  await page.keyboard.press("ArrowLeft");
+  await expectSmoothCaretAtSelection(page);
+
+  await page.keyboard.press("Shift+ArrowLeft");
+  await waitForEditorSelection(page);
+  await expectNativeCaret(page);
+  await page.keyboard.press("ArrowRight");
+  await expectSmoothCaretAtSelection(page);
+
+  // The compositions Chrome reports while a Korean IME types 한.
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.imeSetComposition", { text: "ㅎ", selectionStart: 1, selectionEnd: 1 });
+  await expectNativeCaret(page);
+  await cdp.send("Input.imeSetComposition", { text: "하", selectionStart: 1, selectionEnd: 1 });
+  await expectNativeCaret(page);
+  await cdp.send("Input.insertText", { text: "한" });
+  await expect(page.locator(".bn-editor").getByText("Smooth care한t")).toHaveCount(1);
+  await expectSmoothCaretAtSelection(page);
+
+  // Focus in another field hides it.
+  await page.keyboard.press(modifierShortcut("F"));
+  await expect(page.locator(".find-bar input")).toBeFocused();
+  await expectNativeCaret(page);
+});
+
+test("snaps the smooth caret without a glide when reduced motion is requested", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("Still");
+  await expectSmoothCaretAtSelection(page);
+  expect((await readSmoothCaret(page)).transitionDuration).toBe("0s");
+});
+
+// A desktop bridge stub that keeps the editor preferences in sessionStorage, so they outlive a
+// reload as the store's do.
+function stubPreferenceKeepingBridge() {
+  const now = Date.now();
+  const note = {
+    id: "caret-note",
+    title: "Caret note",
+    titleManuallyEdited: true,
+    blocksJSON: null,
+    markdown: "",
+    theme: {},
+    seedDemoContent: false,
+    editorFontFamily: "Inter",
+    trashedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  const readPreferences = () => JSON.parse(window.sessionStorage.getItem("caret-preferences") ?? "{}");
+  window.blocknoteSticky = {
+    getCurrentNoteId: async () => note.id,
+    getNote: async () => note,
+    listNotes: async () => [note],
+    listTrash: async () => [],
+    getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
+    getLayoutMode: async () => "tabs",
+    getEditorPreferences: async () => readPreferences(),
+    updateEditorPreferences: async (preferences) => {
+      window.sessionStorage.setItem("caret-preferences", JSON.stringify(preferences));
+      return preferences;
+    },
+    listFonts: async () => [],
+    saveContent: async () => note,
+    updateAppearance: async () => undefined,
+  };
+}
+
+test("turns the smooth caret off from Settings > Editor and keeps it off after a reload", { tag: OPENS_OWN_PAGE }, async ({ page }) => {
+  await page.addInitScript(stubPreferenceKeepingBridge);
+  await page.goto("/");
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("On");
+  await expectSmoothCaretAtSelection(page);
+
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await preferences.getByRole("tab", { name: "Editor" }).click();
+  const smoothCaretSwitch = preferences.getByRole("switch", { name: "Smooth caret" });
+  await expect(smoothCaretSwitch).toHaveAttribute("aria-checked", "true");
+  await smoothCaretSwitch.click();
+  await expect(smoothCaretSwitch).toHaveAttribute("aria-checked", "false");
+  await preferences.getByRole("button", { name: "Close preferences" }).click();
+  await expect(preferences).toHaveCount(0);
+
+  await page.locator(".bn-editor").getByText("On", { exact: true }).click();
+  await waitForEditorSelection(page);
+  await page.keyboard.press("End");
+  await page.keyboard.type("Off");
+  await expect(page.locator(".smooth-caret")).toHaveCount(0);
+  await expectNativeCaret(page);
+
+  await page.reload();
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("Still off");
+  await expect(page.locator(".smooth-caret")).toHaveCount(0);
+  await expectNativeCaret(page);
+  await page.keyboard.press(modifierShortcut(","));
+  await preferences.getByRole("tab", { name: "Editor" }).click();
+  await expect(smoothCaretSwitch).toHaveAttribute("aria-checked", "false");
+});

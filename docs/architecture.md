@@ -54,6 +54,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Table column widths: live resize, double-click auto-fit, fit to width | `src/editor/tableColumnSizing.js` |
 | How far a wide table grows right of the text column before it scrolls (a container query on `.sticky-editor-surface`) | table section of `src/styles/blocknote.css` |
 | Editor motion: toggle open and close, new blocks rising in (a ProseMirror decoration dropped with the next transaction), moved blocks gliding into place (FLIP), the checklist pop; all through the Web Animations API or decorations, never DOM writes ProseMirror would observe | `src/editor/editorMotion.js`, `src/styles/editor-motion.css` |
+| The smooth caret: a drawn caret at the ProseMirror selection head (`coordsAtPos`, in the surface's scroll coordinates) that glides small moves and snaps clicks, scrolls and jumps; the native caret is transparent only while it shows (`data-smooth-caret` on the surface), and comes back for a range, block or cell selection, an IME composition, another focused field, print and export; the `smoothCaret` editor preference | `src/editor/smoothCaret.js`, `src/hooks/useSmoothCaret.js`, `src/styles/caret.css` |
 | Block selection model, exactly-selected blocks, block-set indent and move | `src/editor/blockSelection.js`, `src/editor/blockSelectionRules.js` |
 | Marquee and drag selection gestures, edge auto-scroll, and the keyboard (Enter, Tab, move, delete) and IME composition routing for a block set or the whole note | `src/editor/blockDragSelection.js` |
 | Block lookup, cut, table of contents extraction | `src/editor/blocks.js` |
@@ -88,6 +89,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Applying a theme to the document, the first-paint theme, the export theme | `src/style/applyTheme.js` |
 | Applying the selected theme in a window, code theme included | `src/hooks/useAppliedTheme.js` |
 | A reload's first frames: the shell's last paint under the app, then the app's fade-in | `public/boot.js`, `index.html`, `src/hooks/useReloadReveal.js` |
+| The launch intro: the app icon's windows flying into the mark, its box drawn and filled, the name written out; once per launch in the tabs window (`app:take-launch-intro` in `electron/main.cjs` answers yes once, never in a test run unless `BLOCKNOTE_STICKY_LAUNCH_INTRO=1`), skipped under reduced motion; the `launchIntro` editor preference | `src/ui/LaunchIntro.jsx`, `src/hooks/useLaunchIntro.js`, `src/styles/intro.css` |
 | Code block syntax colours per theme, re-highlighting on a theme change | `src/editor/codeHighlighter.js` |
 | The theme picker in Preferences | `src/ui/ThemePicker.jsx` |
 | The Settings window (Tern-style floating window): grouped page sidebar (App, Look, Data, System), search over every setting (`SETTINGS_INDEX`), the hold-to-peek eye button, and the cards each page is made of | `src/ui/preferencesWindow.jsx`, `src/ui/PreferencesCard.jsx`, `src/ui/preferencesSections.jsx`, `src/ui/trashPreferences.jsx` |

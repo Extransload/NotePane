@@ -1,0 +1,65 @@
+/* The smooth caret (src/editor/smoothCaret.js): a drawn caret in the theme's accent, readable on
+   the window and panel, that glides to each new caret position as TablePeek's does. While it
+   shows, the editor surface carries data-smooth-caret and the native caret is transparent.
+
+   It glides over --notepane-motion-caret-duration on motion.css's ease-out, stays solid while it
+   moves, and blinks once it has rested (the script adds .is-blinking). prefers-reduced-motion
+   snaps it to each place; print and export never draw it and keep the native caret. */
+
+:root {
+  --notepane-motion-caret-duration: 45ms;
+  --notepane-caret-blink-period: 1s;
+}
+
+.smooth-caret {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 2px;
+  border-radius: 1px;
+  background-color: var(--notepane-focus-outline);
+  pointer-events: none;
+  /* It follows the editor in the surface, so an arrow key past the last block could carry the
+     document selection into it, out of the editor. */
+  -webkit-user-select: none;
+  user-select: none;
+  will-change: transform;
+  transition: transform var(--notepane-motion-caret-duration) var(--notepane-motion-ease-out);
+}
+
+.smooth-caret.is-snapping {
+  transition: none;
+}
+
+/* Visible for the first half of each period, as the native caret blinks. */
+@keyframes notepaneCaretBlink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.smooth-caret.is-blinking {
+  animation: notepaneCaretBlink var(--notepane-caret-blink-period) step-end infinite;
+}
+
+@media screen {
+  body:not(.is-exporting) .sticky-editor-surface[data-smooth-caret] .bn-editor {
+    caret-color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .smooth-caret {
+    transition: none !important;
+  }
+}
+
+@media print {
+  .smooth-caret {
+    display: none !important;
+  }
+}
+
+body.is-exporting .smooth-caret {
+  display: none !important;
+}

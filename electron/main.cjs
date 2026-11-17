@@ -88,6 +88,11 @@ const quietTestMode = process.env.BLOCKNOTE_STICKY_QUIET === "1";
 // never flashes notes on screen. Their size, position and focus behave as on screen.
 // NOTEPANE_SHOW_TEST_WINDOWS=1 shows them, to watch a run.
 const hiddenTestWindows = quietTestMode && process.env.NOTEPANE_SHOW_TEST_WINDOWS !== "1";
+// The launch intro never plays in a test run, which would cover the window it tests, unless the
+// test that covers the intro asks for it.
+const launchIntroInTests = process.env.BLOCKNOTE_STICKY_LAUNCH_INTRO === "1";
+// The launch intro plays once per launch, in the first window that asks (src/hooks/useLaunchIntro.js).
+let launchIntroTaken = false;
 const MAX_BACKUP_FILE_SIZE = 512 * 1024 * 1024;
 // A background picture is decoded and kept in memory by every window, so a camera original is
 // fine but anything larger is almost certainly the wrong file.
@@ -1276,6 +1281,22 @@ function installIpcHandlers() {
     } catch (error) {
       return { status: "error", mode: updateMode, message: String(error?.message ?? error) };
     }
+  });
+
+  // Yes once per launch, to the first window that asks, when the app opens in Tabs mode with
+  // Settings > Look > Theme > Show intro on launch on. A sticky window, a window opened later or a
+  // reload gets no.
+  ipcMain.handle("app:take-launch-intro", (event) => {
+    if (launchIntroTaken) {
+      return false;
+    }
+    launchIntroTaken = true;
+    return (
+      (!quietTestMode || launchIntroInTests) &&
+      !getDetachedStickyEntry(event.sender) &&
+      store.getLayoutMode() === "tabs" &&
+      store.getEditorPreferences().launchIntro !== false
+    );
   });
 
   ipcMain.handle("app-theme:update", (_event, payload) => {

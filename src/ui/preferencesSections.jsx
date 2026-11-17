@@ -295,6 +295,15 @@ export function EditorPreferencesSection({
     },
     [normalizedEditorPreferences, onEditorPreferencesChange],
   );
+  const updateSmoothCaret = useCallback(
+    (smoothCaret) => {
+      onEditorPreferencesChange?.({
+        ...normalizedEditorPreferences,
+        smoothCaret: Boolean(smoothCaret),
+      });
+    },
+    [normalizedEditorPreferences, onEditorPreferencesChange],
+  );
 
   // The editor and app fonts live on the Fonts page with the rest of the type settings.
   return (
@@ -314,6 +323,19 @@ export function EditorPreferencesSection({
             checked={normalizedEditorPreferences.showTableOfContents}
             ariaLabel="Show table of contents"
             onChange={updateTableOfContentsVisibility}
+          />
+        </div>
+        <div className="preference-setting-row">
+          <div>
+            <div className="preference-setting-title">Smooth caret</div>
+            <div className="preferences-section-description">
+              The cursor glides as you type, in the theme's accent colour.
+            </div>
+          </div>
+          <PreferenceToggleSwitch
+            checked={normalizedEditorPreferences.smoothCaret}
+            ariaLabel="Smooth caret"
+            onChange={updateSmoothCaret}
           />
         </div>
       </PreferencesCard>

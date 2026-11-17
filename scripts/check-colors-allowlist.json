@@ -285,5 +285,15 @@
     "file": "electron/store.cjs",
     "text": "tint: \"#1b2a4a\",",
     "reason": "Twin of DEFAULT_LOOK in src/model/look.js (store-side normalizeLook): user data defaults, not a UI colour."
+  },
+  {
+    "file": "src/styles/intro.css",
+    "text": "--launch-intro-outline: #d5b5e6;",
+    "reason": "Launch intro brand art: the lilac of the dots in assets/notepane-icon.svg, for the box drawn round the mark. The mark keeps its own colours in every theme."
+  },
+  {
+    "file": "src/styles/intro.css",
+    "text": "background-image: linear-gradient(100deg, #8a63f6 0%, #b46cf0 40%, #f3e6ff 50%, #b46cf0 60%, #8a63f6 100%);",
+    "reason": "Launch intro brand art: the purple of \"Pane\" in the NotePane wordmark (assets/notepane-wordmark.png) and its passing light, the same in every theme."
   }
 ]

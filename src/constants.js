@@ -63,6 +63,8 @@ export const DEFAULT_EDITOR_PREFERENCES = {
   appFontFamily: DEFAULT_APP_FONT_FAMILY,
   appZoom: DEFAULT_APP_ZOOM,
   showTableOfContents: false,
+  smoothCaret: true,
+  launchIntro: true,
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
 };

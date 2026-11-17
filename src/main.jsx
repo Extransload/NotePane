@@ -259,6 +259,9 @@ import {
 import { useAppliedTheme } from "./hooks/useAppliedTheme.js";
 import { useLookStyles } from "./hooks/useLookStyles.js";
 import { useEditorSurfaceShortcuts } from "./hooks/useEditorSurfaceShortcuts.js";
+import { useSmoothCaret } from "./hooks/useSmoothCaret.js";
+import { useLaunchIntro } from "./hooks/useLaunchIntro.js";
+import { LaunchIntro } from "./ui/LaunchIntro.jsx";
 import { useFindInNote } from "./hooks/useFindInNote.js";
 import { FindInNote, getFindSeedText } from "./editor/findInNote.js";
 import { FindBar } from "./ui/FindBar.jsx";
@@ -1695,6 +1698,9 @@ function StickyEditor({
     exportFormatMenu,
     isMarkdownImportOpen,
   ]);
+
+  useSmoothCaret(editor, editorSurfaceRef, normalizedEditorPreferences);
+  const { isLaunchIntroVisible, finishLaunchIntro } = useLaunchIntro();
 
   useEditorSurfaceShortcuts({
     activeImageBlockId,
@@ -3167,6 +3173,7 @@ function StickyEditor({
           />
         )}
       </Presence>
+      {isLaunchIntroVisible && <LaunchIntro onDone={finishLaunchIntro} />}
     </main>
   );
 }

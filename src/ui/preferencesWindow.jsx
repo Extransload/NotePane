@@ -135,6 +135,7 @@ export const SETTINGS_INDEX = [
   { page: "theme", id: "appTheme", title: "App theme", description: "The colours every NotePane window uses.", keywords: "colour color dark light mode palette scheme" },
   { page: "theme", id: "accentColor", title: "Accent color", description: "Buttons, switches, focus rings and selection.", keywords: "accent colour color highlight tint blue purple green orange pink" },
   { page: "theme", id: "corners", title: "Corners", description: "How round windows, menus and buttons are.", keywords: "radius rounded round sharp square" },
+  { page: "theme", id: "launchIntro", title: "Show intro on launch", description: "The NotePane mark plays in as the app opens.", keywords: "intro splash launch start opening animation logo" },
   { page: "fonts", id: "editorFontFamily", title: "Editor font", description: "The typeface notes are written in.", keywords: "font family typeface editor" },
   { page: "fonts", id: "appFontFamily", title: "App font", description: "The typeface of the sidebar, menus and Settings.", keywords: "font family typeface interface ui chrome" },
   { page: "fonts", id: "editorSize", title: "Size", description: "How large the editor text is.", keywords: "font size text bigger smaller scale" },
@@ -174,6 +175,7 @@ export const SETTINGS_INDEX = [
   { page: "tabs", id: "tabNewColor", title: "New tab colour", description: "Give each new tab the next pastel colour.", keywords: "tabs colour color new cycle pastel" },
   { page: "tabs", id: "tabColorStrength", title: "Colour strength", description: "How strongly a coloured tab is filled.", keywords: "tabs colour color strength intensity" },
   { page: "editor", id: "tableOfContents", selector: '[aria-label="Show table of contents"]', title: "Table of contents", description: "Show the right rail of headings in tab mode.", keywords: "toc outline headings rail navigation" },
+  { page: "editor", id: "smoothCaret", selector: '[aria-label="Smooth caret"]', title: "Smooth caret", description: "The cursor glides as you type.", keywords: "caret cursor smooth animation glide blink" },
   { page: "trash", id: "trashDeletedNotes", selector: ".preferences-trash-section", title: "Deleted notes", description: "Restore or permanently delete notes in the Trash.", keywords: "trash deleted restore purge bin recycle" },
   { page: "backup", id: "exportBackup", title: "Workspace backup", description: "Save the whole workspace to a .notepane file.", keywords: "backup export save data file" },
   { page: "backup", id: "importBackup", title: "Restore a backup", description: "Replace the workspace with a .notepane file.", keywords: "backup import restore data file" },
@@ -289,6 +291,16 @@ export function PreferencesWindow({
       onEditorPreferencesChange?.({
         ...normalizedEditorPreferences,
         look: nextLook,
+      });
+    },
+    [normalizedEditorPreferences, onEditorPreferencesChange],
+  );
+
+  const updateLaunchIntro = useCallback(
+    (launchIntro) => {
+      onEditorPreferencesChange?.({
+        ...normalizedEditorPreferences,
+        launchIntro: Boolean(launchIntro),
       });
     },
     [normalizedEditorPreferences, onEditorPreferencesChange],
@@ -562,6 +574,8 @@ export function PreferencesWindow({
             appThemeId={appThemeId}
             themes={PICKER_THEMES}
             onAppThemeChange={onAppThemeChange}
+            launchIntro={normalizedEditorPreferences.launchIntro}
+            onLaunchIntroChange={updateLaunchIntro}
           />
         );
     }

@@ -149,6 +149,14 @@ BlockNote handles editor interaction directly.
   and drop or `Command/Ctrl + Shift + Up/Down` glide to their new place; a checklist box pops when it is ticked. The
   slash menu, the formatting and link toolbars, the six-dot block menu and the table handle menus close with a short
   fade that takes no clicks. All of it is off under reduced motion and in print and export
+- Smooth caret (Settings > Editor, on by default): the caret is drawn in the theme's accent and glides to each new
+  place in 45ms as you type or move it, stays solid while it moves and blinks once it rests. A click, a scroll or a jump
+  of more than three lines moves it at once, and so does every move under reduced motion. A text selection, a selected
+  block or cell, Korean and other IME composition, print and export use the native caret
+- Launch intro (Settings > Look > Theme, on by default): as the app opens in Tabs mode, three windows fly in from
+  round the window and stack into the NotePane mark, its box is drawn round them and filled, and the name is written
+  out over a blur of the app, for about three seconds. It plays once per launch, never in a sticky window, a later
+  window or a reload, and never under reduced motion. Any key or click clears it and still reaches the app
 - The six-dot block menu stays inside the editor: when the sidebar leaves no room on the handle's left, it opens on its
   right
 - `Command/Ctrl + A` selects all editor blocks

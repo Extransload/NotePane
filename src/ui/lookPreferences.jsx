@@ -110,7 +110,15 @@ const CORNER_OPTIONS = [
   { value: "round", label: "Round" },
 ];
 
-export function ThemeLookPage({ look, onLookChange, appThemeId, themes, onAppThemeChange }) {
+export function ThemeLookPage({
+  look,
+  onLookChange,
+  appThemeId,
+  themes,
+  onAppThemeChange,
+  launchIntro,
+  onLaunchIntroChange,
+}) {
   const pageRef = useRef(null);
   const setLook = (patch) => onLookChange({ ...look, ...patch });
   const isCustomAccent =
@@ -174,6 +182,17 @@ export function ThemeLookPage({ look, onLookChange, appThemeId, themes, onAppThe
             options={CORNER_OPTIONS}
             onChange={(corners) => setLook({ corners })}
           />
+        </SettingRow>
+      </SettingsGroup>
+      <SettingsGroup label="Launch">
+        <SettingRow
+          id="launchIntro"
+          title="Show intro on launch"
+          description="The NotePane mark plays in as the app opens. Any key or click skips it."
+          changed={launchIntro !== true}
+          onReset={() => onLaunchIntroChange(true)}
+        >
+          <Switch label="Show intro on launch" checked={launchIntro} onChange={onLaunchIntroChange} />
         </SettingRow>
       </SettingsGroup>
     </div>

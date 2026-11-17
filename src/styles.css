@@ -15,3 +15,5 @@
 @import "./styles/motion.css";
 @import "./styles/editor-motion.css";
 @import "./styles/look.css";
+@import "./styles/caret.css";
+@import "./styles/intro.css";

@@ -211,6 +211,8 @@ const DEFAULT_EDITOR_PREFERENCES = Object.freeze({
   appFontFamily: DEFAULT_APP_FONT_FAMILY,
   appZoom: DEFAULT_APP_ZOOM,
   showTableOfContents: false,
+  smoothCaret: true,
+  launchIntro: true,
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
 });
@@ -1640,6 +1642,16 @@ function normalizeEditorPreferences(
       typeof source.showTableOfContents === "boolean"
         ? source.showTableOfContents
         : Boolean(fallbackSource.showTableOfContents),
+    // On unless turned off; a stored file from before the setting has none.
+    smoothCaret:
+      typeof source.smoothCaret === "boolean"
+        ? source.smoothCaret
+        : fallbackSource.smoothCaret !== false,
+    // On unless turned off, like smoothCaret.
+    launchIntro:
+      typeof source.launchIntro === "boolean"
+        ? source.launchIntro
+        : fallbackSource.launchIntro !== false,
     ...normalizeKeyboardShortcutPreferences(source, fallbackSource),
     // A partial update without a look keeps the previous one.
     look: normalizeLook(source.look ?? fallbackSource.look),
@@ -2223,6 +2235,7 @@ module.exports = {
   normalizeAppTheme,
   normalizeAppZoom,
   normalizeBlocksJSON,
+  normalizeEditorPreferences,
   normalizeLook,
   normalizeNoteTags,
 };

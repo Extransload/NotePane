@@ -599,6 +599,8 @@ test("updates editor preferences and applies them to new notes", () => {
     appFontFamily: "inter",
     appZoom: 1,
     showTableOfContents: false,
+    smoothCaret: true,
+    launchIntro: true,
     keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
     keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
   });
@@ -619,6 +621,8 @@ test("updates editor preferences and applies them to new notes", () => {
     appFontFamily: "garamond",
     appZoom: 1.25,
     showTableOfContents: true,
+    smoothCaret: false,
+    launchIntro: false,
     keyboardShortcuts,
     keyboardShortcutEnabled,
   }), {
@@ -626,6 +630,8 @@ test("updates editor preferences and applies them to new notes", () => {
     appFontFamily: "garamond",
     appZoom: 1.25,
     showTableOfContents: true,
+    smoothCaret: false,
+    launchIntro: false,
     keyboardShortcuts,
     keyboardShortcutEnabled,
     look: normalizeLook({}),
@@ -640,10 +646,36 @@ test("updates editor preferences and applies them to new notes", () => {
     appFontFamily: "garamond",
     appZoom: 1.25,
     showTableOfContents: true,
+    smoothCaret: false,
+    launchIntro: false,
     keyboardShortcuts,
     keyboardShortcutEnabled,
     look: normalizeLook({}),
   });
+});
+
+test("keeps the smooth caret on unless it is turned off, in the renderer and the store alike", async () => {
+  globalThis.window ??= {};
+  const { normalizeEditorPreferences: normalizeRendererPreferences } =
+    await import("../../src/model/preferences.js");
+  const { normalizeEditorPreferences: normalizeStorePreferences } = require("../../electron/store.cjs");
+  const cases = [
+    [{}, undefined, true],
+    [{ smoothCaret: false }, undefined, false],
+    [{ smoothCaret: true }, { smoothCaret: false }, true],
+    [{ smoothCaret: "false" }, undefined, true],
+    [{ smoothCaret: 0 }, { smoothCaret: false }, false],
+    [{}, { appZoom: 1 }, true],
+  ];
+  for (const [source, fallback, expected] of cases) {
+    const label = JSON.stringify({ source, fallback });
+    assert.equal(normalizeRendererPreferences(source, fallback).smoothCaret, expected, label);
+    assert.equal(normalizeStorePreferences(source, fallback).smoothCaret, expected, label);
+  }
+
+  const directory = createTemporaryDirectory();
+  new StickyStore(directory).updateEditorPreferences({ smoothCaret: false });
+  assert.equal(new StickyStore(directory).getEditorPreferences().smoothCaret, false);
 });
 
 test("snaps the app zoom to a zoom step and keeps it across a restart", () => {
