@@ -12,10 +12,14 @@ them in view. Local-first, no account, no sync service.
 
 macOS · Windows · built with [Electron](https://www.electronjs.org/) and [BlockNote](https://www.blocknotejs.org/)
 
-</div>
+[![Latest release](https://img.shields.io/github/v/release/Extransload/NotePane)](https://github.com/Extransload/NotePane/releases/latest) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-<div align="center">
-  <img src="docs/images/desk-light.png" alt="NotePane in Tab sessions mode, with three colour-coded sessions in the sidebar and a rich note open" width="880">
+[Install](#install) · [Features](#features) · [Two modes](#two-modes) · [Everyday use](#everyday-use) · [Usage guide](docs/usage.md)
+
+<img src="docs/images/tour.gif" alt="NotePane opening with its intro, a checklist item typed with the smooth caret, notes in folders, a tag search in the palette, and a switch to the Neon Noir theme" width="880">
+
+<sub>The same tour as a video: <a href="docs/media/tour.mp4">tour.mp4</a></sub>
+
 </div>
 
 ---
@@ -29,9 +33,8 @@ no structure and no real editor.
 NotePane does both, and switches between them with one shortcut.
 
 - **A real block editor.** BlockNote gives you the `/` command palette,
-  drag handles, nesting, tables, toggles and code blocks. Its default UI is
-  used as-is rather than wrapped in a custom toolbar, so it behaves the way
-  you already expect.
+  drag handles, nesting, tables, toggles and code blocks, used as-is rather
+  than wrapped in a custom toolbar, so it behaves the way you already expect.
 - **Two shapes for the same notes.** Gather them into a sidebar, or spread
   them across the screen. Nothing is duplicated or exported between modes.
 - **Yours, on your disk.** Notes are a plain JSON file in your user data
@@ -39,21 +42,58 @@ NotePane does both, and switches between them with one shortcut.
 
 ---
 
+## Features
+
+**Write**
+- **Blocks for everything.** Headings, lists, checklists, toggles, callouts, tables with column handles, columns,
+  code blocks with highlighting and a prettifier, equations, bookmarks, images, files, video and audio.
+- **A caret that glides.** The cursor moves smoothly as you type, in the theme's accent, and steps aside for Korean
+  and other IME input.
+- **Media you can act on.** Right-click an image, file or video to open it, preview it large, save, copy or crop it.
+
+**Organise**
+- **Folders and tags.** Group tabs into folders you collapse, rename and drop tabs onto, and tag notes from the
+  chips above their first line.
+- **Search everything.** `⌘P` searches every note, filtered by `#tag` and `folder:Name` with one-click chips.
+- **Version history and Trash.** Every save keeps a version to go back to; a closed note waits in Trash.
+
+**Export**
+- One click for a PDF or Markdown copy of the open note, or the Export window for **PDF, Markdown, HTML or a PNG
+  image** of a note, a folder or every note, with page size, colours, images beside the file and front matter.
+
+**Make it yours**
+- **51 themes**, from NotePane Light and Dark, Catppuccin, Nord, Dracula and Tokyo Night to Gruvbox, Rosé Pine and
+  Neon Noir. Click a card and every window takes it at once.
+- **A background behind the app.** A photo, a colour or a gradient, with the window made Solid, Frosted or Clear
+  glass over it, and text kept readable.
+- **Typography and tabs.** Editor and heading fonts, size, line height, text width; tab style, height and colours.
+- **A settings window like Tern's.** One floating window with search across every setting, and an eye button to
+  peek at the app behind it.
+
+**Stays current.** On a Mac, a new release downloads by itself and **Restart to update** swaps it in. On Windows it
+installs when you quit.
+
+---
+
 ## Two modes
 
 ### Tab sessions mode
 
-One window. Sessions live in the sidebar, each with its own accent colour and
-a `⌘1`–`⌘9` shortcut. This is where you draft, compare and organise.
+One window. Sessions live in the sidebar, in folders if you like, each with a `⌘1`–`⌘9` shortcut. Tabs stay
+plain until you give one a colour. This is where you draft, compare and organise.
 
 <div align="center">
-  <img src="docs/images/desk-dark.png" alt="Tab sessions mode in dark theme" width="820">
+  <img src="docs/images/desk-light.png" alt="Tab sessions mode: tabs grouped in Work and Reading folders, a tagged note with a checklist and a table" width="820">
+</div>
+
+<div align="center">
+  <img src="docs/images/desk-dark.png" alt="The same window in the Neon Noir theme" width="820">
 </div>
 
 ### Sticky windows mode
 
 Every session becomes its own small window, arranged across your display and
-tinted with its accent colour. Pin the ones you want above other apps and keep
+tinted with its colour. Pin the ones you want above other apps and keep
 working elsewhere.
 
 <div align="center">
@@ -64,37 +104,56 @@ Press `⌘⇧T` to move between them.
 
 ---
 
+## Find, theme, and set it up
+
+<div align="center">
+  <img src="docs/images/search.png" alt="The search palette filtered to the launch tag, with folder and tag chips" width="820">
+</div>
+
+`⌘P` opens the search palette. Type words, `#tag` or `folder:Name`, or press the chips.
+
+<div align="center">
+  <img src="docs/images/background.png" alt="NotePane over a snowy mountain photo, the sidebar and editor in frosted glass" width="820">
+</div>
+
+Settings › Look › Background puts a picture, colour or gradient behind the app and sets the glass over it.
+
+<div align="center">
+  <img src="docs/images/settings.png" alt="The Settings window open on the Background page, with Material, Opacity and Border" width="820">
+</div>
+
+---
+
 ## The editor
 
 <div align="center">
   <img src="docs/images/slash-menu.png" alt="The slash command palette open in the editor" width="820">
 </div>
 
-Type `/` anywhere to insert a block. Available blocks:
+Type `/` anywhere to insert a block:
 
 | | |
 | --- | --- |
-| **Text** | Paragraph, Heading 1–3, Toggle Heading, Quote, Callout |
+| **Text** | Paragraph, Heading 1–3, Toggle Heading, Quote, Callout, Divider |
 | **Lists** | Bullet, Numbered, Check, Toggle |
-| **Structure** | Table with advanced handles, Code block with syntax highlighting and a prettifier |
-| **Media** | Image with download and crop, File, Video, Audio |
+| **Structure** | Table with advanced handles, Columns, Code block with syntax highlighting and a prettifier, Equation |
+| **Media** | Image with crop, File, Video, Audio, Bookmark card |
 
-Plus inline styles, links, per-note typography, a table of contents rail, and
-Markdown import straight from the slash menu.
+Plus inline styles, links, a table of contents rail, find in note (`⌘F`), and Markdown import straight from the
+slash menu.
 
 ---
 
 ## Install
 
-### Homebrew (macOS)
+### Homebrew (macOS, Apple silicon)
 
 ```sh
 brew install --cask extransload/tap/notepane
 ```
 
-The cask clears the download quarantine, so NotePane opens without the
-**Open Anyway** step. Update with `brew upgrade --cask notepane`; a dmg
-downloaded from the in-app **Download** link asks again.
+The cask clears the download quarantine, so NotePane opens without the **Open Anyway** step. After that the app
+updates itself; `brew upgrade --cask --greedy notepane` also works.
 
 ### Download
 
@@ -110,9 +169,12 @@ On macOS, open NotePane from System Settings → Privacy & Security →
 **Open Anyway**; the installer window walks you through it. On Windows,
 choose **More info → Run anyway**.
 
-NotePane checks Releases for a newer version at startup. On Windows it
-installs the update when you quit; on macOS it offers the download. No note
-data is sent.
+### Updates
+
+NotePane checks Releases at startup and every six hours; no note data is sent. On macOS a newer release downloads
+in the background, its checksum and version are checked, and **Restart to update** appears in the window's title
+bar: it saves your notes, swaps the new app in and opens it. On Windows the update installs when you quit.
+Versions before 0.5.1 only link to the release page, so they need one update by hand.
 
 ### Build a package yourself
 
@@ -159,14 +221,17 @@ their first line until you rename one by double-clicking its tab.
 | --- | --- |
 | `⌘T` / `⌘N` | New session |
 | `⌘1` … `⌘9` | Jump to a session |
+| `⌘P` | Search every note |
+| `⌘F` | Find in the open note |
 | `⌘⇧T` | Switch between Tab sessions mode and Sticky windows mode |
 | `/` | Open the block palette |
-| `⌘,` | Preferences |
-| `⌘⇧E` | Export as PDF or Markdown |
+| `⌘,` | Settings |
+| `⌘⇧E` | Export menu: PDF, Markdown, or Options… for the Export window |
+| `⌘=` / `⌘-` / `⌘0` | Zoom every window |
 
 These are the default macOS shortcuts (`⌘` = Command, `⇧` = Shift).
-On Windows, use Ctrl instead of Command.
-See the [usage guide](docs/usage.md) for more shortcuts and appearance settings.
+On Windows, use Ctrl instead of Command. Every shortcut can be changed in Settings › Shortcuts.
+See the [usage guide](docs/usage.md) for more.
 
 ---
 
@@ -179,9 +244,9 @@ macOS     ~/Library/Application Support/NotePane/notes.json
 Windows   %APPDATA%\NotePane\notes.json
 ```
 
-It holds the BlockNote document, a Markdown fallback, window bounds, colours
-and typography for every note. Preferences include a full backup export and
-import, so moving to another machine is a file copy.
+It holds the BlockNote document, a Markdown fallback, folders, tags, window bounds, colours and typography for
+every note; images and files you add sit beside it in `assets/`. Settings › Backup exports and imports everything,
+so moving to another machine is a file copy.
 
 ---
 
@@ -209,12 +274,20 @@ src/utils/    small shared helpers
 Tests live in `tests/e2e/renderer/` by feature, `tests/e2e/electron.spec.mjs`
 for desktop behaviour, and `tests/unit/` for the store.
 
+The README's screenshots and tour come from the built app with demo notes, never your own:
+
+```bash
+npm run build
+node scripts/capture-readme-media.mjs            # every scene
+node scripts/capture-readme-media.mjs tour desk  # just these
+```
+
 ---
 
 ## Not included
 
-AI, comments, real-time collaboration and DOCX/ODT export are not currently
-provided. NotePane focuses on local note-taking.
+AI, comments, real-time collaboration, sync between machines and DOCX/ODT export are not currently provided.
+NotePane focuses on local note-taking.
 
 ---
 
