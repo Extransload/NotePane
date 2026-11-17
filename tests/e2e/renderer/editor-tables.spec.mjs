@@ -418,7 +418,9 @@ test("auto-fits table columns within the editor width", async ({ page }) => {
 
   await cell.click();
   await page.keyboard.press(modifierShortcut("A"));
-  await page.keyboard.type("unbroken-value-".repeat(80));
+  // The width is what matters, not the keystrokes: 1,200 typed keys take most of the test's budget
+  // on a loaded CI runner.
+  await page.keyboard.insertText("unbroken-value-".repeat(80));
   await autoFitColumn();
 
   const bounds = await page.evaluate(() => ({

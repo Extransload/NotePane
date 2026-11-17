@@ -211,6 +211,9 @@ async function readColors(locator) {
 // into the fixture and keeps the THEMES order.
 for (const themeId of THEMES) {
   test(`keeps ${themeId} computed colours unchanged`, async ({ page }) => {
+    // About forty menu round trips (eighteen colours applied, then a reading of every target),
+    // 15 s alone and twice that next to three other workers on a CI runner.
+    test.slow();
     await page.goto("/");
     await expect(editorSurface(page)).toBeVisible();
     await selectAppTheme(page, "notepane-light");

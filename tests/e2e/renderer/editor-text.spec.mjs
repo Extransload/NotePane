@@ -1439,8 +1439,17 @@ test("keeps BlockNote color and delete menus usable inside the app window", asyn
 
   const table = page.getByRole("table");
   const tableBox = await table.boundingBox();
-  await page.mouse.move(tableBox.x + 20, tableBox.y + 20);
-  await expect(openBlockMenuButton).toBeVisible();
+  // BlockNote moves the handle on pointer moves. One move can land while the deleted block's menu
+  // is still closing and be dropped, so keep moving within the table, as a hand does, until the
+  // handle is beside it; a click before then opens the menu of the block above.
+  let nudge = 0;
+  await expect.poll(async () => {
+    nudge = (nudge + 1) % 2;
+    await page.mouse.move(tableBox.x + 20 + nudge * 8, tableBox.y + 20);
+    const handleBox = await openBlockMenuButton.boundingBox();
+    const middle = handleBox ? handleBox.y + handleBox.height / 2 : -1;
+    return middle >= tableBox.y && middle <= tableBox.y + tableBox.height;
+  }).toBe(true);
   await openBlockMenuButton.click();
   // Colors, the table items (Fit to width, Header row, Header column) and Delete; a table has no
   // text that Turn into could keep.
@@ -1781,6 +1790,9 @@ test("copies only the highlighted text of a keyboard selection across blocks", a
   await page.keyboard.insertText("gamma delta");
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Home");
+  // ProseMirror reads a native caret move on selectionchange. Until it has, its state still has
+  // the caret at the end of the note, where BlockNote's trailing-node plugin swallows ArrowDown.
+  await waitForEditorSelection(page);
   await page.keyboard.press("Shift+ArrowDown");
   await page.keyboard.press("Shift+End");
   for (let index = 0; index < 2; index += 1) {

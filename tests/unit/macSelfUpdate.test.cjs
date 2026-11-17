@@ -34,7 +34,10 @@ test("picks the release's Mac zip for this architecture", () => {
   assert.equal(findMacZip(undefined, "arm64"), null);
 });
 
-test("finds the bundle an executable runs from", () => {
+// The updater only runs in the Mac app, where bundle paths are POSIX paths.
+const MAC_ONLY = { skip: process.platform === "win32" && "macOS bundle paths" };
+
+test("finds the bundle an executable runs from", MAC_ONLY, () => {
   assert.equal(
     bundlePathFor("/Applications/NotePane.app/Contents/MacOS/NotePane"),
     "/Applications/NotePane.app",
@@ -91,7 +94,7 @@ function createHarness({ zipBytes = Buffer.from("zip bytes"), listedSha512, unpa
   return { updater, updateInfo, states, runs, spawned, tempDir };
 }
 
-test("downloads, checks and unpacks a release, then installs it as the app quits", async () => {
+test("downloads, checks and unpacks a release, then installs it as the app quits", MAC_ONLY, async () => {
   const harness = createHarness({});
   await harness.updater.prepare(harness.updateInfo);
   assert.deepEqual(harness.states.map(({ status }) => status), ["downloading", "ready"]);

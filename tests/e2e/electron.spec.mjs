@@ -395,6 +395,8 @@ test("Cmd/Ctrl+= zooms every window, and the zoom persists", async () => {
     // At 50% the sticky header is 15px, about the buttons' own height, so they stay inside it.
     const page = await getStickyPageByNoteId(electronApp, "first-note");
     await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    // As above: once the caret is in, the shortcut listener is too.
+    await expect(page.locator(".smooth-caret")).toBeAttached();
     for (let press = 0; press < 4; press += 1) {
       await page.keyboard.press(modifierShortcut("-"));
     }

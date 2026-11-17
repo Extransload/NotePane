@@ -57,7 +57,8 @@ import {
  * The fixed position of a menu opened at `anchor` ({ left, top, width, height }, a pointer being
  * a rectangle of no size): below it, or above it when there is no room below, and clamped to the
  * viewport by the dropdown placement helper. The menu is laid out hidden first, so the helper
- * works with its real size.
+ * works with its real size: its layout size, as its pop-in starts scaled down and a menu placed
+ * above its anchor by that smaller height would cover the anchor once it has grown.
  */
 function useAnchoredMenuStyle(menuRef, { left, top, width = 0, height = 0 }, align = "start") {
   const [style, setStyle] = useState(null);
@@ -67,7 +68,7 @@ function useAnchoredMenuStyle(menuRef, { left, top, width = 0, height = 0 }, ali
     if (!menu) {
       return;
     }
-    const size = menu.getBoundingClientRect();
+    const size = { width: menu.offsetWidth, height: menu.offsetHeight };
     const { placement, ...position } = getFloatingDropdownMenuStyle(
       {
         getBoundingClientRect: () => ({
