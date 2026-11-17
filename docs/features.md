@@ -39,7 +39,9 @@
 - Look: accent colour and corner shape; editor font, size, line height, letter spacing, block spacing, text width,
   heading font and weight, code font, size and ligatures; a background (colour, gradient or picture, with fit,
   position, blur, brightness, saturation and tint) and, on the same page as Tern sets its window, the window over it:
-  Material (Solid, Frosted or Clear), one Opacity for every area (menus and Settings stay at least 80%), Border, and
+  Material (Solid, Frosted or Clear), one Opacity for every area (menus and Settings stay at least 80%), a material
+  of their own for Menus and popups (Frosted by default, so the note under an open menu, the search palette or
+  Settings blurs instead of showing through sharp), Border, and
   Keep text readable (a soft halo behind text while the background shows through, on by default); tab style,
   height, radius, numbers, shortcuts, new tab colour and colour strength
 - Preferences > About: the NotePane wordmark, "Version x.y.z", a short description of the app and, in the desktop
@@ -111,8 +113,10 @@
 - PDF export hides app chrome and sticky background
 - PDF export renders with NotePane Light colours unless the current theme is chosen in the Export window
 - Folders in the tabs sidebar: New folder, collapse and expand, rename, delete (notes move out), move a tab from its
-  menu or by dropping it on a folder header, new note in a folder; tab numbers and `Command/Ctrl + 1..9` follow the
-  visible order
+  menu, by dropping it on a folder header, or by dragging it over another group's tabs (above the first tab, or onto
+  an ungrouped tab, takes it out of its folder), new note in a folder; tab numbers and `Command/Ctrl + 1..9` follow
+  the visible order
+- Switching sessions swaps the note in place: nothing in the sidebar or the editor fades in again
 - Tags on notes: chips above the first block, added with suggestions; a tag opens the search palette filtered to it.
   The palette (`Command/Ctrl + P`) filters by `#tag` and `folder:Name`, with folder and tag chips. A sticky window
   shows the tag row only once its note has tags
@@ -160,8 +164,9 @@ BlockNote handles editor interaction directly.
   block or cell, Korean and other IME composition, print and export use the native caret
 - Launch intro (Settings > Look > Theme, on by default): as the app opens in Tabs mode, three windows fly in from
   round the window and stack into the NotePane mark, its box is drawn round them and filled, and the name is written
-  out over a blur of the app, for about three seconds. It plays once per launch, never in a sticky window, a later
-  window or a reload, and never under reduced motion. Any key or click clears it and still reaches the app
+  out, for about three seconds, over the window's own colour: the app does not show until the intro clears. It plays
+  once per launch, never in a sticky window, a later window or a reload, and never under reduced motion. Any key or
+  click clears it and still reaches the app
 - The six-dot block menu stays inside the editor: when the sidebar leaves no room on the handle's left, it opens on its
   right
 - `Command/Ctrl + A` selects all editor blocks

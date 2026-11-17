@@ -32,7 +32,8 @@ function stubLaunchBridge() {
       window.sessionStorage.setItem("intro-preferences", JSON.stringify(preferences));
       return preferences;
     },
-    takeLaunchIntro: async () => {
+    // Synchronous, as preload's sendSync is.
+    takeLaunchIntro: () => {
       window.launchIntroAsks += 1;
       return window.launchIntroAsks === 1;
     },
@@ -54,6 +55,31 @@ test("plays the launch intro once and clears it on its own", async ({ page }) =>
   await expect(intro(page)).toContainText("NotePane");
   await expect(intro(page)).toHaveCount(0, { timeout: 6000 });
   expect(await page.evaluate(() => window.launchIntroAsks)).toBe(1);
+});
+
+// The app never shows before the intro: it is in the DOM when the shell first is, opaque, and
+// with nothing of the app showing through.
+test("covers the app from its first frame", async ({ page }) => {
+  await page.addInitScript(() => {
+    new MutationObserver((_records, observer) => {
+      if (!document.querySelector("[data-testid='sticky-shell']")) {
+        return;
+      }
+      observer.disconnect();
+      const cover = document.querySelector("[data-testid='launch-intro']");
+      const style = cover ? getComputedStyle(cover) : null;
+      window.introAtFirstShell = cover
+        ? { opacity: style.opacity, background: style.backgroundColor, backdrop: style.backdropFilter }
+        : null;
+    }).observe(document, { childList: true, subtree: true });
+  });
+  await page.goto("/");
+  await expect(intro(page)).toBeVisible();
+  const atFirstShell = await page.evaluate(() => window.introAtFirstShell);
+  expect(atFirstShell).not.toBeNull();
+  expect(atFirstShell.opacity).toBe("1");
+  expect(atFirstShell.background).toMatch(/^rgb\(/);
+  expect(atFirstShell.backdrop).toBe("none");
 });
 
 // The intro takes no clicks and keeps no keys: the click that skips it lands in the note.

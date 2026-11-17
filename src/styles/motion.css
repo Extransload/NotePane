@@ -143,12 +143,6 @@ div:has(> .bn-link-toolbar) {
   animation: notepaneMenuIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
 }
 
-/* StickyEditor remounts for each note, so a session switch fades the new note in. Only opacity
-   moves: the editor takes focus at once, and fixed-position children keep their frame. */
-.sticky-editor-surface {
-  animation: notepaneMenuFadeIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
-}
-
 /* A reloaded window's app fades in over the paint public/boot.js put under it
    (src/hooks/useReloadReveal.js). */
 html[data-boot="revealing"] #root {
@@ -189,8 +183,7 @@ html[data-boot="revealing"] #root {
   .search-palette-backdrop,
   .preferences-window,
   .markdown-import-dialog,
-  .search-palette,
-  .sticky-editor-surface {
+  .search-palette {
     animation: none !important;
   }
 }
@@ -201,8 +194,7 @@ html[data-boot="revealing"] #root {
   .bn-suggestion-menu,
   .notepane-block-menu-subpanel,
   .color-panel,
-  .code-block-language-menu,
-  .sticky-editor-surface {
+  .code-block-language-menu {
     animation: none !important;
   }
 }
@@ -211,8 +203,7 @@ body.is-exporting .bn-menu-dropdown,
 body.is-exporting .mantine-Popover-dropdown,
 body.is-exporting .bn-suggestion-menu,
 body.is-exporting .notepane-block-menu-subpanel,
-body.is-exporting .color-panel,
-body.is-exporting .sticky-editor-surface {
+body.is-exporting .color-panel {
   animation: none !important;
 }
 

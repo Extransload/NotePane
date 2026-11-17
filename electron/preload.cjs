@@ -34,7 +34,8 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
   openStickyNote: (noteId) => ipcRenderer.invoke("notes:open-sticky", noteId),
   getAppInfo: () => ipcRenderer.invoke("app:info"),
   checkForUpdates: () => ipcRenderer.invoke("app:check-for-updates"),
-  takeLaunchIntro: () => ipcRenderer.invoke("app:take-launch-intro"),
+  // Synchronous, so the renderer knows before its first frame whether the intro covers it.
+  takeLaunchIntro: () => ipcRenderer.sendSync("app:take-launch-intro"),
   getAppUpdateState: () => ipcRenderer.invoke("app-update:get-state"),
   installAppUpdate: () => ipcRenderer.invoke("app-update:install"),
   openUpdateRelease: (version) => ipcRenderer.invoke("app-update:open-release", version),

@@ -1,14 +1,16 @@
 /* The launch intro (src/ui/LaunchIntro.jsx): three windows fly in from round the window and
    stack into the mark, its box is drawn round them and filled, the dots light, then the name is
-   written out letter by letter and a light runs across "Pane". It all lies over a blur of the
-   app, takes no pointer events, and clears with a short fade.
+   written out letter by letter and a light runs across "Pane". It lies over the whole app in the
+   window's own colour, opaque from the first frame so nothing of the app shows until it clears,
+   takes no pointer events, and clears with a short fade.
 
    Everything that moves animates transform or opacity on a layer of its own (will-change), so
    the compositor runs the whole intro: it stays smooth while the app mounts on the main thread.
    No percentage translate (it depends on the box size), no filter, clip-path, stroke or
-   background-position animation. The mark is 112 x 116 px; the offsets below are in that box.
-   The motion starts once the app is idle (.is-playing); until then the veil waits on its own.
-   Reduced motion never mounts it (useLaunchIntro). */
+   background-position animation, and no backdrop-filter, which would redraw with the app under
+   it. The mark is 112 x 116 px; the offsets below are in that box. The motion starts once the
+   app is idle (.is-playing); until then the veil waits on its own. Reduced motion never mounts
+   it (useLaunchIntro). */
 .launch-intro {
   /* The mark's own lilac (the dots in assets/notepane-icon.svg), for the box drawn round it. */
   --launch-intro-outline: #d5b5e6;
@@ -24,13 +26,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: color-mix(in srgb, var(--sticky-effective-bg) 70%, transparent);
-  -webkit-backdrop-filter: blur(24px) saturate(1.1);
-  backdrop-filter: blur(24px) saturate(1.1);
+  background: var(--sticky-effective-bg);
   pointer-events: none;
   user-select: none;
   will-change: opacity;
-  animation: launch-intro-fade-in 0.28s ease-out both;
 }
 
 .launch-intro.is-leaving {
@@ -288,12 +287,6 @@
 
 .launch-intro.is-playing .launch-intro-letter.is-pane::after {
   animation: launch-intro-glint 0.42s ease-in-out calc(2.05s + var(--j) * 70ms) both;
-}
-
-@keyframes launch-intro-fade-in {
-  from {
-    opacity: 0;
-  }
 }
 
 @keyframes launch-intro-fade-out {

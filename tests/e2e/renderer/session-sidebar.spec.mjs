@@ -1285,3 +1285,69 @@ test("drops a dragged tab on a folder header to move it into the folder", async 
   await expect(header).not.toHaveClass(/\bis-drop-target\b/);
   await expect(page.getByRole("tab")).toHaveCount(2);
 });
+
+test("drags a tab out of its folder onto the ungrouped tabs, and back by its folder's tabs", async ({ page }) => {
+  await createBlankSession(page);
+  await createBlankSession(page);
+  await expect(page.locator(".session-tab-row.is-entering")).toHaveCount(0);
+  await createFolder(page, "Work");
+  await moveTabToFolder(page, 0, "Work");
+  const workTabs = folderTabRows(page, "Work");
+  await expect(workTabs).toHaveCount(1);
+  const movedId = await workTabs.first().getAttribute("data-note-id");
+  const ungroupedRows = page.locator(".session-tabs > .session-tab-row");
+  await expect(ungroupedRows).toHaveCount(2);
+
+  // The emulated drag sends dragover only on a move, so keep moving until the tab lands.
+  const dragTabOnto = async (source, target, settled) => {
+    const sourceBox = await source.boundingBox();
+    await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
+    await page.mouse.down();
+    let nudge = 0;
+    await expect(async () => {
+      nudge = nudge === 0 ? 1 : 0;
+      const targetBox = await target.boundingBox();
+      await page.mouse.move(targetBox.x + targetBox.width / 2 + nudge, targetBox.y + 4, { steps: 4 });
+      await settled();
+    }).toPass();
+    await page.mouse.up();
+  };
+
+  await dragTabOnto(workTabs.first(), ungroupedRows.first(), async () => {
+    await expect(workTabs).toHaveCount(0, { timeout: 500 });
+    await expect(ungroupedRows.first()).toHaveAttribute("data-note-id", movedId, { timeout: 500 });
+  });
+  await expect(page.locator(".session-tab-row.is-dragging")).toHaveCount(0);
+  await expect(workTabs).toHaveCount(0);
+  await expect(ungroupedRows).toHaveCount(3);
+  await expect(ungroupedRows.first()).toHaveAttribute("data-note-id", movedId);
+
+  // Dragged back over a tab in the folder, it joins the folder again.
+  await moveTabToFolder(page, 1, "Work");
+  await expect(workTabs).toHaveCount(1);
+  await dragTabOnto(ungroupedRows.first(), workTabs.first(), async () => {
+    await expect(workTabs).toHaveCount(2, { timeout: 500 });
+  });
+  await expect(workTabs).toHaveCount(2);
+  await expect(workTabs.and(page.locator(`[data-note-id='${movedId}']`))).toHaveCount(1);
+});
+
+// The editor shell remounts for each note; its sidebar, folders and editor must not fade in again,
+// which made the whole window blink on every switch.
+test("switches sessions without fading the window in again", async ({ page }) => {
+  await createBlankSession(page);
+  await createBlankSession(page);
+  await createFolder(page, "Work");
+  await moveTabToFolder(page, 1, "Work");
+  await expect(page.locator(".session-tab-row.is-entering")).toHaveCount(0);
+  const fadesRunning = () => page.evaluate(() =>
+    document.querySelector("[data-testid='sticky-shell']").getAnimations({ subtree: true })
+      .filter((animation) => animation.animationName === "notepaneMenuFadeIn" && animation.playState === "running")
+      .map((animation) => animation.effect.target.className));
+
+  for (const row of [page.locator(".session-tabs > .session-tab-row").first(), folderTabRows(page, "Work").first()]) {
+    await row.getByRole("tab").click();
+    await expect(row.getByRole("tab")).toHaveAttribute("aria-selected", "true");
+    expect(await fadesRunning()).toEqual([]);
+  }
+});

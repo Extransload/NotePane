@@ -661,6 +661,18 @@ export function useSessionList({
     return moved ? { ...moved, folderId: targetFolderId } : null;
   }, [notes, updateNoteInList]);
 
+  // A tab dragged across a group's edge shows in the group it would join. Nothing is stored:
+  // the drop stores the move (moveNoteToFolder), and a cancelled drag sets the folder back.
+  const previewNoteFolder = useCallback((noteId, folderId) => {
+    const targetFolderId = folderId ?? null;
+    const withFolder = (candidate) =>
+      candidate?.id === noteId && (candidate.folderId ?? null) !== targetFolderId
+        ? { ...candidate, folderId: targetFolderId }
+        : candidate;
+    setNotes((currentNotes) => currentNotes.map(withFolder));
+    setNote(withFolder);
+  }, []);
+
   // Tags are stored normalised (src/model/tags.js), so the returned note holds
   // exactly what the tag chips should show.
   const setNoteTags = useCallback(async (noteId, tags) => {
@@ -684,6 +696,7 @@ export function useSessionList({
     moveNoteToFolder,
     note,
     notes,
+    previewNoteFolder,
     purgeTrashedNote,
     renameFolder,
     reorderNotes,

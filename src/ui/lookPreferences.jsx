@@ -631,7 +631,7 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
           <SettingRow
             id="surfaceOpacity"
             title="Opacity"
-            description="How much the window hides the background. Menus and Settings stay at least 80%."
+            description="How much the window hides the background. Menus and popups stay at least 80%."
             {...resetSurfaceStyle("opacity")}
           >
             <Slider
@@ -645,6 +645,19 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
             />
           </SettingRow>
         )}
+        <SettingRow
+          id="floatingMaterial"
+          title="Menus and popups"
+          description="Menus, the search palette and Settings float over your note. Frosted blurs the text under them."
+          {...resetSurfaceStyle("floating")}
+        >
+          <Segmented
+            label="Menus and popups"
+            value={surfaceStyle.floating}
+            options={MATERIAL_OPTIONS}
+            onChange={(floating) => setSurfaceStyle({ floating })}
+          />
+        </SettingRow>
         <SettingRow
           id="surfaceBorder"
           title="Border"

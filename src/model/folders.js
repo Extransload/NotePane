@@ -51,8 +51,9 @@ export function groupSessionNotes(notes, folders, activeNoteId) {
 /**
  * The full session order for a new order of the visible tabs. A tab hidden in a
  * collapsed folder keeps its place, and every session stays in its own group:
- * a tab dragged or moved past the edge of its group stays at that edge, since
- * only a drop on a folder header or the tab menu changes a session's folder.
+ * a tab dragged or moved past the edge of its group stays at that edge. A tab
+ * changes group by its folder (a drop on a folder header, the tab menu, or a drag
+ * over another group's tabs, see useSessionTabDrag), never by this order.
  */
 export function getGroupedSessionOrder(orderedVisibleIds, grouping) {
   const visibleIds = grouping.visibleNotes.map((note) => note.id);

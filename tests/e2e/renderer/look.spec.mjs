@@ -41,6 +41,16 @@ test("a background picture shows through frosted glass, and text stays readable"
   await expect.poll(() => rootVariable(page, "--look-sidebar-opacity")).toBe("67%");
   expect(await rootVariable(page, "--look-sidebar-filter")).toBe("none");
   expect(await rootVariable(page, "--look-menus-opacity")).toBe("80%");
+  // Menus and popups keep their own material: still frosted over a clear window, until set.
+  expect(await rootVariable(page, "--look-menus-filter")).toBe("blur(24px) saturate(150%)");
+  const floating = settings(page).locator("[data-setting-id='floatingMaterial']");
+  await floating.getByRole("radio", { name: "Clear" }).click();
+  await expect.poll(() => rootVariable(page, "--look-settings-filter")).toBe("none");
+  await expect.poll(() => settings(page).evaluate((element) => getComputedStyle(element).backdropFilter))
+    .toBe("none");
+  await floating.getByRole("radio", { name: "Frosted" }).click();
+  await expect.poll(() => settings(page).evaluate((element) => getComputedStyle(element).backdropFilter))
+    .toBe("blur(30px) saturate(1.5)");
   // The sidebar's own fill gives way to the layer drawn from these variables.
   await expect.poll(() => page.getByTestId("session-sidebar")
     .evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");

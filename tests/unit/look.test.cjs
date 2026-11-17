@@ -140,27 +140,36 @@ test("normalizeLook clamps, snaps and validates", async () => {
   assert.equal(normalizeLook({ accentColor: "#ABCDEF" }).accentColor, "#abcdef");
 });
 
-test("applySurfaceStyle sets every area from one material, opacity and border", async () => {
+test("applySurfaceStyle sets the window from one material and menus from their own", async () => {
   const { applySurfaceStyle, getSurfaceStyle, normalizeLook, DEFAULT_LOOK } = await loadLook();
-  // The default look reads as frosted at the sidebar's opacity.
-  assert.deepEqual(getSurfaceStyle(DEFAULT_LOOK), { material: "frosted", opacity: 72, border: "hairline" });
+  // The default look reads as frosted at the sidebar's opacity, with frosted menus.
+  assert.deepEqual(getSurfaceStyle(DEFAULT_LOOK), { material: "frosted", opacity: 72, border: "hairline", floating: "frosted" });
 
   const look = normalizeLook({ surfaces: { sidebar: { fill: "#aabbcc", border: "strong" } } });
   const clear = applySurfaceStyle(look, { material: "clear", opacity: 30, border: "none" });
   assert.deepEqual(clear.surfaces.sidebar, { fill: null, opacity: 30, blur: 0, border: "none" });
-  // Menus and Settings stay legible, and the editor draws no border.
-  assert.equal(clear.surfaces.menus.opacity, 80);
+  // A clear window keeps its frosted menus, at least 80% opaque, and the editor draws no border.
+  assert.deepEqual(clear.surfaces.menus, { fill: null, opacity: 80, blur: 24, border: "none" });
   assert.equal(clear.surfaces.editor.border, "none");
-  assert.deepEqual(getSurfaceStyle(clear), { material: "clear", opacity: 30, border: "none" });
+  assert.deepEqual(getSurfaceStyle(clear), { material: "clear", opacity: 30, border: "none", floating: "frosted" });
 
-  const frosted = applySurfaceStyle(clear, { material: "frosted" });
-  assert.deepEqual(getSurfaceStyle(frosted), { material: "frosted", opacity: 30, border: "none" });
-  assert.ok(Object.values(frosted.surfaces).every((surface) => surface.blur > 0));
+  const clearMenus = applySurfaceStyle(clear, { floating: "clear" });
+  assert.equal(clearMenus.surfaces.settings.blur, 0);
+  assert.deepEqual(getSurfaceStyle(clearMenus), { material: "clear", opacity: 30, border: "none", floating: "clear" });
 
-  // Solid hides the background everywhere; going back to glass starts from the default opacity.
-  const solid = applySurfaceStyle(frosted, { material: "solid" });
+  const frosted = applySurfaceStyle(clearMenus, { material: "frosted" });
+  assert.equal(getSurfaceStyle(frosted).material, "frosted");
+  assert.equal(frosted.surfaces.editor.blur, 12);
+  assert.equal(frosted.surfaces.menus.blur, 0);
+
+  // Solid hides the background behind the window; going back to glass starts from the default
+  // opacity. Solid menus are fully opaque whatever the window is.
+  const solid = applySurfaceStyle(frosted, { material: "solid", floating: "solid" });
   assert.ok(Object.values(solid.surfaces).every((surface) => surface.opacity === 100 && surface.blur === 0));
-  assert.deepEqual(getSurfaceStyle(solid), { material: "solid", opacity: 72, border: "none" });
+  assert.deepEqual(getSurfaceStyle(solid), { material: "solid", opacity: 72, border: "none", floating: "solid" });
+  const frostedMenusOnSolid = applySurfaceStyle(solid, { floating: "frosted" });
+  assert.equal(getSurfaceStyle(frostedMenusOnSolid).material, "solid");
+  assert.deepEqual(frostedMenusOnSolid.surfaces.menus, { fill: null, opacity: 80, blur: 24, border: "none" });
 });
 
 test("getNextCycledTabColor takes the pastel after the newest coloured session", async () => {

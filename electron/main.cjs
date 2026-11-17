@@ -1307,18 +1307,19 @@ function installIpcHandlers() {
 
   // Yes once per launch, to the first window that asks, when the app opens in Tabs mode with
   // Settings > Look > Theme > Show intro on launch on. A sticky window, a window opened later or a
-  // reload gets no.
-  ipcMain.handle("app:take-launch-intro", (event) => {
+  // reload gets no. Asked synchronously (preload's takeLaunchIntro), so the renderer's first
+  // frame already has the intro over the app.
+  ipcMain.on("app:take-launch-intro", (event) => {
     if (launchIntroTaken) {
-      return false;
+      event.returnValue = false;
+      return;
     }
     launchIntroTaken = true;
-    return (
+    event.returnValue =
       (!quietTestMode || launchIntroInTests) &&
       !getDetachedStickyEntry(event.sender) &&
       store.getLayoutMode() === "tabs" &&
-      store.getEditorPreferences().launchIntro !== false
-    );
+      store.getEditorPreferences().launchIntro !== false;
   });
 
   ipcMain.handle("app-theme:update", (_event, payload) => {

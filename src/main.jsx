@@ -260,6 +260,7 @@ import { useAppliedTheme } from "./hooks/useAppliedTheme.js";
 import { useLookStyles } from "./hooks/useLookStyles.js";
 import { useEditorSurfaceShortcuts } from "./hooks/useEditorSurfaceShortcuts.js";
 import { useSmoothCaret } from "./hooks/useSmoothCaret.js";
+import { useMountWithoutFades } from "./hooks/useMountWithoutFades.js";
 import { useLaunchIntro } from "./hooks/useLaunchIntro.js";
 import { LaunchIntro } from "./ui/LaunchIntro.jsx";
 import { useAppUpdate } from "./hooks/useAppUpdate.js";
@@ -344,6 +345,7 @@ function App({ bindTestThemeSetter }) {
     moveNoteToFolder,
     note,
     notes,
+    previewNoteFolder,
     purgeTrashedNote,
     renameFolder,
     reorderNotes,
@@ -558,12 +560,22 @@ function App({ bindTestThemeSetter }) {
   }, []);
 
   useReloadReveal(Boolean(note));
+  // Here rather than in StickyEditor, which remounts for each note: the intro covers the app from
+  // its first frame, the loading screen too, and stays one intro however the note changes. Its key
+  // keeps it mounted as the loading screen gives way to the editor.
+  const { isLaunchIntroVisible, finishLaunchIntro } = useLaunchIntro();
+  const launchIntro = isLaunchIntroVisible && (
+    <LaunchIntro key="launch-intro" onDone={finishLaunchIntro} />
+  );
 
   if (!note) {
     return (
-      <div className="loading">
-        <span>Loading…</span>
-      </div>
+      <>
+        <div className="loading">
+          <span>Loading…</span>
+        </div>
+        {launchIntro}
+      </>
     );
   }
 
@@ -599,6 +611,7 @@ function App({ bindTestThemeSetter }) {
         onToggleFolderCollapsed={toggleFolderCollapsed}
         onDeleteFolder={deleteFolder}
         onMoveNoteToFolder={moveNoteToFolder}
+        onPreviewNoteFolder={previewNoteFolder}
         onSetNoteTags={setNoteTags}
         onSessionMovedToTrash={showSessionMovedToTrashToast}
         installedFontFamilies={installedFontFamilies}
@@ -616,6 +629,7 @@ function App({ bindTestThemeSetter }) {
       />
       </EditorErrorBoundary>
       <StickyToast toast={sessionUndoStickyToast} timer={sessionUndoToastTimer} />
+      {launchIntro}
     </>
   );
 }
@@ -648,6 +662,7 @@ function StickyEditor({
   onToggleFolderCollapsed,
   onDeleteFolder,
   onMoveNoteToFolder,
+  onPreviewNoteFolder,
   onSetNoteTags,
   onSessionMovedToTrash,
   installedFontFamilies,
@@ -1702,7 +1717,8 @@ function StickyEditor({
   ]);
 
   useSmoothCaret(editor, editorSurfaceRef, normalizedEditorPreferences);
-  const { isLaunchIntroVisible, finishLaunchIntro } = useLaunchIntro();
+  const shellRef = useRef(null);
+  useMountWithoutFades(shellRef);
   const { update: appUpdate, installUpdate, openRelease } = useAppUpdate();
 
   useEditorSurfaceShortcuts({
@@ -2198,7 +2214,6 @@ function StickyEditor({
   const {
     cancelSessionTabReorder,
     dropSessionTab,
-    endSessionTabDrag,
     handleSessionTabDragOver,
     handleSessionTabsDragOver,
     previewSessionTabReorder,
@@ -2206,7 +2221,10 @@ function StickyEditor({
   } = useSessionTabDrag({
     draggingSessionNoteId,
     normalizedLayoutMode,
+    onMoveNoteToFolder,
+    onPreviewNoteFolder,
     reorderSessionNotes,
+    sessionGrouping,
     sessionTabRowsRef,
     setDraggingSessionNoteId,
     visibleSessionNoteIds,
@@ -2340,7 +2358,6 @@ function StickyEditor({
         onDragStart={(event) => startSessionTabDrag(sessionNote, event)}
         onDragOver={(event) => handleSessionTabDragOver(sessionNote, event)}
         onDrop={(event) => void dropSessionTab(event)}
-        onDragEnd={(event) => void endSessionTabDrag(event)}
       >
         {isSidebarCompact ? (
           <button
@@ -2455,6 +2472,7 @@ function StickyEditor({
 
   return (
     <main
+      ref={shellRef}
       className={`sticky-shell layout-${normalizedLayoutMode} sidebar-${sidebarState}`}
       style={shellStyle}
       data-testid="sticky-shell"
@@ -3177,7 +3195,6 @@ function StickyEditor({
           />
         )}
       </Presence>
-      {isLaunchIntroVisible && <LaunchIntro onDone={finishLaunchIntro} />}
     </main>
   );
 }

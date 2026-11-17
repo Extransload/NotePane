@@ -444,10 +444,8 @@ test("Electron plays the launch intro once per launch, unless it is turned off",
     const tabsPage = await electronApp.firstWindow();
     await expect(tabsPage.getByTestId("sticky-editor-surface")).toBeVisible();
     await expect(tabsPage.locator(".smooth-caret")).toBeAttached();
-    // The window asked for the intro as it mounted; main answers in order, so once a later call
-    // returns, that answer has arrived too.
-    await tabsPage.evaluate(() => window.blocknoteSticky.getAppInfo());
-    await tabsPage.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve())));
+    // The window took its answer synchronously before its first frame, so the editor showing
+    // without the intro means it was not granted.
     await expect(tabsPage.getByTestId("launch-intro")).toHaveCount(0);
   } finally {
     await electronApp.close();

@@ -529,11 +529,9 @@ const getAnimationName = (locator) =>
 
 test("animates menus and panels open unless the system asks for reduced motion", async ({ page }) => {
   await loadTemplatePreview(page);
-  const editorSurface = page.getByTestId("sticky-editor-surface");
   const preferencesWindow = page.getByRole("dialog", { name: "Preferences window" });
   const blockMenu = await openFirstBlockMenu(page);
   expect(await getAnimationName(blockMenu)).toBe("notepaneMenuFadeIn");
-  expect(await getAnimationName(editorSurface)).toBe("notepaneMenuFadeIn");
   await page.keyboard.press("Escape");
   await expect(blockMenu).toHaveCount(0);
   await page.keyboard.press(modifierShortcut(","));
@@ -541,7 +539,6 @@ test("animates menus and panels open unless the system asks for reduced motion",
   await preferencesWindow.getByRole("button", { name: "Close preferences" }).click();
 
   await page.emulateMedia({ reducedMotion: "reduce" });
-  expect(await getAnimationName(editorSurface)).toBe("none");
   await page.keyboard.press(modifierShortcut(","));
   expect(await getAnimationName(preferencesWindow)).toBe("none");
   await preferencesWindow.getByRole("button", { name: "Close preferences" }).click();

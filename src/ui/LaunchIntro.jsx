@@ -56,10 +56,11 @@ function OutlineSweep() {
 
 /**
  * The intro played as NotePane opens: three windows fly in from round the screen and stack
- * into the mark, its box is drawn round them and filled, then the name is written out, over a
- * blur of the app. Every moving part animates only transform and opacity on a layer of its own,
- * so the motion stays smooth while the app mounts underneath. A click or any key clears it at
- * once and still reaches the app, since the intro takes no pointer events and leaves keys alone.
+ * into the mark, its box is drawn round them and filled, then the name is written out, over the
+ * window's own colour, which hides the app until the intro clears. Every moving part animates
+ * only transform and opacity on a layer of its own, so the motion stays smooth while the app
+ * mounts underneath. A click or any key clears it at once and still reaches the app, since the
+ * intro takes no pointer events and leaves keys alone.
  */
 export function LaunchIntro({ onDone }) {
   const [isPlaying, setIsPlaying] = useState(false);
