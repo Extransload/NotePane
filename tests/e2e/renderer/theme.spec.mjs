@@ -131,15 +131,15 @@ test("choosing a card applies the theme immediately", async ({ page }) => {
   expect(mochaAccent, "the two themes' accents differ, so the marks followed the theme").not.toBe(lightAccent);
 });
 
-test("TablePeek Dark paints the app with its palette", async ({ page }) => {
+test("Aura Dark paints the app with its palette", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
   const preferences = await openPreferences(page);
-  await preferences.getByTestId("theme-card-tablepeek-dark").click();
+  await preferences.getByTestId("theme-card-aura-dark").click();
 
-  await expectAppliedTheme(page, "tablepeek-dark");
-  expect(await rootToken(page, "--sticky-shell-bg")).toBe("#1c1c1f");
-  await expect(preferences.getByTestId("theme-card-tablepeek-dark"))
+  await expectAppliedTheme(page, "aura-dark");
+  expect(await rootToken(page, "--sticky-shell-bg")).toBe("#15141b");
+  await expect(preferences.getByTestId("theme-card-aura-dark"))
     .toHaveAttribute("aria-checked", "true");
 });
 
@@ -202,7 +202,7 @@ test("arrow keys move the selection", async ({ page }) => {
   await expectSelected("notepane-light");
   // Both ends wrap.
   await page.keyboard.press("ArrowLeft");
-  await expectSelected("xcode-light");
+  await expectSelected("neon-noir");
   await page.keyboard.press("ArrowRight");
   await expectSelected("notepane-light");
 });

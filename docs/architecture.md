@@ -283,7 +283,11 @@ The app ships the original nine themes first, in picker order:
 | `dracula` | Dracula | dark |
 | `tokyo-night` | Tokyo Night | dark |
 
-The picker then offers 43 themes adapted from TablePeek: its two default palettes plus 41 catalog palettes not already present above. Their window, sidebar, header, accent, text and status colours come from TablePeek's `web/src/palette.ts` and `web/src/themeCatalog.ts`. NotePane adjusts text where needed for readability, maps TablePeek's data type colours to editor colours, and uses a bundled Shiki theme with the same light or dark scheme for code blocks. Rosé Pine uses a stronger tint so its pastel note colours remain distinct. The original seven themes shared by both apps keep their existing NotePane palettes.
+The picker then offers 41 themes adapted from TablePeek's catalog palettes not already present above; TablePeek's own two default themes are not offered, and a stored `tablepeek-dark` or `tablepeek-light` falls back by its `mode` to NotePane Dark or Light. Their window, sidebar, header, accent, text and status colours come from TablePeek's `web/src/palette.ts` and `web/src/themeCatalog.ts`. NotePane adjusts text where needed for readability, maps TablePeek's data type colours to editor colours, and uses a bundled Shiki theme with the same light or dark scheme for code blocks. Rosé Pine uses a stronger tint so its pastel note colours remain distinct. The original seven themes shared by both apps keep their existing NotePane palettes.
+
+Last comes Neon Noir (`neon-noir`), NotePane's own: the dark neon noir Tern theme with the customisations in
+`~/dotfiles/tern/themes/gyu.css` (Dracula's surfaces, the iTerm2 ANSI palette for the named colours, the `#287d8e`
+teal of its active tab as the accent) and the Dracula code theme.
 
 A theme is data in `electron/themes.json`: a `scheme`, a `palette` of 27 primitive colours (surfaces, lines, text,
 roles, the nine named colours, code colours), a Shiki `codeTheme`, and `overrides`. `buildThemeTokens`

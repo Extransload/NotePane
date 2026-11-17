@@ -19,8 +19,10 @@
 - Below 760px of window width the tabs sidebar turns compact by itself and returns when the window is wider again;
   the show/hide choice made in a wide window is kept, and one made in a narrow window lasts until the window crosses
   the breakpoint
-- 52 app themes: NotePane Light (default) and NotePane Dark, Catppuccin Latte, Frappé, Macchiato and Mocha, Nord,
-  Dracula and Tokyo Night, followed by 43 palettes adapted from TablePeek
+- 51 app themes: NotePane Light (default) and NotePane Dark, Catppuccin Latte, Frappé, Macchiato and Mocha, Nord,
+  Dracula and Tokyo Night, then 41 palettes adapted from TablePeek's theme catalogue (TablePeek's own two themes are
+  not offered; a window that had one takes NotePane Light or Dark), and Neon Noir: the dark neon noir Tern theme as
+  customised here (Dracula's surfaces, the iTerm2 palette, a teal accent)
 - Theme picker in Settings > Look > Theme: preview cards that apply the theme at once to every window;
   All / Light / Dark chips and a name filter narrow the cards, and arrow keys move within the cards shown
 - Every colour comes from the selected theme, code block syntax colours included

@@ -106,7 +106,7 @@ const SHIPPED_THEMES = [
   ["tokyo-night", "Tokyo Night"],
 ];
 const TABLEPEEK_THEMES = [
-  "tablepeek-dark", "tablepeek-light", "aura-dark", "aura-soft-dark", "ayu-dark", "ayu-light",
+  "aura-dark", "aura-soft-dark", "ayu-dark", "ayu-light",
   "ayu-mirage", "cobalt2", "everforest-dark", "everforest-light", "github-dark", "github-light",
   "gruvbox-dark", "gruvbox-light", "horizon", "kanagawa", "material", "material-darker",
   "material-lighter", "material-ocean", "material-palenight", "monokai", "monokai-pro",
@@ -115,6 +115,9 @@ const TABLEPEEK_THEMES = [
   "snazzy-light", "solarized-dark", "solarized-light", "synthwave-84", "tokyo-night-light",
   "tokyo-night-storm", "tomorrow-night", "xcode-dark", "xcode-light",
 ];
+// NotePane's own themes after the adapted ones: Neon Noir, the dark neon noir Tern theme as set up
+// on this machine (Dracula's surfaces, the iTerm2 palette, a teal accent).
+const NOTEPANE_EXTRA_THEMES = ["neon-noir"];
 const NOTEPANE_THEME_IDS = new Set(["notepane-light", "notepane-dark"]);
 const OFFICIAL_PALETTES = require("./fixtures/official-palettes.json");
 const loadColorMath = () => import("../../src/style/colorMath.js");
@@ -131,7 +134,10 @@ test("keeps the original nine themes before the TablePeek colours", async () => 
     listThemes().slice(0, SHIPPED_THEMES.length).map((theme) => [theme.id, theme.label]),
     SHIPPED_THEMES,
   );
-  assert.deepEqual(listThemes().slice(SHIPPED_THEMES.length).map((theme) => theme.id), TABLEPEEK_THEMES);
+  assert.deepEqual(
+    listThemes().slice(SHIPPED_THEMES.length).map((theme) => theme.id),
+    [...TABLEPEEK_THEMES, ...NOTEPANE_EXTRA_THEMES],
+  );
 });
 
 test("the picker offers all shipped themes, never registered test themes", async () => {
@@ -141,7 +147,7 @@ test("the picker offers all shipped themes, never registered test themes", async
   try {
     assert.ok(listThemes().some((theme) => theme.id === "sentinel-light-a"), "the sentinels are registered");
     assert.deepEqual(listBuiltInThemes().map((theme) => theme.id), [
-      ...SHIPPED_THEMES.map(([id]) => id), ...TABLEPEEK_THEMES,
+      ...SHIPPED_THEMES.map(([id]) => id), ...TABLEPEEK_THEMES, ...NOTEPANE_EXTRA_THEMES,
     ]);
   } finally {
     registerTestThemes([]);
@@ -874,6 +880,11 @@ test("renderer and store normalizeAppTheme agree", async () => {
     }
   }
   assert.deepEqual(normalizeStoreAppTheme({ themeId: "solarized", mode: "dark" }), {
+    themeId: "notepane-dark",
+    mode: "dark",
+  });
+  // TablePeek's own two themes were removed; a window that had one takes NotePane's of its mode.
+  assert.deepEqual(normalizeStoreAppTheme({ themeId: "tablepeek-dark", mode: "dark" }), {
     themeId: "notepane-dark",
     mode: "dark",
   });

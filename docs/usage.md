@@ -47,10 +47,10 @@ Zoom works like Notion's: every window scales together, from 50% to 200%, and
 the zoom is kept after a restart. While you zoom, a gauge at the top of the
 editor shows where the zoom sits between the smallest and the largest step.
 
-Choose the app theme in Settings > Look > Theme. 52 themes are
+Choose the app theme in Settings > Look > Theme. 51 themes are
 available: NotePane Light (the default), NotePane Dark, Catppuccin Latte,
-Frappé, Macchiato and Mocha, Nord, Dracula and Tokyo Night, then 43 palettes
-adapted from TablePeek. Click a card, or
+Frappé, Macchiato and Mocha, Nord, Dracula and Tokyo Night, then 41 more
+palettes such as Aura, Ayu, GitHub, Gruvbox and Rosé Pine, and Neon Noir. Click a card, or
 move between cards with the arrow keys, and the theme applies at once to every
 window. There is no separate light/dark toggle and no light/dark shortcut:
 pick a light or a dark theme instead.
