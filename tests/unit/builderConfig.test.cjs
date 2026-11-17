@@ -25,11 +25,11 @@ function loadConfig(environment) {
   }
 }
 
-test("builds a drag-to-install dmg and an updater zip for both Mac architectures", () => {
+test("builds a drag-to-install dmg and an updater zip for Apple silicon only", () => {
   const config = loadConfig({});
   assert.deepEqual(config.mac.target, [
-    { target: "dmg", arch: ["arm64", "x64"] },
-    { target: "zip", arch: ["arm64", "x64"] },
+    { target: "dmg", arch: ["arm64"] },
+    { target: "zip", arch: ["arm64"] },
   ]);
   assert.deepEqual(config.win.target, [{ target: "nsis", arch: ["x64"] }]);
 });

@@ -20,7 +20,7 @@ make icons
 
 ```bash
 npm run app       # the current OS
-npm run app:mac   # dmg and zip, arm64 and x64
+npm run app:mac   # dmg and zip, Apple silicon (arm64) only
 npm run app:win   # NSIS installer, x64
 ```
 
@@ -50,7 +50,7 @@ download NotePane and where the app looks for updates.
 
 3. The workflow checks that the tag matches `package.json`, runs `npm run verify:quick`, creates a draft release with
    generated notes, and builds on macOS and Windows runners. It uploads:
-   - `NotePane-<version>-arm64.dmg` and `NotePane-<version>.dmg` (Intel), for people to download;
+   - `NotePane-<version>-arm64.dmg`, for people to download (Apple silicon only; Intel Macs are not supported);
    - the matching `-mac.zip` files and `latest-mac.yml`, read by the updater;
    - `NotePane-Setup-<version>.exe` and `latest.yml`, for Windows.
 4. Check the draft on the repository's Releases page, edit the notes if needed, and press **Publish release**.
@@ -129,5 +129,23 @@ warning for a while even after signing.
 
 ## Homebrew
 
-Once releases are signed, a Homebrew Cask can install the published dmg. The cask needs the release URL and the
-dmg's SHA-256.
+`brew install --cask extransload/tap/notepane` installs the published dmg on an Apple silicon Mac and clears the
+download quarantine, so an ad-hoc signed build opens without **Open Anyway**. The cask is `Casks/notepane.rb` in
+[Extransload/homebrew-tap](https://github.com/Extransload/homebrew-tap), which also holds TablePeek's.
+
+`.github/workflows/homebrew.yml` writes it with `scripts/homebrew-cask.mjs` from the release's dmg and pushes it
+to the tap when a stable release is published (step 4 above); a draft or prerelease never reaches it. To push the cask
+for a release published before the workflow existed, run the workflow from the Actions tab with the tag. The push uses
+a deploy key with write access to the tap only, stored once as a secret. Run this yourself, so the key never passes
+through anyone else's screen or logs:
+
+```bash
+gh secret set HOMEBREW_TAP_DEPLOY_KEY < tap_deploy_key   # the private key of the tap's deploy key
+```
+
+To try a cask before publishing, write it from local dmgs with
+`node scripts/homebrew-cask.mjs v<version> <dir> --base-url file://<dir>`.
+
+The cask has no `auto_updates`, because an ad-hoc signed Mac build only links to the release, so `brew upgrade`
+installs new versions. Once releases are signed and the app updates itself, add `auto_updates true` and drop the
+quarantine step.

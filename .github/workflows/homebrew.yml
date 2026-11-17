@@ -1,0 +1,54 @@
+# Updates the Homebrew cask, Casks/notepane.rb in Extransload/homebrew-tap,
+# when a stable release is published. Release drafts stay out of the tap until
+# someone presses Publish release, so this runs on that event rather than on the
+# tag. To push the cask for an already published release, run it by hand with
+# its tag. See docs/release.md.
+name: Homebrew cask
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published stable release tag, for example v0.4.0
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  cask:
+    # The tap follows the latest stable release, as the app's update check does.
+    if: ${{ github.event_name == 'workflow_dispatch' || !github.event.release.prerelease }}
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Download the macOS disk image
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release download "$TAG" --pattern "NotePane-${TAG#v}-arm64.dmg" --dir dist
+      # A deploy key with write access to the tap only.
+      - uses: actions/checkout@v5
+        with:
+          repository: Extransload/homebrew-tap
+          ssh-key: ${{ secrets.HOMEBREW_TAP_DEPLOY_KEY }}
+          path: tap
+      - name: Push Casks/notepane.rb
+        run: |
+          node scripts/homebrew-cask.mjs "$TAG" dist > tap/Casks/notepane.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/notepane.rb
+          if git diff --cached --quiet; then
+            echo "Casks/notepane.rb is already at ${TAG#v}"
+            exit 0
+          fi
+          git commit -m "notepane ${TAG#v}"
+          git push

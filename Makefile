@@ -10,7 +10,7 @@ help:
 	@echo "  make verify-quick  Static checks, build, unit tests and dist check only"
 	@echo "  make run      Build and run the NotePane desktop app"
 	@echo "  make app      Build an app package for the current OS"
-	@echo "  make app-mac  Build macOS dmg and zip packages (arm64 and x64)"
+	@echo "  make app-mac  Build macOS dmg and zip packages (Apple silicon)"
 	@echo "  make app-win  Build a Windows NSIS app package"
 	@echo ""
 	@echo "Development:"

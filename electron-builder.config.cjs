@@ -34,8 +34,8 @@ module.exports = {
     category: "public.app-category.productivity",
     // The dmg is what people download; the zip is what the updater fetches.
     target: [
-      { target: "dmg", arch: ["arm64", "x64"] },
-      { target: "zip", arch: ["arm64", "x64"] },
+      { target: "dmg", arch: ["arm64"] },
+      { target: "zip", arch: ["arm64"] },
     ],
     ...(hasMacCertificate ? {} : { identity: "-", hardenedRuntime: false }),
   },

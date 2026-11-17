@@ -86,14 +86,23 @@ Markdown import straight from the slash menu.
 
 ## Install
 
+### Homebrew (macOS)
+
+```sh
+brew install --cask extransload/tap/notepane
+```
+
+The cask clears the download quarantine, so NotePane opens without the
+**Open Anyway** step. Update with `brew upgrade --cask notepane`; a dmg
+downloaded from the in-app **Download** link asks again.
+
 ### Download
 
 Get the latest version from
 [Releases](https://github.com/Extransload/NotePane/releases/latest):
 
-- **macOS:** `NotePane-<version>-arm64.dmg` for Apple silicon, or
-  `NotePane-<version>.dmg` for Intel. Open it and drag NotePane to
-  Applications.
+- **macOS (Apple silicon):** `NotePane-<version>-arm64.dmg`. Open it and drag
+  NotePane to Applications. Intel Macs are not supported.
 - **Windows:** `NotePane-Setup-<version>.exe`.
 
 Until releases are code-signed, both systems ask once before the first launch.
@@ -115,8 +124,8 @@ make app
 ```
 
 The installer lands in `release/`. `make app` builds for the machine you are
-on; `make app-mac` produces macOS dmg and zip packages for Apple silicon and
-Intel, and `make app-win` a Windows x64 installer.
+on; `make app-mac` produces macOS dmg and zip packages for Apple silicon, and
+`make app-win` a Windows x64 installer.
 
 ### Run from source
 
