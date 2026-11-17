@@ -278,8 +278,14 @@ test("NotePane sticky and tab output equals the baseline", async () => {
   for (const entry of fixture.tabs) {
     const label = describeTab(entry);
     const actual = normalise(
-      themeStyles.getSessionTabStyle(entry.noteTheme, notePaneTheme(getTheme, entry.mode), entry.noteIndex),
+      themeStyles.getSessionTabStyle(entry.noteTheme, notePaneTheme(getTheme, entry.mode)),
     );
+    // The fixture predates plain tabs: a note without a colour of its own then took the pastel of
+    // its place. Its tab now carries no inline style; the stylesheet draws it (.is-plain).
+    if (entry.noteTheme.tabTextColor == null) {
+      assert.deepEqual(actual, {}, label);
+      continue;
+    }
     const { background } = tabModel(cm, pastels, entry, TODAYS_TAB_RULES(cm));
     const reads = (style) => [
       cm.getContrastRatio(style["--session-tab-text-color"], background),

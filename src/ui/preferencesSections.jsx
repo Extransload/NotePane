@@ -27,7 +27,6 @@ import {
   normalizeKeyboardShortcuts,
 } from "../model/keyboardShortcuts.js";
 import {
-  normalizeEditorFontFamily,
   normalizeEditorPreferences,
 } from "../model/preferences.js";
 import {
@@ -53,9 +52,6 @@ import {
 import {
   PreferenceToggleSwitch,
 } from "./controls.jsx";
-import {
-  EditorFontFamilyControl,
-} from "./EditorFontControls.jsx";
 import {
   PreferencesCard,
 } from "./PreferencesCard.jsx";
@@ -166,25 +162,33 @@ export function ColorSettingsSection({
         {isStickyVariant ? "Pastel sticky color" : "Sidebar tab background color"}
       </div>
 
-      {isStickyVariant && (
-        <div
-          className="pastel-preset-row"
-          role="group"
-          aria-label="Pastel colors"
-        >
-          {STICKY_PASTEL_PALETTE.map((color, index) => (
-            <button
-              key={color}
-              type="button"
-              aria-label={`Pastel color ${index + 1}`}
-              aria-pressed={activeColor === color}
-              style={{ "--pastel-color": toneMatch(color, activeTheme, "surface") }}
-              onMouseDown={preventFocusLoss}
-              onClick={() => updateTabTextColor(color)}
-            />
-          ))}
-        </div>
-      )}
+      <div
+        className="pastel-preset-row"
+        role="group"
+        aria-label="Pastel colors"
+      >
+        {!isStickyVariant && (
+          <button
+            type="button"
+            className="pastel-preset-none"
+            aria-label="No color"
+            aria-pressed={theme.tabTextColor == null}
+            onMouseDown={preventFocusLoss}
+            onClick={() => updateTabTextColor(null)}
+          />
+        )}
+        {STICKY_PASTEL_PALETTE.map((color, index) => (
+          <button
+            key={color}
+            type="button"
+            aria-label={`Pastel color ${index + 1}`}
+            aria-pressed={theme.tabTextColor == null && !isStickyVariant ? false : activeColor === color}
+            style={{ "--pastel-color": toneMatch(color, activeTheme, previewRole) }}
+            onMouseDown={preventFocusLoss}
+            onClick={() => updateTabTextColor(color)}
+          />
+        ))}
+      </div>
 
       <ColorWheel
         hsv={hsv}
@@ -278,22 +282,9 @@ export function ColorSettingsSection({
 
 export function EditorPreferencesSection({
   editorPreferences,
-  fontOptions,
-  appFontOptions,
-  onAppFontFamilyChange,
   onEditorPreferencesChange,
 }) {
   const normalizedEditorPreferences = normalizeEditorPreferences(editorPreferences);
-
-  const updateEditorPreferenceFontFamily = useCallback(
-    (nextEditorFontFamily) => {
-      onEditorPreferencesChange?.({
-        ...normalizedEditorPreferences,
-        editorFontFamily: normalizeEditorFontFamily(nextEditorFontFamily),
-      });
-    },
-    [normalizedEditorPreferences, onEditorPreferencesChange],
-  );
 
   const updateTableOfContentsVisibility = useCallback(
     (showTableOfContents) => {
@@ -305,47 +296,9 @@ export function EditorPreferencesSection({
     [normalizedEditorPreferences, onEditorPreferencesChange],
   );
 
+  // The editor and app fonts live on the Fonts page with the rest of the type settings.
   return (
     <>
-      <PreferencesCard
-        title="Typography"
-        description={`The font family applies to every session tab. Zoom the app with ${formatKeyboardShortcutLabel(
-          normalizedEditorPreferences.keyboardShortcuts.zoomIn,
-        )} and ${formatKeyboardShortcutLabel(normalizedEditorPreferences.keyboardShortcuts.zoomOut)}.`}
-        className="preferences-default-editor-section"
-      >
-        <div className="preference-setting-row editor-font-family-setting">
-          <div>
-            <div className="preference-setting-title">Font family</div>
-            <div className="preferences-section-description">
-              Default editor typeface.
-            </div>
-          </div>
-          <EditorFontFamilyControl
-            className="preferences-font-family-control"
-            fontFamily={normalizedEditorPreferences.editorFontFamily}
-            fontOptions={fontOptions}
-            onFontFamilyChange={updateEditorPreferenceFontFamily}
-          />
-        </div>
-        <div className="preference-setting-row app-font-family-setting">
-          <div>
-            <div className="preference-setting-title">App font</div>
-            <div className="preferences-section-description">
-              Interface typeface for chrome, menus, and preferences.
-            </div>
-          </div>
-          <EditorFontFamilyControl
-            className="preferences-font-family-control"
-            fontFamily={normalizedEditorPreferences.appFontFamily}
-            fontOptions={appFontOptions}
-            inputAriaLabel="App font family"
-            menuButtonAriaLabel="Open app font menu"
-            optionsAriaLabel="App font family options"
-            onFontFamilyChange={onAppFontFamilyChange}
-          />
-        </div>
-      </PreferencesCard>
       <PreferencesCard title="Behaviour" description="What the editor shows around a note.">
         <div className="preference-setting-row">
           <div>

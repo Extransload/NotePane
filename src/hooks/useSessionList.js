@@ -10,6 +10,7 @@ import {
   DEFAULT_THEME,
   DEFAULT_TITLE,
   TRASH_UNDO_TOAST_TIMEOUT_MS,
+  STICKY_PASTEL_PALETTE,
   electronApi,
 } from "../constants.js";
 import {
@@ -22,6 +23,8 @@ import {
   normalizeTitle,
   reorderNotesByIds,
 } from "../model/notes.js";
+import { normalizeFolderName } from "../model/folders.js";
+import { normalizeTags } from "../model/tags.js";
 import { hasPendingSave, waitForPendingSave } from "../model/pendingSaves.js";
 import { useTimedToast } from "./useTimedToast.js";
 import {
@@ -29,13 +32,41 @@ import {
   normalizeEditorPreferences,
   normalizeLayoutMode,
 } from "../model/preferences.js";
+import {
+  getNextCycledTabColor,
+  normalizeLook,
+} from "../model/look.js";
+
+// With Preferences > Tabs > New tab colour set to Cycle, a new session takes the next pastel, so
+// a run of new tabs tells apart at a glance. The desktop app saves the colour into the note.
+async function colorNewSession(note, notes, editorPreferences) {
+  if (normalizeLook(editorPreferences?.look).tabs.newTabColor !== "cycle") {
+    return note;
+  }
+  const theme = {
+    ...note.theme,
+    tabTextColor: getNextCycledTabColor(notes, STICKY_PASTEL_PALETTE),
+  };
+  if (!electronApi) {
+    return { ...note, theme };
+  }
+  const colored = await electronApi.updateAppearance({
+    noteId: note.id,
+    title: note.title,
+    titleManuallyEdited: note.titleManuallyEdited,
+    theme,
+  });
+  return colored ?? { ...note, theme };
+}
 
 /**
  * The window's session list: the open note, every session and the trash, their
- * create, select, reorder, trash, restore and purge commands (with the browser
- * preview's in-memory equivalents), and the undo toast shown after a session
- * moves to Trash. The startup load also hands the stored app theme, layout mode
- * and editor preferences to the setters App owns.
+ * create, select, reorder, trash, restore and purge commands, the folders that
+ * group the sessions with their create, rename, collapse, delete and move
+ * commands, a note's folder and tags (each with the browser preview's in-memory
+ * equivalent), and the undo toast shown after a session moves to Trash. The
+ * startup load also hands the stored app theme, layout mode and editor
+ * preferences to the setters App owns.
  */
 export function useSessionList({
   editorPreferences,
@@ -47,6 +78,7 @@ export function useSessionList({
   const [note, setNote] = useState(null);
   const [notes, setNotes] = useState([]);
   const [trashedNotes, setTrashedNotes] = useState([]);
+  const [folders, setFolders] = useState([]);
   const {
     hide: hideSessionUndoToast,
     show: showSessionUndoToast,
@@ -101,12 +133,14 @@ export function useSessionList({
         loadedLayoutMode,
         loadedEditorPreferences,
         loadedTrashedNotes,
+        loadedFolders,
       ] = await Promise.all([
         electronApi.listNotes(),
         electronApi.getAppTheme?.(),
         electronApi.getLayoutMode?.(),
         electronApi.getEditorPreferences?.(),
         electronApi.listTrash?.(),
+        electronApi.listFolders?.(),
       ]);
       const loadedNote = resolvedNoteId
         ? await electronApi.getNote(resolvedNoteId)
@@ -133,6 +167,7 @@ export function useSessionList({
           };
         setNotes(mergeNotes(loadedNotes, fallbackNote));
         setTrashedNotes(Array.isArray(loadedTrashedNotes) ? loadedTrashedNotes : []);
+        setFolders(Array.isArray(loadedFolders) ? loadedFolders : []);
         setNote(fallbackNote);
       }
     }
@@ -173,6 +208,9 @@ export function useSessionList({
       if (nextTrashedNotes) {
         setTrashedNotes(nextTrashedNotes);
       }
+      if (Array.isArray(payload?.folders)) {
+        setFolders(payload.folders);
+      }
       const currentNoteId = noteRef.current?.id;
       const candidate = activeNote?.id
         ? activeNote
@@ -203,10 +241,13 @@ export function useSessionList({
     [adoptNote, notes],
   );
 
+  // `options.folderId` creates the session inside that folder ("New note in folder"). The store
+  // checks the folder exists; the sidebar shows a note of an unknown folder as ungrouped.
   const createSidebarNote = useCallback(async (options = {}) => {
     const template = options?.template === "default" ? "default" : "blank";
-    const nextNote = electronApi
-      ? await electronApi.createNote({ template })
+    const folderId = typeof options?.folderId === "string" ? options.folderId : null;
+    const createdNote = electronApi
+      ? await electronApi.createNote({ template, folderId })
       : {
           id: crypto.randomUUID(),
           title: template === "default" ? "NotePane" : DEFAULT_TITLE,
@@ -217,10 +258,13 @@ export function useSessionList({
           theme: DEFAULT_THEME,
           seedDemoContent: false,
           editorFontFamily: editorPreferences.editorFontFamily,
+          folderId,
+          tags: [],
           trashedAt: null,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
+    const nextNote = await colorNewSession(createdNote, notes, editorPreferences);
 
     setNotes((currentNotes) => mergeNotes(currentNotes, nextNote));
 
@@ -238,7 +282,7 @@ export function useSessionList({
     }
 
     setNote(nextNote);
-  }, [editorPreferences, layoutMode, notes.length]);
+  }, [editorPreferences, layoutMode, notes]);
 
   // A new session holding a copy of `source` (title, blocks, Markdown and colour), shown in
   // this window. The desktop app creates a blank note, saves the content and the title into it,
@@ -483,21 +527,182 @@ export function useSessionList({
     );
   }, []);
 
+  // The browser preview, and a test page whose stand-in bridge lacks the folder
+  // calls, keep folders in memory; the desktop app stores them and broadcasts the
+  // change to every window.
+  const createFolder = useCallback(async (name) => {
+    if (electronApi?.createFolder) {
+      const folder = await electronApi.createFolder({ name });
+      if (folder) {
+        setFolders((currentFolders) => mergeFolder(currentFolders, folder));
+      }
+      return folder ?? null;
+    }
+
+    const folder = {
+      id: crypto.randomUUID(),
+      name: normalizeFolderName(name),
+      collapsed: false,
+    };
+    setFolders((currentFolders) => [...currentFolders, folder]);
+    return folder;
+  }, []);
+
+  // Applied at once and then stored, so a collapse or a rename never waits on the
+  // main process.
+  const updateFolder = useCallback(async (folderId, changes) => {
+    const folder = folders.find((candidate) => candidate.id === folderId);
+    if (!folder) {
+      return null;
+    }
+
+    const updated = {
+      ...folder,
+      ...(Object.hasOwn(changes, "name")
+        ? { name: normalizeFolderName(changes.name, folder.name) }
+        : {}),
+      ...(Object.hasOwn(changes, "collapsed") ? { collapsed: Boolean(changes.collapsed) } : {}),
+    };
+    setFolders((currentFolders) => mergeFolder(currentFolders, updated));
+    if (!electronApi?.updateFolder) {
+      return updated;
+    }
+
+    const stored = await electronApi.updateFolder({ id: folderId, ...changes });
+    if (stored) {
+      setFolders((currentFolders) => mergeFolder(currentFolders, stored));
+    }
+    return stored ?? null;
+  }, [folders]);
+
+  const renameFolder = useCallback(
+    (folderId, name) => updateFolder(folderId, { name }),
+    [updateFolder],
+  );
+
+  const toggleFolderCollapsed = useCallback((folderId) => {
+    const folder = folders.find((candidate) => candidate.id === folderId);
+    return folder ? updateFolder(folderId, { collapsed: !folder.collapsed }) : null;
+  }, [folders, updateFolder]);
+
+  // The folder's notes move out to the ungrouped tabs; none is deleted.
+  const deleteFolder = useCallback(async (folderId) => {
+    if (electronApi?.deleteFolder && !(await electronApi.deleteFolder(folderId))) {
+      return false;
+    }
+
+    const moveOut = (candidate) =>
+      candidate?.folderId === folderId ? { ...candidate, folderId: null } : candidate;
+    setFolders((currentFolders) =>
+      currentFolders.filter((folder) => folder.id !== folderId),
+    );
+    setNotes((currentNotes) => currentNotes.map(moveOut));
+    setTrashedNotes((currentTrashedNotes) => currentTrashedNotes.map(moveOut));
+    setNote(moveOut);
+    return true;
+  }, []);
+
+  const moveFolder = useCallback(async (folderId, toIndex) => {
+    if (electronApi?.moveFolder) {
+      const storedFolders = await electronApi.moveFolder({ id: folderId, toIndex });
+      if (Array.isArray(storedFolders)) {
+        setFolders(storedFolders);
+      }
+      return storedFolders;
+    }
+
+    const index = folders.findIndex((folder) => folder.id === folderId);
+    if (index < 0) {
+      return folders;
+    }
+    const nextFolders = [...folders];
+    const [folder] = nextFolders.splice(index, 1);
+    nextFolders.splice(Math.min(Math.max(toIndex, 0), nextFolders.length), 0, folder);
+    setFolders(nextFolders);
+    return nextFolders;
+  }, [folders]);
+
+  // `folderId` null takes the session out of its folder. A session that changes
+  // group goes to the end of the group it joins, as the store orders it. The
+  // in-memory move does not check the folder against `folders`: the tab menu's
+  // New folder… moves the tab into a folder created a moment before, which this
+  // render has not seen yet.
+  const moveNoteToFolder = useCallback(async (noteId, folderId) => {
+    if (electronApi?.setNoteFolder) {
+      const updated = await electronApi.setNoteFolder({ noteId, folderId });
+      if (updated) {
+        updateNoteInList(updated);
+      }
+      return updated ?? null;
+    }
+
+    const targetFolderId = folderId ?? null;
+    setNotes((currentNotes) => {
+      const moved = currentNotes.find((candidate) => candidate.id === noteId);
+      if (!moved || (moved.folderId ?? null) === targetFolderId) {
+        return currentNotes;
+      }
+      return reorderNotesByIds(
+        currentNotes.map((candidate) =>
+          candidate.id === noteId ? { ...candidate, folderId: targetFolderId } : candidate,
+        ),
+        [
+          ...currentNotes
+            .filter((candidate) => candidate.id !== noteId)
+            .map((candidate) => candidate.id),
+          noteId,
+        ],
+      );
+    });
+    setNote((currentNote) =>
+      currentNote?.id === noteId ? { ...currentNote, folderId: targetFolderId } : currentNote,
+    );
+    const moved = notes.find((candidate) => candidate.id === noteId);
+    return moved ? { ...moved, folderId: targetFolderId } : null;
+  }, [notes, updateNoteInList]);
+
+  // Tags are stored normalised (src/model/tags.js), so the returned note holds
+  // exactly what the tag chips should show.
+  const setNoteTags = useCallback(async (noteId, tags) => {
+    const updated = electronApi?.setNoteTags
+      ? await electronApi.setNoteTags({ noteId, tags })
+      : { id: noteId, tags: normalizeTags(tags) };
+    if (updated) {
+      updateNoteInList(updated);
+    }
+    return updated ?? null;
+  }, [updateNoteInList]);
+
   return {
+    createFolder,
     createSidebarNote,
+    deleteFolder,
     deleteSidebarNote,
     duplicateSidebarNote,
+    folders,
+    moveFolder,
+    moveNoteToFolder,
     note,
     notes,
     purgeTrashedNote,
+    renameFolder,
     reorderNotes,
     restoreTrashedNote,
     selectNote,
     sessionUndoToast,
     sessionUndoToastTimer,
+    setNoteTags,
     showSessionMovedToTrashToast,
+    toggleFolderCollapsed,
     trashedNotes,
     undoSessionMoveToTrash,
     updateNoteInList,
   };
+}
+
+// The folder list with `folder` replacing the one of the same id, or appended.
+function mergeFolder(folders, folder) {
+  return folders.some((candidate) => candidate.id === folder.id)
+    ? folders.map((candidate) => (candidate.id === folder.id ? folder : candidate))
+    : [...folders, folder];
 }

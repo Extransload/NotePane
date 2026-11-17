@@ -301,3 +301,28 @@ function readFileAsDataUrl(file) {
     reader.readAsDataURL(file);
   });
 }
+
+// Where a media block's bytes live, which decides what its menu offers: "web" (an address the
+// browser opens and can copy), "file" (a linked local file Finder can show), "embedded" (an asset
+// or data URL kept with the note), or null when there is no file yet.
+export function mediaUrlKind(url) {
+  if (typeof url !== "string" || url === "") {
+    return null;
+  }
+  if (/^https?:\/\//i.test(url)) {
+    return "web";
+  }
+  if (url.startsWith("file:")) {
+    return "file";
+  }
+  return "embedded";
+}
+
+// The path of a linked local file, as Finder shows it.
+export function mediaFilePath(url) {
+  try {
+    return decodeURIComponent(new URL(url).pathname);
+  } catch {
+    return "";
+  }
+}

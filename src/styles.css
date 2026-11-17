@@ -5,6 +5,7 @@
 @import "./styles/chrome.css";
 @import "./styles/sidebar.css";
 @import "./styles/preferences.css";
+@import "./styles/settings-controls.css";
 @import "./styles/controls.css";
 @import "./styles/editor-surface.css";
 @import "katex/dist/katex.min.css";
@@ -13,3 +14,4 @@
 @import "./styles/search.css";
 @import "./styles/motion.css";
 @import "./styles/editor-motion.css";
+@import "./styles/look.css";

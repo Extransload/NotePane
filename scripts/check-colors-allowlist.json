@@ -220,5 +220,70 @@
     "file": "src/style/colorMath.js",
     "text": "export const BLACK = \"#000000\";",
     "reason": "The black endpoint of sRGB in colour maths: the readable-text fallback when neither theme ink reaches 4.5:1, and hexToRgb's fallback for a malformed value."
+  },
+  {
+    "file": "src/model/look.js",
+    "text": "blue: \"#2383e2\",",
+    "reason": "LOOK_ACCENTS: accent colours the user can pick in Preferences > Theme, not theme colours."
+  },
+  {
+    "file": "src/model/look.js",
+    "text": "purple: \"#8b5cf6\",",
+    "reason": "LOOK_ACCENTS: accent colours the user can pick in Preferences > Theme, not theme colours."
+  },
+  {
+    "file": "src/model/look.js",
+    "text": "green: \"#2f9e44\",",
+    "reason": "LOOK_ACCENTS: accent colours the user can pick in Preferences > Theme, not theme colours."
+  },
+  {
+    "file": "src/model/look.js",
+    "text": "orange: \"#e8590c\",",
+    "reason": "LOOK_ACCENTS: accent colours the user can pick in Preferences > Theme, not theme colours."
+  },
+  {
+    "file": "src/model/look.js",
+    "text": "pink: \"#d6336c\",",
+    "reason": "LOOK_ACCENTS: accent colours the user can pick in Preferences > Theme, not theme colours."
+  },
+  {
+    "file": "src/model/look.js",
+    "text": "color: \"#dfe7f2\",",
+    "reason": "DEFAULT_LOOK background: the starting colour, gradient and tint of a user-chosen backdrop, user data rather than a theme colour; shown only once the user picks a background."
+  },
+  {
+    "file": "src/model/look.js",
+    "text": "from: \"#f7d9cf\",",
+    "reason": "DEFAULT_LOOK background: the starting colour, gradient and tint of a user-chosen backdrop, user data rather than a theme colour; shown only once the user picks a background."
+  },
+  {
+    "file": "src/model/look.js",
+    "text": "to: \"#c9d7f7\",",
+    "reason": "DEFAULT_LOOK background: the starting colour, gradient and tint of a user-chosen backdrop, user data rather than a theme colour; shown only once the user picks a background."
+  },
+  {
+    "file": "src/model/look.js",
+    "text": "tint: \"#1b2a4a\",",
+    "reason": "DEFAULT_LOOK background: the starting colour, gradient and tint of a user-chosen backdrop, user data rather than a theme colour; shown only once the user picks a background."
+  },
+  {
+    "file": "electron/store.cjs",
+    "text": "color: \"#dfe7f2\",",
+    "reason": "Twin of DEFAULT_LOOK in src/model/look.js (store-side normalizeLook): user data defaults, not a UI colour."
+  },
+  {
+    "file": "electron/store.cjs",
+    "text": "from: \"#f7d9cf\",",
+    "reason": "Twin of DEFAULT_LOOK in src/model/look.js (store-side normalizeLook): user data defaults, not a UI colour."
+  },
+  {
+    "file": "electron/store.cjs",
+    "text": "to: \"#c9d7f7\",",
+    "reason": "Twin of DEFAULT_LOOK in src/model/look.js (store-side normalizeLook): user data defaults, not a UI colour."
+  },
+  {
+    "file": "electron/store.cjs",
+    "text": "tint: \"#1b2a4a\",",
+    "reason": "Twin of DEFAULT_LOOK in src/model/look.js (store-side normalizeLook): user data defaults, not a UI colour."
   }
 ]

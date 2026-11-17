@@ -3,11 +3,14 @@ import {
 } from "../constants.js";
 import {
   getNoteDisplayTitle,
-  getNoteIndexById,
 } from "../model/notes.js";
 import {
   blocksToPlainText,
+  collectNoteTags,
   createNoteTextReader,
+  filterSearchEntries,
+  parseSearchQuery,
+  resolveFolderFilter,
   searchNotes,
 } from "../model/search.js";
 import {
@@ -20,10 +23,12 @@ import {
 /**
  * The Mod+P note search palette: its query, ranked results, and where a chosen
  * result goes. A blank query works as a plain note switch, so it never opens
- * the find bar.
+ * the find bar. `#tag` and `folder:Name` tokens in the query filter the notes
+ * before the text is matched, so filters alone list every note they keep.
  */
 export function useNoteSearchPalette({
   editor,
+  folders,
   normalizedLayoutMode,
   note,
   notes,
@@ -35,7 +40,24 @@ export function useNoteSearchPalette({
 }) {
   const [query, setQuery] = useState(null);
   const [storedNotes, setStoredNotes] = useState(null);
+  const [storedFolders, setStoredFolders] = useState(null);
   const readNoteText = useMemo(() => createNoteTextReader(), []);
+  const parsedQuery = useMemo(() => parseSearchQuery(query ?? ""), [query]);
+  const paletteFolders = useMemo(
+    () => storedFolders ?? (Array.isArray(folders) ? folders : []),
+    [folders, storedFolders],
+  );
+  const sourceNotes = storedNotes ?? notes;
+
+  // The tags in use, plus any the query names that no note carries any more,
+  // so its chip still shows and can be turned off.
+  const paletteTags = useMemo(() => {
+    if (query === null) {
+      return [];
+    }
+    const inUse = collectNoteTags(sourceNotes);
+    return [...inUse, ...parsedQuery.tags.filter((tag) => !inUse.includes(tag))];
+  }, [parsedQuery.tags, query, sourceNotes]);
 
   const results = useMemo(() => {
     if (query === null) {
@@ -43,35 +65,44 @@ export function useNoteSearchPalette({
     }
     // The current note may have edits still waiting on the save debounce, so
     // it is read from the live editor instead of the stored copy.
-    const entries = (storedNotes ?? notes).map((candidate) => ({
+    const entries = sourceNotes.map((candidate) => ({
       note: candidate,
       title: getNoteDisplayTitle(candidate),
       body: candidate.id === note.id
         ? blocksToPlainText(editor.document)
         : readNoteText(candidate),
     }));
-    return searchNotes(entries, query);
-  }, [editor, note.id, notes, query, readNoteText, storedNotes]);
-  // Each result's place in the notes it was found in, which may include notes this window has
-  // not heard of yet: its default pastel then matches its tab in the window that shows it.
-  const noteIndexById = useMemo(
-    () => getNoteIndexById(storedNotes ?? notes),
-    [notes, storedNotes],
-  );
+    const filtered = filterSearchEntries(entries, {
+      tags: parsedQuery.tags,
+      folderId: resolveFolderFilter(parsedQuery.folder, paletteFolders),
+      folders: paletteFolders,
+    });
+    return searchNotes(filtered, parsedQuery.text);
+  }, [editor, note.id, paletteFolders, parsedQuery, query, readNoteText, sourceNotes]);
 
-  const openPalette = useCallback(async () => {
-    setQuery("");
+  // Opens the palette on a query, such as "#launch " from a tag chip on a note.
+  const openPaletteWithQuery = useCallback(async (initialQuery) => {
+    setQuery(typeof initialQuery === "string" ? initialQuery : "");
     // Other windows save straight to the main process, and this window's note
     // list only refreshes when a title changes, so search the stored notes.
-    const latestNotes = await electronApi?.listNotes?.();
+    const [latestNotes, latestFolders] = await Promise.all([
+      electronApi?.listNotes?.(),
+      electronApi?.listFolders?.(),
+    ]);
     if (Array.isArray(latestNotes)) {
       setStoredNotes(latestNotes);
     }
+    if (Array.isArray(latestFolders)) {
+      setStoredFolders(latestFolders);
+    }
   }, []);
+
+  const openPalette = useCallback(() => openPaletteWithQuery(""), [openPaletteWithQuery]);
 
   const dismissPalette = useCallback(() => {
     setQuery(null);
     setStoredNotes(null);
+    setStoredFolders(null);
   }, []);
 
   const closePalette = useCallback(() => {
@@ -80,7 +111,8 @@ export function useNoteSearchPalette({
   }, [dismissPalette, editor]);
 
   const chooseResult = useCallback(async (result) => {
-    const findQuery = (query ?? "").trim();
+    // Only the text is found in the note; tag and folder filters have done their part.
+    const findQuery = parsedQuery.text.trim();
     dismissPalette();
     const targetId = result.note.id;
     if (targetId === note.id) {
@@ -112,7 +144,7 @@ export function useNoteSearchPalette({
     onFindRequested,
     onPendingFindHandled,
     openFind,
-    query,
+    parsedQuery.text,
     selectSidebarNote,
   ]);
 
@@ -129,9 +161,11 @@ export function useNoteSearchPalette({
   return {
     query,
     results,
-    noteIndexById,
+    folders: paletteFolders,
+    tags: paletteTags,
     setQuery,
     openPalette,
+    openPaletteWithQuery,
     closePalette,
     chooseResult,
   };

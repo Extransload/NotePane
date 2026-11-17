@@ -13,6 +13,11 @@ const NOTE_HISTORY_VERSION = 2;
 const MAX_NOTE_HISTORY = 50;
 const NOTE_HISTORY_INTERVAL_MS = 5 * 60 * 1000;
 const AUTO_NOTE_TITLE_MAX_LENGTH = 48;
+const DEFAULT_FOLDER_NAME = "New folder";
+const MAX_FOLDER_NAME_LENGTH = 60;
+// Twins of MAX_TAG_LENGTH and MAX_TAGS_PER_NOTE in src/model/tags.js.
+const MAX_TAG_LENGTH = 32;
+const MAX_TAGS_PER_NOTE = 20;
 const DEFAULT_APP_THEME = Object.freeze({
   themeId: "notepane-light",
   mode: "light",
@@ -247,6 +252,7 @@ class StickyStore {
       tabsWindow: DEFAULT_TABS_WINDOW,
       editorPreferences: DEFAULT_EDITOR_PREFERENCES,
       notes: [],
+      folders: [],
     };
     this.load();
     this.loadHistory();
@@ -339,6 +345,14 @@ class StickyStore {
         versions.forEach(collect);
       }
     }
+    // The background pictures the user added stay in Preferences > Background until removed,
+    // so they count as referenced while the look lists them.
+    const { background } = normalizeLook(this.state.editorPreferences?.look);
+    for (const url of [background.picture, ...background.pictures]) {
+      if (url.startsWith("notepane-asset:")) {
+        referenced.add(url);
+      }
+    }
     return referenced;
   }
 
@@ -350,6 +364,7 @@ class StickyStore {
         tabsWindow: DEFAULT_TABS_WINDOW,
         editorPreferences: DEFAULT_EDITOR_PREFERENCES,
         notes: [],
+        folders: [],
       };
       return;
     }
@@ -369,6 +384,7 @@ class StickyStore {
       const editorPreferences = normalizeEditorPreferences(
         migrateLegacyEditorPreferences(parsedObject.editorPreferences, version),
       );
+      const folders = normalizeFolders(parsedObject.folders);
       this.state = {
         appTheme: normalizeAppTheme(
           Array.isArray(parsed)
@@ -378,11 +394,15 @@ class StickyStore {
         layoutMode: normalizeLayoutMode(parsedObject.layoutMode),
         tabsWindow: normalizeTabsWindow(parsedObject.tabsWindow),
         editorPreferences,
-        notes: backfillMissingSortOrders(
-          rawNotes.map((note) =>
-            normalizeNote(note, { resetLegacyAlwaysOnTop, editorPreferences }),
+        notes: clearMissingFolderIds(
+          backfillMissingSortOrders(
+            rawNotes.map((note) =>
+              normalizeNote(note, { resetLegacyAlwaysOnTop, editorPreferences }),
+            ),
           ),
+          folders,
         ),
+        folders,
       };
       for (const [index, note] of this.state.notes.entries()) {
         if (note.unreadableBlocksJSON && !rawNotes[index]?.unreadableBlocksJSON) {
@@ -411,6 +431,7 @@ class StickyStore {
         tabsWindow: DEFAULT_TABS_WINDOW,
         editorPreferences: DEFAULT_EDITOR_PREFERENCES,
         notes: [],
+        folders: [],
       };
       console.error("[NotePane] Failed to load notes.json:", error);
     }
@@ -578,6 +599,9 @@ class StickyStore {
       editorFontFamily: Object.hasOwn(options, "editorFontFamily")
         ? options.editorFontFamily
         : editorPreferences.editorFontFamily,
+      // "New note in folder" creates the note inside it, so it never shows outside first.
+      folderId: this.getFolder(options?.folderId) ? options.folderId : null,
+      tags: [],
       trashedAt: null,
       sortOrder: nextNoteSortOrder(this.state.notes),
       createdAt: now,
@@ -823,6 +847,105 @@ class StickyStore {
     return note;
   }
 
+  listFolders() {
+    return this.state.folders.map((folder) => ({ ...folder }));
+  }
+
+  getFolder(folderId) {
+    return typeof folderId === "string"
+      ? this.state.folders.find((folder) => folder.id === folderId) ?? null
+      : null;
+  }
+
+  createFolder(payload = {}) {
+    const folder = {
+      id: randomUUID(),
+      name: normalizeFolderName(payload?.name, DEFAULT_FOLDER_NAME),
+      collapsed: false,
+    };
+    this.state.folders.push(folder);
+    this.save();
+    return { ...folder };
+  }
+
+  // Changes only the fields the payload carries, like updateAppearance. A blank
+  // name keeps the current one, so clearing the rename field cannot leave a
+  // folder without a header.
+  updateFolder(payload = {}) {
+    const folder = this.getFolder(payload?.id);
+    if (!folder) {
+      return null;
+    }
+
+    if (Object.hasOwn(payload, "name")) {
+      folder.name = normalizeFolderName(payload.name, folder.name);
+    }
+    if (Object.hasOwn(payload, "collapsed")) {
+      folder.collapsed = Boolean(payload.collapsed);
+    }
+    this.save();
+    return { ...folder };
+  }
+
+  // Deleting a folder loses nothing: its notes, trashed ones included, move out
+  // to the ungrouped tabs.
+  deleteFolder(folderId) {
+    const index = this.state.folders.findIndex((folder) => folder.id === folderId);
+    if (index < 0) {
+      return false;
+    }
+
+    this.state.folders.splice(index, 1);
+    for (const note of this.state.notes) {
+      if (note.folderId === folderId) {
+        note.folderId = null;
+      }
+    }
+    this.save();
+    return true;
+  }
+
+  moveFolder(payload = {}) {
+    const index = this.state.folders.findIndex((folder) => folder.id === payload?.id);
+    const toIndex = Math.trunc(Number(payload?.toIndex));
+    if (index < 0 || !Number.isFinite(toIndex)) {
+      return this.listFolders();
+    }
+
+    const [folder] = this.state.folders.splice(index, 1);
+    this.state.folders.splice(clamp(toIndex, 0, this.state.folders.length), 0, folder);
+    this.save();
+    return this.listFolders();
+  }
+
+  // A folder id that names no folder means no folder. A note that changes group
+  // takes the next sort order, so it lands at the end of the group it joins.
+  setNoteFolder(payload = {}) {
+    const note = this.getNote(payload?.noteId);
+    if (!note) {
+      return null;
+    }
+
+    const folderId = this.getFolder(payload.folderId) ? payload.folderId : null;
+    if (note.folderId !== folderId) {
+      note.folderId = folderId;
+      note.sortOrder = nextNoteSortOrder(this.state.notes);
+      this.save();
+    }
+    return note;
+  }
+
+  setNoteTags(payload = {}) {
+    const note = this.getNote(payload?.noteId);
+    if (!note) {
+      return null;
+    }
+
+    note.tags = normalizeNoteTags(payload.tags);
+    this.save();
+    return note;
+  }
+
   createBackup(options = {}) {
     return {
       format: NOTE_PANE_BACKUP_FORMAT,
@@ -894,12 +1017,15 @@ class StickyStore {
 
   save() {
     writeJsonAtomic(this.filePath, {
-      version: 11,
+      // Version 12 added folders and the notes' folderId and tags. An older file
+      // loads with no folders and every note ungrouped and untagged.
+      version: 12,
       appTheme: this.state.appTheme,
       layoutMode: this.state.layoutMode,
       tabsWindow: this.state.tabsWindow,
       editorPreferences: this.state.editorPreferences,
       notes: this.state.notes,
+      folders: this.state.folders,
     });
   }
 
@@ -979,8 +1105,12 @@ function normalizeBackup(value) {
   const editorPreferences = normalizeEditorPreferences(
     renameLegacyShortcutPreferences(data.editorPreferences),
   );
-  const notes = backfillMissingSortOrders(
-    data.notes.map((note) => normalizeNote(note, { editorPreferences })),
+  const folders = normalizeFolders(data.folders);
+  const notes = clearMissingFolderIds(
+    backfillMissingSortOrders(
+      data.notes.map((note) => normalizeNote(note, { editorPreferences })),
+    ),
+    folders,
   );
   if (!notes.some((note) => !isTrashedNote(note))) {
     throw new Error("The NotePane backup must contain at least one active note.");
@@ -1001,6 +1131,7 @@ function normalizeBackup(value) {
       tabsWindow: normalizeTabsWindow(data.tabsWindow),
       editorPreferences,
       notes,
+      folders,
     },
   };
 }
@@ -1068,11 +1199,85 @@ function normalizeNote(value, options = {}) {
       source.editorFontFamily,
       editorPreferences.editorFontFamily,
     ),
+    folderId: typeof source.folderId === "string" && source.folderId ? source.folderId : null,
+    tags: normalizeNoteTags(source.tags),
     trashedAt: normalizeTimestamp(source.trashedAt),
     sortOrder: normalizeSortOrder(source.sortOrder),
     createdAt: Number.isFinite(source.createdAt) ? source.createdAt : now,
     updatedAt: Number.isFinite(source.updatedAt) ? source.updatedAt : now,
   };
+}
+
+// Folders in display order. An entry that is not an object is dropped, and so is
+// a second folder with an id already used, which no note could tell apart.
+function normalizeFolders(value) {
+  const folders = [];
+  const folderIds = new Set();
+  for (const source of Array.isArray(value) ? value : []) {
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      continue;
+    }
+    const id = typeof source.id === "string" && source.id ? source.id : randomUUID();
+    if (folderIds.has(id)) {
+      continue;
+    }
+    folderIds.add(id);
+    folders.push({
+      id,
+      name: normalizeFolderName(source.name, DEFAULT_FOLDER_NAME),
+      collapsed: source.collapsed === true,
+    });
+  }
+  return folders;
+}
+
+// Trimmed and cut to MAX_FOLDER_NAME_LENGTH characters; a blank name takes the fallback.
+function normalizeFolderName(value, fallback) {
+  const name = typeof value === "string" ? value.trim() : "";
+  return name ? [...name].slice(0, MAX_FOLDER_NAME_LENGTH).join("").trim() : fallback;
+}
+
+// A note that names a folder no longer listed would sit in no section of the
+// sidebar, so it is treated as ungrouped.
+function clearMissingFolderIds(notes, folders) {
+  const folderIds = new Set(folders.map((folder) => folder.id));
+  for (const note of notes) {
+    if (note.folderId && !folderIds.has(note.folderId)) {
+      note.folderId = null;
+    }
+  }
+  return notes;
+}
+
+// Twin of normalizeTag in src/model/tags.js: trimmed, without leading "#",
+// lower-cased, inner whitespace as "-". A tag outside 1..MAX_TAG_LENGTH
+// characters is dropped rather than cut.
+function normalizeNoteTag(value) {
+  const tag = String(value ?? "")
+    .normalize("NFC")
+    .trim()
+    .replace(/^#+/, "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+  const length = [...tag].length;
+  return length >= 1 && length <= MAX_TAG_LENGTH ? tag : "";
+}
+
+// Twin of normalizeTags in src/model/tags.js: unique valid tags in the order
+// they were added, at most MAX_TAGS_PER_NOTE.
+function normalizeNoteTags(values) {
+  const tags = [];
+  for (const value of Array.isArray(values) ? values : []) {
+    const tag = normalizeNoteTag(value);
+    if (tag && !tags.includes(tag)) {
+      tags.push(tag);
+      if (tags.length === MAX_TAGS_PER_NOTE) {
+        break;
+      }
+    }
+  }
+  return tags;
 }
 
 function sortNotesByOrder(a, b) {
@@ -1436,6 +1641,8 @@ function normalizeEditorPreferences(
         ? source.showTableOfContents
         : Boolean(fallbackSource.showTableOfContents),
     ...normalizeKeyboardShortcutPreferences(source, fallbackSource),
+    // A partial update without a look keeps the previous one.
+    look: normalizeLook(source.look ?? fallbackSource.look),
   };
 }
 
@@ -1824,6 +2031,182 @@ function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
+// Twin of normalizeLook in src/model/look.js, with the same defaults, ranges and steps
+// (tests/unit/look.test.cjs checks that they agree). The renderer bundles the built-in
+// pictures; here only their ids are needed.
+const LOOK_AREAS = ["sidebar", "header", "editor", "menus", "settings"];
+const LOOK_BUILTIN_BACKGROUND_IDS = ["builtin:dawn"];
+const LOOK_BACKGROUND_POSITIONS = [
+  "left top",
+  "center top",
+  "right top",
+  "left center",
+  "center",
+  "right center",
+  "left bottom",
+  "center bottom",
+  "right bottom",
+];
+const LOOK_ASSET_URL_PATTERN = /^notepane-asset:\/\/local\/[0-9a-f]{64}\.[a-z0-9]{1,5}$/;
+const LOOK_MAX_BACKGROUND_PICTURES = 12;
+const DEFAULT_LOOK = Object.freeze({
+  accentColor: null,
+  corners: "default",
+  fonts: Object.freeze({
+    editorSize: 16,
+    lineHeight: 1.5,
+    letterSpacing: 0,
+    blockSpacing: 0,
+    textWidth: 820,
+    headingFont: "same",
+    headingWeight: 700,
+    codeFont: "system",
+    codeSize: 14,
+    codeLigatures: true,
+  }),
+  background: Object.freeze({
+    type: "none",
+    color: "#dfe7f2",
+    from: "#f7d9cf",
+    to: "#c9d7f7",
+    angle: 135,
+    picture: "builtin:dawn",
+    pictures: Object.freeze([]),
+    fit: "cover",
+    position: "center",
+    blur: 0,
+    brightness: 100,
+    saturation: 100,
+    tint: "#1b2a4a",
+    tintAmount: 0,
+    behindStickies: true,
+    dimInDark: true,
+  }),
+  surfaces: Object.freeze({
+    sidebar: Object.freeze({ fill: null, opacity: 72, blur: 16, border: "hairline" }),
+    header: Object.freeze({ fill: null, opacity: 60, blur: 12, border: "hairline" }),
+    editor: Object.freeze({ fill: null, opacity: 82, blur: 0, border: "none" }),
+    menus: Object.freeze({ fill: null, opacity: 88, blur: 24, border: "hairline" }),
+    settings: Object.freeze({ fill: null, opacity: 92, blur: 24, border: "hairline" }),
+  }),
+  tabs: Object.freeze({
+    style: "outline",
+    height: "regular",
+    radius: 7,
+    showNumbers: true,
+    showShortcuts: true,
+    colorStrength: 100,
+    newTabColor: "none",
+  }),
+});
+
+const asLookObject = (value) =>
+  (value && typeof value === "object" && !Array.isArray(value) ? value : {});
+
+function normalizeLookNumber(value, fallback, min, max, step) {
+  const numeric =
+    typeof value === "number" || (typeof value === "string" && value.trim() !== "")
+      ? Number(value)
+      : NaN;
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  const snapped = min + Math.round((Math.min(Math.max(numeric, min), max) - min) / step) * step;
+  return Math.min(Number(snapped.toFixed(2)), max);
+}
+
+function normalizeLookChoice(value, choices, fallback) {
+  return choices.includes(value) ? value : fallback;
+}
+
+function normalizeLookBoolean(value, fallback) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function isLookAssetUrl(value) {
+  return typeof value === "string" && LOOK_ASSET_URL_PATTERN.test(value);
+}
+
+function normalizeLook(value) {
+  const source = asLookObject(value);
+  const fonts = asLookObject(source.fonts);
+  const background = asLookObject(source.background);
+  const surfaces = asLookObject(source.surfaces);
+  const tabs = asLookObject(source.tabs);
+  const defaultFonts = DEFAULT_LOOK.fonts;
+  const defaultBackground = DEFAULT_LOOK.background;
+  const defaultTabs = DEFAULT_LOOK.tabs;
+  const pictures = [
+    ...new Set(Array.isArray(background.pictures) ? background.pictures.filter(isLookAssetUrl) : []),
+  ].slice(0, LOOK_MAX_BACKGROUND_PICTURES);
+  return {
+    accentColor: normalizeHexColor(source.accentColor, null),
+    corners: normalizeLookChoice(source.corners, ["sharp", "default", "round"], DEFAULT_LOOK.corners),
+    fonts: {
+      editorSize: normalizeLookNumber(fonts.editorSize, defaultFonts.editorSize, 12, 24, 1),
+      lineHeight: normalizeLookNumber(fonts.lineHeight, defaultFonts.lineHeight, 1.2, 2.2, 0.05),
+      letterSpacing: normalizeLookNumber(fonts.letterSpacing, defaultFonts.letterSpacing, -0.03, 0.08, 0.01),
+      blockSpacing: normalizeLookNumber(fonts.blockSpacing, defaultFonts.blockSpacing, 0, 24, 1),
+      textWidth: normalizeLookNumber(fonts.textWidth, defaultFonts.textWidth, 560, 1100, 20),
+      headingFont: normalizeLookChoice(
+        fonts.headingFont,
+        ["same", "serif", "display", "rounded"],
+        defaultFonts.headingFont,
+      ),
+      headingWeight: normalizeLookChoice(Number(fonts.headingWeight), [600, 700, 800], defaultFonts.headingWeight),
+      codeFont: normalizeLookChoice(
+        fonts.codeFont,
+        ["system", "menlo", "jetbrains", "courier"],
+        defaultFonts.codeFont,
+      ),
+      codeSize: normalizeLookNumber(fonts.codeSize, defaultFonts.codeSize, 11, 20, 1),
+      codeLigatures: normalizeLookBoolean(fonts.codeLigatures, defaultFonts.codeLigatures),
+    },
+    background: {
+      type: normalizeLookChoice(background.type, ["none", "color", "gradient", "picture"], defaultBackground.type),
+      color: normalizeHexColor(background.color, defaultBackground.color),
+      from: normalizeHexColor(background.from, defaultBackground.from),
+      to: normalizeHexColor(background.to, defaultBackground.to),
+      angle: normalizeLookNumber(background.angle, defaultBackground.angle, 0, 360, 1),
+      picture:
+        LOOK_BUILTIN_BACKGROUND_IDS.includes(background.picture) || isLookAssetUrl(background.picture)
+          ? background.picture
+          : defaultBackground.picture,
+      pictures,
+      fit: normalizeLookChoice(background.fit, ["cover", "contain", "tile"], defaultBackground.fit),
+      position: normalizeLookChoice(background.position, LOOK_BACKGROUND_POSITIONS, defaultBackground.position),
+      blur: normalizeLookNumber(background.blur, defaultBackground.blur, 0, 64, 1),
+      brightness: normalizeLookNumber(background.brightness, defaultBackground.brightness, 40, 160, 1),
+      saturation: normalizeLookNumber(background.saturation, defaultBackground.saturation, 0, 200, 1),
+      tint: normalizeHexColor(background.tint, defaultBackground.tint),
+      tintAmount: normalizeLookNumber(background.tintAmount, defaultBackground.tintAmount, 0, 80, 1),
+      behindStickies: normalizeLookBoolean(background.behindStickies, defaultBackground.behindStickies),
+      dimInDark: normalizeLookBoolean(background.dimInDark, defaultBackground.dimInDark),
+    },
+    surfaces: Object.fromEntries(
+      LOOK_AREAS.map((area) => {
+        const surface = asLookObject(surfaces[area]);
+        const fallback = DEFAULT_LOOK.surfaces[area];
+        return [area, {
+          fill: normalizeHexColor(surface.fill, null),
+          opacity: normalizeLookNumber(surface.opacity, fallback.opacity, 0, 100, 1),
+          blur: normalizeLookNumber(surface.blur, fallback.blur, 0, 40, 1),
+          border: normalizeLookChoice(surface.border, ["none", "hairline", "strong"], fallback.border),
+        }];
+      }),
+    ),
+    tabs: {
+      style: normalizeLookChoice(tabs.style, ["plain", "outline", "filled"], defaultTabs.style),
+      height: normalizeLookChoice(tabs.height, ["compact", "regular", "tall"], defaultTabs.height),
+      radius: normalizeLookNumber(tabs.radius, defaultTabs.radius, 0, 14, 1),
+      showNumbers: normalizeLookBoolean(tabs.showNumbers, defaultTabs.showNumbers),
+      showShortcuts: normalizeLookBoolean(tabs.showShortcuts, defaultTabs.showShortcuts),
+      colorStrength: normalizeLookNumber(tabs.colorStrength, defaultTabs.colorStrength, 20, 100, 1),
+      newTabColor: normalizeLookChoice(tabs.newTabColor, ["none", "cycle"], defaultTabs.newTabColor),
+    },
+  };
+}
+
 module.exports = {
   StickyStore,
   NOTE_PANE_BACKUP_FORMAT,
@@ -1840,4 +2223,6 @@ module.exports = {
   normalizeAppTheme,
   normalizeAppZoom,
   normalizeBlocksJSON,
+  normalizeLook,
+  normalizeNoteTags,
 };

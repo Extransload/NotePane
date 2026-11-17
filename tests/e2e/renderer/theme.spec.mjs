@@ -6,7 +6,7 @@ import {
   modifierShortcut,
 } from "../support/renderer-helpers.mjs";
 
-// The theme picker in Preferences > General, and the light/dark switch and shortcut it replaces.
+// The theme picker in Preferences > Theme, and the light/dark switch and shortcut it replaces.
 const THEMES = JSON.parse(fs.readFileSync(path.resolve("electron/themes.json"), "utf8"));
 const themeById = (themeId) => THEMES.find((theme) => theme.id === themeId);
 const PICKER_LABELS = THEMES.map((theme) => theme.label);
@@ -97,7 +97,7 @@ test("picker lists all themes and marks the active one", async ({ page }) => {
   const preferences = await openPreferences(page);
 
   await expect(preferences.getByText("App theme", { exact: true })).toBeVisible();
-  await expect(preferences.getByText("The theme applies to every window.")).toBeVisible();
+  await expect(preferences.getByText("Applies to every window.", { exact: false })).toBeVisible();
   const picker = preferences.getByRole("radiogroup", { name: "App theme" });
   const cards = picker.getByRole("radio");
   await expect(cards).toHaveCount(PICKER_LABELS.length);

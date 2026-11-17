@@ -1,0 +1,318 @@
+/* Preferences > Look. src/hooks/useLookStyles.js sets the attributes and --look-* variables on
+   <html> from editorPreferences.look (src/model/look.js). A typography variable only exists while
+   its setting differs from the default, and every rule here falls back to the value the other
+   stylesheets give, so the default look draws the app exactly as it was. This file is imported
+   last so its rules win over the ones they adjust. */
+
+/* ---------- Accent ---------- */
+
+/* The theme sets its tokens inline on <html>; only !important from a stylesheet outranks them. */
+html[data-look-accent] {
+  --notepane-input-focus-border: var(--look-accent) !important;
+  --notepane-control-accent: var(--look-accent) !important;
+  --notepane-control-accent-hover: color-mix(in srgb, var(--look-accent) 85%, var(--sticky-text-color)) !important;
+}
+
+/* ---------- Corners ---------- */
+
+/* --look-radius-scale is 0.4 (sharp), 1 or 1.6 (round). Preferences and its controls multiply
+   their own radii by it; these are the app's floating surfaces and chrome buttons. */
+html:is([data-look-corners="sharp"], [data-look-corners="round"]) {
+  --chrome-icon-button-radius: calc(9px * var(--look-radius-scale));
+}
+
+html:is([data-look-corners="sharp"], [data-look-corners="round"]) :is(.notepane-context-menu, .export-format-menu) {
+  border-radius: calc(10px * var(--look-radius-scale));
+}
+
+html:is([data-look-corners="sharp"], [data-look-corners="round"]) :is(.notepane-context-menu, .export-format-menu) button {
+  border-radius: calc(6px * var(--look-radius-scale));
+}
+
+html:is([data-look-corners="sharp"], [data-look-corners="round"]) .search-palette {
+  border-radius: calc(12px * var(--look-radius-scale));
+}
+
+html:is([data-look-corners="sharp"], [data-look-corners="round"]) .search-result {
+  border-radius: calc(8px * var(--look-radius-scale));
+}
+
+html:is([data-look-corners="sharp"], [data-look-corners="round"]) :is(.bn-menu-dropdown, .mantine-Menu-dropdown, .bn-table-handle-menu) {
+  border-radius: calc(8px * var(--look-radius-scale)) !important;
+}
+
+html:is([data-look-corners="sharp"], [data-look-corners="round"]) .bn-popover-content.bn-form-popover {
+  border-radius: calc(9px * var(--look-radius-scale)) !important;
+}
+
+/* ---------- Fonts ---------- */
+
+.sticky-editor-surface .bn-editor {
+  font-size: var(--look-editor-size, 16px);
+  letter-spacing: var(--look-letter-spacing, normal);
+}
+
+.sticky-editor-surface .bn-editor .bn-block-outer {
+  line-height: var(--look-line-height, 1.5);
+}
+
+/* Extra room between top-level blocks, on top of blocknote.css's 8px. */
+.bn-editor > .bn-block-group > .bn-block-outer + .bn-block-outer {
+  margin-top: calc(8px + var(--look-block-spacing, 0px));
+}
+
+.sticky-editor-surface.is-editor-reading-width .bn-editor {
+  width: min(var(--look-text-width, 820px), calc(100% - 96px));
+  max-width: var(--look-text-width, 820px);
+}
+
+/* The heading elements carry the browser's bold, which is 700. */
+.bn-editor [data-content-type="heading"] :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--look-heading-font, inherit);
+  font-weight: var(--look-heading-weight, 700);
+}
+
+.bn-editor .bn-inline-content code {
+  font-family: var(--look-code-font, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+  font-variant-ligatures: var(--look-code-ligatures, normal);
+}
+
+/* A code block draws in the browser's monospace font by default. */
+.bn-editor [data-content-type="codeBlock"] :is(pre, code) {
+  font-family: var(--look-code-font, monospace);
+  font-variant-ligatures: var(--look-code-ligatures, normal);
+}
+
+html[data-look-code-size] .bn-editor [data-content-type="codeBlock"] pre {
+  font-size: var(--look-code-size);
+}
+
+html[data-look-code-size] .bn-editor [data-content-type="codeBlock"] pre code {
+  font-size: inherit;
+}
+
+/* ---------- Background ---------- */
+
+/* The backdrop is two layers under everything in the shell: the picture, colour or gradient
+   with its blur, brightness and saturation, then the tint. The shell's stacking context keeps
+   them above its own (now transparent) background; the frosted layers of the areas sit above
+   both at z-index -1. The picture layer reaches past the shell by twice its blur, so the blurred
+   edge stays outside the clip. */
+html[data-backdrop] .sticky-shell {
+  --look-editor-theme-fill: var(--sticky-editor-bg);
+  isolation: isolate;
+  background: transparent;
+}
+
+/* A sticky window's editor is transparent over the note colour of its shell, so the note colour
+   is the editor's own fill there. */
+html[data-backdrop] .sticky-shell.layout-sticky {
+  --look-editor-theme-fill: var(--sticky-note-bg);
+}
+
+html[data-backdrop] .sticky-shell::before,
+html[data-backdrop] .sticky-shell::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+html[data-backdrop] .sticky-shell::before {
+  z-index: -3;
+  inset: calc(-1 * var(--look-backdrop-bleed, 0px));
+  background-image: var(--look-backdrop-image);
+  background-position: var(--look-backdrop-position, center);
+  background-repeat: var(--look-backdrop-repeat, no-repeat);
+  background-size: var(--look-backdrop-size, cover);
+  filter: var(--look-backdrop-filter, none);
+}
+
+html[data-backdrop] .sticky-shell::after {
+  z-index: -2;
+  inset: 0;
+  background: color-mix(in srgb, var(--look-tint-color) var(--look-tint-amount, 0%), transparent);
+}
+
+/* An exported note or a printout shows the note, never the window's backdrop. */
+body.is-exporting .sticky-shell::before,
+body.is-exporting .sticky-shell::after {
+  display: none !important;
+}
+
+@media print {
+  .sticky-shell::before,
+  .sticky-shell::after {
+    display: none !important;
+  }
+}
+
+/* ---------- Surfaces ---------- */
+
+/* Each area is its fill (its own colour or the theme's) at the chosen opacity over the
+   backdrop, frosted by a blur. The sidebar and title bar hold menus placed with position: fixed,
+   and a backdrop-filter on them would become those menus' containing block, so they frost a
+   ::before layer instead. */
+html[data-backdrop] .session-sidebar {
+  background: transparent;
+}
+
+html[data-backdrop] .session-sidebar::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  background: color-mix(
+    in srgb,
+    var(--look-sidebar-fill, var(--sticky-sidebar-bg)) var(--look-sidebar-opacity, 100%),
+    transparent
+  );
+  backdrop-filter: var(--look-sidebar-filter, none);
+  pointer-events: none;
+}
+
+html[data-backdrop] :is(.session-sidebar-topbar, .session-sidebar-footer) {
+  background: transparent;
+}
+
+html[data-backdrop] .sticky-shell .sticky-header {
+  background: transparent;
+}
+
+html[data-backdrop] .sticky-header::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  content: "";
+  background: color-mix(
+    in srgb,
+    var(--look-header-fill, var(--sticky-header-bg)) var(--look-header-opacity, 100%),
+    transparent
+  );
+  backdrop-filter: var(--look-header-filter, none);
+  pointer-events: none;
+}
+
+/* The editor scrolls, so a layer inside it would scroll away; it frosts itself. Its floating
+   menus open in portals on the body, outside it. */
+html[data-backdrop] .sticky-shell .sticky-editor-surface {
+  background: color-mix(
+    in srgb,
+    var(--look-editor-fill, var(--look-editor-theme-fill)) var(--look-editor-opacity, 100%),
+    transparent
+  );
+  backdrop-filter: var(--look-editor-filter, none);
+}
+
+html[data-backdrop] .sticky-editor-surface :is(.bn-container, .bn-editor) {
+  background: transparent !important;
+}
+
+html[data-backdrop] :is(
+  .notepane-context-menu,
+  .export-format-menu,
+  .search-palette,
+  .bn-menu-dropdown,
+  .mantine-Menu-dropdown,
+  .mantine-Popover-dropdown,
+  .bn-table-handle-menu,
+  .color-panel
+) {
+  background: color-mix(
+    in srgb,
+    var(--look-menus-fill, var(--sticky-portal-menu-bg)) var(--look-menus-opacity, 100%),
+    transparent
+  ) !important;
+  backdrop-filter: var(--look-menus-filter, none);
+}
+
+html[data-backdrop] .preferences-window {
+  background: color-mix(
+    in srgb,
+    var(--look-settings-fill, var(--sticky-panel-bg)) var(--look-settings-opacity, 100%),
+    transparent
+  );
+  backdrop-filter: var(--look-settings-filter, none);
+}
+
+/* Borders: hairline keeps each area's own; none and strong set --look-<area>-border with the
+   matching data-look-<area>-border attribute. A sticky window's title bar has no border. */
+html[data-backdrop][data-look-sidebar-border] .session-sidebar {
+  border-right-color: var(--look-sidebar-border);
+}
+
+html[data-backdrop][data-look-header-border] .sticky-shell:not(.layout-sticky) .sticky-header {
+  border-bottom-color: var(--look-header-border);
+}
+
+html[data-backdrop][data-look-menus-border] :is(
+  .notepane-context-menu,
+  .export-format-menu,
+  .search-palette,
+  .bn-menu-dropdown,
+  .mantine-Menu-dropdown,
+  .mantine-Popover-dropdown,
+  .bn-table-handle-menu,
+  .color-panel
+) {
+  border-color: var(--look-menus-border) !important;
+}
+
+html[data-backdrop][data-look-settings-border] .preferences-window {
+  border-color: var(--look-settings-border);
+}
+
+/* No print or export carries frosted glass. */
+body.is-exporting .sticky-editor-surface {
+  backdrop-filter: none !important;
+}
+
+/* ---------- Tabs ---------- */
+
+/* Tabs without a colour of their own (.is-plain). Outline is sidebar.css's own look. Plain drops
+   the outline and keeps the faint fill of the open tab; filled gives every tab a faint fill and
+   raises the open one like a segmented control's active segment. */
+html[data-tab-style="plain"] .session-tab-row.is-plain,
+html[data-tab-style="plain"] .session-tab-row.is-plain.active {
+  border-color: transparent;
+}
+
+html[data-tab-style="filled"] .session-tab-row.is-plain {
+  --session-tab-inactive-bg: color-mix(in srgb, var(--sticky-text-color) 5%, transparent);
+  --session-tab-hover-bg: var(--sticky-control-hover-bg);
+  --session-tab-active-bg: var(--sticky-panel-bg);
+  --session-tab-active-shadow: var(--sticky-table-control-shadow);
+  --session-tab-border-color: transparent;
+  border-color: transparent;
+}
+
+/* The icon-only sidebar keeps its own square tabs. */
+html[data-tab-height="compact"] .session-sidebar:not(.is-compact) .session-tab-row {
+  --session-tab-row-height: 26px;
+}
+
+html[data-tab-height="tall"] .session-sidebar:not(.is-compact) .session-tab-row {
+  --session-tab-row-height: 38px;
+}
+
+.session-sidebar:not(.is-compact) .session-tab-row {
+  border-radius: var(--look-tab-radius, 7px);
+}
+
+html[data-tab-numbers="hidden"] .session-index-label,
+html[data-tab-shortcuts="hidden"] .session-shortcut {
+  visibility: hidden;
+}
+
+/* A tab with its own colour gets that colour inline (getSessionTabStyle in
+   src/style/themeStyles.js); the strength thins it toward transparent. */
+html[data-tab-strength] .session-tab-row:not(.is-plain) {
+  background: color-mix(in srgb, var(--session-tab-inactive-bg) var(--look-tab-strength), transparent);
+}
+
+html[data-tab-strength] .session-tab-row:not(.is-plain):hover {
+  background: color-mix(in srgb, var(--session-tab-hover-bg) var(--look-tab-strength), transparent);
+}
+
+html[data-tab-strength] .session-tab-row:not(.is-plain).active {
+  background: color-mix(in srgb, var(--session-tab-active-bg) var(--look-tab-strength), transparent);
+}

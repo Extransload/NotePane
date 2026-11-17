@@ -130,6 +130,38 @@ test("Electron app opens a sticky window and persists editor content", async () 
     )
       .toBe(true);
 
+    // The Export window: an HTML page, a PNG of the whole note, and every note as Markdown files.
+    const exportWith = async (format, scope = "This note") => {
+      await page.getByRole("button", { name: "Export" }).click();
+      await page.getByRole("menu", { name: "Export format" })
+        .getByRole("menuitem", { name: /Options/ })
+        .click();
+      const exportDialog = page.getByRole("dialog", { name: "Export" });
+      await exportDialog.getByRole("radiogroup", { name: "Export what" })
+        .getByRole("radio", { name: scope })
+        .click();
+      await exportDialog.getByRole("radio", { name: format, exact: true }).click();
+      await exportDialog.getByRole("button", { name: /^Export .*\.\.\.$/ }).click();
+      await expect(exportDialog).toHaveCount(0);
+    };
+    await exportWith("HTML");
+    await expect(page.locator(".sticky-toast-success")).toHaveText("HTML exported");
+    const htmlPath = path.join(exportDirectory, "Project note.html");
+    await expect.poll(() => fs.existsSync(htmlPath), { timeout: 20_000 }).toBe(true);
+    expect(fs.readFileSync(htmlPath, "utf8")).toContain("electron persistence probe");
+
+    await exportWith("Image");
+    await expect(page.locator(".sticky-toast-success")).toHaveText("Image exported", { timeout: 20_000 });
+    const pngPath = path.join(exportDirectory, "Project note.png");
+    await expect.poll(() => fs.existsSync(pngPath), { timeout: 20_000 }).toBe(true);
+    expect(fs.readFileSync(pngPath).subarray(1, 4).toString("latin1")).toBe("PNG");
+
+    await exportWith("Markdown", "All notes");
+    await expect(page.locator(".sticky-toast-success")).toHaveText("1 note exported");
+    const allNotesPath = path.join(exportDirectory, "NotePane", "Project note.md");
+    await expect.poll(() => fs.existsSync(allNotesPath), { timeout: 20_000 }).toBe(true);
+    expect(fs.readFileSync(allNotesPath, "utf8")).toMatch(/^---\ntitle: "Project note"/);
+
     const persistedState = JSON.parse(fs.readFileSync(notesPath, "utf8"));
     const notes = persistedState.notes;
     expect(notes).toHaveLength(1);
@@ -150,8 +182,6 @@ test("Electron app opens a sticky window and persists editor content", async () 
       .toBeGreaterThan(1000);
     expect(fs.readFileSync(path.join(exportDirectory, "Project note.md"), "utf8"))
       .toContain("electron persistence probe");
-    expect(fs.existsSync(path.join(exportDirectory, "Project note.png")))
-      .toBe(false);
   } finally {
     await electronApp.close();
   }
@@ -510,6 +540,7 @@ test("Electron exports and imports a complete portable workspace backup", async 
     await page.keyboard.insertText(" with an immediate edit");
     await page.getByRole("button", { name: "Preferences" }).click();
     const preferences = page.getByRole("dialog", { name: "Preferences window" });
+    await preferences.getByRole("tab", { name: "Backup" }).click();
     await expect(preferences.getByText("Workspace backup")).toBeVisible();
 
     await preferences.getByRole("button", { name: "Export backup" }).click();
@@ -3084,7 +3115,7 @@ function modifierShortcut(key) {
 }
 
 // Chooses a theme as a user does: Preferences through its shortcut in a tabs window (a sticky
-// window does not open it), the theme's card in General, then Close.
+// window does not open it), the theme's card on the Theme page, then Close.
 async function chooseAppTheme(page, themeId) {
   await page.bringToFront();
   await page.keyboard.press(modifierShortcut(","));

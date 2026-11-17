@@ -8,8 +8,12 @@ import {
 // position, a note id, the note awaiting confirmation) and null while closed.
 const CLOSED_OVERLAYS = {
   colorPanel: false,
+  exportDialog: false,
   exportFormatMenu: null,
+  folderMenu: null,
   markdownImport: false,
+  mediaMenu: null,
+  mediaPreview: null,
   preferencesWindow: false,
   sessionCloseConfirm: null,
   sessionColorPanel: null,
@@ -24,6 +28,10 @@ const CLOSED_OVERLAYS = {
 // Opening one of these closes the others; every other overlay stacks.
 const EXCLUSIVE_OVERLAYS = [
   "colorPanel",
+  "exportDialog",
+  "folderMenu",
+  "mediaMenu",
+  "mediaPreview",
   "preferencesWindow",
   "sessionColorPanel",
   "sessionTabMenu",
@@ -34,8 +42,12 @@ const EXCLUSIVE_OVERLAYS = [
 
 // Escape closes the first open overlay in this order.
 const ESCAPE_ORDER = [
+  "mediaMenu",
+  "mediaPreview",
   "exportFormatMenu",
+  "exportDialog",
   "sessionTabMenu",
+  "folderMenu",
   "sessionColorPanel",
   "colorPanel",
   "markdownImport",
@@ -102,9 +114,13 @@ export function useOverlayState() {
     closeExclusive,
     closeTopmost,
     exportFormatMenu: overlays.exportFormatMenu,
+    folderMenu: overlays.folderMenu,
     isAnyOpen: topmostKind !== null,
     isColorPanelOpen: overlays.colorPanel,
+    isExportDialogOpen: overlays.exportDialog,
     isMarkdownImportOpen: overlays.markdownImport,
+    mediaMenu: overlays.mediaMenu,
+    mediaPreviewBlockId: overlays.mediaPreview,
     isPreferencesWindowOpen: overlays.preferencesWindow,
     isStickyActionBarOpen: overlays.stickyActionBar,
     isStickySettingsOpen: overlays.stickySettings,

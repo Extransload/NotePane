@@ -9,6 +9,8 @@ const {
   NOTE_PANE_BACKUP_VERSION,
   DEFAULT_KEYBOARD_SHORTCUTS,
   DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
+  normalizeLook,
+  normalizeNoteTags,
 } = require("../../electron/store.cjs");
 
 test("creates, saves, and reloads a local note", () => {
@@ -626,6 +628,7 @@ test("updates editor preferences and applies them to new notes", () => {
     showTableOfContents: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
+    look: normalizeLook({}),
   });
 
   const note = store.createNote({ width: 900, height: 700 });
@@ -639,6 +642,7 @@ test("updates editor preferences and applies them to new notes", () => {
     showTableOfContents: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
+    look: normalizeLook({}),
   });
 });
 
@@ -1613,6 +1617,181 @@ test("rejects malformed, duplicate, and newer NotePane backups", () => {
     /duplicate note IDs/i,
   );
   assert.equal(store.getNote(note.id).id, note.id);
+});
+
+test("keeps folders, a note's folder and its tags across a restart", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+  const note = store.createNote({ width: 900, height: 700 });
+  const work = store.createFolder({ name: "  Work  " });
+  const personal = store.createFolder({ name: "Personal" });
+  assert.deepEqual(store.listFolders(), [
+    { id: work.id, name: "Work", collapsed: false },
+    { id: personal.id, name: "Personal", collapsed: false },
+  ]);
+
+  assert.equal(store.setNoteFolder({ noteId: note.id, folderId: work.id }).folderId, work.id);
+  assert.deepEqual(
+    store.setNoteTags({ noteId: note.id, tags: ["#Launch", "guide"] }).tags,
+    ["launch", "guide"],
+  );
+  store.updateFolder({ id: work.id, collapsed: true });
+
+  const reloaded = new StickyStore(directory);
+  assert.deepEqual(reloaded.listFolders(), [
+    { id: work.id, name: "Work", collapsed: true },
+    { id: personal.id, name: "Personal", collapsed: false },
+  ]);
+  assert.equal(reloaded.getNote(note.id).folderId, work.id);
+  assert.deepEqual(reloaded.getNote(note.id).tags, ["launch", "guide"]);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(directory, "notes.json"), "utf8")).version, 12);
+});
+
+test("loads a notes file from before folders with every note ungrouped and untagged", () => {
+  const directory = createTemporaryDirectory();
+  const notes = [
+    { id: "plain", title: "Plain", sortOrder: 1, createdAt: 1, updatedAt: 1 },
+    // A folder id that names no folder is treated as none.
+    { id: "stray", title: "Stray", folderId: "gone", tags: "launch", sortOrder: 2, createdAt: 2, updatedAt: 2 },
+  ];
+  fs.writeFileSync(
+    path.join(directory, "notes.json"),
+    JSON.stringify({ version: 11, layoutMode: "tabs", notes }),
+    "utf8",
+  );
+
+  const store = new StickyStore(directory);
+  assert.deepEqual(store.listFolders(), []);
+  for (const note of store.listNotes()) {
+    assert.equal(note.folderId, null);
+    assert.deepEqual(note.tags, []);
+  }
+  assert.deepEqual(store.listNotes().map((note) => note.id), ["plain", "stray"]);
+});
+
+test("deleting a folder moves its notes out, trashed ones included, and deletes none", () => {
+  const store = new StickyStore(createTemporaryDirectory());
+  const kept = store.createNote({ width: 900, height: 700 });
+  const filed = store.createNote({ width: 900, height: 700 });
+  const trashed = store.createNote({ width: 900, height: 700 });
+  const folder = store.createFolder({ name: "Work" });
+  store.setNoteFolder({ noteId: filed.id, folderId: folder.id });
+  store.setNoteFolder({ noteId: trashed.id, folderId: folder.id });
+  store.deleteNote(trashed.id);
+
+  assert.equal(store.deleteFolder(folder.id), true);
+  assert.equal(store.deleteFolder(folder.id), false);
+  assert.deepEqual(store.listFolders(), []);
+  assert.deepEqual(
+    store.listNotes().map((note) => [note.id, note.folderId]),
+    [[kept.id, null], [filed.id, null]],
+  );
+  assert.equal(store.listTrash()[0].folderId, null);
+});
+
+test("a note that changes folder goes to the end of its new group", () => {
+  const store = new StickyStore(createTemporaryDirectory());
+  const first = store.createNote({ width: 900, height: 700 });
+  const second = store.createNote({ width: 900, height: 700 });
+  const folder = store.createFolder({ name: "Work" });
+
+  store.setNoteFolder({ noteId: first.id, folderId: folder.id });
+  assert.deepEqual(store.listNotes().map((note) => note.id), [second.id, first.id]);
+  const orderInFolder = store.getNote(first.id).sortOrder;
+
+  // Moving to the folder it is already in, or to a folder that does not exist,
+  // changes nothing but the folder.
+  store.setNoteFolder({ noteId: first.id, folderId: folder.id });
+  assert.equal(store.getNote(first.id).sortOrder, orderInFolder);
+  assert.equal(store.setNoteFolder({ noteId: second.id, folderId: "missing" }).folderId, null);
+  assert.equal(store.setNoteFolder({ noteId: "missing", folderId: folder.id }), null);
+
+  const created = store.createNote({ width: 900, height: 700 }, { folderId: folder.id });
+  assert.equal(created.folderId, folder.id);
+  assert.equal(store.createNote({ width: 900, height: 700 }, { folderId: "missing" }).folderId, null);
+});
+
+test("normalises folder names, folder order and note tags", () => {
+  const store = new StickyStore(createTemporaryDirectory());
+  const note = store.createNote({ width: 900, height: 700 });
+  const blank = store.createFolder({ name: "   " });
+  assert.equal(blank.name, "New folder");
+  const long = store.createFolder({ name: "x".repeat(70) });
+  assert.equal(long.name, "x".repeat(60));
+  // A blank rename keeps the name; a duplicate name is allowed.
+  assert.equal(store.updateFolder({ id: long.id, name: "" }).name, "x".repeat(60));
+  assert.equal(store.updateFolder({ id: long.id, name: "New folder" }).name, "New folder");
+  assert.equal(store.updateFolder({ id: "missing", name: "Other" }), null);
+
+  const third = store.createFolder({ name: "Third" });
+  assert.deepEqual(
+    store.moveFolder({ id: third.id, toIndex: 0 }).map((folder) => folder.id),
+    [third.id, blank.id, long.id],
+  );
+  assert.deepEqual(
+    store.moveFolder({ id: third.id, toIndex: 99 }).map((folder) => folder.id),
+    [blank.id, long.id, third.id],
+  );
+
+  const tags = store.setNoteTags({
+    noteId: note.id,
+    tags: [
+      "  #Launch ",
+      "launch",
+      "##Two   Words",
+      "",
+      "#",
+      "x".repeat(33),
+      "y".repeat(32),
+      ...Array.from({ length: 30 }, (_, index) => `tag${index}`),
+    ],
+  }).tags;
+  assert.deepEqual(tags.slice(0, 3), ["launch", "two-words", "y".repeat(32)]);
+  assert.equal(tags.length, 20);
+  assert.equal(tags.at(-1), "tag16");
+  assert.deepEqual(store.setNoteTags({ noteId: note.id, tags: "launch" }).tags, []);
+});
+
+test("renderer and store tag normalisers agree", async () => {
+  const { normalizeTags } = await import("../../src/model/tags.js");
+  const inputs = [
+    ["  #Launch ", "launch", "##Two   Words", "Café", "Cafe\u0301", "", "#", "x".repeat(33)],
+    Array.from({ length: 25 }, (_, index) => `#Tag ${index}`),
+    [null, undefined, 5, true, "  ", "#a b\tc"],
+    "not a list",
+    null,
+  ];
+  for (const input of inputs) {
+    assert.deepEqual(normalizeNoteTags(input), normalizeTags(input), JSON.stringify(input));
+  }
+});
+
+test("a backup carries folders and each note's folder and tags", () => {
+  const sourceStore = new StickyStore(createTemporaryDirectory());
+  const note = sourceStore.createNote({ width: 900, height: 700 });
+  const folder = sourceStore.createFolder({ name: "Work" });
+  sourceStore.updateFolder({ id: folder.id, collapsed: true });
+  sourceStore.setNoteFolder({ noteId: note.id, folderId: folder.id });
+  sourceStore.setNoteTags({ noteId: note.id, tags: ["launch"] });
+  const backup = sourceStore.createBackup({ exportedAt: "2026-11-17T08:30:00.000Z" });
+
+  const targetDirectory = createTemporaryDirectory();
+  const targetStore = new StickyStore(targetDirectory);
+  targetStore.restoreBackup(backup);
+  for (const store of [targetStore, new StickyStore(targetDirectory)]) {
+    assert.deepEqual(store.listFolders(), [{ id: folder.id, name: "Work", collapsed: true }]);
+    assert.equal(store.getNote(note.id).folderId, folder.id);
+    assert.deepEqual(store.getNote(note.id).tags, ["launch"]);
+  }
+
+  // A backup from before folders restores with none, every note ungrouped.
+  const olderBackup = JSON.parse(JSON.stringify(backup));
+  delete olderBackup.data.folders;
+  const olderStore = new StickyStore(createTemporaryDirectory());
+  olderStore.restoreBackup(olderBackup);
+  assert.deepEqual(olderStore.listFolders(), []);
+  assert.equal(olderStore.getNote(note.id).folderId, null);
+  assert.deepEqual(olderStore.getNote(note.id).tags, ["launch"]);
 });
 
 // Each store test gets its own directory. They are removed at the end of the

@@ -1,19 +1,21 @@
 /* Entrance motion for menus and panels. Imported last so it layers animations over the owning
    files without rewriting their rules.
 
-   Only opacity and translate animate. A menu is interactive from its first frame, and nothing
-   waits for an animation before it unmounts, so closing stays instant. The BlockNote menus that
-   src/editor/floatingMenus.js places (Mantine menus and popovers, the block menu's Turn into and
-   Colors panels) only fade: they keep their box from the first frame, so placing them and
-   pointing at their items never races a moving menu.
+   NotePane's own menus open with a small pop from where they were opened (scale and opacity) and
+   dialogs float up into place; both settle on a long ease-out. A menu is interactive from its
+   first frame, and nothing waits for an animation before it unmounts, so closing stays instant.
+   The BlockNote menus that src/editor/floatingMenus.js places (Mantine menus and popovers, the
+   block menu's Turn into and Colors panels) only fade: they keep their box from the first frame,
+   so placing them and pointing at their items never races a moving menu.
 
    prefers-reduced-motion, print and export turn every animation here off (end of file). */
 
 :root {
-  --notepane-motion-menu-duration: 140ms;
-  --notepane-motion-panel-duration: 180ms;
-  --notepane-motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --notepane-motion-menu-duration: 180ms;
+  --notepane-motion-panel-duration: 260ms;
+  --notepane-motion-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --notepane-motion-shift: 4px;
+  --notepane-motion-pop-scale: 0.94;
 }
 
 /* A menu starts a few pixels toward its anchor, then settles. --notepane-menu-from-y says where
@@ -71,10 +73,20 @@ div:has(> .bn-link-toolbar) {
   animation: notepaneMenuFadeIn var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out);
 }
 
-/* NotePane's own menus already fade in with menuIn; match the easing, and move a dropdown that
-   opens above its field up from it. */
-.session-tab-context-menu,
-.export-format-menu,
+/* A context menu grows out of the pointer that opened it; the export menu out of its button. */
+@keyframes notepaneMenuPop {
+  from {
+    opacity: 0;
+    scale: var(--notepane-motion-pop-scale);
+  }
+}
+
+.notepane-context-menu,
+.export-format-menu {
+  transform-origin: top left;
+  animation: notepaneMenuPop var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out) both;
+}
+
 .notepane-dropdown-menu {
   animation-timing-function: var(--notepane-motion-ease-out);
 }
@@ -87,6 +99,7 @@ div:has(> .bn-link-toolbar) {
 @keyframes notepaneDialogIn {
   from {
     opacity: 0;
+    translate: 0 6px;
     scale: 0.98;
   }
 }
@@ -120,7 +133,9 @@ div:has(> .bn-link-toolbar) {
 }
 
 .preferences-window,
-.markdown-import-dialog {
+.markdown-import-dialog,
+.export-dialog,
+.media-preview {
   animation: notepaneDialogIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
 }
 
@@ -158,7 +173,7 @@ html[data-boot="revealing"] #root {
   .color-panel,
   .code-block-language-menu,
   .notepane-link-preview-copy svg,
-  .session-tab-context-menu,
+  .notepane-context-menu,
   .export-format-menu,
   .notepane-dropdown-menu,
   .adaptive-tooltip,
@@ -308,7 +323,7 @@ body.is-exporting .sticky-editor-surface {
 }
 
 :is(
-  .session-tab-context-menu,
+  .notepane-context-menu,
   .export-format-menu,
   .notepane-dropdown-menu,
   .color-panel,
@@ -328,7 +343,9 @@ body.is-exporting .sticky-editor-surface {
   .trash-confirm-backdrop,
   .search-palette-backdrop,
   .version-history-backdrop,
-  .crop-dialog
+  .crop-dialog,
+  .media-preview,
+  .export-dialog-backdrop
 )[data-state="closing"] {
   animation: notepaneFadeOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
 }
@@ -338,7 +355,8 @@ body.is-exporting .sticky-editor-surface {
   .markdown-import-dialog,
   .trash-confirm-dialog,
   .version-history-panel,
-  .crop-panel
+  .crop-panel,
+  .export-dialog
 ) {
   animation: notepaneDialogOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
 }
@@ -379,7 +397,7 @@ body.is-exporting .sticky-editor-surface {
 }
 
 /* Menu items and list rows that had no transition ease their hover background. */
-.session-tab-context-menu button,
+.notepane-context-menu button,
 .export-format-menu button,
 .notepane-dropdown-option,
 .search-result,
@@ -435,7 +453,7 @@ body.is-exporting .sticky-editor-surface {
 
 @media (prefers-reduced-motion: reduce) {
   :is(
-    .session-tab-context-menu button,
+    .notepane-context-menu button,
     .export-format-menu button,
     .notepane-dropdown-option,
     .search-result,

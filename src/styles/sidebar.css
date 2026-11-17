@@ -322,6 +322,21 @@
   --session-tab-offset-x: 2px;
 }
 
+/* A tab without a colour of its own: an outline, filled faintly when hovered and more when open. */
+.session-tab-row.is-plain {
+  --session-tab-inactive-bg: transparent;
+  --session-tab-hover-bg: color-mix(in srgb, var(--sticky-text-color) 4%, transparent);
+  --session-tab-active-bg: color-mix(in srgb, var(--sticky-text-color) 7%, transparent);
+  --session-tab-border-color: color-mix(in srgb, var(--sticky-text-color) 28%, transparent);
+  --session-tab-dot-bg: transparent;
+  --session-tab-dot-text-color: var(--sticky-muted-color);
+  border-color: var(--sticky-border-color);
+}
+
+.session-tab-row.is-plain.active {
+  border-color: var(--session-tab-border-color);
+}
+
 .session-sidebar.is-compact .session-tabs {
   gap: 7px;
   padding: 9px 8px 0;
@@ -552,6 +567,181 @@
 
 .session-sidebar.is-compact .session-add-button span:last-child {
   display: none;
+}
+
+/* The row under New session that creates a folder: quieter than New session, no border. */
+.session-add-folder-button {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 16px);
+  height: 28px;
+  margin: -6px 8px 10px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sticky-muted-color);
+  font: 500 12px/1 var(--notepane-ui-font);
+  cursor: pointer;
+  transition:
+    background var(--notepane-motion-hover-duration) var(--notepane-motion-ease-out),
+    color var(--notepane-motion-hover-duration) var(--notepane-motion-ease-out);
+  -webkit-app-region: no-drag;
+}
+
+.session-add-folder-button:hover {
+  background: var(--sticky-control-hover-bg);
+  color: var(--sticky-text-color);
+}
+
+.session-add-folder-button:focus-visible {
+  outline: 2px solid var(--notepane-focus-outline);
+  outline-offset: -2px;
+}
+
+.session-add-folder-icon {
+  flex: 0 0 auto;
+}
+
+.session-sidebar.is-compact .session-add-folder-button {
+  justify-content: center;
+  padding: 0;
+}
+
+.session-sidebar.is-compact .session-add-folder-button span {
+  display: none;
+}
+
+/* A folder: its header, then its tabs indented under it. The same gap as between tabs keeps the
+   rhythm of the list. */
+.session-folder,
+.session-folder-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.session-folder-body {
+  padding-left: 12px;
+  animation: notepaneMenuFadeIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
+}
+
+.session-sidebar.is-compact .session-folder-body {
+  padding-left: 0;
+}
+
+.session-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 28px;
+  min-width: 0;
+  padding: 0 8px 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sticky-muted-color);
+  font: 600 12px/1 var(--notepane-ui-font);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--notepane-motion-hover-duration) var(--notepane-motion-ease-out),
+    color var(--notepane-motion-hover-duration) var(--notepane-motion-ease-out),
+    box-shadow var(--notepane-motion-hover-duration) var(--notepane-motion-ease-out);
+  -webkit-app-region: no-drag;
+}
+
+.session-folder-header:hover {
+  background: color-mix(in srgb, var(--sticky-control-hover-bg) 60%, transparent);
+  color: var(--sticky-text-color);
+}
+
+.session-folder-header:focus-visible {
+  outline: 2px solid var(--notepane-focus-outline);
+  outline-offset: -2px;
+}
+
+/* A tab dragged over the header drops into the folder. */
+.session-folder-header.is-drop-target {
+  background: color-mix(in srgb, var(--notepane-control-accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px var(--notepane-control-accent);
+  color: var(--sticky-text-color);
+}
+
+.session-folder-header.is-renaming {
+  box-shadow: inset 0 0 0 1px var(--notepane-focus-outline);
+  color: var(--sticky-text-color);
+  cursor: text;
+}
+
+.session-folder-header input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.session-folder-chevron,
+.session-folder-icon {
+  flex: 0 0 auto;
+}
+
+.session-folder-chevron {
+  transition: transform var(--notepane-motion-menu-duration) var(--notepane-motion-ease-out);
+}
+
+.session-folder-header.is-collapsed .session-folder-chevron {
+  transform: rotate(-90deg);
+}
+
+.session-folder-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-folder-count {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The compact rail keeps only the folder icon, centred like the tab numbers. */
+.session-sidebar.is-compact .session-folder-header {
+  justify-content: center;
+  padding: 0;
+}
+
+.session-sidebar.is-compact :is(
+  .session-folder-chevron,
+  .session-folder-name,
+  .session-folder-count
+) {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-folder-chevron,
+  .session-folder-header,
+  .session-add-folder-button {
+    transition: none;
+  }
+
+  .session-folder-body {
+    animation: none;
+  }
 }
 
 .session-sidebar.is-compact .session-sidebar-footer {

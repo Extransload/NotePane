@@ -97,7 +97,6 @@ import {
 } from "./editor/clipboard.js";
 import {
   setActiveCodeTheme,
-  withCodeTheme,
 } from "./editor/codeHighlighter.js";
 import {
   NotePaneLinkToolbarController,
@@ -181,10 +180,8 @@ import {
 } from "./style/themeStyles.js";
 import {
   applyThemeToDocument,
-  getExportTheme,
   readInitialThemeId,
   runThemeTransition,
-  withExportTheme,
 } from "./style/applyTheme.js";
 import {
   getTheme,
@@ -199,6 +196,9 @@ import {
 import {
   CropDialog,
 } from "./ui/CropDialog.jsx";
+import {
+  MediaPreview,
+} from "./ui/MediaPreview.jsx";
 import {
   ColorPanel,
 } from "./ui/colorPanel.jsx";
@@ -225,10 +225,21 @@ import {
 } from "./ui/icons.jsx";
 import {
   ExportFormatMenu,
+  FolderContextMenu,
   getExportMenuAnchor,
   MarkdownImportDialog,
+  MediaContextMenu,
   SessionTabContextMenu,
 } from "./ui/menus.jsx";
+import {
+  NewFolderButton,
+  SessionFolderHeader,
+} from "./ui/SessionFolderHeader.jsx";
+import {
+  getGroupedSessionOrder,
+  groupSessionNotes,
+} from "./model/folders.js";
+import { useSessionFolders } from "./hooks/useSessionFolders.js";
 import {
   AppZoomGauge,
   LayoutTransitionOverlay,
@@ -246,6 +257,7 @@ import {
   isVisibleElement,
 } from "./utils/dom.js";
 import { useAppliedTheme } from "./hooks/useAppliedTheme.js";
+import { useLookStyles } from "./hooks/useLookStyles.js";
 import { useEditorSurfaceShortcuts } from "./hooks/useEditorSurfaceShortcuts.js";
 import { useFindInNote } from "./hooks/useFindInNote.js";
 import { FindInNote, getFindSeedText } from "./editor/findInNote.js";
@@ -260,6 +272,8 @@ import {
 } from "./hooks/useKeyboardCommands.js";
 import { useNoteAppearance } from "./hooks/useNoteAppearance.js";
 import { useNotePersistence } from "./hooks/useNotePersistence.js";
+import { useMediaContextMenu } from "./hooks/useMediaContextMenu.js";
+import { useNoteExport } from "./hooks/useNoteExport.js";
 import { useOverlayState } from "./hooks/useOverlayState.js";
 import { EditorErrorBoundary } from "./ui/EditorErrorBoundary.jsx";
 import { usePendingSaveFlush } from "./hooks/usePendingSaveFlush.js";
@@ -279,8 +293,18 @@ import {
   arraysEqual,
   clamp,
   moveArrayItem,
-  nextAnimationFrame,
 } from "./utils/values.js";
+import {
+  collectNoteTags,
+  formatSearchQuery,
+} from "./model/search.js";
+import {
+  DEFAULT_EXPORT_OPTIONS,
+  ExportDialog,
+} from "./ui/ExportDialog.jsx";
+import {
+  NoteTags,
+} from "./ui/NoteTags.jsx";
 import "./styles.css";
 
 function App({ bindTestThemeSetter }) {
@@ -306,20 +330,27 @@ function App({ bindTestThemeSetter }) {
     DEFAULT_EDITOR_PREFERENCES,
   );
   const {
+    createFolder,
     createSidebarNote,
+    deleteFolder,
     deleteSidebarNote,
     duplicateSidebarNote,
+    folders,
+    moveNoteToFolder,
     note,
     notes,
     purgeTrashedNote,
+    renameFolder,
     reorderNotes,
     restoreTrashedNote,
     selectNote,
     sessionUndoToast,
     sessionUndoToastTimer,
     showSessionMovedToTrashToast,
+    toggleFolderCollapsed,
     trashedNotes,
     undoSessionMoveToTrash,
+    setNoteTags,
     updateNoteInList,
   } = useSessionList({
     editorPreferences,
@@ -327,6 +358,10 @@ function App({ bindTestThemeSetter }) {
     setAppTheme,
     setEditorPreferences,
     setLayoutMode,
+  });
+  useLookStyles(editorPreferences.look, {
+    scheme: normalizeAppTheme(appTheme).mode,
+    layoutMode: normalizeLayoutMode(layoutMode),
   });
   const sessionUndoStickyToast = useMemo(
     () =>
@@ -534,6 +569,7 @@ function App({ bindTestThemeSetter }) {
         key={note.id}
         note={note}
         notes={notes}
+        folders={folders}
         trashedNotes={trashedNotes}
         appTheme={appTheme}
         layoutMode={layoutMode}
@@ -553,6 +589,12 @@ function App({ bindTestThemeSetter }) {
         onAppThemeChanged={pickAppTheme}
         onLayoutModeChanged={updateLayoutMode}
         onReorderNotes={reorderNotes}
+        onCreateFolder={createFolder}
+        onRenameFolder={renameFolder}
+        onToggleFolderCollapsed={toggleFolderCollapsed}
+        onDeleteFolder={deleteFolder}
+        onMoveNoteToFolder={moveNoteToFolder}
+        onSetNoteTags={setNoteTags}
         onSessionMovedToTrash={showSessionMovedToTrashToast}
         installedFontFamilies={installedFontFamilies}
         editorPreferences={editorPreferences}
@@ -576,6 +618,7 @@ function App({ bindTestThemeSetter }) {
 function StickyEditor({
   note,
   notes,
+  folders,
   trashedNotes,
   appTheme,
   layoutMode,
@@ -595,6 +638,12 @@ function StickyEditor({
   onAppThemeChanged,
   onLayoutModeChanged,
   onReorderNotes,
+  onCreateFolder,
+  onRenameFolder,
+  onToggleFolderCollapsed,
+  onDeleteFolder,
+  onMoveNoteToFolder,
+  onSetNoteTags,
   onSessionMovedToTrash,
   installedFontFamilies,
   editorPreferences,
@@ -741,10 +790,22 @@ function StickyEditor({
   }, [appFontFamily, appFontOptions, normalizedEditorPreferences.appZoom]);
   const activeTheme = useAppliedTheme(normalizeAppTheme(appTheme).themeId);
   const normalizedLayoutMode = normalizeLayoutMode(layoutMode);
-  const visibleSessionNotes = notes;
+  // The tabs sidebar groups sessions by folder; its visible order numbers the
+  // tabs and drives Cmd+1..9 and the next/previous tab commands. The sticky
+  // layout has no sidebar and keeps the plain session order.
+  const sessionGrouping = useMemo(
+    () => groupSessionNotes(notes, folders, note.id),
+    [folders, note.id, notes],
+  );
+  const visibleSessionNotes =
+    normalizedLayoutMode === "tabs" ? sessionGrouping.visibleNotes : notes;
   const visibleSessionNoteIds = useMemo(
     () => visibleSessionNotes.map((sessionNote) => sessionNote.id),
     [visibleSessionNotes],
+  );
+  const visibleSessionIndexById = useMemo(
+    () => new Map(visibleSessionNoteIds.map((noteId, index) => [noteId, index])),
+    [visibleSessionNoteIds],
   );
   const noteIndexById = useMemo(() => getNoteIndexById(notes), [notes]);
   const noteIndex = noteIndexById.get(note.id) ?? 0;
@@ -769,9 +830,13 @@ function StickyEditor({
     closeExclusive: closeExclusiveOverlays,
     closeTopmost: closeTopmostOverlay,
     exportFormatMenu,
+    folderMenu,
     isAnyOpen: isAnyOverlayOpen,
     isColorPanelOpen,
+    isExportDialogOpen,
     isMarkdownImportOpen,
+    mediaMenu,
+    mediaPreviewBlockId,
     isPreferencesWindowOpen,
     isStickyActionBarOpen,
     isStickySettingsOpen,
@@ -783,7 +848,7 @@ function StickyEditor({
     sessionColorPanelNoteId,
     sessionTabMenu,
   } = useOverlayState();
-  const [preferencesInitialPage, setPreferencesInitialPage] = useState("general");
+  const [preferencesInitialPage, setPreferencesInitialPage] = useState("theme");
   const [isDefaultTemplateSuggestionVisible, setIsDefaultTemplateSuggestionVisible] =
     useState(
       () =>
@@ -922,7 +987,7 @@ function StickyEditor({
         return;
       }
 
-      closeOverlay("sessionTabMenu", "exportFormatMenu");
+      closeOverlay("sessionTabMenu", "folderMenu", "exportFormatMenu", "mediaMenu");
       if (!target.closest(".sticky-header-actions")) {
         closeOverlay("stickyActionBar");
       }
@@ -1319,7 +1384,7 @@ function StickyEditor({
   // A sticky window is too small for Preferences; it opens from the tabs window only.
   const canOpenPreferences = normalizedLayoutMode !== "sticky";
 
-  const openPreferencesPage = useCallback((pageId = "general") => {
+  const openPreferencesPage = useCallback((pageId = "theme") => {
     if (!canOpenPreferences) {
       return;
     }
@@ -1328,7 +1393,7 @@ function StickyEditor({
   }, [canOpenPreferences, openOverlay]);
 
   const openPreferences = useCallback(() => {
-    openPreferencesPage("general");
+    openPreferencesPage("theme");
   }, [openPreferencesPage]);
 
   const requestNewSession = useCallback(() => {
@@ -1394,52 +1459,26 @@ function StickyEditor({
     void electronApi?.closeCurrentWindow?.();
   }, [closeOverlay]);
 
+  const { runExport, copyMarkdown } = useNoteExport({
+    editor,
+    note,
+    title,
+    notes,
+    folders,
+    showToast: showExportToast,
+    hideToast: hideExportToast,
+  });
+
+  // The export menu's one-click PDF and Markdown, and the export shortcut: the open note with the
+  // usual settings (light colours, A4, images inside the file, no front matter).
   const exportNote = useCallback(async (type = "pdf") => {
     closeOverlay("exportFormatMenu");
-    if (!electronApi) {
-      showExportToast("Note export is available in the desktop app.", "error");
-      return;
-    }
-
-    const isPdf = type === "pdf";
-    showExportToast(`Exporting ${isPdf ? "PDF" : "Markdown"}...`, "progress", { timeout: 0 });
-    if (isPdf) {
-      document.body.classList.add("is-exporting");
-    }
-    try {
-      const render = async () => {
-        if (isPdf) {
-          await nextAnimationFrame();
-          await nextAnimationFrame();
-        }
-        const markdown = isPdf
-          ? undefined
-          : await editor.blocksToMarkdownLossy(editor.document);
-        return electronApi?.exportNote({
-          noteId: note.id,
-          title: normalizeTitle(title),
-          type,
-          markdown,
-        });
-      };
-      const result = isPdf
-        ? await withExportTheme(() => withCodeTheme(getExportTheme().codeTheme, render))
-        : await render();
-
-      if (result?.canceled) {
-        hideExportToast();
-        return;
-      }
-
-      showExportToast(`${isPdf ? "PDF" : "Markdown"} exported`, "success");
-    } catch (error) {
-      showExportToast(error.message || `${isPdf ? "PDF" : "Markdown"} export failed.`, "error");
-    } finally {
-      if (isPdf) {
-        document.body.classList.remove("is-exporting");
-      }
-    }
-  }, [closeOverlay, editor, hideExportToast, note.id, showExportToast, title]);
+    await runExport({
+      scope: "note",
+      format: type,
+      options: { ...DEFAULT_EXPORT_OPTIONS, frontMatter: false },
+    });
+  }, [closeOverlay, runExport]);
 
   const openExportFormatMenu = useCallback((event) => {
     openOverlay("exportFormatMenu", getExportMenuAnchor(event.currentTarget));
@@ -1581,6 +1620,7 @@ function StickyEditor({
 
   const notePalette = useNoteSearchPalette({
     editor,
+    folders,
     normalizedLayoutMode,
     note,
     notes,
@@ -1759,8 +1799,8 @@ function StickyEditor({
     }
   }, [activeImageBlockId, editor, showExportToast]);
 
-  const openCropDialog = useCallback(() => {
-    const block = findBlockById(editor.document, activeImageBlockId);
+  const openCropDialog = useCallback((selectedBlock) => {
+    const block = findBlockById(editor.document, selectedBlock?.id ?? activeImageBlockId);
     const { url, crop } = getCropSource(block?.props);
     if (!url) {
       return;
@@ -1772,6 +1812,20 @@ function StickyEditor({
       crop,
     });
   }, [activeImageBlockId, editor]);
+
+  const getMediaActions = useMediaContextMenu({
+    editor,
+    openOverlay,
+    closeOverlay,
+    showToast: showExportToast,
+    onSave: downloadActiveImage,
+    onCopyImage: canCopyImageToClipboard() ? copyActiveImage : undefined,
+    onCrop: openCropDialog,
+  });
+  const mediaMenuBlock = mediaMenu ? findBlockById(editor.document, mediaMenu.blockId) : null;
+  const mediaPreviewBlock = mediaPreviewBlockId
+    ? findBlockById(editor.document, mediaPreviewBlockId)
+    : null;
 
   const startHeaderWindowDrag = useCallback(
     (event) => {
@@ -1893,10 +1947,12 @@ function StickyEditor({
     openOverlay("sessionColorPanel", sessionNoteId);
   }, [openOverlay]);
 
+  // Every session counts, hidden ones in a collapsed folder too, so opening a folder reveals its
+  // tabs with the folder's fade rather than the new session animation.
   useEffect(() => {
-    const visibleIds = visibleSessionNotes.map((sessionNote) => sessionNote.id);
+    const sessionIds = notes.map((sessionNote) => sessionNote.id);
 
-    const newSessionIds = collectNewSessionTabIds(visibleIds);
+    const newSessionIds = collectNewSessionTabIds(sessionIds);
 
     if (newSessionIds.length === 0) {
       return undefined;
@@ -1917,7 +1973,7 @@ function StickyEditor({
     }, SESSION_TAB_ENTER_MS);
 
     return () => window.clearTimeout(timerId);
-  }, [visibleSessionNotes]);
+  }, [notes]);
 
   const {
     cancelSessionRename,
@@ -1966,6 +2022,7 @@ function StickyEditor({
     (sessionNote) =>
       [
         "session-tab-row",
+        resolveSessionTabAccentColor(sessionNote.theme) ? "" : "is-plain",
         sessionNote.id === note.id ? "active" : "",
         enteringSessionIds.has(sessionNote.id) ? "is-entering" : "",
         removingSessionIds.has(sessionNote.id) ? "is-leaving" : "",
@@ -2000,10 +2057,20 @@ function StickyEditor({
         return null;
       }
 
+      // The order comes from the visible tabs; it is spread over every session,
+      // hidden ones included, with each session kept in its folder.
+      const groupedNoteIds = getGroupedSessionOrder(normalizedOrderedNoteIds, sessionGrouping);
+      if (
+        options.persist === false &&
+        arraysEqual(groupedNoteIds, notes.map((sessionNote) => sessionNote.id))
+      ) {
+        return null;
+      }
+
       captureSessionTabRects();
-      return await onReorderNotes?.(normalizedOrderedNoteIds, options);
+      return await onReorderNotes?.(groupedNoteIds, options);
     },
-    [captureSessionTabRects, normalizedLayoutMode, onReorderNotes],
+    [captureSessionTabRects, normalizedLayoutMode, notes, onReorderNotes, sessionGrouping],
   );
 
   const moveCurrentSessionNote = useCallback(
@@ -2120,6 +2187,7 @@ function StickyEditor({
   });
 
   const {
+    cancelSessionTabReorder,
     dropSessionTab,
     endSessionTabDrag,
     handleSessionTabDragOver,
@@ -2134,6 +2202,33 @@ function StickyEditor({
     setDraggingSessionNoteId,
     visibleSessionNoteIds,
   });
+
+  const {
+    cancelFolderRename,
+    changeDraftFolderName,
+    commitFolderRename,
+    createFolderAndRename,
+    draftFolderName,
+    editingFolderId,
+    folderDropTargetId,
+    handleFolderDragOverCapture,
+    handleFolderDropCapture,
+    moveSessionToNewFolder,
+    openFolderMenu,
+    startFolderRename,
+  } = useSessionFolders({
+    cancelSessionTabReorder,
+    draggingSessionNoteId,
+    onCreateFolder,
+    onMoveNoteToFolder,
+    onRenameFolder,
+    openOverlay,
+  });
+
+  const folderMenuFolder = useMemo(
+    () => folders.find((folder) => folder.id === folderMenu?.folderId) ?? null,
+    [folderMenu, folders],
+  );
 
   const startSidebarResize = useCallback(
     (event) => {
@@ -2176,6 +2271,178 @@ function StickyEditor({
     saveTimerRef,
     sessionAppearanceTimerRef,
   });
+
+  // One session tab: its rename field while it is renamed, else the tab with its number, delete
+  // button and shortcut. Its number is its place among the visible tabs, folders included.
+  const renderSessionTabRow = (sessionNote) => {
+    const index = visibleSessionIndexById.get(sessionNote.id) ?? 0;
+    return editingSessionId === sessionNote.id ? (
+      <div
+        key={sessionNote.id}
+        ref={(element) => setSessionTabRowRef(sessionNote.id, element)}
+        className={getSessionTabRowClassName(sessionNote)}
+        data-note-id={sessionNote.id}
+        style={getSessionTabStyle(sessionNote.theme, activeTheme)}
+      >
+        <div
+          role="tab"
+          aria-selected={sessionNote.id === note.id}
+          className="session-tab-edit"
+        >
+          <span className="session-dot">{index + 1}</span>
+          <input
+            aria-label="Session name"
+            value={draftSessionTitle}
+            autoFocus
+            spellCheck={false}
+            onFocus={(event) => event.target.select()}
+            onChange={(event) => changeDraftSessionTitle(event.target.value)}
+            onBlur={() => void commitSessionRename(sessionNote)}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) {
+                return;
+              }
+              if (event.key === "Enter") {
+                event.preventDefault();
+                void commitSessionRename(sessionNote);
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                cancelSessionRename();
+              }
+            }}
+          />
+        </div>
+      </div>
+    ) : (
+      <div
+        key={sessionNote.id}
+        ref={(element) => setSessionTabRowRef(sessionNote.id, element)}
+        className={getSessionTabRowClassName(sessionNote)}
+        data-note-id={sessionNote.id}
+        style={getSessionTabStyle(sessionNote.theme, activeTheme)}
+        draggable={normalizedLayoutMode === "tabs"}
+        aria-grabbed={
+          draggingSessionNoteId === sessionNote.id ? "true" : undefined
+        }
+        onContextMenu={(event) =>
+          openSessionTabMenu(sessionNote, event)
+        }
+        onDragStart={(event) => startSessionTabDrag(sessionNote, event)}
+        onDragOver={(event) => handleSessionTabDragOver(sessionNote, event)}
+        onDrop={(event) => void dropSessionTab(event)}
+        onDragEnd={(event) => void endSessionTabDrag(event)}
+      >
+        {isSidebarCompact ? (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={sessionNote.id === note.id}
+            className="session-tab-button has-tooltip"
+            data-tooltip={formatShortcutTooltip(
+              `Open ${getSessionDisplayTitle(sessionNote)}`,
+              isKeyboardShortcutEnabled(
+                keyboardShortcutEnabled,
+                "selectTabByNumber",
+              )
+                ? `Mod+${index + 1}`
+                : "",
+            )}
+            onMouseDown={(event) => {
+              if (event.button === 0 && event.detail > 1 && sessionNote.id !== note.id) {
+                requestSessionRename(sessionNote);
+              }
+            }}
+            onClick={() => void selectSessionTab(sessionNote.id)}
+            onDoubleClick={(event) => {
+              event.preventDefault();
+              requestSessionRename(sessionNote);
+            }}
+          >
+            <span className="session-dot">{index + 1}</span>
+            <span className="session-name">
+              {getSessionDisplayTitle(sessionNote)}
+            </span>
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="session-index-button session-delete-button has-tooltip"
+              aria-label={`Delete session ${getSessionDisplayTitle(sessionNote)}`}
+              disabled={removingSessionIds.has(sessionNote.id)}
+              data-tooltip={
+                sessionNote.id === note.id
+                  ? "Move current session to Trash"
+                  : "Move session to Trash"
+              }
+              onMouseDown={(event) => {
+                preventFocusLoss(event);
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.stopPropagation();
+                requestDeleteSessionNote(sessionNote);
+              }}
+            >
+              <span className="session-index-label">{index + 1}</span>
+              <span className="session-index-delete" aria-hidden="true">
+                <X
+                  className="session-index-delete-icon"
+                  size={14}
+                  strokeWidth={2.25}
+                />
+              </span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sessionNote.id === note.id}
+              className="session-tab-button has-tooltip"
+              data-tooltip={formatShortcutTooltip(
+                `Open ${getSessionDisplayTitle(sessionNote)}`,
+                isKeyboardShortcutEnabled(
+                  keyboardShortcutEnabled,
+                  "selectTabByNumber",
+                )
+                  ? `Mod+${index + 1}`
+                  : "",
+              )}
+              onMouseDown={(event) => {
+                if (event.button === 0 && event.detail > 1 && sessionNote.id !== note.id) {
+                  requestSessionRename(sessionNote);
+                }
+              }}
+              onClick={() => void selectSessionTab(sessionNote.id)}
+              onDoubleClick={(event) => {
+                event.preventDefault();
+                requestSessionRename(sessionNote);
+              }}
+            >
+              <span className="session-name">
+                {getSessionDisplayTitle(sessionNote)}
+              </span>
+            </button>
+            <span className="session-tab-trailing">
+              {index < 9 && (
+                <span
+                  className="session-shortcut"
+                  aria-label={`Shortcut ${getSessionShortcutLabel(index)}`}
+                >
+                  {isKeyboardShortcutEnabled(
+                    keyboardShortcutEnabled,
+                    "selectTabByNumber",
+                  )
+                    ? getSessionShortcutLabel(index)
+                    : ""}
+                </span>
+              )}
+            </span>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <main
@@ -2338,185 +2605,38 @@ function StickyEditor({
                 // Busy while a session moves to Trash. Moving the open note shows the next one,
                 // which remounts this editor, so the flag clears only once that note is showing.
                 aria-busy={removingSessionIds.size > 0 ? "true" : undefined}
+                onDragOverCapture={handleFolderDragOverCapture}
+                onDropCapture={(event) => void handleFolderDropCapture(event)}
                 onDragOver={handleSessionTabsDragOver}
                 onDrop={(event) => void dropSessionTab(event)}
               >
-                {visibleSessionNotes.map((sessionNote, index) =>
-                  editingSessionId === sessionNote.id ? (
-                    <div
-                      key={sessionNote.id}
-                      ref={(element) => setSessionTabRowRef(sessionNote.id, element)}
-                      className={getSessionTabRowClassName(sessionNote)}
-                      data-note-id={sessionNote.id}
-                      style={getSessionTabStyle(
-                        sessionNote.theme,
-                        activeTheme,
-                        noteIndexById.get(sessionNote.id) ?? index,
-                      )}
-                    >
+                {sessionGrouping.ungrouped.map(renderSessionTabRow)}
+                {sessionGrouping.sections.map(({ folder, notes: folderNotes, visibleNotes }) => (
+                  <div key={folder.id} className="session-folder" data-folder-id={folder.id}>
+                    <SessionFolderHeader
+                      folder={folder}
+                      count={folderNotes.length}
+                      isCompact={isSidebarCompact}
+                      isDropTarget={folderDropTargetId === folder.id}
+                      isRenaming={editingFolderId === folder.id}
+                      draftName={draftFolderName}
+                      onDraftNameChange={changeDraftFolderName}
+                      onCommitRename={(name) => commitFolderRename(folder.id, name)}
+                      onCancelRename={cancelFolderRename}
+                      onToggle={() => void onToggleFolderCollapsed(folder.id)}
+                      onContextMenu={(event) => openFolderMenu(folder, event)}
+                    />
+                    {visibleNotes.length > 0 && (
                       <div
-                        role="tab"
-                        aria-selected={sessionNote.id === note.id}
-                        className="session-tab-edit"
+                        // Remounted when the folder opens or closes, so its tabs fade in.
+                        key={folder.collapsed ? "collapsed" : "expanded"}
+                        className="session-folder-body"
                       >
-                        <span className="session-dot">{index + 1}</span>
-                        <input
-                          aria-label="Session name"
-                          value={draftSessionTitle}
-                          autoFocus
-                          spellCheck={false}
-                          onFocus={(event) => event.target.select()}
-                          onChange={(event) => changeDraftSessionTitle(event.target.value)}
-                          onBlur={() => void commitSessionRename(sessionNote)}
-                          onKeyDown={(event) => {
-                            if (event.nativeEvent.isComposing) {
-                              return;
-                            }
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              void commitSessionRename(sessionNote);
-                            }
-                            if (event.key === "Escape") {
-                              event.preventDefault();
-                              cancelSessionRename();
-                            }
-                          }}
-                        />
+                        {visibleNotes.map(renderSessionTabRow)}
                       </div>
-                    </div>
-                  ) : (
-                    <div
-                      key={sessionNote.id}
-                      ref={(element) => setSessionTabRowRef(sessionNote.id, element)}
-                      className={getSessionTabRowClassName(sessionNote)}
-                      data-note-id={sessionNote.id}
-                      style={getSessionTabStyle(
-                        sessionNote.theme,
-                        activeTheme,
-                        noteIndexById.get(sessionNote.id) ?? index,
-                      )}
-                      draggable={normalizedLayoutMode === "tabs"}
-                      aria-grabbed={
-                        draggingSessionNoteId === sessionNote.id ? "true" : undefined
-                      }
-                      onContextMenu={(event) =>
-                        openSessionTabMenu(sessionNote, event)
-                      }
-                      onDragStart={(event) => startSessionTabDrag(sessionNote, event)}
-                      onDragOver={(event) => handleSessionTabDragOver(sessionNote, event)}
-                      onDrop={(event) => void dropSessionTab(event)}
-                      onDragEnd={(event) => void endSessionTabDrag(event)}
-                    >
-                      {isSidebarCompact ? (
-                        <button
-                          type="button"
-                          role="tab"
-                          aria-selected={sessionNote.id === note.id}
-                          className="session-tab-button has-tooltip"
-                          data-tooltip={formatShortcutTooltip(
-                            `Open ${getSessionDisplayTitle(sessionNote)}`,
-                            isKeyboardShortcutEnabled(
-                              keyboardShortcutEnabled,
-                              "selectTabByNumber",
-                            )
-                              ? `Mod+${index + 1}`
-                              : "",
-                          )}
-                          onMouseDown={(event) => {
-                            if (event.button === 0 && event.detail > 1 && sessionNote.id !== note.id) {
-                              requestSessionRename(sessionNote);
-                            }
-                          }}
-                          onClick={() => void selectSessionTab(sessionNote.id)}
-                          onDoubleClick={(event) => {
-                            event.preventDefault();
-                            requestSessionRename(sessionNote);
-                          }}
-                        >
-                          <span className="session-dot">{index + 1}</span>
-                          <span className="session-name">
-                            {getSessionDisplayTitle(sessionNote)}
-                          </span>
-                        </button>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            className="session-index-button session-delete-button has-tooltip"
-                            aria-label={`Delete session ${getSessionDisplayTitle(sessionNote)}`}
-                            disabled={removingSessionIds.has(sessionNote.id)}
-                            data-tooltip={
-                              sessionNote.id === note.id
-                                ? "Move current session to Trash"
-                                : "Move session to Trash"
-                            }
-                            onMouseDown={(event) => {
-                              preventFocusLoss(event);
-                              event.stopPropagation();
-                            }}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              requestDeleteSessionNote(sessionNote);
-                            }}
-                          >
-                            <span className="session-index-label">{index + 1}</span>
-                            <span className="session-index-delete" aria-hidden="true">
-                              <X
-                                className="session-index-delete-icon"
-                                size={14}
-                                strokeWidth={2.25}
-                              />
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            role="tab"
-                            aria-selected={sessionNote.id === note.id}
-                            className="session-tab-button has-tooltip"
-                            data-tooltip={formatShortcutTooltip(
-                              `Open ${getSessionDisplayTitle(sessionNote)}`,
-                              isKeyboardShortcutEnabled(
-                                keyboardShortcutEnabled,
-                                "selectTabByNumber",
-                              )
-                                ? `Mod+${index + 1}`
-                                : "",
-                            )}
-                            onMouseDown={(event) => {
-                              if (event.button === 0 && event.detail > 1 && sessionNote.id !== note.id) {
-                                requestSessionRename(sessionNote);
-                              }
-                            }}
-                            onClick={() => void selectSessionTab(sessionNote.id)}
-                            onDoubleClick={(event) => {
-                              event.preventDefault();
-                              requestSessionRename(sessionNote);
-                            }}
-                          >
-                            <span className="session-name">
-                              {getSessionDisplayTitle(sessionNote)}
-                            </span>
-                          </button>
-                          <span className="session-tab-trailing">
-                            {index < 9 && (
-                              <span
-                                className="session-shortcut"
-                                aria-label={`Shortcut ${getSessionShortcutLabel(index)}`}
-                              >
-                                {isKeyboardShortcutEnabled(
-                                  keyboardShortcutEnabled,
-                                  "selectTabByNumber",
-                                )
-                                  ? getSessionShortcutLabel(index)
-                                  : ""}
-                              </span>
-                            )}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  ),
-                )}
+                    )}
+                  </div>
+                ))}
               </div>
               <button
                 type="button"
@@ -2537,6 +2657,7 @@ function StickyEditor({
                 />
                 <span>New session</span>
               </button>
+              <NewFolderButton onCreate={() => void createFolderAndRename()} />
             </div>
             <div
               className="session-sidebar-footer"
@@ -2701,6 +2822,17 @@ function StickyEditor({
               </button>
             </div>
           )}
+          {/* A sticky window stays a bare note: its tag row shows only once the note has tags,
+              which are added from the tabs window. */}
+          {(normalizedLayoutMode !== "sticky" || note.tags?.length > 0) && (
+            <NoteTags
+              key={note.id}
+              tags={note.tags ?? []}
+              allTags={collectNoteTags(notes)}
+              onChange={(tags) => void onSetNoteTags(note.id, tags)}
+              onOpenTag={(tag) => void notePalette.openPaletteWithQuery(formatSearchQuery({ tags: [tag] }))}
+            />
+          )}
           <NotePaneMantineProvider>
             <BlockNoteView
               editor={editor}
@@ -2732,9 +2864,10 @@ function StickyEditor({
                 onCopyImage={canCopyImageToClipboard() ? copyActiveImage : undefined}
                 activeImageBlockId={activeImageBlockId}
                 portalElement={document.body}
-                // The export menu stands for the whole note: the toolbar of a selection would sit
-                // under it, so it is hidden until the menu closes.
-                hidden={isTableCellSelectionDismissed || Boolean(exportFormatMenu)}
+                // The export menu stands for the whole note, and the media menu repeats the
+                // toolbar's actions: the toolbar of a selection would sit under either, so it is
+                // hidden until the menu closes.
+                hidden={isTableCellSelectionDismissed || Boolean(exportFormatMenu) || Boolean(mediaMenu)}
               />
               <BlockMenuHighlightController />
               <NotePaneSideMenuController
@@ -2799,7 +2932,23 @@ function StickyEditor({
               closeOverlay("sessionTabMenu");
               void openSessionAsSticky(menuNote);
             }}
+            onPickColor={(color) => {
+              closeOverlay("sessionTabMenu");
+              updateSessionNoteTheme(menuNote.id, {
+                ...normalizeTheme(menuNote.theme),
+                tabTextColor: color,
+              });
+            }}
             onOpenColor={() => openSessionColorPanel(menuNote.id)}
+            folders={folders}
+            onMoveToFolder={(folderId) => {
+              closeOverlay("sessionTabMenu");
+              void onMoveNoteToFolder(menuNote.id, folderId);
+            }}
+            onNewFolder={() => {
+              closeOverlay("sessionTabMenu");
+              void moveSessionToNewFolder(menuNote.id);
+            }}
             onMoveToTrash={() => {
               closeOverlay("sessionTabMenu");
               requestDeleteSessionNote(menuNote);
@@ -2807,13 +2956,88 @@ function StickyEditor({
           />
         )}
       </Presence>
+      <Presence
+        when={folderMenu && folderMenuFolder
+          ? { menu: folderMenu, folder: folderMenuFolder }
+          : null}
+      >
+        {({ menu, folder }) => (
+          <FolderContextMenu
+            x={menu.x}
+            y={menu.y}
+            folder={folder}
+            onNewNote={() => {
+              closeExclusiveOverlays();
+              void onCreateNote({ template: "blank", folderId: folder.id });
+            }}
+            onRename={() => {
+              closeOverlay("folderMenu");
+              startFolderRename(folder);
+            }}
+            onToggleCollapsed={() => {
+              closeOverlay("folderMenu");
+              void onToggleFolderCollapsed(folder.id);
+            }}
+            onDelete={() => {
+              closeOverlay("folderMenu");
+              void onDeleteFolder(folder.id);
+            }}
+          />
+        )}
+      </Presence>
+      <Presence when={mediaMenu && mediaMenuBlock ? { menu: mediaMenu, block: mediaMenuBlock } : null}>
+        {({ menu, block }) => (
+          <MediaContextMenu x={menu.x} y={menu.y} {...getMediaActions(block)} />
+        )}
+      </Presence>
+      <Presence when={mediaPreviewBlock}>
+        {(block) => {
+          const { name, onOpen, onSave } = getMediaActions(block);
+          return (
+            <MediaPreview
+              block={block}
+              name={name}
+              onOpen={onOpen}
+              onSave={onSave}
+              onClose={() => closeOverlay("mediaPreview")}
+            />
+          );
+        }}
+      </Presence>
       <Presence when={exportFormatMenu}>
         {(anchor) => (
           <ExportFormatMenu
             anchor={anchor}
             onExport={(type) => void exportNote(type)}
+            onOpenOptions={() => {
+              closeOverlay("exportFormatMenu");
+              openOverlay("exportDialog");
+            }}
           />
         )}
+      </Presence>
+      <Presence when={isExportDialogOpen}>
+        {() => {
+          const folder = folders.find((candidate) => candidate.id === note.folderId) ?? null;
+          const liveNotes = notes.filter((candidate) => !candidate.trashedAt);
+          return (
+            <ExportDialog
+              noteTitle={getSessionDisplayTitle(note)}
+              folderName={folder?.name ?? null}
+              folderNoteCount={folder ? liveNotes.filter((candidate) => candidate.folderId === folder.id).length : 0}
+              noteCount={liveNotes.length}
+              onExport={(request) => {
+                closeOverlay("exportDialog");
+                void runExport(request);
+              }}
+              onCopyMarkdown={() => {
+                closeOverlay("exportDialog");
+                void copyMarkdown();
+              }}
+              onClose={() => closeOverlay("exportDialog")}
+            />
+          );
+        }}
       </Presence>
       <Presence when={isMarkdownImportOpen}>
         {() => (
@@ -2908,6 +3132,7 @@ function StickyEditor({
             trashedNotes={trashedNotes}
             onAppThemeChange={onAppThemeChanged}
             onEditorPreferencesChange={updateGlobalEditorPreferences}
+            onPickBackground={electronApi?.pickBackground}
             onExportBackup={exportDataBackup}
             onImportBackup={importDataBackup}
             onRestoreTrashedNote={onRestoreTrashedNote}
@@ -2923,7 +3148,8 @@ function StickyEditor({
             query={palette.query}
             results={palette.results}
             activeTheme={activeTheme}
-            noteIndexById={palette.noteIndexById}
+            folders={palette.folders}
+            tags={palette.tags}
             onQueryChange={palette.setQuery}
             onChoose={(result) => void palette.chooseResult(result)}
             onClose={palette.closePalette}

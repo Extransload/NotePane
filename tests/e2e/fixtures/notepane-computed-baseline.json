@@ -7,10 +7,10 @@
       "boxShadow": "none"
     },
     "active session tab": {
-      "color": "rgb(31, 31, 31)",
-      "backgroundColor": "rgb(255, 242, 184)",
-      "borderTopColor": "rgba(31, 31, 31, 0.34)",
-      "boxShadow": "rgba(31, 31, 31, 0.34) 0px 0px 0px 1px inset, rgba(31, 31, 31, 0.12) 0px 7px 16px 0px"
+      "color": "rgb(55, 53, 47)",
+      "backgroundColor": "color(srgb 0.215686 0.207843 0.184314 / 0.07)",
+      "borderTopColor": "color(srgb 0.215686 0.207843 0.184314 / 0.28)",
+      "boxShadow": "none"
     },
     "sticky header": {
       "color": "rgb(55, 53, 47)",
@@ -189,10 +189,10 @@
       "boxShadow": "none"
     },
     "active session tab": {
-      "color": "rgb(31, 31, 31)",
-      "backgroundColor": "rgb(224, 213, 162)",
-      "borderTopColor": "rgba(31, 31, 31, 0.34)",
-      "boxShadow": "rgba(31, 31, 31, 0.34) 0px 0px 0px 1px inset, rgba(31, 31, 31, 0.12) 0px 7px 16px 0px"
+      "color": "rgb(241, 241, 239)",
+      "backgroundColor": "color(srgb 0.945098 0.945098 0.937255 / 0.07)",
+      "borderTopColor": "color(srgb 0.945098 0.945098 0.937255 / 0.28)",
+      "boxShadow": "none"
     },
     "sticky header": {
       "color": "rgb(241, 241, 239)",

@@ -939,12 +939,30 @@ test("every token a stylesheet or script reads is defined", async () => {
     [...stylesheets.matchAll(/(?:^|[{;\s])(--[\w-]+)\s*:/g)].map((match) => match[1]),
   );
   const pastel = { tabTextColor: "#fff2b8", tabTextOpacity: 1 };
-  const setByStyleFunctions = new Set(
-    ["notepane-light", "notepane-dark"].map(getTheme).flatMap((theme) => [
+  // The look hook sets its variables from data, so its pure half is asked for every variable it
+  // can set: a look with every option away from its default, once per border kind.
+  const { getLookStyles } = await import("../../src/hooks/useLookStyles.js");
+  const lookVariables = ["none", "strong"].flatMap((border) => {
+    const surface = { fill: "#123456", opacity: 50, blur: 10, border };
+    return Object.keys(getLookStyles({
+      accentColor: "#123456",
+      corners: "round",
+      fonts: {
+        editorSize: 18, lineHeight: 1.7, letterSpacing: 0.02, blockSpacing: 6, textWidth: 700,
+        headingFont: "serif", headingWeight: 800, codeFont: "menlo", codeSize: 15, codeLigatures: false,
+      },
+      background: { type: "picture", blur: 8, tintAmount: 20 },
+      surfaces: Object.fromEntries(["sidebar", "header", "editor", "menus", "settings"].map((area) => [area, surface])),
+      tabs: { style: "filled", height: "tall", radius: 10, showNumbers: false, showShortcuts: false, colorStrength: 60 },
+    }).properties);
+  });
+  const setByStyleFunctions = new Set([
+    ...["notepane-light", "notepane-dark"].map(getTheme).flatMap((theme) => [
       ...Object.keys(getStickyShellStyle(pastel, "#fff2b8", theme)),
-      ...Object.keys(getSessionTabStyle(pastel, theme, 0)),
+      ...Object.keys(getSessionTabStyle(pastel, theme)),
     ]),
-  );
+    ...lookVariables,
+  ]);
   // Layout and picker variables that components define as inline styles: the quoted keys of a
   // style object ({ "--x": … }) and the first argument of style.setProperty("--x", …). Only a
   // definition counts; a name that is merely quoted, such as getPropertyValue("--x"), defines

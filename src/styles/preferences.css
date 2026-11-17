@@ -157,52 +157,6 @@
   font: 560 11px/1.35 var(--notepane-ui-font);
 }
 
-.preferences-window-sidebar {
-  display: grid;
-  align-content: start;
-  gap: 6px;
-  padding: 14px 10px;
-  border-right: 1px solid var(--sticky-border-color);
-  background: color-mix(in srgb, var(--sticky-control-bg) 48%, transparent);
-}
-
-.preferences-window-sidebar button {
-  min-width: 0;
-  padding: 8px 10px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--sticky-panel-muted);
-  font: 700 11px/1 var(--notepane-ui-font);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background 130ms ease,
-    border-color 130ms ease,
-    color 130ms ease;
-}
-
-.preferences-window-sidebar button:hover,
-.preferences-window-sidebar button[aria-selected="true"] {
-  border-color: color-mix(in srgb, var(--sticky-text-color) 10%, transparent);
-  background: var(--sticky-control-hover-bg);
-  color: var(--sticky-panel-text);
-}
-
-.preferences-window-sidebar button:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--sticky-text-color) 32%, transparent);
-  outline-offset: 2px;
-}
-
-.preferences-window-content {
-  display: grid;
-  align-content: start;
-  max-height: 100%;
-  overflow: auto;
-  gap: 16px;
-  padding: 16px;
-}
-
 .sticky-settings-content {
   display: grid;
   flex: 1 1 auto;
@@ -1157,7 +1111,8 @@
 
 .pastel-preset-row {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
   gap: 6px;
 }
 
@@ -1174,6 +1129,22 @@
 .pastel-preset-row button[aria-pressed="true"] {
   border-color: color-mix(in srgb, var(--notepane-pastel-swatch-ink) 38%, var(--pastel-color));
   transform: translateY(-1px);
+}
+
+/* "No color" for a session tab: an empty swatch crossed out. */
+.pastel-preset-row .pastel-preset-none {
+  --pastel-color: transparent;
+  border-color: var(--sticky-border-color);
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.75px),
+    var(--sticky-muted-color) calc(50% - 0.75px) calc(50% + 0.75px),
+    transparent calc(50% + 0.75px)
+  );
+}
+
+.pastel-preset-row .pastel-preset-none[aria-pressed="true"] {
+  border-color: var(--sticky-text-color);
 }
 
 .color-action-row button,
@@ -1264,70 +1235,211 @@
   animation: pinButtonPop 190ms cubic-bezier(0.2, 0.9, 0.2, 1.2);
 }
 
-/* Preferences: a sidebar of pages beside the active page, which scrolls on its own. A page is its
-   title and cards (src/ui/PreferencesCard.jsx): a header, then rows of 44px split by hairlines,
-   label on the left and control on the right. */
+/* Settings, laid out like Tern's: a floating window centred over the app, a sidebar (brand,
+   search, pages under group headings, version) beside the active page. The page is a large title
+   above groups, each a label over a rounded card of rows: title and description on the left,
+   control on the right. Radii follow the Corners setting through --look-radius-scale
+   (src/hooks/useLookStyles.js). The window paints its own background so that, with a background
+   picture set, src/styles/look.css can frost it; the panes inside stay see-through. */
 .preferences-window.is-two-pane {
   display: grid;
-  width: min(820px, calc(100vw - 56px));
-  grid-template-columns: 180px minmax(0, 1fr);
+  width: min(980px, calc(100vw - 64px));
+  height: min(780px, calc(100vh - 56px));
+  min-height: min(560px, calc(100vh - 56px));
+  max-height: min(780px, calc(100vh - 56px));
+  grid-template-columns: 248px minmax(0, 1fr);
+  border-radius: calc(16px * var(--look-radius-scale, 1));
   background: var(--sticky-panel-bg);
+  color: var(--sticky-text-color);
+  font: 13px/1.4 var(--notepane-ui-font);
+  transition: opacity 160ms ease;
+}
+
+/* Holding the eye button: the window and the dimming behind it go clear, and stay where they are
+   so the release still lands on the button. */
+.preferences-backdrop {
+  transition: background 160ms ease;
+}
+
+.preferences-backdrop.is-peeking {
+  background: transparent;
+}
+
+.preferences-backdrop.is-peeking .preferences-window {
+  opacity: 0;
 }
 
 .is-two-pane .preferences-window-sidebar {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: 2px;
-  overflow-y: auto;
-  padding: 16px 10px;
+  padding: 18px 12px 0;
   border-right: 1px solid var(--sticky-border-color);
   /* A step away from the content pane in every theme: toward the text colour. */
   background: color-mix(in srgb, var(--sticky-sidebar-bg) 96%, var(--sticky-text-color));
 }
 
-.is-two-pane .preferences-window-title {
-  padding: 2px 10px 14px;
-  font: 760 15px/1.2 var(--notepane-ui-font);
+/* Over a background the window's own frosted fill shows through the sidebar too. */
+html[data-backdrop] .is-two-pane .preferences-window-sidebar {
+  background: color-mix(in srgb, var(--sticky-sidebar-bg) 45%, transparent);
 }
 
-.is-two-pane .preferences-window-sidebar button {
+.preferences-brand {
   display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 6px 14px;
+}
+
+.preferences-brand-mark {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: calc(7px * var(--look-radius-scale, 1));
+  background: var(--notepane-control-accent);
+  color: var(--sticky-panel-bg);
+}
+
+.is-two-pane .preferences-window-title {
+  color: var(--sticky-text-color);
+  font: 700 15px/1.2 var(--notepane-ui-font);
+}
+
+.settings-search-field {
+  display: flex;
+  height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0 10px;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(9px * var(--look-radius-scale, 1));
+  background: var(--sticky-panel-bg);
+  color: var(--sticky-muted-color);
+  cursor: text;
+  transition:
+    border-color 130ms ease,
+    box-shadow 130ms ease;
+}
+
+.settings-search-field:focus-within {
+  border-color: var(--notepane-input-focus-border);
+  box-shadow: 0 0 0 3px var(--notepane-input-focus-ring);
+}
+
+.settings-search-icon {
+  flex: 0 0 auto;
+}
+
+.settings-search-field input {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--sticky-text-color);
+  font: 400 13.5px/1 var(--notepane-ui-font);
+  appearance: none;
+}
+
+.settings-search-field input::placeholder {
+  color: var(--sticky-muted-color);
+}
+
+/* Escape clears the field (src/ui/preferencesWindow.jsx), so the native clear button would only
+   repeat it. */
+.settings-search-field input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.preferences-nav {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-bottom: 8px;
+  overscroll-behavior: contain;
+}
+
+.preferences-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.preferences-nav-heading {
+  margin: 12px 8px 6px;
+  color: var(--sticky-muted-color);
+  font: 500 12px/1.2 var(--notepane-ui-font);
+}
+
+.preferences-nav-group:first-child .preferences-nav-heading {
+  margin-top: 2px;
+}
+
+.preferences-nav button {
+  display: flex;
+  width: 100%;
   height: 32px;
   flex: 0 0 auto;
   align-items: center;
-  gap: 9px;
+  gap: 11px;
   padding: 0 10px;
   border: 0;
-  border-radius: 8px;
-  color: var(--sticky-panel-muted);
-  font: 650 12px/1 var(--notepane-ui-font);
+  border-radius: calc(8px * var(--look-radius-scale, 1));
+  background: transparent;
+  color: var(--sticky-text-color);
+  font: 450 13.5px/1 var(--notepane-ui-font);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 130ms ease,
+    color 130ms ease;
 }
 
 .preferences-tab-icon {
   flex: 0 0 auto;
-  color: var(--icon-chrome-color);
+  color: var(--sticky-muted-color);
   transition: color 130ms ease;
 }
 
-.is-two-pane .preferences-window-sidebar button:hover {
+.preferences-nav button:hover {
+  background: color-mix(in srgb, var(--sticky-control-hover-bg) 60%, transparent);
+}
+
+.preferences-nav button[aria-selected="true"] {
   background: var(--sticky-control-hover-bg);
-  color: var(--sticky-panel-text);
+  font-weight: 600;
 }
 
-.is-two-pane .preferences-window-sidebar button[aria-selected="true"] {
-  background: color-mix(in srgb, var(--notepane-control-accent) 14%, transparent);
-  color: var(--sticky-panel-text);
+.preferences-nav button[aria-selected="true"] .preferences-tab-icon {
+  color: var(--notepane-control-accent);
 }
 
-.is-two-pane .preferences-window-sidebar button[aria-selected="true"] .preferences-tab-icon {
-  color: var(--icon-chrome-accent-color);
+.preferences-nav button:focus-visible {
+  outline: 2px solid var(--notepane-focus-outline);
+  outline-offset: -2px;
+}
+
+.preferences-window-footer {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  padding: 12px 8px 14px;
+  border-top: 1px solid var(--sticky-border-color);
+  color: var(--sticky-muted-color);
+  font: 400 11.5px/1 ui-monospace, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 .is-two-pane .preferences-window-content {
   display: flex;
+  min-width: 0;
   min-height: 0;
-  max-height: none;
   flex-direction: column;
   gap: 0;
   overflow: hidden;
@@ -1338,16 +1450,56 @@
   display: flex;
   flex: 0 0 auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 20px 12px;
+  gap: 4px;
+  padding: 22px 20px 6px 40px;
 }
 
-.preferences-page-title {
+.is-two-pane .preferences-page-title {
+  min-width: 0;
+  flex: 1 1 auto;
   margin: 0;
-  color: var(--sticky-panel-text);
-  font: 760 17px/1.2 var(--notepane-ui-font);
-  letter-spacing: 0;
+  overflow: hidden;
+  color: var(--sticky-text-color);
+  font: 700 22px/1.25 var(--notepane-ui-font);
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preferences-page-header .preferences-header-button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: calc(7px * var(--look-radius-scale, 1));
+  background: transparent;
+  color: var(--sticky-muted-color);
+  cursor: pointer;
+  transition:
+    background 130ms ease,
+    color 130ms ease,
+    scale var(--notepane-motion-press-duration) var(--notepane-motion-ease-out);
+}
+
+.preferences-page-header .preferences-header-button:hover {
+  background: var(--sticky-control-hover-bg);
+  color: var(--sticky-text-color);
+}
+
+.preferences-page-header .preferences-header-button:active {
+  scale: 0.94;
+}
+
+.preferences-page-header .preferences-header-button:focus-visible {
+  outline: 2px solid var(--notepane-focus-outline);
+  outline-offset: 1px;
+}
+
+.preferences-peek-button[aria-pressed="true"] {
+  color: var(--notepane-control-accent);
 }
 
 .preferences-page-body {
@@ -1355,56 +1507,82 @@
   min-height: 0;
   flex: 1 1 auto;
   align-content: start;
-  gap: 16px;
+  gap: 22px;
   overflow-y: auto;
-  padding: 0 20px 20px;
+  padding: 14px 40px 32px;
   overscroll-behavior: contain;
 }
 
+/* A settings group placed straight on the page (Backup) takes the page's gap instead of its
+   label's own top margin, which spaces groups inside a Look page. */
+.preferences-page-body > .settings-group .settings-group-label {
+  margin-top: 0;
+}
+
+/* A PreferencesCard (src/ui/PreferencesCard.jsx) reads like a settings group
+   (src/ui/settingsControls.jsx): its title is a label above, and the body is the card. */
 .preferences-card {
   display: grid;
   min-width: 0;
-  border: 1px solid var(--sticky-border-color);
-  border-radius: 10px;
-  background: var(--sticky-control-bg);
 }
 
 .preferences-card-header {
-  padding: 12px 14px 10px;
+  padding: 0 2px 8px;
 }
 
 .preferences-card-title {
   margin: 0;
-  color: var(--sticky-panel-text);
-  font: 720 13px/1.25 var(--notepane-ui-font);
+  color: var(--sticky-panel-muted);
+  font: 600 12.5px/1.3 var(--notepane-ui-font);
 }
 
 .preferences-card-description {
   margin: 3px 0 0;
-  color: var(--sticky-panel-muted);
-  font: 540 11px/1.4 var(--notepane-ui-font);
+  color: color-mix(in srgb, var(--sticky-muted-color) 82%, transparent);
+  font: 400 12px/1.45 var(--notepane-ui-font);
 }
 
-.preferences-card-body {
+.preferences-card-body,
+.preferences-card.about-card {
   display: grid;
   min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(12px * var(--look-radius-scale, 1));
+  background: var(--sticky-control-bg);
 }
 
 .preferences-card .preference-setting-row,
 .preferences-card .trash-selection-toolbar,
 .preferences-card .trash-note-row,
 .preferences-card .trash-empty-state {
-  min-height: 44px;
-  padding: 8px 14px;
+  min-height: 56px;
+  padding: 12px 16px;
   border: 0;
-  border-top: 1px solid var(--sticky-border-color);
+  border-top: 1px solid color-mix(in srgb, var(--sticky-border-color) 60%, transparent);
   border-radius: 0;
+}
+
+.preferences-card .trash-note-row {
+  min-height: 48px;
+  padding-block: 8px;
 }
 
 .preferences-card .preference-setting-row,
 .preferences-card .trash-selection-toolbar,
 .preferences-card .trash-empty-state {
+  gap: 16px;
   background: transparent;
+}
+
+.preferences-card-body > :first-child,
+.preferences-card .trash-note-list > :first-child {
+  border-top: 0;
+}
+
+.preferences-card .preference-setting-row > :first-child {
+  min-width: 0;
+  max-width: 62%;
 }
 
 .preferences-card .trash-note-row:not(.is-selected) {
@@ -1413,10 +1591,6 @@
 
 .preferences-card .trash-note-list {
   gap: 0;
-}
-
-.preferences-card .app-theme-setting {
-  padding-bottom: 14px;
 }
 
 .preferences-card .preference-backup-row {
@@ -1428,38 +1602,186 @@
   flex: 0 0 min(224px, 46%);
 }
 
+.is-two-pane .preference-setting-title {
+  color: var(--sticky-text-color);
+  font: 500 13.5px/1.3 var(--notepane-ui-font);
+}
+
+.is-two-pane .preferences-section-description {
+  margin-top: 3px;
+  color: var(--sticky-muted-color);
+  font: 400 12px/1.45 var(--notepane-ui-font);
+}
+
+.is-two-pane .preference-data-button {
+  min-height: 28px;
+  border-radius: calc(7px * var(--look-radius-scale, 1));
+  font: 600 12px/1 var(--notepane-ui-font);
+}
+
 .preferences-card .shortcut-list-header {
-  border-top: 1px solid var(--sticky-border-color);
+  height: 34px;
+  border-top: 1px solid color-mix(in srgb, var(--sticky-border-color) 60%, transparent);
+  font: 500 11.5px/1 var(--notepane-ui-font);
 }
 
 .preferences-card .shortcut-list {
   border: 0;
-  border-top: 1px solid var(--sticky-border-color);
+  border-top: 1px solid color-mix(in srgb, var(--sticky-border-color) 60%, transparent);
   border-radius: 0;
 }
 
+.preferences-card .shortcut-list-header,
+.preferences-card .shortcut-row {
+  padding: 0 10px 0 16px;
+}
+
+.preferences-card .shortcut-row {
+  min-height: 44px;
+  border-top-color: color-mix(in srgb, var(--sticky-border-color) 60%, transparent);
+}
+
+.is-two-pane .shortcut-command-label {
+  color: var(--sticky-text-color);
+  font: 500 13px/1.25 var(--notepane-ui-font);
+}
+
 .preferences-card .shortcut-error {
-  padding: 8px 14px;
-  border-top: 1px solid var(--sticky-border-color);
+  padding: 8px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--sticky-border-color) 60%, transparent);
 }
 
 .preferences-card .shortcut-error:empty {
   display: none;
 }
 
-@media (max-width: 760px) {
-  .preferences-window.is-two-pane {
-    grid-template-columns: 148px minmax(0, 1fr);
+/* Search: the matching settings replace the page, one card of results. Each names its page so a
+   row with a common title (Blur, Fill) says where it lives. */
+.settings-search-results {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(12px * var(--look-radius-scale, 1));
+  background: var(--sticky-control-bg);
+}
+
+.settings-search-result {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--sticky-border-color) 60%, transparent);
+  background: transparent;
+  color: var(--sticky-text-color);
+  font: 400 13px/1.3 var(--notepane-ui-font);
+  text-align: left;
+  cursor: pointer;
+  transition: background 110ms ease;
+}
+
+.settings-search-result:first-child {
+  border-top: 0;
+}
+
+.settings-search-result[aria-selected="true"] {
+  background: color-mix(in srgb, var(--notepane-control-accent) 9%, transparent);
+}
+
+.settings-search-result-icon {
+  color: var(--sticky-muted-color);
+}
+
+.settings-search-result[aria-selected="true"] .settings-search-result-icon {
+  color: var(--notepane-control-accent);
+}
+
+.settings-search-result-text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.settings-search-result-title {
+  font: 500 13.5px/1.3 var(--notepane-ui-font);
+}
+
+.settings-search-result-description {
+  overflow: hidden;
+  color: var(--sticky-muted-color);
+  font: 400 12px/1.4 var(--notepane-ui-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-search-result-page {
+  color: var(--sticky-muted-color);
+  font: 500 11.5px/1 var(--notepane-ui-font);
+  white-space: nowrap;
+}
+
+.settings-search-empty {
+  padding: 28px 4px;
+  color: var(--sticky-muted-color);
+  font: 400 13px/1.4 var(--notepane-ui-font);
+  text-align: center;
+}
+
+/* The row a search result opened glows in the accent, then fades back
+   (SEARCH_HIT_MS in src/ui/preferencesWindow.jsx). */
+.is-two-pane [data-search-hit] {
+  border-radius: calc(10px * var(--look-radius-scale, 1));
+  animation: preferencesSearchHit 1600ms var(--notepane-motion-ease-out);
+}
+
+@keyframes preferencesSearchHit {
+  0%,
+  55% {
+    background: color-mix(in srgb, var(--notepane-control-accent) 12%, transparent);
+    box-shadow: inset 0 0 0 2px var(--notepane-control-accent);
   }
 
-  .preferences-card .theme-picker {
+  100% {
+    box-shadow: inset 0 0 0 2px transparent;
+  }
+}
+
+@media (max-width: 760px) {
+  .preferences-window.is-two-pane {
+    width: calc(100vw - 32px);
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+
+  .preferences-page-header {
+    padding-left: 24px;
+  }
+
+  .preferences-page-body {
+    padding-inline: 24px;
+  }
+
+  .is-two-pane .theme-picker {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .preferences-tab-icon {
+  .preferences-window.is-two-pane,
+  .preferences-backdrop,
+  .preferences-tab-icon,
+  .preferences-nav button,
+  .settings-search-result {
     transition: none;
+  }
+
+  /* Without the glow's motion the row stays marked until the highlight is removed. */
+  .is-two-pane [data-search-hit] {
+    animation: none;
+    background: color-mix(in srgb, var(--notepane-control-accent) 12%, transparent);
+    box-shadow: inset 0 0 0 2px var(--notepane-control-accent);
   }
 }
 

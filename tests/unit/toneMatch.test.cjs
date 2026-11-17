@@ -156,7 +156,7 @@ test("text on fill and surface results is readable", async () => {
           surfaceRatio >= 4.5,
           `${theme.id} surface ${hex} @${tabTextOpacity}: ${sticky["--sticky-text-color"]} on ${sticky["--sticky-effective-bg"]} is ${surfaceRatio.toFixed(2)}`,
         );
-        const tab = getSessionTabStyle(noteTheme, theme, 0);
+        const tab = getSessionTabStyle(noteTheme, theme);
         const fill = compositeOver(colorMath, tab["--session-tab-active-bg"], chrome.tabBase);
         const fillRatio = getContrastRatio(tab["--session-tab-text-color"], fill);
         assert.ok(
@@ -175,7 +175,7 @@ test("session tab text on the tab fill, active and inactive, meets the same bar"
     const chrome = getNoteChrome(theme);
     for (const hex of inputs) {
       for (const tabTextOpacity of OPACITIES) {
-        const tab = getSessionTabStyle({ tabTextColor: hex, tabTextOpacity }, theme, 0);
+        const tab = getSessionTabStyle({ tabTextColor: hex, tabTextOpacity }, theme);
         const fill = compositeOver(colorMath, tab["--session-tab-active-bg"], chrome.tabBase);
         const texts = {
           active: tab["--session-tab-text-color"],

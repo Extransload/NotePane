@@ -49,13 +49,28 @@ const ALLOWLIST = [
   },
   { selector: ".crop-image-frame", reason: "The crop frame, selection and handles draw over the image." },
   {
+    selector: ".settings-swatch[style*='--settings-swatch-color']",
+    reason: "Accent choices in Settings > Look > Theme: each swatch shows the fixed colour it would set, in every theme. The No colour and Custom swatches are still scanned.",
+  },
+  {
     selector: ".theme-card-preview",
     reason: "previews other themes: each picker card's small window is painted in that card's theme. The card around it is still scanned.",
   },
 ];
 
 const NAMED_COLOURS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
-const PREFERENCES_SECTIONS = ["General", "Editor", "Trash", "Shortcuts", "About"];
+const PREFERENCES_SECTIONS = [
+  "Editor",
+  "Theme",
+  "Fonts",
+  "Background",
+  "Surfaces",
+  "Tabs",
+  "Trash",
+  "Backup",
+  "Shortcuts",
+  "About",
+];
 
 // The template's image is remote; serve a local one so the note never waits on the network.
 const TEMPLATE_IMAGE_SVG =
@@ -753,7 +768,7 @@ const SCREEN_GROUPS = [
         // A sentinel is never a picker card, so no card is checked; one has focus, so the focus
         // ring is part of the scan.
         const themeCard = preferences.getByTestId("theme-card-notepane-light");
-        if (section === "General") {
+        if (section === "Theme") {
           await themeCard.focus();
           await expect.poll(() => themeCard.evaluate((element) => element.matches(":focus-visible"))).toBe(true);
         }
@@ -761,7 +776,7 @@ const SCREEN_GROUPS = [
           include: [".preferences-backdrop"],
           scrollbars: section === "Shortcuts",
         });
-        if (section === "General") {
+        if (section === "Theme") {
           await expect(themeCard, "the theme card kept focus through both readings").toBeFocused();
         }
       }

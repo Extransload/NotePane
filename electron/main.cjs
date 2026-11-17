@@ -1,6 +1,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { fileURLToPath } = require("url");
 const { execFile } = require("child_process");
 const { promisify } = require("util");
 const {
@@ -33,6 +34,14 @@ const {
   resolveWindowBackgroundColor,
 } = require("./windowTheme.cjs");
 const { readAssetFromUrl } = require("./assetSources.cjs");
+const { isWebUrl, writeOpenableCopy } = require("./assetOpen.cjs");
+const {
+  buildFrontMatter,
+  buildHtmlDocument,
+  externalizeMarkdownAssets,
+  renderHtmlToPng,
+  writeExportEntries,
+} = require("./noteExport.cjs");
 const { fetchBookmarkMetadata } = require("./bookmarkMetadata.cjs");
 const { compareVersions, resolveUpdateMode, startAppUpdates } = require("./appUpdates.cjs");
 const packageInfo = require("../package.json");
@@ -80,6 +89,16 @@ const quietTestMode = process.env.BLOCKNOTE_STICKY_QUIET === "1";
 // NOTEPANE_SHOW_TEST_WINDOWS=1 shows them, to watch a run.
 const hiddenTestWindows = quietTestMode && process.env.NOTEPANE_SHOW_TEST_WINDOWS !== "1";
 const MAX_BACKUP_FILE_SIZE = 512 * 1024 * 1024;
+// A background picture is decoded and kept in memory by every window, so a camera original is
+// fine but anything larger is almost certainly the wrong file.
+const MAX_BACKGROUND_FILE_SIZE = 32 * 1024 * 1024;
+const BACKGROUND_MIME_BY_EXTENSION = Object.freeze({
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+});
 
 let store;
 let quitting = false;
@@ -354,6 +373,7 @@ function createNoteForLayoutMode(
 ) {
   const options = {
     template: creationOptions?.template === "default" ? "default" : "blank",
+    folderId: creationOptions?.folderId ?? null,
   };
   if (layoutMode === "sticky") {
     options.theme = createDefaultStickyTheme(store.listNotes().length);
@@ -536,6 +556,7 @@ function broadcastEditorPreferences(editorPreferences) {
 function broadcastNotesChanged(payload = {}) {
   const notes = store.listNotes();
   const trash = store.listTrash();
+  const folders = store.listFolders();
   for (const entry of windows.values()) {
     const { window } = entry;
     if (!window.isDestroyed()) {
@@ -543,6 +564,7 @@ function broadcastNotesChanged(payload = {}) {
       window.webContents.send("notes:changed", {
         notes,
         trash,
+        folders,
         activeNote,
       });
     }
@@ -609,6 +631,7 @@ function ensureTabsWindow(activeNoteId) {
     primaryEntry.window.webContents.send("notes:changed", {
       notes: store.listNotes(),
       trash: store.listTrash(),
+      folders: store.listFolders(),
       activeNote: note,
     });
     presentWindow(primaryEntry.window, { focus: false });
@@ -1573,6 +1596,55 @@ function installIpcHandlers() {
     return note;
   });
 
+  ipcMain.handle("folders:list", () => {
+    return store.listFolders();
+  });
+
+  // Folder changes keep every window's open note, so they broadcast without one.
+  ipcMain.handle("folders:create", (_event, payload) => {
+    const folder = store.createFolder(payload);
+    broadcastNotesChanged();
+    return folder;
+  });
+
+  ipcMain.handle("folders:update", (_event, payload) => {
+    const folder = store.updateFolder(payload);
+    if (folder) {
+      broadcastNotesChanged();
+    }
+    return folder;
+  });
+
+  ipcMain.handle("folders:delete", (_event, folderId) => {
+    const deleted = store.deleteFolder(folderId);
+    if (deleted) {
+      broadcastNotesChanged();
+    }
+    return deleted;
+  });
+
+  ipcMain.handle("folders:move", (_event, payload) => {
+    const folders = store.moveFolder(payload);
+    broadcastNotesChanged();
+    return folders;
+  });
+
+  ipcMain.handle("notes:set-folder", (_event, payload) => {
+    const note = store.setNoteFolder(payload);
+    if (note) {
+      broadcastNotesChanged({ activeNote: note });
+    }
+    return note;
+  });
+
+  ipcMain.handle("notes:set-tags", (_event, payload) => {
+    const note = store.setNoteTags(payload);
+    if (note) {
+      broadcastNotesChanged({ activeNote: note });
+    }
+    return note;
+  });
+
   ipcMain.handle("notes:versions:list", (event, noteId) => {
     const resolvedNoteId = noteId || getNoteIdForWebContents(event.sender);
     return resolvedNoteId ? store.listNoteVersions(resolvedNoteId) : [];
@@ -1604,13 +1676,67 @@ function installIpcHandlers() {
       if (typeof payload?.markdown !== "string") {
         throw new Error("Markdown export content is missing.");
       }
+      const frontMatter = payload.frontMatter
+        ? buildFrontMatter({ title: payload.title, ...payload.frontMatter })
+        : "";
+      if (payload.images === "folder") {
+        const filePath = await chooseSavePath({
+          window,
+          defaultName: `${title}.md`,
+          dialogTitle: "Export note as Markdown",
+          filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+        });
+        if (!filePath) {
+          return { canceled: true, filePath: null };
+        }
+        const folderName = `${path.basename(filePath, path.extname(filePath))} files`;
+        const { markdown, files } = externalizeMarkdownAssets(payload.markdown, { assets: store.assets, folderName });
+        writeExportEntries(path.dirname(filePath), [{
+          folder: null,
+          fileName: path.basename(filePath),
+          content: frontMatter + markdown,
+          extraFiles: files.map((file) => ({ folder: folderName, ...file })),
+        }]);
+        return { canceled: false, filePath };
+      }
       return saveBuffer({
         window,
         // Assets are inlined so the exported file stays self-contained.
-        buffer: Buffer.from(store.assets.inlineAssetUrls(payload.markdown), "utf8"),
+        buffer: Buffer.from(frontMatter + store.assets.inlineAssetUrls(payload.markdown), "utf8"),
         defaultName: `${title}.md`,
         dialogTitle: "Export note as Markdown",
         filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
+      });
+    }
+
+    if (type === "html" || type === "png") {
+      if (typeof payload?.html !== "string") {
+        throw new Error("HTML export content is missing.");
+      }
+      const page = buildHtmlDocument({
+        title: payload.title,
+        bodyHtml: store.assets.inlineAssetUrls(payload.html),
+        colors: payload.colors ?? null,
+      });
+      if (type === "html") {
+        return saveBuffer({
+          window,
+          buffer: Buffer.from(page, "utf8"),
+          defaultName: `${title}.html`,
+          dialogTitle: "Export note as HTML",
+          filters: [{ name: "HTML", extensions: ["html", "htm"] }],
+        });
+      }
+      const buffer = await renderHtmlToPng(BrowserWindow, page, {
+        scale: payload.scale === 1 ? 1 : 2,
+        tempDirectory: path.join(app.getPath("temp"), "NotePane"),
+      });
+      return saveBuffer({
+        window,
+        buffer,
+        defaultName: `${title}.png`,
+        dialogTitle: "Export note as an image",
+        filters: [{ name: "PNG image", extensions: ["png"] }],
       });
     }
 
@@ -1618,9 +1744,10 @@ function installIpcHandlers() {
       throw new Error("Unsupported note export format.");
     }
 
+    const pageSize = payload?.pageSize === "Letter" ? "Letter" : payload?.pageSize === "A4" ? "A4" : null;
     const buffer = await window.webContents.printToPDF({
       printBackground: true,
-      preferCSSPageSize: true,
+      ...(pageSize ? { pageSize } : { preferCSSPageSize: true }),
       margins: { marginType: "none" },
     });
     return saveBuffer({
@@ -1630,6 +1757,47 @@ function installIpcHandlers() {
       dialogTitle: "Export note as PDF",
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
+  });
+
+  // A folder or every note as Markdown or HTML, one file per note, into a folder the user picks.
+  // Entries come from the renderer already converted; folders inside become sub-folders.
+  ipcMain.handle("export:notes", async (event, payload) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) {
+      throw new Error("No active window found for export.");
+    }
+    const format = payload?.format === "html" ? "html" : "md";
+    const entries = Array.isArray(payload?.entries) ? payload.entries : [];
+    const parent = await chooseExportDirectory(window);
+    if (!parent) {
+      return { canceled: true, count: 0 };
+    }
+    const directory = path.join(parent, sanitizeFileName(payload?.folderName, "NotePane"));
+    const files = entries.map((entry) => {
+      const fileTitle = sanitizeFileName(entry?.title, "Untitled");
+      const folder = entry?.folder ? sanitizeFileName(entry.folder, "Folder") : null;
+      if (format === "html") {
+        return {
+          folder,
+          fileName: `${fileTitle}.html`,
+          content: buildHtmlDocument({ title: entry?.title, bodyHtml: store.assets.inlineAssetUrls(String(entry?.content ?? "")) }),
+        };
+      }
+      const frontMatter = payload?.frontMatter ? buildFrontMatter({ title: entry?.title, ...entry }) : "";
+      if (payload?.images === "folder") {
+        const imageFolder = `${fileTitle} files`;
+        const { markdown, files: images } = externalizeMarkdownAssets(entry?.content, { assets: store.assets, folderName: imageFolder });
+        return {
+          folder,
+          fileName: `${fileTitle}.md`,
+          content: frontMatter + markdown,
+          extraFiles: images.map((image) => ({ folder: imageFolder, ...image })),
+        };
+      }
+      return { folder, fileName: `${fileTitle}.md`, content: frontMatter + store.assets.inlineAssetUrls(String(entry?.content ?? "")) };
+    });
+    const written = writeExportEntries(directory, files);
+    return { canceled: false, count: written.length, directory };
   });
 
   ipcMain.handle("backup:export", async (event) => withBackupOperation(async () => {
@@ -1739,6 +1907,29 @@ function installIpcHandlers() {
     return store.assets.put(Buffer.from(bytes), mimeType);
   });
 
+  // Preferences > Background: picks a picture file, stores it as an asset and returns its
+  // notepane-asset URL, or null when the dialog is cancelled.
+  ipcMain.handle("look:pick-background", async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(window, {
+      title: "Choose a background picture",
+      properties: ["openFile"],
+      filters: [{ name: "Images", extensions: Object.keys(BACKGROUND_MIME_BY_EXTENSION) }],
+    });
+    const filePath = result.canceled ? null : result.filePaths[0];
+    if (!filePath) {
+      return null;
+    }
+    const mimeType = BACKGROUND_MIME_BY_EXTENSION[path.extname(filePath).slice(1).toLowerCase()];
+    if (!mimeType) {
+      throw new Error("Choose a PNG, JPEG, WebP or GIF picture.");
+    }
+    if (fs.statSync(filePath).size > MAX_BACKGROUND_FILE_SIZE) {
+      throw new Error("This picture is larger than the 32 MB background limit.");
+    }
+    return store.assets.put(fs.readFileSync(filePath), mimeType);
+  });
+
   ipcMain.handle("assets:save-url", async (event, payload) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     const asset = await readAssetFromUrl(payload?.url, { assets: store.assets });
@@ -1766,6 +1957,36 @@ function installIpcHandlers() {
       throw new Error("Image could not be copied.");
     }
     clipboard.writeImage(image);
+    return true;
+  });
+
+  // A web address opens in the browser; anything else opens as a copy in the default app of its
+  // type (electron/assetOpen.cjs).
+  ipcMain.handle("assets:open", async (_event, payload) => {
+    const url = payload?.url;
+    if (isWebUrl(url)) {
+      await shell.openExternal(url);
+      return true;
+    }
+    const filePath = await writeOpenableCopy(url, sanitizeFileName(payload?.name, "file"), {
+      assets: store.assets,
+      directory: path.join(app.getPath("temp"), "NotePane"),
+    });
+    const error = await shell.openPath(filePath);
+    if (error) {
+      throw new Error(error);
+    }
+    return true;
+  });
+
+  // Only a linked local file has a place of its own to show; the media check is the same as Open's.
+  ipcMain.handle("assets:reveal", async (_event, payload) => {
+    const url = payload?.url;
+    if (typeof url !== "string" || !url.startsWith("file:")) {
+      throw new Error("Only a linked file can be shown in Finder.");
+    }
+    await readAssetFromUrl(url);
+    shell.showItemInFolder(fileURLToPath(url));
     return true;
   });
 
@@ -1882,12 +2103,11 @@ function requestEditorFlush(webContents, timeoutMs) {
 // reachable from renderers.
 globalThis.notepaneFlushEditorWindows = flushEditorWindows;
 
-async function saveBuffer({ window, buffer, defaultName, dialogTitle, filters }) {
+// Where an export goes: the test override folder, or the save dialog's choice (null if cancelled).
+async function chooseSavePath({ window, defaultName, dialogTitle, filters }) {
   if (exportDirectoryOverride) {
     fs.mkdirSync(exportDirectoryOverride, { recursive: true });
-    const filePath = path.join(exportDirectoryOverride, defaultName);
-    fs.writeFileSync(filePath, buffer);
-    return { canceled: false, filePath };
+    return path.join(exportDirectoryOverride, defaultName);
   }
 
   const result = await dialog.showSaveDialog(window, {
@@ -1895,13 +2115,30 @@ async function saveBuffer({ window, buffer, defaultName, dialogTitle, filters })
     defaultPath: defaultName,
     filters,
   });
+  return result.canceled || !result.filePath ? null : result.filePath;
+}
 
-  if (result.canceled || !result.filePath) {
+async function saveBuffer({ window, buffer, defaultName, dialogTitle, filters }) {
+  const filePath = await chooseSavePath({ window, defaultName, dialogTitle, filters });
+  if (!filePath) {
     return { canceled: true, filePath: null };
   }
+  fs.writeFileSync(filePath, buffer);
+  return { canceled: false, filePath };
+}
 
-  fs.writeFileSync(result.filePath, buffer);
-  return { canceled: false, filePath: result.filePath };
+// The folder a multi-note export is written into: the test override, or the folder the user picks.
+async function chooseExportDirectory(window) {
+  if (exportDirectoryOverride) {
+    fs.mkdirSync(exportDirectoryOverride, { recursive: true });
+    return exportDirectoryOverride;
+  }
+  const result = await dialog.showOpenDialog(window, {
+    title: "Export notes into a folder",
+    buttonLabel: "Export Here",
+    properties: ["openDirectory", "createDirectory"],
+  });
+  return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
 }
 
 async function selectBackupFile(window) {

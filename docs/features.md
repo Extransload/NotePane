@@ -21,7 +21,7 @@
   the breakpoint
 - 52 app themes: NotePane Light (default) and NotePane Dark, Catppuccin Latte, Frappé, Macchiato and Mocha, Nord,
   Dracula and Tokyo Night, followed by 43 palettes adapted from TablePeek
-- Theme picker in Preferences > General > App theme: preview cards that apply the theme at once to every window;
+- Theme picker in Settings > Look > Theme: preview cards that apply the theme at once to every window;
   All / Light / Dark chips and a name filter narrow the cards, and arrow keys move within the cards shown
 - Every colour comes from the selected theme, code block syntax colours included
 - Flat surfaces: menus, toolbars, the colour panel, sticky settings, toasts and the search palette draw one soft
@@ -30,10 +30,15 @@
 - Session and sticky colours are shown in each theme's tone (tone matching): the hue is kept, the stored colour never
   changes, and text on it stays readable
 - No light/dark toggle and no light/dark shortcut; `Command/Ctrl + Shift + L` is unbound
-- Preferences panel via sidebar footer button, native app menu, or `Command/Ctrl + ,`: a sidebar of pages (General,
-  Editor, Trash, Shortcuts, About, each with an icon) beside the page, which scrolls on its own. A page is its title and
-  cards of settings: General has Appearance (the theme picker) and Data (backup export and import), Editor has
-  Typography (editor and app font) and Behaviour (table of contents), Trash and Shortcuts one card each
+- Settings window via sidebar footer button, native app menu, or `Command/Ctrl + ,`: a floating window like Tern's,
+  with a search field and pages grouped under App (Editor), Look (Theme, Fonts, Background, Surfaces, Tabs), Data
+  (Trash, Backup) and System (Shortcuts, About). Search (`Command/Ctrl + F` while open) finds any setting and opens
+  its page; holding the eye button hides the window to show the app behind it
+- Look: accent colour and corner shape; editor font, size, line height, letter spacing, block spacing, text width,
+  heading font and weight, code font, size and ligatures; a background (colour, gradient or picture, with fit,
+  position, blur, brightness, saturation and tint); per area (sidebar, title bar, editor, menus, settings) fill,
+  opacity, blur and border over that background, with Solid / Frosted / Clear presets; tab style, height, radius,
+  numbers, shortcuts, new tab colour and colour strength
 - Preferences > About: the NotePane wordmark, "Version x.y.z", a short description of the app and, in the desktop
   app, the Electron and Chromium versions. Its Updates card has **Check for updates**, with a status line (checking,
   up to date, "NotePane x.y.z is available" with a **Download** link to the release on an unsigned Mac build or "installs
@@ -48,9 +53,10 @@
 - Right-click session tab context menu, opened at the pointer and kept inside the window: Rename (inline rename),
   Duplicate (a new session with the same content, colour and "<title> copy" as its name), Open as sticky (desktop
   tabs layout: the note opens in its own sticky window while the app stays in tabs; its tab then brings that window
-  forward, and switching the window to tabs puts the note back), Color... for the per-session tab color, and Move
-  to Trash with its confirmation
-- Sidebar tab background/accent color customization with automatic contrast text
+  forward, and switching the window to tabs puts the note back), a row of one-click tab colours (No color and the
+  six pastels), Color... for the full colour panel, and Move to Trash with its confirmation
+- Session tabs are plain (an outline) until given a colour; the colour panel offers the six pastels, "No color" to
+  clear it, and a background/accent wheel with automatic contrast text
 - Tab color wheel
 - Color brightness/value slider that is preserved when the wheel color changes
 - Color opacity slider for the sidebar tab accent
@@ -94,9 +100,17 @@
   the theme's accent marks only the button under the pointer and a pressed toggle
 - Window bounds persistence
 - Editor area is explicitly non-drag so BlockNote mouse interactions remain intact
-- Single share-style export icon with PDF/Markdown format choices
+- Single share-style export icon: PDF or Markdown in one click, and Options... for the Export window (the open note,
+  its folder or every note; PDF, Markdown, HTML or a PNG image; colours, page size, images beside the file, front
+  matter; Copy as Markdown)
 - PDF export hides app chrome and sticky background
-- PDF export renders with NotePane Light colours whatever theme is selected
+- PDF export renders with NotePane Light colours unless the current theme is chosen in the Export window
+- Folders in the tabs sidebar: New folder, collapse and expand, rename, delete (notes move out), move a tab from its
+  menu or by dropping it on a folder header, new note in a folder; tab numbers and `Command/Ctrl + 1..9` follow the
+  visible order
+- Tags on notes: chips above the first block, added with suggestions; a tag opens the search palette filtered to it.
+  The palette (`Command/Ctrl + P`) filters by `#tag` and `folder:Name`, with folder and tag chips. A sticky window
+  shows the tag row only once its note has tags
 
 ## Editor
 
@@ -200,6 +214,10 @@ BlockNote handles editor interaction directly.
 ## Media tools
 
 - Image blocks expose an app-level image toolbar after selection
+- Right-clicking an image, video, audio or file block opens its menu: Open (in the default app, or the browser for a
+  web address), Preview (images and videos, shown large in the window), Show in Finder (a linked local file), Save
+  As..., Copy Image (images), Copy Link or Copy File Path (web and linked files), Crop... (images), left/centre/right
+  alignment (images and videos), and Delete. The formatting toolbar steps aside while the menu is open
 - Image download uses the desktop save dialog
 - Image crop replaces the selected image block with a cropped PNG data URL
 

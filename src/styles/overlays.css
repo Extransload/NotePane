@@ -93,6 +93,234 @@
   transform: translateY(-1px);
 }
 
+/* Export (src/ui/ExportDialog.jsx): a window like Settings, its rows built from the same
+   controls (src/styles/settings-controls.css), with format tiles and a footer of actions. */
+.export-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--notepane-backdrop-preferences);
+  -webkit-app-region: no-drag;
+}
+
+.export-dialog {
+  display: flex;
+  width: min(640px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  flex-direction: column;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(16px * var(--look-radius-scale, 1));
+  background: var(--sticky-panel-bg);
+  box-shadow: var(--sticky-panel-shadow);
+  color: var(--sticky-panel-text);
+  font-family: var(--notepane-ui-font);
+}
+
+.export-dialog-header {
+  display: flex;
+  align-items: center;
+  padding: 20px 16px 6px 28px;
+}
+
+.export-dialog-header h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.export-dialog-close {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sticky-panel-muted);
+  cursor: pointer;
+}
+
+.export-dialog-close:hover {
+  background: var(--sticky-control-hover-bg);
+  color: var(--sticky-panel-text);
+}
+
+.export-dialog-body {
+  overflow: auto;
+  padding: 0 28px 8px;
+}
+
+.export-formats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px;
+}
+
+.export-format {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(10px * var(--look-radius-scale, 1));
+  background: var(--sticky-panel-bg);
+  color: var(--sticky-panel-text);
+  font: 600 13px/1.2 var(--notepane-ui-font);
+  text-align: left;
+  cursor: pointer;
+}
+
+.export-format small {
+  color: var(--sticky-panel-muted);
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.export-format svg {
+  color: var(--sticky-panel-muted);
+}
+
+.export-format:hover:not(:disabled) {
+  background: var(--sticky-control-hover-bg);
+}
+
+.export-format.is-checked {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--notepane-control-accent);
+}
+
+.export-format.is-checked svg {
+  color: var(--notepane-control-accent);
+}
+
+.export-format:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.export-dialog-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 14px 16px 16px 28px;
+  border-top: 1px solid var(--sticky-border-color);
+}
+
+.export-dialog-spacer {
+  flex: 1;
+}
+
+.export-dialog-footer button {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(8px * var(--look-radius-scale, 1));
+  background: var(--sticky-panel-bg);
+  color: var(--sticky-panel-text);
+  font: 600 12.5px/1 var(--notepane-ui-font);
+  cursor: pointer;
+}
+
+.export-dialog-footer button:hover {
+  background: var(--sticky-control-hover-bg);
+}
+
+.export-dialog-footer .export-dialog-primary {
+  border-color: var(--notepane-control-accent);
+  background: var(--notepane-control-accent);
+  color: var(--sticky-panel-bg);
+}
+
+.export-dialog-footer .export-dialog-primary:hover {
+  background: var(--notepane-control-accent-hover);
+}
+
+/* An image or video shown large (src/ui/MediaPreview.jsx): a bar of actions over the dimmed
+   window, and the media fitted below it. */
+.media-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  justify-items: center;
+  gap: 14px;
+  padding: 16px 24px 24px;
+  background: var(--notepane-backdrop-crop);
+  backdrop-filter: blur(12px);
+  -webkit-app-region: no-drag;
+}
+
+.media-preview-bar {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 5px 5px 14px;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: 12px;
+  background: var(--sticky-portal-menu-bg);
+  box-shadow: var(--sticky-portal-menu-shadow);
+  color: var(--sticky-panel-text);
+}
+
+.media-preview-name {
+  overflow: hidden;
+  margin-right: 8px;
+  font: 650 12.5px/1 var(--notepane-ui-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-preview-bar button {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--sticky-panel-text);
+  font: 600 12px/1 var(--notepane-ui-font);
+  cursor: pointer;
+}
+
+.media-preview-bar button:hover {
+  background: var(--sticky-control-hover-bg);
+}
+
+.media-preview-bar .media-preview-close {
+  width: 28px;
+  justify-content: center;
+  padding: 0;
+}
+
+.media-preview-stage {
+  display: grid;
+  width: 100%;
+  min-height: 0;
+  place-items: center;
+}
+
+.media-preview-stage :is(img, video) {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  box-shadow: var(--sticky-panel-shadow);
+}
+
 .crop-dialog {
   position: fixed;
   inset: 0;
@@ -305,7 +533,8 @@ body.is-exporting .bn-editor [data-content-type="codeBlock"] > pre {
   .image-tools,
   .code-block-tools,
   .sticky-toast,
-  .crop-dialog {
+  .crop-dialog,
+  .media-preview {
     display: none !important;
   }
 

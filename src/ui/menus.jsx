@@ -1,9 +1,25 @@
 import {
+  Copy,
   CopyPlus,
+  Crop,
   Download,
+  ExternalLink,
   FileDown,
+  FilePlus,
+  Folder,
+  FolderInput,
+  FolderMinus,
+  FolderOpen,
+  FolderPlus,
+  FolderX,
+  Link,
   PanelTopOpen,
   PencilLine,
+  ScanEye,
+  SlidersHorizontal,
+  TextAlignCenter,
+  TextAlignEnd,
+  TextAlignStart,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -21,6 +37,9 @@ import {
   useMergedRefs,
   usePresenceContext,
 } from "../hooks/usePresence.js";
+import {
+  STICKY_PASTEL_PALETTE,
+} from "../constants.js";
 import {
   getNoteDisplayTitle,
 } from "../model/notes.js";
@@ -85,9 +104,13 @@ function MenuItem({ icon, children, tone, disabled = false, onSelect }) {
       onClick={onSelect}
     >
       {icon}
-      <span>{children}</span>
+      <span className="context-menu-label">{children}</span>
     </button>
   );
+}
+
+function MenuSeparator() {
+  return <div className="session-tab-menu-separator" role="separator" />;
 }
 
 const MENU_ICON_PROPS = {
@@ -115,35 +138,61 @@ function moveMenuFocus(event) {
   items[nextIndex].focus();
 }
 
+/**
+ * A menu opened at the pointer: placed below and right of it, flipped and clamped inside the
+ * window (useAnchoredMenuStyle), with arrow keys moving between its items. `className` names the
+ * menu for the stylesheet and for the window's outside-click handling.
+ */
+function ContextMenu({ x, y, label, className, children }) {
+  const menuRef = useRef(null);
+  const { rootProps } = usePresenceContext();
+  const rootRef = useMergedRefs(menuRef, rootProps.ref);
+  const position = useAnchoredMenuStyle(menuRef, { left: x, top: y });
+
+  return (
+    <div
+      {...rootProps}
+      ref={rootRef}
+      className={`${className} notepane-context-menu editor-floating-menu`}
+      role="menu"
+      aria-label={label}
+      style={position}
+      onContextMenu={(event) => event.preventDefault()}
+      onKeyDown={moveMenuFocus}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function SessionTabContextMenu({
   x,
   y,
   sessionNote,
   activeTheme,
   canOpenAsSticky = false,
+  folders = [],
   onRename,
   onDuplicate,
   onOpenAsSticky,
+  onPickColor,
   onOpenColor,
+  onMoveToFolder,
+  onNewFolder,
   onMoveToTrash,
 }) {
-  const menuRef = useRef(null);
-  const { rootProps } = usePresenceContext();
-  const rootRef = useMergedRefs(menuRef, rootProps.ref);
-  const position = useAnchoredMenuStyle(menuRef, { left: x, top: y });
   const storedColor = resolveSessionTabAccentColor(sessionNote.theme);
-  const colorPreview = storedColor ? toneMatch(storedColor, activeTheme, "mark") : undefined;
+  // A folder id that names no folder counts as none, as in the sidebar.
+  const currentFolderId = folders.some((folder) => folder.id === sessionNote.folderId)
+    ? sessionNote.folderId
+    : null;
 
   return (
-    <div
-      {...rootProps}
-      ref={rootRef}
-      className="session-tab-context-menu editor-floating-menu"
-      role="menu"
-      aria-label={`Session options for ${getNoteDisplayTitle(sessionNote)}`}
-      style={position}
-      onContextMenu={(event) => event.preventDefault()}
-      onKeyDown={moveMenuFocus}
+    <ContextMenu
+      x={x}
+      y={y}
+      label={`Session options for ${getNoteDisplayTitle(sessionNote)}`}
+      className="session-tab-context-menu"
     >
       <MenuItem icon={<PencilLine {...MENU_ICON_PROPS} />} onSelect={onRename}>
         Rename
@@ -156,11 +205,38 @@ export function SessionTabContextMenu({
           Open as sticky
         </MenuItem>
       )}
+      <MenuSeparator />
+      <div className="context-menu-swatches" role="group" aria-label="Tab color">
+        <button
+          type="button"
+          className="context-menu-swatch is-none"
+          aria-label="No color"
+          aria-pressed={!storedColor}
+          onMouseDown={preventFocusLoss}
+          onClick={() => onPickColor(null)}
+        />
+        {STICKY_PASTEL_PALETTE.map((color, index) => (
+          <button
+            key={color}
+            type="button"
+            className="context-menu-swatch"
+            aria-label={`Pastel color ${index + 1}`}
+            aria-pressed={storedColor === color}
+            style={{ "--context-menu-swatch-color": toneMatch(color, activeTheme, "fill") }}
+            onMouseDown={preventFocusLoss}
+            onClick={() => onPickColor(color)}
+          />
+        ))}
+      </div>
       <MenuItem
         icon={
           <span
             className="session-tab-menu-color-swatch"
-            style={{ "--session-tab-menu-color": colorPreview }}
+            style={{
+              "--session-tab-menu-color": storedColor
+                ? toneMatch(storedColor, activeTheme, "mark")
+                : undefined,
+            }}
             aria-hidden="true"
           />
         }
@@ -168,7 +244,31 @@ export function SessionTabContextMenu({
       >
         Color...
       </MenuItem>
-      <div className="session-tab-menu-separator" role="separator" />
+      <MenuSeparator />
+      <div className="context-menu-heading" role="presentation">Folder</div>
+      {folders
+        .filter((folder) => folder.id !== currentFolderId)
+        .map((folder) => (
+          <MenuItem
+            key={folder.id}
+            icon={<FolderInput {...MENU_ICON_PROPS} />}
+            onSelect={() => onMoveToFolder(folder.id)}
+          >
+            {`Move to ${folder.name}`}
+          </MenuItem>
+        ))}
+      {currentFolderId && (
+        <MenuItem
+          icon={<FolderMinus {...MENU_ICON_PROPS} />}
+          onSelect={() => onMoveToFolder(null)}
+        >
+          Remove from folder
+        </MenuItem>
+      )}
+      <MenuItem icon={<FolderPlus {...MENU_ICON_PROPS} />} onSelect={onNewFolder}>
+        New folder…
+      </MenuItem>
+      <MenuSeparator />
       <MenuItem
         icon={<Trash2 {...MENU_ICON_PROPS} />}
         tone="danger"
@@ -176,7 +276,141 @@ export function SessionTabContextMenu({
       >
         Move to Trash
       </MenuItem>
-    </div>
+    </ContextMenu>
+  );
+}
+
+/**
+ * The right-click menu of a folder header in the tabs sidebar. Deleting a folder
+ * moves its notes out to the ungrouped tabs, so it needs no confirmation.
+ */
+export function FolderContextMenu({
+  x,
+  y,
+  folder,
+  onNewNote,
+  onRename,
+  onToggleCollapsed,
+  onDelete,
+}) {
+  return (
+    <ContextMenu
+      x={x}
+      y={y}
+      label={`Folder options for ${folder.name}`}
+      className="folder-context-menu"
+    >
+      <MenuItem icon={<FilePlus {...MENU_ICON_PROPS} />} onSelect={onNewNote}>
+        New note in folder
+      </MenuItem>
+      <MenuItem icon={<PencilLine {...MENU_ICON_PROPS} />} onSelect={onRename}>
+        Rename
+      </MenuItem>
+      <MenuItem
+        icon={folder.collapsed
+          ? <FolderOpen {...MENU_ICON_PROPS} />
+          : <Folder {...MENU_ICON_PROPS} />}
+        onSelect={onToggleCollapsed}
+      >
+        {folder.collapsed ? "Expand" : "Collapse"}
+      </MenuItem>
+      <MenuSeparator />
+      <MenuItem
+        icon={<FolderX {...MENU_ICON_PROPS} />}
+        tone="danger"
+        onSelect={onDelete}
+      >
+        Delete folder
+      </MenuItem>
+    </ContextMenu>
+  );
+}
+
+const ALIGNMENTS = [
+  ["left", "Align left", TextAlignStart],
+  ["center", "Align center", TextAlignCenter],
+  ["right", "Align right", TextAlignEnd],
+];
+
+/**
+ * The right-click menu of an image, video, audio or file block. An action left undefined is not
+ * offered: `onPreview` for media the app cannot show, `onReveal` for a file that is not linked
+ * from disk, `onCopyLink` for a file kept with the note, `onCopyImage` and `onCrop` for anything
+ * but an image, `onAlign` for blocks without an alignment.
+ */
+export function MediaContextMenu({
+  x,
+  y,
+  name,
+  copyLinkLabel,
+  alignment,
+  onOpen,
+  onPreview,
+  onReveal,
+  onSave,
+  onCopyImage,
+  onCopyLink,
+  onCrop,
+  onAlign,
+  onDelete,
+}) {
+  return (
+    <ContextMenu x={x} y={y} label={`Options for ${name}`} className="media-context-menu">
+      <div className="context-menu-heading" title={name}>{name}</div>
+      <MenuItem icon={<ExternalLink {...MENU_ICON_PROPS} />} onSelect={onOpen}>
+        Open
+      </MenuItem>
+      {onPreview && (
+        <MenuItem icon={<ScanEye {...MENU_ICON_PROPS} />} onSelect={onPreview}>
+          Preview
+        </MenuItem>
+      )}
+      {onReveal && (
+        <MenuItem icon={<FolderOpen {...MENU_ICON_PROPS} />} onSelect={onReveal}>
+          Show in Finder
+        </MenuItem>
+      )}
+      <MenuSeparator />
+      <MenuItem icon={<Download {...MENU_ICON_PROPS} />} onSelect={onSave}>
+        Save As...
+      </MenuItem>
+      {onCopyImage && (
+        <MenuItem icon={<Copy {...MENU_ICON_PROPS} />} onSelect={onCopyImage}>
+          Copy Image
+        </MenuItem>
+      )}
+      {onCopyLink && (
+        <MenuItem icon={<Link {...MENU_ICON_PROPS} />} onSelect={onCopyLink}>
+          {copyLinkLabel}
+        </MenuItem>
+      )}
+      {(onCrop || onAlign) && <MenuSeparator />}
+      {onCrop && (
+        <MenuItem icon={<Crop {...MENU_ICON_PROPS} />} onSelect={onCrop}>
+          Crop...
+        </MenuItem>
+      )}
+      {onAlign && (
+        <div className="context-menu-segments" role="group" aria-label="Alignment">
+          {ALIGNMENTS.map(([value, label, Icon]) => (
+            <button
+              key={value}
+              type="button"
+              aria-label={label}
+              aria-pressed={alignment === value}
+              onMouseDown={preventFocusLoss}
+              onClick={() => onAlign(value)}
+            >
+              <Icon {...MENU_ICON_PROPS} />
+            </button>
+          ))}
+        </div>
+      )}
+      <MenuSeparator />
+      <MenuItem icon={<Trash2 {...MENU_ICON_PROPS} />} tone="danger" onSelect={onDelete}>
+        Delete
+      </MenuItem>
+    </ContextMenu>
   );
 }
 
@@ -213,7 +447,9 @@ export function getExportMenuAnchor(trigger = null) {
   return { left: window.innerWidth / 2, top: 0, width: 0, height: 0, align: "center" };
 }
 
-export function ExportFormatMenu({ anchor, onExport }) {
+// One click exports the open note as PDF or Markdown with the usual settings; Options... opens
+// the Export window for HTML, an image, a folder or every note, and per-format settings.
+export function ExportFormatMenu({ anchor, onExport, onOpenOptions }) {
   const menuRef = useRef(null);
   const { rootProps } = usePresenceContext();
   const rootRef = useMergedRefs(menuRef, rootProps.ref);
@@ -250,6 +486,19 @@ export function ExportFormatMenu({ anchor, onExport }) {
         <span className="export-format-menu-copy">
           <strong>Markdown</strong>
           <small>Editable .md file</small>
+        </span>
+      </button>
+      <div className="session-tab-menu-separator" role="separator" />
+      <button
+        type="button"
+        role="menuitem"
+        onMouseDown={preventFocusLoss}
+        onClick={onOpenOptions}
+      >
+        <SlidersHorizontal aria-hidden="true" size={16} strokeWidth={2} />
+        <span className="export-format-menu-copy">
+          <strong>Options...</strong>
+          <small>HTML, image, folders, settings</small>
         </span>
       </button>
     </div>

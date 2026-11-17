@@ -15,10 +15,12 @@
 | `electron/main.cjs` | app lifecycle, tab/sticky window orchestration, native menu, note/session create/activate/delete IPC, export/download IPC |
 | `electron/store.cjs` | local JSON persistence |
 | `electron/assetStore.cjs` | content-addressed media files under `userData/assets`, served as `notepane-asset://local/<sha256>.<ext>` |
+| `electron/assetOpen.cjs` | Open from the media menu: a web address goes to the browser, anything else opens as a copy named after its block in the temp folder, limited to media files so a note cannot launch a program (`assets:open`; `assets:reveal` shows a linked local file in Finder) |
 | `electron/bookmarkMetadata.cjs` | the `bookmarks:fetch-metadata` IPC behind a bookmark card: reads a public http(s) page's title, description, site name and preview image, refusing other schemes and loopback, private and link-local addresses (redirects included), within 5 s and 1 MB |
 | `electron/preload.cjs` | safe renderer bridge |
 | `electron/appUpdates.cjs` | update checks for a packaged app against GitHub Releases: install on quit, or offer the release page from an ad-hoc signed Mac build; `checkNow()` behind the About page's `app:check-for-updates` IPC, and `compareVersions` |
 | `electron-builder.config.cjs` | packaging, signing and publishing; `.github/workflows/release.yml` runs it on a version tag (see `docs/release.md`) |
+| `scripts/homebrew-cask.mjs` | the Homebrew cask for a published release; `.github/workflows/homebrew.yml` pushes it to `Extransload/homebrew-tap` |
 | `electron/themes.json` | the theme definitions (palette, code theme, overrides), the single source read by the renderer (`src/style/themes.js`) and the main process (`electron/windowTheme.cjs`, `electron/store.cjs`) |
 | `src/main.jsx` | composition only: the `App` shell and the `StickyEditor` component that wires everything below together |
 | `src/styles.css` | ordered `@import` list for `src/styles/` |
@@ -70,8 +72,12 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | The code block formatters that are not Prettier plugins, most of them WebAssembly, each loaded on first use. Their `.wasm` is inlined into its lazy chunk as a data: URL (`build.assetsInlineLimit` in `vite.config.js`) because the packaged renderer's file:// page cannot fetch a file beside it, and the CSP's `script-src` allows `'wasm-unsafe-eval'` to compile it | `src/editor/codeFormatEngines.js` |
 | Code block languages: the language menu's list and search, the language a new code block starts in | `src/editor/codeLanguages.js` |
 | Code block tool bar: showing on hover, the language menu, Prettify and Copy | `src/ui/CodeBlockTools.jsx`, `src/ui/CodeLanguageMenu.jsx` |
-| Note search matching, snippets and plain-text extraction | `src/model/search.js` |
-| The note search palette: its results, match count and last-edited labels, keyboard selection | `src/ui/SearchPalette.jsx`, `src/hooks/useNoteSearchPalette.js`, `formatRelativeEditTime` in `src/model/notes.js` |
+| Note search matching, snippets and plain-text extraction; the palette query's `#tag` and `folder:` filters (`parseSearchQuery`, `formatSearchQuery`, `filterSearchEntries`) | `src/model/search.js` |
+| The note search palette: its results with their folder and tags, match count and last-edited labels, keyboard selection, the folder and tag filter chips, opening it on a query (`openPaletteWithQuery`) | `src/ui/SearchPalette.jsx`, `src/hooks/useNoteSearchPalette.js`, `formatRelativeEditTime` in `src/model/notes.js` |
+| Tag rules: trimmed, without "#", lower-cased, spaces as "-", 1 to 32 characters, at most 20 a note (a twin in `electron/store.cjs`) | `src/model/tags.js` |
+| The tag chips above a note's first block: open the palette on a tag, add with suggestions, remove | `src/ui/NoteTags.jsx`, tag section of `src/styles/editor-surface.css` |
+| Folders in the tabs sidebar: grouping and visible order, folder names (store twin and IPC `folders:*`, `notes:set-folder`, `notes:set-tags` in `electron/store.cjs` / `electron/main.cjs`) | `src/model/folders.js` |
+| Folder headers, the New folder row, inline rename, the folder menu and dropping a tab on a header | `src/ui/SessionFolderHeader.jsx`, `src/hooks/useSessionFolders.js` |
 | Find in note decorations and navigation | `src/editor/findInNote.js`, `src/hooks/useFindInNote.js` |
 | Note titles, ordering, trash previews | `src/model/notes.js` |
 | Preference and font normalisation and defaults | `src/model/preferences.js` |
@@ -84,7 +90,11 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | A reload's first frames: the shell's last paint under the app, then the app's fade-in | `public/boot.js`, `index.html`, `src/hooks/useReloadReveal.js` |
 | Code block syntax colours per theme, re-highlighting on a theme change | `src/editor/codeHighlighter.js` |
 | The theme picker in Preferences | `src/ui/ThemePicker.jsx` |
-| The Preferences window: its page sidebar, page header and the cards each page is made of | `src/ui/preferencesWindow.jsx`, `src/ui/PreferencesCard.jsx`, `src/ui/preferencesSections.jsx`, `src/ui/trashPreferences.jsx` |
+| The Settings window (Tern-style floating window): grouped page sidebar (App, Look, Data, System), search over every setting (`SETTINGS_INDEX`), the hold-to-peek eye button, and the cards each page is made of | `src/ui/preferencesWindow.jsx`, `src/ui/PreferencesCard.jsx`, `src/ui/preferencesSections.jsx`, `src/ui/trashPreferences.jsx` |
+| The five Look pages (Theme, Fonts, Background, Surfaces, Tabs) and the controls they share | `src/ui/lookPreferences.jsx`, `src/ui/settingsControls.jsx` |
+| The look settings (`editorPreferences.look`): defaults, ranges, surface presets, built-in background pictures; the store keeps a twin normaliser and keeps background pictures through asset clean-up | `src/model/look.js`, `electron/store.cjs` |
+| Applying the look: attributes and `--look-*` variables on `<html>` (`useLookStyles`, its pure half `getLookStyles`) and the rules that read them; the default look changes nothing on screen | `src/hooks/useLookStyles.js`, `src/styles/look.css` |
+| Picking a background picture: `look:pick-background` stores the file as an asset (at most 32 MB) | `electron/main.cjs`, `electron/preload.cjs` |
 | Preferences > About: version, description, Electron/Chromium versions, the manual update check (`app:info`, `app:check-for-updates`) | `src/ui/aboutPreferences.jsx` |
 | Sticky shell and session tab computed styles | `src/style/themeStyles.js` |
 | Colour conversion and contrast | `src/style/colorMath.js` |
@@ -95,7 +105,9 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Keys handled on the editor surface | `src/hooks/useEditorSurfaceShortcuts.js` |
 | Window, session and tab-mode keyboard commands | `src/hooks/useKeyboardCommands.js` |
 | Session tab rename, duplicate, open as sticky, move to Trash, and closing the current tab | `src/hooks/useSessionTabActions.js` |
-| The session tab menu and the export format menu, placed at their anchor and clamped to the window | `src/ui/menus.jsx` |
+| The session tab menu (with its one-click tab colours), the media menu and the export format menu, placed at their anchor and clamped to the window | `src/ui/menus.jsx` |
+| Right-clicking an image, video, audio or file block, and what its menu does | `src/hooks/useMediaContextMenu.js` |
+| An image or video shown large from its menu | `src/ui/MediaPreview.jsx` |
 | Session tab drag and drop | `src/hooks/useSessionTabDrag.js` |
 | Whether the tabs sidebar is open: the user's choice, and the compact sidebar of a narrow window | `src/hooks/useSidebarVisibility.js` |
 | Export toast and zoom gauge timing | `src/hooks/useStickyToasts.js` |
@@ -225,8 +237,14 @@ The renderer uses:
 
 ## Export and media
 
-- Export is opened from one icon and then chooses PNG or PDF.
-- PNG export captures the visible editor surface with Electron `capturePage`.
+- Export is opened from one icon: its menu exports the open note as PDF or Markdown in one click, and Options... opens
+  the Export window (`src/ui/ExportDialog.jsx`, run by `src/hooks/useNoteExport.js`): the open note, its folder or every
+  note; PDF (light or current theme colours, A4 or Letter), Markdown (images inside the file or in a folder beside
+  it, optional title/tags/dates front matter), HTML (one self-contained page) or an image; Copy as Markdown.
+- An image export renders the note's HTML page in a hidden window and captures it whole (`renderHtmlToPng` in
+  `electron/noteExport.cjs`, cut at 16000 px). A folder or every note exports Markdown or HTML, one file per note in a
+  folder the user picks, notes in folders written into sub-folders, same titles numbered (`export:notes`). Notes
+  that are not open are converted by a detached editor (`src/editor/noteConversion.js`).
 - PDF export uses Electron `printToPDF` with print CSS that hides app chrome.
 - Both export paths temporarily remove app chrome/background styling so the exported content has no NotePane shell background.
 - PDF export renders with NotePane Light's colours whatever theme is selected, its GitHub dark code blocks included, so
@@ -272,7 +290,7 @@ menus portalled to `document.body` inherit them. Stylesheets and components use 
 scheme is internal: it drives tone matching, BlockNote's `theme` prop, `color-scheme` and the wordmark, which keeps its
 brand colours in every theme (the light PNG for light themes, the dark PNG for dark themes).
 
-The theme is chosen in Preferences > General > App theme ("The theme applies to every window."): a radio group of
+The theme is chosen in Settings > Look > Theme ("The theme applies to every window."): a radio group of
 preview cards, each a small window drawn in that theme's colours. Clicking a card, or moving with the arrow keys,
 applies the theme at once in every open window, sticky windows and their portalled menus included, through the
 `app-theme:update` and `app-theme:changed` IPC broadcast. There is no light/dark toggle: the former Light/Dark switch,
@@ -289,9 +307,12 @@ tone matching and show the pastels as they are, the contrast fallback being thei
 and the colour panel preview show the tone-matched colour. Named editor colours (the formatting menu's text and
 background colours) are stored by name and take the theme's named colours directly.
 
-Session tab backgrounds can use each session's accent color. Active, inactive, and hover backgrounds are derived from
-that accent, tone-matched to the current theme, and the title text color is calculated from the effective background
-so the tab remains readable in every theme. Full-window custom background colors are deliberately not supported
+A session tab is plain until its note has a colour of its own: an outline, faintly filled on hover and when open
+(`.session-tab-row.is-plain`), and its search result dot is an empty ring. A sticky window without a colour still shows
+the pastel of its place in the stored note order. Once a session has an accent colour, the tab's active, inactive, and
+hover backgrounds are derived from it, tone-matched to the current theme, and the title text color is calculated from
+the effective background so the tab remains readable in every theme. The colour panel's "No color" swatch clears it.
+Full-window custom background colors are deliberately not supported
 because they conflict with editor-level colors such as text color, code background, code text, and user authored
 inline colors.
 
@@ -348,7 +369,7 @@ Sticky styling is applied outside the BlockNote editor:
 - The sticky header exposes a gear button that opens per-sticky window settings for background color/opacity, pinning, layout, and editor controls.
 - Sticky mode calculates text, border, code, and table colors from the current sticky background to keep contrast readable.
 - The session tab context menu exposes per-tab color/opacity settings in Tab session mode.
-- The export control uses a share-style icon and opens PNG/PDF choices.
+- The export control uses a share-style icon and opens PDF/Markdown choices and the Export window.
 - `.sticky-header` is the only drag region.
 - `.sticky-editor-surface` is explicitly `no-drag`.
 - Sidebar controls, header toggle, and image tools are explicitly `no-drag`.

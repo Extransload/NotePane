@@ -382,3 +382,38 @@ test("reports a pasted file that cannot be read and leaves no placeholder behind
   await expect(page.locator(".sticky-toast-error")).toHaveText("Could not add photo.png.");
   await expect(page.locator(".bn-editor [data-content-type='image']")).toHaveCount(0);
 });
+
+test("right-clicking an image opens its menu: preview, alignment and delete", async ({ page }) => {
+  await loadTemplatePreview(page);
+  const images = page.locator(".bn-editor [data-content-type='image']");
+  const imageCount = await images.count();
+  const image = images.first();
+  const source = await image.locator("img.bn-visual-media").getAttribute("src");
+  const menu = page.getByRole("menu", { name: /^Options for / });
+
+  await image.locator("img.bn-visual-media").click({ button: "right" });
+  await expect(menu).toBeVisible();
+  // A web image can be opened, previewed and its address copied; it has no file to show in Finder.
+  for (const name of ["Open", "Preview", "Save As...", "Copy Link", "Crop...", "Delete"]) {
+    await expect(menu.getByRole("menuitem", { name })).toBeVisible();
+  }
+  await expect(menu.getByRole("menuitem", { name: "Show in Finder" })).toHaveCount(0);
+  // The menu repeats the formatting toolbar's actions, so the toolbar steps aside.
+  await expect(page.locator(".notepane-formatting-toolbar:visible")).toHaveCount(0);
+
+  await menu.getByRole("button", { name: "Align center" }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(image).toHaveAttribute("data-text-alignment", "center");
+
+  await image.locator("img.bn-visual-media").click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "Preview" }).click();
+  const preview = page.getByRole("dialog", { name: /^Preview of / });
+  await expect(preview).toBeVisible();
+  await expect(preview.locator("img")).toHaveAttribute("src", source);
+  await page.keyboard.press("Escape");
+  await expect(preview).toHaveCount(0);
+
+  await image.locator("img.bn-visual-media").click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "Delete" }).click();
+  await expect(images).toHaveCount(imageCount - 1);
+});

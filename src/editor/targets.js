@@ -5,7 +5,7 @@ export function isEditorShortcutTarget(target) {
 
   if (
     target.closest(
-      ".sticky-header, .session-sidebar, .image-tools, .crop-dialog, .preferences-panel, .preferences-window, .find-bar, .search-palette",
+      ".sticky-header, .session-sidebar, .image-tools, .crop-dialog, .preferences-panel, .preferences-window, .find-bar, .search-palette, .note-tags",
     )
   ) {
     return false;

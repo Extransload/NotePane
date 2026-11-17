@@ -121,6 +121,65 @@
   outline: none;
 }
 
+/* Filter chips under the query: folders, then the tags in use. Pressed chips
+   get the accent ring, as a pressed tag chip on a note does. */
+.search-palette-filters {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--sticky-border-color) 36%, transparent);
+}
+
+.search-palette-filters-gap {
+  width: 8px;
+}
+
+.search-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+  height: 22px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: 999px;
+  background: var(--sticky-control-bg);
+  color: var(--sticky-muted-color);
+  font: 500 12px/1 var(--notepane-ui-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.search-filter-chip svg {
+  flex: 0 0 auto;
+}
+
+.search-filter-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-filter-chip:hover,
+.search-filter-chip[aria-pressed="true"] {
+  background: var(--sticky-control-hover-bg);
+  color: var(--sticky-text-color);
+}
+
+.search-filter-chip[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--notepane-control-accent) 55%, transparent);
+}
+
+.search-filter-chip:focus-visible {
+  outline: 2px solid var(--notepane-focus-outline);
+  outline-offset: 1px;
+}
+
 .search-palette-results {
   min-height: 0;
   margin: 0;
@@ -150,6 +209,11 @@
   border-radius: 50%;
 }
 
+/* A note without a colour of its own, whose tab is plain too. */
+.search-result-dot.is-plain {
+  box-shadow: inset 0 0 0 1.5px var(--sticky-muted-color);
+}
+
 .search-result-title {
   overflow: hidden;
   font-weight: 650;
@@ -172,6 +236,38 @@
 }
 
 .search-result-count + .search-result-time::before {
+  margin-right: 8px;
+  content: "·";
+}
+
+/* The note's folder and tags, before its match count and edit time. */
+.search-result-path {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 220px;
+  overflow: hidden;
+}
+
+.search-result-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-result-tags {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-result-folder + .search-result-tags::before,
+.search-result-path + .search-result-count::before,
+.search-result-path + .search-result-time::before {
   margin-right: 8px;
   content: "·";
 }

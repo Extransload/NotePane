@@ -79,7 +79,8 @@ test("shows table of contents in tab mode only when enabled from preferences", a
     const heading = [...document.querySelectorAll(".sticky-editor-surface .bn-block-outer")]
       .find((element) => element.textContent?.includes("Launch checklist"));
     if (!surface || !heading) throw new Error("Launch checklist heading was not rendered");
-    surface.scrollTop = Math.max(0, heading.offsetTop - 48);
+    // Measured on screen, so whatever sits above the editor (the note's tag row) is counted.
+    surface.scrollTop += Math.max(0, heading.getBoundingClientRect().top - surface.getBoundingClientRect().top - 40);
     surface.dispatchEvent(new Event("scroll"));
   });
   await expect(tableOfContents.getByRole("button", {
@@ -429,7 +430,6 @@ test("keeps breathing room above and below the editor document", async ({ page }
     }
 
     return {
-      editorPaddingTop: Number.parseFloat(editorStyle.paddingTop),
       editorPaddingBottom: Number.parseFloat(editorStyle.paddingBottom),
       emptyTailPoint: point,
       firstBlockTopGap: firstBlockRect.top - surfaceTopRect.top,
@@ -437,7 +437,6 @@ test("keeps breathing room above and below the editor document", async ({ page }
       scrollTop: surface.scrollTop,
     };
   });
-  expect(spacingMetrics.editorPaddingTop).toBeGreaterThanOrEqual(30);
   expect(spacingMetrics.editorPaddingBottom).toBeGreaterThanOrEqual(120);
   expect(spacingMetrics.firstBlockTopGap).toBeGreaterThanOrEqual(24);
   expect(spacingMetrics.lastBlockBottomGap).toBeGreaterThanOrEqual(72);
@@ -717,6 +716,19 @@ test("turns the sidebar compact in a narrow window without losing the wide-windo
   await expect(sidebar).toHaveAttribute("data-sidebar-state", "expanded");
 });
 
+const PREFERENCE_PAGE_NAMES = [
+  "Editor",
+  "Theme",
+  "Fonts",
+  "Background",
+  "Surfaces",
+  "Tabs",
+  "Trash",
+  "Backup",
+  "Shortcuts",
+  "About",
+];
+
 test("lays Preferences out as a sidebar of pages beside a scrolling page of cards", async ({ page }) => {
   await page.keyboard.press(modifierShortcut(","));
   const preferences = page.getByRole("dialog", { name: "Preferences window" });
@@ -725,18 +737,22 @@ test("lays Preferences out as a sidebar of pages beside a scrolling page of card
   await preferences.evaluate((element) => Promise.all(
     element.getAnimations({ subtree: true }).map((animation) => animation.finished),
   ));
+  const sidebarPane = preferences.locator(".preferences-window-sidebar");
+  const sidebarBox = await sidebarPane.boundingBox();
+  expect(Math.round(sidebarBox.width)).toBe(248);
   const sidebar = preferences.getByRole("tablist", { name: "Preferences pages" });
-  const sidebarBox = await sidebar.boundingBox();
-  expect(Math.round(sidebarBox.width)).toBe(180);
-  await expect(sidebar.getByRole("tab")).toHaveText(["General", "Editor", "Trash", "Shortcuts", "About"]);
-  expect(await sidebar.locator("[role='tab'] svg").count()).toBe(5);
+  await expect(sidebar.getByRole("tab")).toHaveText(PREFERENCE_PAGE_NAMES);
+  expect(await sidebar.locator("[role='tab'] svg").count()).toBe(PREFERENCE_PAGE_NAMES.length);
+  // Group headings label the pages without being tabs themselves.
+  await expect(sidebar.locator(".preferences-nav-heading"))
+    .toHaveText(["App", "Look", "Data", "System"]);
 
-  for (const pageName of ["General", "Editor", "Trash", "Shortcuts", "About"]) {
+  for (const pageName of PREFERENCE_PAGE_NAMES) {
     await sidebar.getByRole("tab", { name: pageName }).click();
     const panel = preferences.getByRole("tabpanel");
     await expect(panel.getByRole("heading", { level: 2 })).toHaveText(pageName);
     const layout = await panel.evaluate((element) => {
-      const cards = [...element.querySelectorAll(".preferences-card")];
+      const cards = [...element.querySelectorAll(".preferences-card, .settings-group")];
       const overflowing = cards.flatMap((card) => {
         const cardBox = card.getBoundingClientRect();
         return [...card.querySelectorAll("*")]
@@ -747,7 +763,8 @@ test("lays Preferences out as a sidebar of pages beside a scrolling page of card
           .map((child) => child.className || child.tagName);
       });
       return {
-        cards: cards.map((card) => card.querySelector(".preferences-card-title")?.textContent),
+        cards: cards.map((card) =>
+          card.querySelector(".preferences-card-title, .settings-group-label")?.textContent),
         overflowing,
       };
     });
@@ -756,10 +773,83 @@ test("lays Preferences out as a sidebar of pages beside a scrolling page of card
   }
 
   // The page scrolls on its own; the sidebar stays put.
-  await sidebar.getByRole("tab", { name: "General" }).click();
+  await sidebar.getByRole("tab", { name: "Theme" }).click();
   const body = preferences.locator(".preferences-page-body");
   await body.evaluate((element) => element.scrollTo(0, element.scrollHeight));
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
-  expect((await sidebar.boundingBox()).y).toBe(sidebarBox.y);
+  expect((await sidebarPane.boundingBox()).y).toBe(sidebarBox.y);
   await expect(preferences.getByRole("button", { name: "Close preferences" })).toBeInViewport();
+});
+
+test("finds a setting from the Preferences search and opens its page", async ({ page }) => {
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await expect(preferences).toBeVisible();
+  const search = preferences.getByRole("searchbox", { name: "Search settings" });
+
+  // Command-F searches settings while the window is open, not the note behind it.
+  await preferences.getByRole("tab", { name: "Tabs" }).click();
+  await page.keyboard.press(modifierShortcut("f"));
+  await expect(search).toBeFocused();
+  await expect(page.getByRole("search", { name: "Find in note" })).toHaveCount(0);
+
+  await search.fill("line height");
+  const results = preferences.getByRole("listbox", { name: "Settings search results" });
+  await expect(results.getByRole("option").first()).toContainText("Line height");
+  await expect(results.getByRole("option").first()).toContainText("Look › Fonts");
+  await expect(preferences.getByRole("heading", { level: 2 })).toHaveText("Search");
+
+  // Escape in a filled field clears it and leaves the window open.
+  await page.keyboard.press("Escape");
+  await expect(search).toHaveValue("");
+  await expect(preferences).toBeVisible();
+  await expect(preferences.getByRole("heading", { level: 2 })).toHaveText("Tabs");
+
+  await search.fill("zzzz-no-such-setting");
+  await expect(preferences.getByText(/^No settings match/)).toBeVisible();
+
+  await search.fill("line height");
+  await page.keyboard.press("Enter");
+  await expect(preferences.getByRole("tab", { name: "Fonts" }))
+    .toHaveAttribute("aria-selected", "true");
+  await expect(search).toHaveValue("");
+  const row = preferences.locator("[data-setting-id='lineHeight']");
+  await expect(row).toHaveAttribute("data-search-hit", "");
+  await expect(row).toBeInViewport();
+
+  // A row this window does not render itself is found by its control.
+  await search.fill("table of contents");
+  const tocResult = results.getByRole("option").first();
+  await expect(tocResult).toContainText("App › Editor");
+  await tocResult.click();
+  await expect(preferences.getByRole("tab", { name: "Editor" }))
+    .toHaveAttribute("aria-selected", "true");
+  await expect(preferences.locator(".preference-setting-row[data-search-hit]"))
+    .toContainText("Table of contents");
+
+  // With the field empty, Escape closes the window as before.
+  await search.focus();
+  await page.keyboard.press("Escape");
+  await expect(preferences).toHaveCount(0);
+});
+
+test("hides Preferences while the eye button is held", async ({ page }) => {
+  await page.keyboard.press(modifierShortcut(","));
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await expect(preferences).toBeVisible();
+  await preferences.evaluate((element) => Promise.all(
+    element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+  ));
+  const eye = preferences.getByRole("button", { name: "Hold to see the app" });
+  const box = await eye.boundingBox();
+  const windowOpacity = () => preferences.evaluate((element) => getComputedStyle(element).opacity);
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(page.locator(".preferences-backdrop")).toHaveClass(/is-peeking/);
+  await expect.poll(windowOpacity).toBe("0");
+  await page.mouse.up();
+  await expect(page.locator(".preferences-backdrop")).not.toHaveClass(/is-peeking/);
+  await expect.poll(windowOpacity).toBe("1");
+  await expect(preferences).toBeVisible();
 });

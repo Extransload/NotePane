@@ -12,9 +12,9 @@ import {
   clamp,
 } from "../utils/values.js";
 
-// Each note's place in `notes`, the stored note order. A note without a stored colour shows the
-// default pastel of its place (resolveDefaultStickyAccentColor), so every view of a note (its
-// tab, its sticky window, its search result) must take the index from here.
+// Each note's place in `notes`, the stored note order. A sticky window whose note has no stored
+// colour shows the default pastel of its place (resolveDefaultStickyAccentColor), so it must take
+// the index from here. A session tab without a colour stays plain.
 export function getNoteIndexById(notes) {
   return new Map(notes.map((note, index) => [note.id, index]));
 }

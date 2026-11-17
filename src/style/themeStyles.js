@@ -61,15 +61,11 @@ export function resolveDefaultStickyAccentColor(noteIndex = 0) {
   ];
 }
 
-// The colour that marks a note in small places, such as the search result dot: the colour its
-// session tab resolves (its own colour, or the default pastel of `noteIndex`, its place in the
-// stored notes; see getNoteIndexById), in the active theme's tone.
-export function resolveNoteMarkColor(noteTheme, theme, noteIndex) {
-  const accentColor = resolveSessionTabAccentColor(
-    noteTheme,
-    resolveDefaultStickyAccentColor(noteIndex),
-  );
-  return toneMatch(accentColor, theme, "mark");
+// The colour that marks a note in small places, such as the search result dot: the note's own tab
+// colour in the active theme's tone, or null for a note without one, whose tab is plain too.
+export function resolveNoteMarkColor(noteTheme, theme) {
+  const accentColor = resolveSessionTabAccentColor(noteTheme);
+  return accentColor ? toneMatch(accentColor, theme, "mark") : null;
 }
 
 /**
@@ -130,16 +126,14 @@ export function getNoteChrome(theme) {
   return theme.noteChrome ?? deriveNoteChrome(theme);
 }
 
-export function getSessionTabStyle(noteTheme, theme, noteIndex = 0) {
-  const accentColor = resolveSessionTabAccentColor(
-    noteTheme,
-    resolveDefaultStickyAccentColor(noteIndex),
-  );
-  const tabTextOpacity = resolveTabTextOpacity(noteTheme);
-
-  if (!accentColor && tabTextOpacity === DEFAULT_THEME.tabTextOpacity) {
+// A tab is plain (no inline style) until its note has a colour of its own; a sticky window still
+// falls back to the pastel of its place (resolveStickyAccentColor), a tab does not.
+export function getSessionTabStyle(noteTheme, theme) {
+  const accentColor = resolveSessionTabAccentColor(noteTheme);
+  if (!accentColor) {
     return {};
   }
+  const tabTextOpacity = resolveTabTextOpacity(noteTheme);
 
   const chrome = getNoteChrome(theme);
   const fillColor = mixHexColors(

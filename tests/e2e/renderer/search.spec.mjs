@@ -274,19 +274,22 @@ test("find opened from the palette expands the toggle holding the match", async 
   await expect(wrapper).toHaveAttribute("data-show-children", "true");
 });
 
-// A preload bridge with two stored notes and no stored colours, so each note shows the default
-// pastel of its place in the stored order. `__searchBridge.addNote` stores a note the way another
-// window would, without telling this one; `__searchBridge.broadcast` then sends the main
-// process's notes-changed message.
+// A preload bridge with two stored notes and no stored colours, so both tabs are plain. The first
+// note is tagged #guide and #launch and sits in no folder; the second is tagged #launch and sits in
+// the folder Work.
+// `__searchBridge.addNote` stores a note the way another window would, without telling this one;
+// `__searchBridge.broadcast` then sends the main process's notes-changed message.
 function stubTwoNoteBridge() {
   const now = Date.now();
-  const makeNote = (index, title) => ({
+  const makeNote = (index, title, theme = {}, tags = [], folderId = null) => ({
     id: `search-note-${index + 1}`,
     title,
     titleManuallyEdited: true,
     blocksJSON: null,
     markdown: "",
-    theme: {},
+    theme,
+    tags,
+    folderId,
     seedDemoContent: false,
     editorFontFamily: "Inter",
     trashedAt: null,
@@ -294,16 +297,28 @@ function stubTwoNoteBridge() {
     createdAt: now + index,
     updatedAt: now + index,
   });
-  const notes = [makeNote(0, "First stored note"), makeNote(1, "Second stored note")];
+  const folders = [{ id: "search-folder-work", name: "Work", collapsed: false }];
+  const notes = [
+    makeNote(0, "First stored note", {}, ["guide", "launch"]),
+    makeNote(1, "Second stored note", {}, ["launch"], "search-folder-work"),
+  ];
   let notesChangedListener = null;
+  const broadcast = () => notesChangedListener?.({ notes: [...notes], folders: [...folders] });
   window.__searchBridge = {
-    addNote: (title) => notes.push(makeNote(notes.length, title)),
-    broadcast: () => notesChangedListener?.({ notes: [...notes] }),
+    addNote: (title, theme) => notes.push(makeNote(notes.length, title, theme)),
+    broadcast,
   };
   window.blocknoteSticky = {
     getCurrentNoteId: async () => notes[0].id,
     getNote: async (noteId) => notes.find((note) => note.id === noteId) ?? notes[0],
     listNotes: async () => [...notes],
+    listFolders: async () => [...folders],
+    setNoteTags: async ({ noteId, tags }) => {
+      const note = notes.find((candidate) => candidate.id === noteId);
+      note.tags = [...tags];
+      broadcast();
+      return note;
+    },
     listTrash: async () => [],
     getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
     getLayoutMode: async () => "tabs",
@@ -320,34 +335,33 @@ function stubTwoNoteBridge() {
   };
 }
 
-test("colours a search result dot like the note's own tab, notes from other windows included", async ({ page }) => {
+test("marks a search result like the note's own tab, notes from other windows included", async ({ page }) => {
   await page.addInitScript(stubTwoNoteBridge);
   await page.reload();
   const tabColour = (title) =>
     page.locator(".session-tab-row").filter({ hasText: title }).evaluate((row) => getComputedStyle(row).backgroundColor);
-  const dotColour = (title) =>
-    palette(page)
-      .getByRole("option", { name: new RegExp(title) })
-      .locator(".search-result-dot")
-      .evaluate((dot) => getComputedStyle(dot).backgroundColor);
+  const dot = (title) =>
+    palette(page).getByRole("option", { name: new RegExp(title) }).locator(".search-result-dot");
+  const dotColour = (title) => dot(title).evaluate((element) => getComputedStyle(element).backgroundColor);
   await expect(page.locator(".session-tab-row")).toHaveCount(2);
 
-  // Another window stores a third note; this window has not heard of it yet, but the palette
-  // searches the stored notes.
-  await page.evaluate(() => window.__searchBridge.addNote("Third stored note"));
+  // Another window stores a third note with a colour of its own; this window has not heard of it
+  // yet, but the palette searches the stored notes.
+  await page.evaluate(() => window.__searchBridge.addNote("Third stored note", { tabTextColor: "#d9efff" }));
   await page.keyboard.press(modifierShortcut("P"));
   await expect(palette(page).getByRole("option")).toHaveCount(3);
-  const secondDot = await dotColour("Second stored note");
+  // A note without a colour gets a plain ring, as its tab gets no fill.
+  await expect(dot("Second stored note")).toHaveClass(/\bis-plain\b/);
+  await expect(dot("Third stored note")).not.toHaveClass(/\bis-plain\b/);
   const thirdDot = await dotColour("Third stored note");
   await palette(page).getByRole("textbox", { name: "Search notes" }).press("Escape");
 
   // Once this window hears of the third note, its tab shows the colour its dot showed.
   await page.evaluate(() => window.__searchBridge.broadcast());
   await expect(page.locator(".session-tab-row")).toHaveCount(3);
-  expect(secondDot).toBe(await tabColour("Second stored note"));
   expect(thirdDot).toBe(await tabColour("Third stored note"));
-  // Both default to their own pastel, not the first one.
-  expect(new Set([await tabColour("First stored note"), secondDot, thirdDot]).size).toBe(3);
+  await expect(page.locator(".session-tab-row").filter({ hasText: "Second stored note" })).toHaveClass(/\bis-plain\b/);
+  expect(await tabColour("Second stored note")).toBe("rgba(0, 0, 0, 0)");
 });
 
 test("refining the find query stays on the current match", async ({ page }) => {
@@ -422,4 +436,90 @@ test("scrolls a long search result list and keeps the keyboard selection in view
     const item = await last.boundingBox();
     return item.y >= list.y - 1 && item.y + item.height <= list.y + list.height + 1;
   }).toBe(true);
+});
+
+function searchFilters(page) {
+  return palette(page).getByRole("group", { name: "Search filters" });
+}
+
+test("a #tag in the palette query keeps only the notes carrying it", async ({ page }) => {
+  await page.addInitScript(stubTwoNoteBridge);
+  await page.reload();
+  await expect(page.locator(".session-tab-row")).toHaveCount(2);
+  await page.keyboard.press(modifierShortcut("P"));
+  const input = palette(page).getByRole("textbox", { name: "Search notes" });
+  const options = palette(page).getByRole("option");
+  await expect(options).toHaveCount(2);
+
+  // A filter with no text lists every note it keeps.
+  await input.fill("#launch");
+  await expect(options).toHaveCount(2);
+  await input.fill("#Guide");
+  await expect(options).toHaveCount(1);
+  await expect(options.first()).toContainText("First stored note");
+  await expect(searchFilters(page).getByRole("button", { name: "#guide" })).toHaveAttribute("aria-pressed", "true");
+  await expect(searchFilters(page).getByRole("button", { name: "#launch" })).toHaveAttribute("aria-pressed", "false");
+
+  // Tags and text together: the text is matched within the tagged notes only.
+  await input.fill("#launch second");
+  await expect(options).toHaveCount(1);
+  const second = options.first();
+  await expect(second).toContainText("Second stored note");
+  await expect(second.locator(".search-result-folder")).toHaveText("Work");
+  await expect(second.locator(".search-result-tags")).toHaveText("#launch");
+
+  await input.fill("#nosuchtag");
+  await expect(options).toHaveCount(0);
+  await expect(palette(page)).toContainText("No matching notes");
+});
+
+test("folder and tag chips filter the palette and keep the query in step", async ({ page }) => {
+  await page.addInitScript(stubTwoNoteBridge);
+  await page.reload();
+  await expect(page.locator(".session-tab-row")).toHaveCount(2);
+  await page.keyboard.press(modifierShortcut("P"));
+  const input = palette(page).getByRole("textbox", { name: "Search notes" });
+  const options = palette(page).getByRole("option");
+  const allFolders = searchFilters(page).getByRole("button", { name: "All folders" });
+  const work = searchFilters(page).getByRole("button", { name: "Work" });
+  await expect(allFolders).toHaveAttribute("aria-pressed", "true");
+
+  await work.click();
+  await expect(input).toHaveValue("folder:Work ");
+  await expect(input).toBeFocused();
+  await expect(work).toHaveAttribute("aria-pressed", "true");
+  await expect(allFolders).toHaveAttribute("aria-pressed", "false");
+  await expect(options).toHaveCount(1);
+  await expect(options.first()).toContainText("Second stored note");
+
+  // A tag chip adds to the folder filter; the second note is not tagged #guide.
+  await searchFilters(page).getByRole("button", { name: "#guide" }).click();
+  await expect(input).toHaveValue("folder:Work #guide ");
+  await expect(options).toHaveCount(0);
+
+  await allFolders.click();
+  await expect(input).toHaveValue("#guide ");
+  await expect(options).toHaveCount(1);
+  await expect(options.first()).toContainText("First stored note");
+
+  // A typed folder: token presses its chip, and clicking a pressed chip clears it.
+  await input.fill("folder:work");
+  await expect(work).toHaveAttribute("aria-pressed", "true");
+  await work.click();
+  await expect(input).toHaveValue("");
+  await expect(options).toHaveCount(2);
+});
+
+test("a tag chip on a note opens the palette filtered to its tag", async ({ page }) => {
+  await page.addInitScript(stubTwoNoteBridge);
+  await page.reload();
+  const noteTags = page.getByRole("group", { name: "Note tags" });
+  await expect(noteTags.getByRole("button", { name: "#guide" })).toBeVisible();
+  await expect(noteTags.getByRole("button", { name: "#launch" })).toBeVisible();
+
+  await noteTags.getByRole("button", { name: "#guide" }).click();
+  const input = palette(page).getByRole("textbox", { name: "Search notes" });
+  await expect(input).toHaveValue("#guide ");
+  await expect(palette(page).getByRole("option")).toHaveCount(1);
+  await expect(palette(page).getByRole("option").first()).toContainText("First stored note");
 });

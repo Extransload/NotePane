@@ -15,6 +15,7 @@ import {
   normalizeKeyboardShortcutEnabled,
   normalizeKeyboardShortcuts,
 } from "./keyboardShortcuts.js";
+import { normalizeLook } from "./look.js";
 import {
   isHexColor,
   normalizeOpacity,
@@ -82,6 +83,8 @@ export function normalizeEditorPreferences(
         ? source.showTableOfContents
         : Boolean(fallbackSource.showTableOfContents),
     ...normalizeKeyboardShortcutPreferences(source, fallbackSource),
+    // A partial update without a look keeps the previous one.
+    look: normalizeLook(source.look ?? fallbackSource.look),
   };
 }
 

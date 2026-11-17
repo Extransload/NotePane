@@ -163,3 +163,105 @@ test("shows a snippet that spans blocks on one line", async () => {
   assert.equal(result.snippet.text, "alpha needle beta");
   assert.deepEqual(result.snippet.ranges, [{ start: 6, end: 12 }]);
 });
+
+const loadTags = () => import("../../src/model/tags.js");
+
+test("normalizes tags: trimmed, no leading #, lower-cased, spaces as dashes, 1 to 32 characters", async () => {
+  const { normalizeTag } = await loadTags();
+  assert.equal(normalizeTag("  #Launch "), "launch");
+  assert.equal(normalizeTag("Q4  Launch\tPlan"), "q4-launch-plan");
+  assert.equal(normalizeTag("한글"), "한글");
+  assert.equal(normalizeTag("#"), "");
+  assert.equal(normalizeTag("   "), "");
+  assert.equal(normalizeTag("a".repeat(32)), "a".repeat(32));
+  assert.equal(normalizeTag("a".repeat(33)), "");
+});
+
+test("keeps tags unique, in the order added, and at most 20", async () => {
+  const { normalizeTags } = await loadTags();
+  assert.deepEqual(normalizeTags(["Guide", "#launch", "guide", "", "LAUNCH"]), ["guide", "launch"]);
+  const many = Array.from({ length: 25 }, (_, index) => `tag${index}`);
+  assert.equal(normalizeTags(many).length, 20);
+  assert.equal(normalizeTags(many)[19], "tag19");
+  assert.deepEqual(normalizeTags(null), []);
+});
+
+test("parses #tag and folder: tokens out of a palette query", async () => {
+  const { parseSearchQuery } = await loadSearch();
+  assert.deepEqual(parseSearchQuery("#Launch notes #guide"), { text: "notes", tags: ["launch", "guide"], folder: null });
+  assert.deepEqual(parseSearchQuery("folder:Work plan"), { text: "plan", tags: [], folder: "Work" });
+  assert.deepEqual(parseSearchQuery('folder:"Two words" #a #a'), { text: "", tags: ["a"], folder: "Two words" });
+  assert.deepEqual(parseSearchQuery("FOLDER:work folder:Personal"), { text: "", tags: [], folder: "Personal" });
+  // A filter token still being typed filters nothing and is not searched as text.
+  assert.deepEqual(parseSearchQuery("needle # folder:"), { text: "needle", tags: [], folder: null });
+  // Without filter tokens the text is kept as typed, so find in note receives it whole.
+  assert.deepEqual(parseSearchQuery("  two  spaces "), { text: "two  spaces", tags: [], folder: null });
+  assert.deepEqual(parseSearchQuery("C# notes"), { text: "C# notes", tags: [], folder: null });
+});
+
+test("formats filters back into a query that parses to the same filters", async () => {
+  const { formatSearchQuery, parseSearchQuery } = await loadSearch();
+  assert.equal(formatSearchQuery({ text: "plan", tags: ["launch"], folder: "Work" }), "folder:Work #launch plan");
+  assert.equal(formatSearchQuery({ text: "", tags: ["launch"], folder: null }), "#launch ");
+  assert.equal(formatSearchQuery({ text: " plan ", tags: [], folder: null }), "plan");
+  const query = formatSearchQuery({ text: "plan", tags: ["a", "b"], folder: "Two words" });
+  assert.equal(query, 'folder:"Two words" #a #b plan');
+  assert.deepEqual(parseSearchQuery(query), { text: "plan", tags: ["a", "b"], folder: "Two words" });
+});
+
+test("resolves a folder name to every folder carrying it, or to no folder", async () => {
+  const { resolveFolderFilter } = await loadSearch();
+  const folders = [
+    { id: "f1", name: "Work", collapsed: false },
+    { id: "f2", name: "work", collapsed: false },
+    { id: "f3", name: "Personal", collapsed: false },
+  ];
+  assert.equal(resolveFolderFilter(null, folders), null);
+  assert.deepEqual(resolveFolderFilter("WORK", folders), ["f1", "f2"]);
+  assert.equal(resolveFolderFilter("none", folders), "none");
+  assert.deepEqual(resolveFolderFilter("Missing", folders), []);
+});
+
+test("filters search entries by every tag and by folder", async () => {
+  const { filterSearchEntries } = await loadSearch();
+  const folders = [{ id: "work", name: "Work", collapsed: false }];
+  const entry = (id, tags, folderId) => ({ note: { id, tags, folderId }, title: id, body: "" });
+  const entries = [
+    entry("a", ["launch", "guide"], null),
+    entry("b", ["launch"], "work"),
+    entry("c", [], "work"),
+    // Its folder was deleted, so it counts as having none.
+    entry("d", ["launch"], "gone"),
+    // Notes stored before tags and folders existed.
+    { note: { id: "e" }, title: "e", body: "" },
+  ];
+  const ids = (options) => filterSearchEntries(entries, { folders, ...options }).map((item) => item.note.id);
+
+  assert.deepEqual(ids({}), ["a", "b", "c", "d", "e"]);
+  assert.deepEqual(ids({ tags: ["launch"] }), ["a", "b", "d"]);
+  assert.deepEqual(ids({ tags: ["#Launch", "guide"] }), ["a"]);
+  assert.deepEqual(ids({ folderId: "work" }), ["b", "c"]);
+  assert.deepEqual(ids({ folderId: ["work"], tags: ["launch"] }), ["b"]);
+  assert.deepEqual(ids({ folderId: "none" }), ["a", "d", "e"]);
+  assert.deepEqual(ids({ folderId: [] }), []);
+});
+
+test("lists every note a filter keeps when the query has no text", async () => {
+  const { filterSearchEntries, parseSearchQuery, searchNotes } = await loadSearch();
+  const entries = [
+    { note: { id: "a", tags: ["launch"] }, title: "Alpha", body: "one" },
+    { note: { id: "b", tags: [] }, title: "Beta", body: "two" },
+    { note: { id: "c", tags: ["launch"] }, title: "Gamma", body: "three" },
+  ];
+  const parsed = parseSearchQuery("#launch ");
+  const results = searchNotes(filterSearchEntries(entries, { tags: parsed.tags }), parsed.text);
+  assert.deepEqual(results.map((result) => result.note.id), ["a", "c"]);
+});
+
+test("collects the tags in use, alphabetically", async () => {
+  const { collectNoteTags } = await loadSearch();
+  assert.deepEqual(
+    collectNoteTags([{ tags: ["launch", "guide"] }, { tags: ["design", "launch"] }, {}]),
+    ["design", "guide", "launch"],
+  );
+});

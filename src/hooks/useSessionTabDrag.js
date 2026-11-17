@@ -138,6 +138,19 @@ export function useSessionTabDrag({
     [draggingSessionNoteId, reorderSessionNotes, visibleSessionNoteIds],
   );
 
+  // A drop that is not a reorder, such as a tab dropped on a folder header,
+  // first puts the tabs back in the order the drag started from. Marking the drop
+  // as handled keeps the drag's end from saving the abandoned preview order.
+  const cancelSessionTabReorder = useCallback(async () => {
+    const originalOrder = dragOriginalSessionOrderRef.current;
+    const hasReordered = dragHasReorderedRef.current;
+    dragDroppedInsideRef.current = true;
+    dragHasReorderedRef.current = false;
+    if (hasReordered && originalOrder) {
+      await reorderSessionNotes(originalOrder, { persist: false });
+    }
+  }, [reorderSessionNotes]);
+
   const endSessionTabDrag = useCallback(
     async (event) => {
       const droppedInside = dragDroppedInsideRef.current;
@@ -166,6 +179,7 @@ export function useSessionTabDrag({
   );
 
   return {
+    cancelSessionTabReorder,
     dropSessionTab,
     endSessionTabDrag,
     handleSessionTabDragOver,

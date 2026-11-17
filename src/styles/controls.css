@@ -1,7 +1,7 @@
 /* Menus, switches and the colour picker used by chrome and preferences. */
 
 /* Placed inline at their anchor, clamped to the window (useAnchoredMenuStyle in src/ui/menus.jsx). */
-.session-tab-context-menu,
+.notepane-context-menu,
 .export-format-menu {
   position: fixed;
   z-index: 46;
@@ -18,35 +18,55 @@
   animation: menuIn 130ms ease both;
 }
 
-.session-tab-context-menu button,
+.notepane-context-menu button,
 .export-format-menu button {
   display: flex;
   height: 28px;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   padding: 0 9px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
   color: var(--sticky-panel-text);
-  font: 680 11px/1 var(--notepane-ui-font);
+  font: 500 12.5px/1 var(--notepane-ui-font);
   text-align: left;
   cursor: pointer;
 }
 
-.session-tab-context-menu button:hover,
+.notepane-context-menu button:hover,
 .export-format-menu button:hover {
   background: var(--sticky-control-hover-bg);
 }
 
-.session-tab-context-menu {
-  min-width: 168px;
-  gap: 2px;
+.notepane-context-menu {
+  min-width: 210px;
+  gap: 1px;
 }
 
-.session-tab-context-menu button:focus-visible {
+.notepane-context-menu button:focus-visible {
   outline: 2px solid var(--notepane-focus-outline);
   outline-offset: -2px;
+}
+
+.notepane-context-menu button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.context-menu-label {
+  flex: 1 1 auto;
+}
+
+/* The file a media menu acts on, above its items. */
+.context-menu-heading {
+  overflow: hidden;
+  max-width: 260px;
+  padding: 5px 9px 4px;
+  color: var(--sticky-muted-color);
+  font: 600 11px/1.3 var(--notepane-ui-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-tab-menu-icon {
@@ -54,15 +74,72 @@
   color: var(--icon-chrome-color);
 }
 
-.session-tab-context-menu button.is-danger,
-.session-tab-context-menu button.is-danger .session-tab-menu-icon {
+.notepane-context-menu button.is-danger,
+.notepane-context-menu button.is-danger .session-tab-menu-icon {
   color: var(--sticky-danger-color);
 }
 
 .session-tab-menu-separator {
   height: 1px;
-  margin: 3px 4px;
+  margin: 3px 6px;
   background: var(--sticky-border-color);
+}
+
+/* One click colours a tab: no colour, then the six pastels. */
+.context-menu-swatches {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 4px 6px;
+}
+
+.notepane-context-menu .context-menu-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: 50%;
+  background: var(--context-menu-swatch-color);
+}
+
+.notepane-context-menu .context-menu-swatch:hover {
+  background: var(--context-menu-swatch-color);
+  transform: scale(1.1);
+}
+
+.notepane-context-menu .context-menu-swatch[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--sticky-panel-bg), 0 0 0 3.5px var(--notepane-control-accent);
+}
+
+.notepane-context-menu .context-menu-swatch.is-none {
+  background: linear-gradient(
+    to top right,
+    transparent calc(50% - 0.75px),
+    var(--sticky-muted-color) calc(50% - 0.75px) calc(50% + 0.75px),
+    transparent calc(50% + 0.75px)
+  );
+}
+
+/* Left, centre, right: a segmented row instead of three menu items. */
+.context-menu-segments {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  margin: 2px 4px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--sticky-control-hover-bg);
+}
+
+.notepane-context-menu .context-menu-segments button {
+  height: 24px;
+  justify-content: center;
+  padding: 0;
+}
+
+.notepane-context-menu .context-menu-segments button[aria-pressed="true"] {
+  background: var(--sticky-panel-bg);
+  box-shadow: var(--sticky-table-control-shadow);
 }
 
 .export-format-menu {

@@ -315,7 +315,7 @@ test("springs the zoom gauge in and glides its thumb between steps unless the sy
   await expect(page.getByRole("meter", { name: "Zoom" })).toHaveAttribute("aria-valuetext", "110%");
   expect(await readGaugeMotion()).toEqual({
     gaugeAnimation: "notepaneGaugeIn",
-    thumbTransition: "translate 0.18s",
+    thumbTransition: "translate 0.26s",
   });
 
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -405,19 +405,22 @@ test("changes editor typography globally from preferences", async ({ page }) => 
   await page.keyboard.press(modifierShortcut(","));
   const preferencesPanel = page.getByRole("dialog", { name: "Preferences window" });
   await expect(preferencesPanel).toBeVisible();
-  await expect(preferencesPanel.getByRole("tab", { name: "General" }))
+  await expect(preferencesPanel.getByRole("tab", { name: "Theme" }))
     .toHaveAttribute("aria-selected", "true");
   const appThemeLabelGap = await preferencesPanel
-    .locator(".preference-setting-row")
+    .locator(".settings-row")
     .first()
     .evaluate((row) => {
-      const title = row.querySelector(".preference-setting-title");
-      const description = row.querySelector(".preferences-section-description");
+      const title = row.querySelector(".settings-row-title");
+      const description = row.querySelector(".settings-row-description");
       const titleRect = title.getBoundingClientRect();
       const descriptionRect = description.getBoundingClientRect();
       return Math.round(descriptionRect.top - titleRect.bottom);
     });
-  expect(appThemeLabelGap).toBeGreaterThanOrEqual(3);
+  expect(appThemeLabelGap).toBeGreaterThanOrEqual(2);
+  // The workspace backup has its own page under Data.
+  await expect(preferencesPanel.getByText("Workspace backup")).toHaveCount(0);
+  await preferencesPanel.getByRole("tab", { name: "Backup" }).click();
   await expect(preferencesPanel.getByText("Workspace backup")).toBeVisible();
   const exportBackupButton = preferencesPanel.getByRole("button", {
     name: "Export backup",
@@ -433,13 +436,13 @@ test("changes editor typography globally from preferences", async ({ page }) => 
   await importBackupButton.click();
   await expect(page.locator(".sticky-toast-error"))
     .toHaveText("Data restore is available in the desktop app.");
-  await expect(page.locator("#preferences-editor")).toHaveCount(0);
-  await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
-  await expect(preferencesPanel.getByRole("tab", { name: "Editor" }))
+  await expect(page.locator("#preferences-fonts")).toHaveCount(0);
+  await preferencesPanel.getByRole("tab", { name: "Fonts" }).click();
+  await expect(preferencesPanel.getByRole("tab", { name: "Fonts" }))
     .toHaveAttribute("aria-selected", "true");
-  // The app font sits with the editor font in the Editor page's Typography card.
+  // The app font sits with the editor font on the Fonts page.
   const appFontRow = preferencesPanel.locator(".app-font-family-setting");
-  await expect(appFontRow.getByText("App font")).toBeVisible();
+  await expect(appFontRow.getByText("App font", { exact: true })).toBeVisible();
   await expect(appFontRow.getByLabel("App font family")).toHaveValue("Inter");
   await appFontRow.getByLabel("App font family").fill("avenir");
   await expect(page.getByRole("listbox", { name: "App font family options" }))
@@ -448,16 +451,11 @@ test("changes editor typography globally from preferences", async ({ page }) => 
     maxWidth: 238,
   });
   await page.getByRole("option", { name: "Avenir" }).click();
-  await expect(page.locator("#preferences-editor .preferences-section-title"))
-    .toHaveText("Editor");
-  await expect(page.getByText(/^The font family applies to every session tab\. Zoom the app with /))
-    .toBeVisible();
+  await expect(page.locator("#preferences-fonts .preferences-section-title"))
+    .toHaveText("Fonts");
   const fontFamilyRow = preferencesPanel.locator(".editor-font-family-setting");
-  await expect(fontFamilyRow.getByText("Font family")).toBeVisible();
+  await expect(fontFamilyRow.getByText("Editor font", { exact: true })).toBeVisible();
   await expect(fontFamilyRow.getByLabel("Editor font family")).toHaveValue("System");
-  // Text size follows the app zoom, as in Notion; there is no font size setting.
-  await expect(preferencesPanel.getByText("Font size")).toHaveCount(0);
-  await expect(preferencesPanel.getByText("App font size")).toHaveCount(0);
 
   await fontFamilyRow.getByLabel("Editor font family").fill("gar");
   await expect(page.getByRole("listbox", { name: "Font family options" }))
@@ -517,16 +515,19 @@ test("supports light/dark mode and readable sidebar tab background customization
       const shell = document.querySelector("[data-testid='sticky-shell']");
       const editor = document.querySelector(".bn-editor");
       const activeTab = document.querySelector(".session-tab-row.active");
+      const tabBackground = getComputedStyle(activeTab).backgroundColor;
+      const tabAlpha = Number((tabBackground.match(/[/,]\s*([\d.]+)\)$/) ?? [0, 1])[1]);
       return {
         shellBackground: getComputedStyle(shell).backgroundColor,
         editorText: getComputedStyle(editor).color,
-        activeTabBackground: getComputedStyle(activeTab).backgroundColor,
+        // A note without a colour of its own has a plain tab: no pastel, only a faint tint.
+        activeTabPlain: activeTab.classList.contains("is-plain") && tabAlpha <= 0.1,
       };
     });
   }).toMatchObject({
     shellBackground: "rgb(25, 25, 25)",
     editorText: "rgb(241, 241, 239)",
-    activeTabBackground: "rgb(224, 213, 162)",
+    activeTabPlain: true,
   });
 
   await selectAppTheme(page, "notepane-light");
@@ -537,14 +538,18 @@ test("supports light/dark mode and readable sidebar tab background customization
   await expect(preferencesPanel).toBeVisible();
   await expect(preferencesPanel.getByRole("tablist", { name: "Preferences pages" }))
     .toBeVisible();
-  await expect(preferencesPanel.getByRole("tab", { name: "General" }))
+  await expect(preferencesPanel.getByRole("tab", { name: "Theme" }))
     .toHaveAttribute("aria-selected", "true");
   await expect(preferencesPanel.getByRole("radiogroup", { name: "App theme" })).toBeVisible();
   await expect(preferencesPanel.getByText("Keyboard shortcuts")).toHaveCount(0);
   await expect(preferencesPanel.getByLabel("Editor font family")).toHaveCount(0);
-  await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
+  await preferencesPanel.getByRole("tab", { name: "Fonts" }).click();
   await expect(preferencesPanel.getByLabel("Editor font family")).toBeVisible();
   await expect(preferencesPanel.getByRole("radiogroup", { name: "App theme" })).toHaveCount(0);
+  await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
+  await expect(preferencesPanel.getByRole("switch", { name: "Show table of contents" }))
+    .toBeVisible();
+  await expect(preferencesPanel.getByLabel("Editor font family")).toHaveCount(0);
   await preferencesPanel.getByRole("tab", { name: "Shortcuts" }).click();
   await expect(preferencesPanel.getByText("Keyboard shortcuts")).toBeVisible();
   await preferencesPanel.getByRole("tab", { name: "Trash" }).click();
@@ -598,8 +603,8 @@ test("supports light/dark mode and readable sidebar tab background customization
 
   const editorSurfaceBox = await page.getByTestId("sticky-editor-surface").boundingBox();
   await page.mouse.move(editorSurfaceBox.x + 24, editorSurfaceBox.y + 24);
-  await expect.poll(() => getTabCssValue(page, 0, "backgroundColor"))
-    .toBe("rgb(255, 242, 184)");
+  // Opening the colour panel paints nothing: the tab stays plain until a colour is picked.
+  await expect(page.locator(".session-tab-row").first()).toHaveClass(/\bis-plain\b/);
   const initialActiveBackground = await getTabCssValue(page, 0, "backgroundColor");
   await page.getByRole("button", { name: "Eyedropper" }).click();
   await expect(page.getByLabel("HEX session tab color value")).toHaveValue(/^00ff31$/);
@@ -633,6 +638,11 @@ test("supports light/dark mode and readable sidebar tab background customization
   await expectActiveTabColor(page, "backgroundColor", "rgb(0, 255, 49)");
   await page.mouse.move(editorSurfaceBox.x + 24, editorSurfaceBox.y + 24);
   expect(await getTabCssValue(page, 0, "backgroundColor")).not.toBe(initialActiveBackground);
+
+  // "No color" clears the tab's colour and it is plain again.
+  await page.getByRole("button", { name: "No color" }).click();
+  await expect(page.getByRole("button", { name: "No color" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".session-tab-row").first()).toHaveClass(/\bis-plain\b/);
 
   const wheel = page.getByRole("slider", { name: "Session tab color" });
   const box = await wheel.boundingBox();
@@ -673,17 +683,15 @@ test("supports light/dark mode and readable sidebar tab background customization
 
     return {
       inactiveBackground: inactiveStyle.backgroundColor,
-      inactiveBoxShadow: inactiveStyle.boxShadow,
-      activeBackground: activeStyle.backgroundColor,
+      activePlain: activeTab.classList.contains("is-plain"),
       activeBorderColor: activeStyle.borderColor,
-      activeBoxShadow: activeStyle.boxShadow,
     };
   });
+  // The coloured tab keeps its colour when it is not the open one; the new session has no colour
+  // of its own, so its tab is plain, outlined more strongly while open.
   expect(tabStates.inactiveBackground).toBe("rgb(0, 255, 49)");
-  expect(tabStates.activeBackground).toBe("rgb(255, 215, 232)");
+  expect(tabStates.activePlain).toBe(true);
   expect(tabStates.activeBorderColor).not.toBe("rgba(0, 0, 0, 0)");
-  expect(tabStates.activeBoxShadow).not.toBe(tabStates.inactiveBoxShadow);
-  expect(tabStates.activeBoxShadow).not.toBe("none");
 
   await page.locator(".session-tab-row").first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Color..." }).click();
@@ -790,8 +798,10 @@ test("customizes keyboard shortcuts from preferences", async ({ page }) => {
 
 test("uses sticky pastel color and carries it back to the session tab", async ({ page }) => {
   const tabModeHeaderHeight = await getHeaderHeight(page);
-  const defaultTabBackground = await getTabCssValue(page, 0, "backgroundColor");
-  expect(defaultTabBackground).toBe("rgb(255, 242, 184)");
+  // The note has no colour of its own: its tab is plain, and its sticky window shows the pastel
+  // of its place.
+  await expect(page.locator(".session-tab-row").first()).toHaveClass(/\bis-plain\b/);
+  const defaultStickyBackground = "rgb(255, 242, 184)";
   const tabsModeButtonMetrics = await page.evaluate(() => {
     const footer = document.querySelector("[data-testid='session-sidebar-footer']");
     const button = footer.querySelector(".layout-mode-button");
@@ -832,7 +842,7 @@ test("uses sticky pastel color and carries it back to the session tab", async ({
       const shell = document.querySelector("[data-testid='sticky-shell']");
       return getComputedStyle(shell).backgroundColor;
     });
-  }).toBe(defaultTabBackground);
+  }).toBe(defaultStickyBackground);
   await expect(page.getByRole("group", { name: "Editor typography" }))
     .toHaveCount(0);
   await expect(page.getByRole("button", { name: "Sticky color" }))

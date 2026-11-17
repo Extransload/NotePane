@@ -997,6 +997,7 @@ test("opens the session tab menu at the pointer, clamped inside the window", asy
     "Rename",
     "Duplicate",
     "Color...",
+    "New folder…",
     "Move to Trash",
   ]);
   // Open as sticky needs the desktop app's sticky windows.
@@ -1055,4 +1056,232 @@ test("renames, duplicates and moves a session to Trash from its tab menu", async
   await confirmDialog.getByRole("button", { name: /Yes, move .* to trash/ }).click();
   await expect(tabs).toHaveCount(1);
   await expect(tabs.first()).toHaveText("Roadmap");
+});
+
+test("colours a tab in one click from its menu and clears it again", async ({ page }) => {
+  const menu = page.getByRole("menu", { name: /Session options/ });
+  const row = page.locator(".session-tab-row").first();
+  await expect(row).toHaveClass(/\bis-plain\b/);
+
+  await row.click({ button: "right" });
+  await expect(menu.getByRole("button", { name: "No color" })).toHaveAttribute("aria-pressed", "true");
+  await menu.getByRole("button", { name: "Pastel color 3" }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(row).not.toHaveClass(/\bis-plain\b/);
+  const colouredBackground = await row.evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(colouredBackground).not.toBe("rgba(0, 0, 0, 0)");
+
+  await row.click({ button: "right" });
+  await expect(menu.getByRole("button", { name: "Pastel color 3" })).toHaveAttribute("aria-pressed", "true");
+  await menu.getByRole("button", { name: "No color" }).click();
+  await expect(row).toHaveClass(/\bis-plain\b/);
+});
+
+// Folders group the tabs. The browser preview keeps them in memory, like its sessions.
+async function createFolder(page, name) {
+  await page.getByRole("button", { name: "New folder", exact: true }).click();
+  const nameInput = page.getByLabel("Folder name");
+  await expect(nameInput).toBeFocused();
+  await expect(nameInput).toHaveValue("New folder");
+  await nameInput.fill(name);
+  await nameInput.press("Enter");
+  const header = page.getByRole("button", { name: `Folder ${name}`, exact: true });
+  await expect(header).toBeVisible();
+  return header;
+}
+
+async function moveTabToFolder(page, tabIndex, folderName) {
+  const menu = page.getByRole("menu", { name: /Session options/ });
+  await page.locator(".session-tab-row").nth(tabIndex).click({ button: "right" });
+  await menu.getByRole("menuitem", { name: `Move to ${folderName}`, exact: true }).click();
+  await expect(menu).toHaveCount(0);
+}
+
+function folderTabRows(page, folderName) {
+  return page
+    .locator(".session-folder")
+    .filter({ has: page.getByRole("button", { name: `Folder ${folderName}`, exact: true }) })
+    .locator(".session-tab-row");
+}
+
+test("creates a folder under New session and renames it in place", async ({ page }) => {
+  const header = await createFolder(page, "Work");
+  await expect(header).toHaveAttribute("aria-expanded", "true");
+  await expect(header.locator(".session-folder-count")).toHaveText("0");
+  const folderMenu = page.getByRole("menu", { name: "Folder options for Work" });
+  const nameInput = page.getByLabel("Folder name");
+
+  // Escape keeps the old name.
+  await header.click({ button: "right" });
+  await folderMenu.getByRole("menuitem", { name: "Rename" }).click();
+  await expect(nameInput).toBeFocused();
+  await nameInput.fill("Scratch");
+  await nameInput.press("Escape");
+  await expect(nameInput).toHaveCount(0);
+  await expect(header).toBeVisible();
+
+  // Leaving the field keeps what was typed.
+  await header.click({ button: "right" });
+  await folderMenu.getByRole("menuitem", { name: "Rename" }).click();
+  await expect(nameInput).toBeFocused();
+  await nameInput.fill("Projects");
+  await page.getByTestId("sticky-editor-surface").click();
+  await expect(page.getByRole("button", { name: "Folder Projects", exact: true })).toBeVisible();
+  await expect(page.locator(".session-folder")).toHaveCount(1);
+});
+
+test("moves a tab into a folder from its tab menu and back out", async ({ page }) => {
+  await createBlankSession(page);
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  const [firstId, secondId] = await getSessionTabNoteIds(page);
+  const header = await createFolder(page, "Work");
+  const menu = page.getByRole("menu", { name: /Session options/ });
+
+  await page.locator(".session-tab-row").first().click({ button: "right" });
+  await expect(menu.getByText("Folder", { exact: true })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Remove from folder" })).toHaveCount(0);
+  await menu.getByRole("menuitem", { name: "Move to Work", exact: true }).click();
+  await expect(menu).toHaveCount(0);
+
+  // Ungrouped tabs come first, then the folder; the numbers and Cmd+1..9 follow that order.
+  const workTabs = folderTabRows(page, "Work");
+  await expect(workTabs).toHaveCount(1);
+  await expect(workTabs.first()).toHaveAttribute("data-note-id", firstId);
+  await expect.poll(() => getSessionTabNoteIds(page)).toEqual([secondId, firstId]);
+  await expect(page.locator(".session-index-label")).toHaveText(["1", "2"]);
+  await expect(header.locator(".session-folder-count")).toHaveText("1");
+  await page.keyboard.press(modifierShortcut("2"));
+  await expect.poll(() => getActiveSessionTabNoteId(page)).toBe(firstId);
+
+  // A tab in a folder offers the way out, and no move to the folder it is in.
+  await workTabs.first().click({ button: "right" });
+  await expect(menu.getByRole("menuitem", { name: "Move to Work", exact: true })).toHaveCount(0);
+  await menu.getByRole("menuitem", { name: "Remove from folder" }).click();
+  await expect(workTabs).toHaveCount(0);
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  await expect(header.locator(".session-folder-count")).toHaveText("0");
+});
+
+test("collapses a folder from its header and keeps the open note in sight", async ({ page }) => {
+  await createBlankSession(page);
+  await createBlankSession(page);
+  await expect(page.getByRole("tab")).toHaveCount(3);
+  const [firstId, secondId, thirdId] = await getSessionTabNoteIds(page);
+  const header = await createFolder(page, "Work");
+  await moveTabToFolder(page, 0, "Work");
+  await moveTabToFolder(page, 0, "Work");
+  const workTabs = folderTabRows(page, "Work");
+  await expect(workTabs).toHaveCount(2);
+  await expect.poll(() => getSessionTabNoteIds(page)).toEqual([thirdId, firstId, secondId]);
+
+  await header.click();
+  await expect(header).toHaveAttribute("aria-expanded", "false");
+  await expect(workTabs).toHaveCount(0);
+  await expect(page.getByRole("tab")).toHaveCount(1);
+  await expect(header.locator(".session-folder-count")).toHaveText("2");
+  await header.click();
+  await expect(header).toHaveAttribute("aria-expanded", "true");
+  await expect(workTabs).toHaveCount(2);
+
+  // The open note stays in sight inside a collapsed folder, numbered after the tabs above it.
+  await workTabs.nth(1).locator(".session-tab-button").click();
+  await expect.poll(() => getActiveSessionTabNoteId(page)).toBe(secondId);
+  await header.click();
+  await expect(header).toHaveAttribute("aria-expanded", "false");
+  await expect(workTabs).toHaveCount(1);
+  await expect(workTabs.first()).toHaveAttribute("data-note-id", secondId);
+  await expect(page.locator(".session-index-label")).toHaveText(["1", "2"]);
+
+  // The header menu collapses and expands it too.
+  await header.click({ button: "right" });
+  await page
+    .getByRole("menu", { name: "Folder options for Work" })
+    .getByRole("menuitem", { name: "Expand" })
+    .click();
+  await expect(header).toHaveAttribute("aria-expanded", "true");
+  await expect(workTabs).toHaveCount(2);
+});
+
+test("deleting a folder moves its notes out and deletes none", async ({ page }) => {
+  await createBlankSession(page);
+  const header = await createFolder(page, "Work");
+  await moveTabToFolder(page, 0, "Work");
+  await expect(folderTabRows(page, "Work")).toHaveCount(1);
+  const noteIds = await getSessionTabNoteIds(page);
+
+  await header.click({ button: "right" });
+  const folderMenu = page.getByRole("menu", { name: "Folder options for Work" });
+  await expect(folderMenu.getByRole("menuitem")).toHaveText([
+    "New note in folder",
+    "Rename",
+    "Collapse",
+    "Delete folder",
+  ]);
+  await folderMenu.getByRole("menuitem", { name: "Delete folder" }).click();
+
+  // Nothing is lost, so there is no confirmation.
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(header).toHaveCount(0);
+  await expect(page.locator(".session-folder")).toHaveCount(0);
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  expect((await getSessionTabNoteIds(page)).toSorted()).toEqual(noteIds.toSorted());
+});
+
+test("creates a note in a folder and a folder from a tab's menu", async ({ page }) => {
+  const header = await createFolder(page, "Work");
+  await header.click({ button: "right" });
+  await page
+    .getByRole("menu", { name: "Folder options for Work" })
+    .getByRole("menuitem", { name: "New note in folder" })
+    .click();
+  await chooseBlankSessionTemplate(page);
+  const workTabs = folderTabRows(page, "Work");
+  await expect(workTabs).toHaveCount(1);
+  await expect(workTabs.getByRole("tab")).toHaveAttribute("aria-selected", "true");
+
+  // New folder… moves the tab into a new folder whose name is ready to type.
+  await page.locator(".session-tab-row").first().click({ button: "right" });
+  await page
+    .getByRole("menu", { name: /Session options/ })
+    .getByRole("menuitem", { name: "New folder…" })
+    .click();
+  const nameInput = page.getByLabel("Folder name");
+  await expect(nameInput).toBeFocused();
+  await nameInput.fill("Ideas");
+  await nameInput.press("Enter");
+  await expect(folderTabRows(page, "Ideas")).toHaveCount(1);
+  await expect(page.locator(".session-folder")).toHaveCount(2);
+});
+
+test("drops a dragged tab on a folder header to move it into the folder", async ({ page }) => {
+  await createBlankSession(page);
+  await expect(page.locator(".session-tab-row.is-entering")).toHaveCount(0);
+  const [firstId] = await getSessionTabNoteIds(page);
+  const header = await createFolder(page, "Work");
+
+  const row = page.locator(".session-tab-row").first();
+  const rowBox = await row.boundingBox();
+  const headerBox = await header.boundingBox();
+  await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    headerBox.x + headerBox.width / 2,
+    headerBox.y + headerBox.height / 2,
+    { steps: 8 },
+  );
+  // A held drag keeps sending dragover; the emulated one only sends it on a move, and a move
+  // made while the tab order previews can be lost, so nudge the pointer on the header.
+  let nudge = 0;
+  await expect(async () => {
+    nudge = nudge === 0 ? 1 : 0;
+    await page.mouse.move(headerBox.x + headerBox.width / 2 + nudge, headerBox.y + headerBox.height / 2);
+    await expect(header).toHaveClass(/\bis-drop-target\b/, { timeout: 500 });
+  }).toPass();
+  await page.mouse.up();
+
+  const workTabs = folderTabRows(page, "Work");
+  await expect(workTabs).toHaveCount(1);
+  await expect(workTabs.first()).toHaveAttribute("data-note-id", firstId);
+  await expect(header).not.toHaveClass(/\bis-drop-target\b/);
+  await expect(page.getByRole("tab")).toHaveCount(2);
 });

@@ -1,0 +1,707 @@
+/* Settings controls: the groups, rows and controls every Settings page is built from
+   (src/ui/settingsControls.jsx), and the pieces of the Look pages (src/ui/lookPreferences.jsx).
+   Radii scale with the Corners setting through --look-radius-scale. */
+
+.look-page {
+  display: grid;
+  min-width: 0;
+}
+
+/* A group is a small label above a card; the label sits outside the card so a page reads as a
+   list of headed blocks rather than boxes with titles inside. */
+.settings-group {
+  display: grid;
+  min-width: 0;
+}
+
+.settings-group-label {
+  margin: 20px 2px 8px;
+  color: var(--sticky-panel-muted);
+  font: 600 12.5px/1.3 var(--notepane-ui-font);
+}
+
+.look-page > .settings-group:first-child .settings-group-label {
+  margin-top: 4px;
+}
+
+.settings-card {
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(12px * var(--look-radius-scale, 1));
+  background: var(--sticky-control-bg);
+}
+
+.settings-group-note {
+  margin: 8px 4px 0;
+  color: var(--sticky-panel-muted);
+  font: 500 12px/1.45 var(--notepane-ui-font);
+}
+
+.settings-row {
+  display: flex;
+  min-width: 0;
+  min-height: 56px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid color-mix(in srgb, var(--sticky-border-color) 60%, transparent);
+}
+
+.settings-row.is-wide {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.settings-row-text {
+  min-width: 0;
+  max-width: 62%;
+}
+
+.settings-row.is-wide .settings-row-text {
+  max-width: none;
+}
+
+.settings-row-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--sticky-panel-text);
+  font: 500 13.5px/1.3 var(--notepane-ui-font);
+}
+
+.settings-row-description {
+  margin-top: 3px;
+  color: var(--sticky-panel-muted);
+  font: 400 12px/1.45 var(--notepane-ui-font);
+}
+
+.settings-row-changed-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--notepane-control-accent);
+}
+
+.settings-row-reset {
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--notepane-control-accent);
+  font: 500 11px/1 var(--notepane-ui-font);
+  cursor: pointer;
+}
+
+.settings-row-reset:hover {
+  text-decoration: underline;
+}
+
+.settings-row-control {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.settings-row.is-wide .settings-row-control {
+  display: block;
+}
+
+/* The font comboboxes keep one width, whatever their descriptions wrap to. */
+.settings-row-control:has(.editor-font-setting-control) {
+  flex: 0 0 min(224px, 46%);
+}
+
+.settings-row-control .editor-font-setting-control {
+  width: 100%;
+}
+
+.settings-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Every focusable control in a card shares one focus ring in the accent. */
+:is(
+  .settings-segment,
+  .settings-switch,
+  .settings-slider-step,
+  .settings-swatch,
+  .settings-position-grid button,
+  .settings-area-picker button,
+  .settings-surface-preset,
+  .settings-picture-tile,
+  .settings-picture-remove,
+  .settings-button,
+  .settings-row-reset
+):focus-visible,
+.settings-swatch.is-custom:has(input:focus-visible),
+.settings-slider input[type="range"]:focus-visible,
+.settings-color-input input:focus-visible {
+  outline: 2px solid var(--notepane-control-accent);
+  outline-offset: 2px;
+}
+
+/* Segmented: a sunken track with the chosen segment raised on it. */
+.settings-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  padding: 2px;
+  border-radius: calc(9px * var(--look-radius-scale, 1));
+  background: var(--sticky-control-hover-bg);
+}
+
+.settings-segment {
+  height: 24px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: calc(7px * var(--look-radius-scale, 1));
+  background: transparent;
+  color: var(--sticky-panel-muted);
+  font: 600 12px/1 var(--notepane-ui-font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.settings-segment:hover {
+  color: var(--sticky-panel-text);
+}
+
+.settings-segment.is-checked {
+  background: var(--sticky-panel-bg);
+  color: var(--sticky-panel-text);
+  box-shadow: var(--sticky-table-control-shadow);
+}
+
+/* Switch: a 30 by 18 pill whose knob slides right and fills with the accent when on. */
+.settings-switch {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: var(--sticky-control-hover-bg);
+  box-shadow: inset 0 0 0 1px var(--sticky-border-color);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.settings-switch::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--sticky-panel-bg);
+  box-shadow: var(--sticky-table-control-shadow);
+  content: "";
+  transition: transform 200ms var(--notepane-motion-ease-out, ease);
+}
+
+.settings-switch[aria-checked="true"] {
+  background: var(--notepane-control-accent);
+  box-shadow: none;
+}
+
+.settings-switch[aria-checked="true"]::after {
+  transform: translateX(12px);
+}
+
+/* Slider: − range + and the value as the user reads it. */
+.settings-slider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.settings-slider input[type="range"] {
+  width: 118px;
+  margin: 0;
+  /* The browser paints a range input's box white; the track and thumb take the accent. */
+  background: transparent;
+  accent-color: var(--notepane-control-accent);
+}
+
+.settings-slider-step {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: calc(6px * var(--look-radius-scale, 1));
+  background: transparent;
+  color: var(--sticky-panel-muted);
+  cursor: pointer;
+}
+
+.settings-slider-step:hover:not(:disabled) {
+  background: var(--sticky-control-hover-bg);
+  color: var(--sticky-panel-text);
+}
+
+.settings-slider-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.settings-slider-step svg {
+  width: 14px;
+  height: 14px;
+}
+
+.settings-slider-value {
+  width: 46px;
+  color: var(--sticky-panel-muted);
+  font: 500 12px/1 var(--notepane-ui-font);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* Colour input: the system colour well and its editable hex. */
+.settings-color-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-color-well {
+  width: 34px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(6px * var(--look-radius-scale, 1));
+  background: none;
+  cursor: pointer;
+}
+
+.settings-color-well::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.settings-color-well::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(4px * var(--look-radius-scale, 1));
+}
+
+.settings-color-hex {
+  width: 76px;
+  height: 24px;
+  padding: 0 7px;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(6px * var(--look-radius-scale, 1));
+  background: var(--sticky-panel-bg);
+  color: var(--sticky-panel-text);
+  font: 12px/1 ui-monospace, Menlo, monospace;
+}
+
+.settings-color-hex:focus {
+  border-color: var(--notepane-control-accent);
+  outline: none;
+}
+
+/* Swatches: round colours; the chosen one gets an accent ring with a gap. */
+.settings-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+
+.settings-swatch {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--settings-swatch-color);
+  box-shadow: inset 0 0 0 1px var(--sticky-border-color);
+  cursor: pointer;
+  transition: box-shadow 120ms ease;
+}
+
+.settings-swatch[aria-pressed="true"],
+.settings-swatch.is-custom[data-checked="true"] {
+  box-shadow:
+    0 0 0 2px var(--sticky-panel-bg),
+    0 0 0 4px var(--notepane-control-accent);
+}
+
+/* "None" follows the theme: half text colour, half panel. */
+.settings-swatch.is-none {
+  background: conic-gradient(var(--sticky-panel-text) 0 50%, var(--sticky-panel-bg) 0);
+}
+
+/* "Custom" is a hue wheel drawn from one theme colour around the long way, over a colour
+   input that opens the system picker. */
+.settings-swatch.is-custom {
+  overflow: hidden;
+  background: conic-gradient(
+    in hsl longer hue,
+    var(--sticky-danger-color),
+    var(--sticky-danger-color)
+  );
+}
+
+.settings-swatch.is-custom input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Position: a 3 by 3 grid standing for the picture's anchor. */
+.settings-position-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 18px);
+  gap: 4px;
+}
+
+.settings-position-grid button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(5px * var(--look-radius-scale, 1));
+  background: var(--sticky-panel-bg);
+  cursor: pointer;
+}
+
+.settings-position-grid button:hover {
+  background: var(--sticky-control-hover-bg);
+}
+
+.settings-position-grid button[aria-checked="true"] {
+  border-color: transparent;
+  background: var(--notepane-control-accent);
+}
+
+/* Area picker: five tiles naming the parts of the window. */
+.settings-area-picker {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px;
+}
+
+.settings-area-picker button {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(10px * var(--look-radius-scale, 1));
+  background: var(--sticky-panel-bg);
+  color: var(--sticky-panel-text);
+  font: 500 12px/1.2 var(--notepane-ui-font);
+  cursor: pointer;
+}
+
+.settings-area-picker button:hover {
+  background: var(--sticky-control-hover-bg);
+}
+
+.settings-area-picker button span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-area-picker svg {
+  width: 18px;
+  height: 18px;
+  color: var(--sticky-panel-muted);
+}
+
+.settings-area-picker button[aria-checked="true"] {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--notepane-control-accent);
+}
+
+.settings-area-picker button[aria-checked="true"] svg {
+  color: var(--notepane-control-accent);
+}
+
+/* Surface presets: small window sketches over the built-in picture, a sidebar and an editor
+   panel drawn at each preset's opacity and blur. */
+.settings-surface-presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px;
+}
+
+.settings-surface-preset {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 8px 10px;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(10px * var(--look-radius-scale, 1));
+  background: var(--sticky-panel-bg);
+  color: var(--sticky-panel-text);
+  font: 600 13px/1.25 var(--notepane-ui-font);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-surface-preset:hover {
+  background: var(--sticky-control-hover-bg);
+}
+
+.settings-surface-preset[aria-pressed="true"] {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--notepane-control-accent);
+}
+
+.settings-surface-preset small {
+  color: var(--sticky-panel-muted);
+  font: 400 11.5px/1.3 var(--notepane-ui-font);
+}
+
+.settings-surface-preset-demo {
+  position: relative;
+  height: 46px;
+  margin-bottom: 5px;
+  overflow: hidden;
+  border-radius: calc(7px * var(--look-radius-scale, 1));
+  background-color: var(--sticky-control-hover-bg);
+  background-position: center;
+  background-size: cover;
+}
+
+.settings-surface-preset-demo i,
+.settings-surface-preset-demo b {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  border-radius: calc(5px * var(--look-radius-scale, 1));
+}
+
+.settings-surface-preset-demo i {
+  left: 6px;
+  width: 34%;
+  background: color-mix(in srgb, var(--sticky-sidebar-bg) var(--preset-side-opacity), transparent);
+  backdrop-filter: blur(var(--preset-side-blur));
+}
+
+.settings-surface-preset-demo b {
+  right: 6px;
+  left: calc(34% + 10px);
+  background: color-mix(in srgb, var(--sticky-editor-bg) var(--preset-main-opacity), transparent);
+  backdrop-filter: blur(var(--preset-main-blur));
+}
+
+/* Picture tiles: 16:10 thumbnails, the chosen one ringed in the accent, and a + tile last. */
+.settings-picture-tiles,
+.settings-picture-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* The choices are their own radio group, but lay out as tiles of the same grid as the + tile. */
+.settings-picture-choices {
+  display: contents;
+}
+
+.settings-picture-tile-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.settings-picture-tile {
+  position: relative;
+  display: grid;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  place-items: center;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(10px * var(--look-radius-scale, 1));
+  background-color: var(--sticky-control-hover-bg);
+  background-position: center;
+  background-size: cover;
+  color: var(--sticky-panel-muted);
+  cursor: pointer;
+}
+
+.settings-picture-tile[aria-checked="true"] {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--notepane-control-accent);
+}
+
+.settings-picture-tile.is-add:hover:not(:disabled) {
+  color: var(--sticky-panel-text);
+  background-color: var(--sticky-control-bg);
+}
+
+.settings-picture-tile.is-add:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.settings-picture-tile svg {
+  width: 18px;
+  height: 18px;
+}
+
+.settings-picture-caption {
+  position: absolute;
+  bottom: 5px;
+  left: 6px;
+  padding: 1px 6px;
+  border-radius: calc(6px * var(--look-radius-scale, 1));
+  background: var(--notepane-tooltip-bg);
+  color: var(--notepane-tooltip-text);
+  font: 500 10.5px/1.4 var(--notepane-ui-font);
+}
+
+/* The remove button shows on hover or focus, so a row of pictures stays calm. */
+.settings-picture-remove {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--notepane-tooltip-bg);
+  color: var(--notepane-tooltip-text);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.settings-picture-tile-wrap:hover .settings-picture-remove,
+.settings-picture-remove:focus-visible {
+  opacity: 1;
+}
+
+.settings-picture-remove svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* A plain bordered button for one-off actions in a row. */
+.settings-button {
+  display: inline-flex;
+  height: 26px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: calc(7px * var(--look-radius-scale, 1));
+  background: var(--sticky-panel-bg);
+  color: var(--sticky-panel-text);
+  font: 600 12px/1 var(--notepane-ui-font);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    transform 80ms ease;
+}
+
+.settings-button:hover {
+  background: var(--sticky-control-hover-bg);
+}
+
+.settings-button:active {
+  transform: translateY(1px);
+}
+
+/* Fonts preview: a sample note typed from the same variables as the editor, with today's
+   values as fallbacks because the Look only sets a variable once it differs from the default. */
+.look-font-preview {
+  padding: 16px 18px;
+  color: var(--sticky-panel-text);
+  font-family: var(
+    --editor-font-family,
+    -apple-system,
+    BlinkMacSystemFont,
+    "SF Pro Text",
+    "Helvetica Neue",
+    Arial,
+    sans-serif
+  );
+  font-size: var(--look-editor-size, 16px);
+  letter-spacing: var(--look-letter-spacing, normal);
+}
+
+.look-font-preview h3 {
+  margin: 0 0 6px;
+  font-family: var(--look-heading-font, inherit);
+  font-size: 1.6em;
+  font-weight: var(--look-heading-weight, 700);
+  line-height: 1.25;
+}
+
+.look-font-preview p {
+  margin: 0 0 10px;
+  line-height: var(--look-line-height, 1.5);
+}
+
+.look-font-preview pre {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: calc(8px * var(--look-radius-scale, 1));
+  background: var(--sticky-code-bg);
+  color: var(--sticky-code-text);
+  font-family: var(
+    --look-code-font,
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace
+  );
+  font-size: var(--look-code-size, 13px);
+  font-variant-ligatures: var(--look-code-ligatures, normal);
+  letter-spacing: normal;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .settings-row-text {
+    max-width: 56%;
+  }
+
+  .settings-area-picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

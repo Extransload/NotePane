@@ -2,6 +2,11 @@
 // substring matching after NFC normalization, so decomposed Hangul (common in
 // text pasted from macOS file names) matches composed input.
 
+import {
+  normalizeTag,
+  normalizeTags,
+} from "./tags.js";
+
 const SNIPPET_BEFORE = 24;
 const SNIPPET_LENGTH = 96;
 const graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
@@ -194,4 +199,128 @@ export function searchNotes(entries, query) {
     (titleRanges.length > 0 ? titleHits : bodyHits).push(result);
   }
   return [...titleHits, ...bodyHits];
+}
+
+// A token is a quoted folder filter, which may hold spaces, or any run of
+// non-space characters. The quoted form is tried first at each token start.
+const QUERY_TOKEN = /folder:"[^"]*"?|\S+/gi;
+const FOLDER_PREFIX = /^folder:/i;
+
+// Splits a palette query into its free text and its filters: each `#tag` token
+// is a tag the note must carry, and `folder:Name` or `folder:"Two words"` names
+// the folder it must be in (the last one wins). A filter token still being
+// typed, such as a lone "#" or "folder:", filters nothing and is not searched
+// as text either.
+export function parseSearchQuery(query) {
+  const source = String(query ?? "");
+  const words = [];
+  const tags = [];
+  let folder = null;
+  let hasFilterToken = false;
+  for (const [token] of source.matchAll(QUERY_TOKEN)) {
+    if (FOLDER_PREFIX.test(token)) {
+      hasFilterToken = true;
+      const value = token.slice("folder:".length).replace(/^"|"$/g, "").trim();
+      if (value) {
+        folder = value;
+      }
+      continue;
+    }
+    if (token.startsWith("#")) {
+      hasFilterToken = true;
+      const tag = normalizeTag(token);
+      if (tag && !tags.includes(tag)) {
+        tags.push(tag);
+      }
+      continue;
+    }
+    words.push(token);
+  }
+  // Without filter tokens the text is kept as typed, inner spacing included,
+  // because that is what find in note receives.
+  return {
+    text: hasFilterToken ? words.join(" ") : source.trim(),
+    tags,
+    folder,
+  };
+}
+
+function formatFolderToken(name) {
+  return /[\s"]/.test(name) ? `folder:"${name.replace(/"/g, "")}"` : `folder:${name}`;
+}
+
+// The inverse of parseSearchQuery, used when a filter chip changes the query:
+// filters first, then the text. A query of filters only ends with a space so
+// typing continues as new text.
+export function formatSearchQuery({ text = "", tags = [], folder = null } = {}) {
+  const filters = [
+    ...(folder ? [formatFolderToken(folder)] : []),
+    ...normalizeTags(tags).map((tag) => `#${tag}`),
+  ].join(" ");
+  const trimmedText = String(text ?? "").trim();
+  if (!filters) {
+    return trimmedText;
+  }
+  return trimmedText ? `${filters} ${trimmedText}` : `${filters} `;
+}
+
+function sameFolderName(left, right) {
+  return normalizeSearchText(String(left ?? "").trim()) === normalizeSearchText(String(right ?? "").trim());
+}
+
+// The folderId filter for a typed folder name. Names may repeat, so a name
+// stands for every folder carrying it. "none" means notes outside any folder,
+// unless a folder is really called that. A name that matches no folder gives
+// an empty list, which no note is in.
+export function resolveFolderFilter(folderName, folders) {
+  if (!folderName) {
+    return null;
+  }
+  const ids = (Array.isArray(folders) ? folders : [])
+    .filter((folder) => sameFolderName(folder.name, folderName))
+    .map((folder) => folder.id);
+  if (ids.length === 0 && sameFolderName(folderName, "none")) {
+    return "none";
+  }
+  return ids;
+}
+
+// Keeps the entries whose note carries every tag and sits in the folder.
+// `folderId` is null for any folder, "none" for no folder, or one folder id or
+// a list of them. With `folders` given, a note whose folder no longer exists
+// counts as having none, as it does in the sidebar.
+export function filterSearchEntries(entries, { tags = [], folderId = null, folders = null } = {}) {
+  const wantedTags = normalizeTags(tags);
+  const knownFolderIds = Array.isArray(folders) ? new Set(folders.map((folder) => folder.id)) : null;
+  const wantedFolderIds = folderId === null || folderId === undefined || folderId === "none"
+    ? null
+    : new Set(Array.isArray(folderId) ? folderId : [folderId]);
+  return (Array.isArray(entries) ? entries : []).filter((entry) => {
+    const noteFolderId = entry.note?.folderId;
+    const effectiveFolderId = noteFolderId && (!knownFolderIds || knownFolderIds.has(noteFolderId))
+      ? noteFolderId
+      : null;
+    if (folderId === "none" && effectiveFolderId !== null) {
+      return false;
+    }
+    if (wantedFolderIds && !wantedFolderIds.has(effectiveFolderId)) {
+      return false;
+    }
+    if (wantedTags.length === 0) {
+      return true;
+    }
+    const noteTags = normalizeTags(entry.note?.tags);
+    return wantedTags.every((tag) => noteTags.includes(tag));
+  });
+}
+
+// Every tag on the given notes, alphabetically, for the palette's chips.
+export function collectNoteTags(notes) {
+  const tags = new Set();
+  for (const note of Array.isArray(notes) ? notes : []) {
+    for (const tag of normalizeTags(note?.tags)) {
+      tags.add(tag);
+    }
+  }
+  return [...tags].sort((left, right) => left.localeCompare(right));
 }
