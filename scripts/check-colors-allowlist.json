@@ -293,7 +293,17 @@
   },
   {
     "file": "src/styles/intro.css",
-    "text": "background-image: linear-gradient(100deg, #8a63f6 0%, #b46cf0 40%, #f3e6ff 50%, #b46cf0 60%, #8a63f6 100%);",
-    "reason": "Launch intro brand art: the purple of \"Pane\" in the NotePane wordmark (assets/notepane-wordmark.png) and its passing light, the same in every theme."
+    "text": "--launch-intro-pane-from: #8a63f6;",
+    "reason": "Launch intro brand art: where the purple of \"Pane\" in the NotePane wordmark (assets/notepane-wordmark.png) starts, the same in every theme."
+  },
+  {
+    "file": "src/styles/intro.css",
+    "text": "--launch-intro-pane-to: #b46cf0;",
+    "reason": "Launch intro brand art: where the purple of \"Pane\" in the NotePane wordmark ends, the same in every theme."
+  },
+  {
+    "file": "src/styles/intro.css",
+    "text": "--launch-intro-glint: #f3e6ff;",
+    "reason": "Launch intro brand art: the light that runs across \"Pane\", the lightest lilac of the mark, the same in every theme."
   }
 ]

@@ -1,12 +1,21 @@
 /* The launch intro (src/ui/LaunchIntro.jsx): three windows fly in from round the window and
-   stack into the mark, the mark's box is drawn round them and filled, the dots light, then the
-   name is written out and a light crosses "Pane". It all lies over a blur of the app, takes no
-   pointer events, and clears with a short fade. The parts of the mark are the groups of
-   assets/notepane-icon.svg in order: the tile, the back, middle and front windows, then the
-   three dots. Reduced motion never mounts it (useLaunchIntro). */
+   stack into the mark, its box is drawn round them and filled, the dots light, then the name is
+   written out letter by letter and a light runs across "Pane". It all lies over a blur of the
+   app, takes no pointer events, and clears with a short fade.
+
+   Everything that moves animates transform or opacity on a layer of its own (will-change), so
+   the compositor runs the whole intro: it stays smooth while the app mounts on the main thread.
+   No percentage translate (it depends on the box size), no filter, clip-path, stroke or
+   background-position animation. The mark is 112 x 116 px; the offsets below are in that box.
+   The motion starts once the app is idle (.is-playing); until then the veil waits on its own.
+   Reduced motion never mounts it (useLaunchIntro). */
 .launch-intro {
   /* The mark's own lilac (the dots in assets/notepane-icon.svg), for the box drawn round it. */
   --launch-intro-outline: #d5b5e6;
+  /* The wordmark's purple across "Pane", and the light that runs over it. */
+  --launch-intro-pane-from: #8a63f6;
+  --launch-intro-pane-to: #b46cf0;
+  --launch-intro-glint: #f3e6ff;
   --launch-intro-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --launch-intro-settle: cubic-bezier(0.34, 1.36, 0.64, 1);
   position: fixed;
@@ -20,129 +29,286 @@
   backdrop-filter: blur(24px) saturate(1.1);
   pointer-events: none;
   user-select: none;
-  animation: launch-intro-veil-in 0.28s ease-out both;
+  will-change: opacity;
+  animation: launch-intro-fade-in 0.28s ease-out both;
 }
 
 .launch-intro.is-leaving {
-  animation: launch-intro-veil-out 0.42s cubic-bezier(0.4, 0, 1, 1) forwards;
-}
-
-.launch-intro.is-leaving .launch-intro-lockup {
-  animation: launch-intro-lockup-out 0.42s cubic-bezier(0.4, 0, 1, 1) forwards;
+  animation: launch-intro-fade-out 0.42s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 .launch-intro-lockup {
   display: flex;
   flex-direction: column;
   align-items: center;
+  will-change: transform, opacity;
+}
+
+.launch-intro:not(.is-playing) .launch-intro-lockup {
+  visibility: hidden;
+}
+
+.launch-intro.is-leaving .launch-intro-lockup {
+  animation: launch-intro-lockup-out 0.42s cubic-bezier(0.4, 0, 1, 1) forwards;
 }
 
 .launch-intro-mark {
   position: relative;
   width: 112px;
   height: 116px;
-  /* The mark's own lilac, as in the approved mockup, whatever the theme's accent. */
-  filter: drop-shadow(0 20px 44px color-mix(in srgb, var(--launch-intro-outline) 60%, transparent));
+  will-change: transform;
+}
+
+.launch-intro.is-playing .launch-intro-mark {
   animation: launch-intro-land 0.36s ease-out 1.52s both;
 }
 
-.launch-intro-icon,
-.launch-intro-icon svg,
-.launch-intro-outline {
+/* A soft halo behind the mark, drawn once as a gradient and only faded in. */
+.launch-intro-glow {
+  position: absolute;
+  inset: -40px -48px -56px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--launch-intro-outline) 70%, transparent), transparent);
+  opacity: 0;
+  will-change: opacity;
+}
+
+.launch-intro.is-playing .launch-intro-glow {
+  animation: launch-intro-glow 0.8s ease-out 1.3s both;
+}
+
+.launch-intro-part {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+.launch-intro-part svg,
+.launch-intro-outline svg {
   display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
 }
 
-.launch-intro-outline {
-  position: absolute;
-  inset: 0;
+/* Each window turns and scales about its own centre, given in px within the mark. */
+.launch-intro-part.is-back {
+  transform-origin: 68.5px 63.5px;
 }
 
-.launch-intro-icon svg > g,
-.launch-intro-icon svg > path {
-  transform-box: fill-box;
-  transform-origin: center;
+.launch-intro-part.is-middle {
+  transform-origin: 60px 55.5px;
+}
+
+.launch-intro-part.is-front {
+  transform-origin: 51.6px 47.4px;
+}
+
+.launch-intro-part.is-dot-1 {
+  transform-origin: 24.8px 29.4px;
+}
+
+.launch-intro-part.is-dot-2 {
+  transform-origin: 32px 29.4px;
+}
+
+.launch-intro-part.is-dot-3 {
+  transform-origin: 39.2px 29.4px;
 }
 
 /* The tile fills in once its box has been drawn. */
-.launch-intro-icon svg > g:nth-of-type(1) {
-  animation: launch-intro-fill 0.4s ease-out 1.4s both;
+.launch-intro.is-playing .launch-intro-part.is-tile {
+  animation: launch-intro-fade-to-full 0.4s ease-out 1.4s both;
 }
 
-.launch-intro-icon svg > g:nth-of-type(2) {
+.launch-intro.is-playing .launch-intro-part.is-back {
   animation: launch-intro-fly-back 0.9s var(--launch-intro-spring) 0.04s both;
 }
 
-.launch-intro-icon svg > g:nth-of-type(3) {
+.launch-intro.is-playing .launch-intro-part.is-middle {
   animation: launch-intro-fly-middle 0.9s var(--launch-intro-spring) 0.1s both;
 }
 
-.launch-intro-icon svg > g:nth-of-type(4) {
+.launch-intro.is-playing .launch-intro-part.is-front {
   animation: launch-intro-fly-front 0.9s var(--launch-intro-spring) 0.16s both;
 }
 
-.launch-intro-icon svg > path {
-  animation: launch-intro-dot 0.34s var(--launch-intro-settle) both;
+.launch-intro.is-playing .launch-intro-part.is-dot-1 {
+  animation: launch-intro-dot 0.34s var(--launch-intro-settle) 1.5s both;
 }
 
-.launch-intro-icon svg > path:nth-of-type(1) {
-  animation-delay: 1.5s;
+.launch-intro.is-playing .launch-intro-part.is-dot-2 {
+  animation: launch-intro-dot 0.34s var(--launch-intro-settle) 1.57s both;
 }
 
-.launch-intro-icon svg > path:nth-of-type(2) {
-  animation-delay: 1.57s;
+.launch-intro.is-playing .launch-intro-part.is-dot-3 {
+  animation: launch-intro-dot 0.34s var(--launch-intro-settle) 1.64s both;
 }
 
-.launch-intro-icon svg > path:nth-of-type(3) {
-  animation-delay: 1.64s;
+/* The box drawn round the windows. Each half of the mark is a clip; inside it a half-plane
+   turns about the mark's centre and uncovers the outline, which turns back by as much and so
+   stays put. The right half sweeps from the top to the bottom, then the left half from the
+   bottom back to the top. Sizes: the half-plane is 120 x 240 px about the centre (56, 58). */
+.launch-intro-outline {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  will-change: opacity;
 }
 
-/* The box, drawn once round from the top centre, then gone as the tile fills. */
+/* One animation, as the compositor takes one per property: shown as the sweep starts at 0.92 s,
+   fading from 1.62 s to 2.07 s. */
+.launch-intro.is-playing .launch-intro-outline {
+  animation: launch-intro-outline-life 1.15s linear 0.92s both;
+}
+
+@keyframes launch-intro-outline-life {
+  0%,
+  60.9% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}
+
 .launch-intro-outline path {
   stroke: var(--launch-intro-outline);
   stroke-width: 12;
   stroke-linecap: round;
-  stroke-dasharray: 1 1;
-  stroke-dashoffset: 1;
-  animation:
-    launch-intro-draw 0.62s cubic-bezier(0.65, 0, 0.35, 1) 0.92s both,
-    launch-intro-veil-out 0.45s ease-out 1.62s forwards;
 }
 
+.launch-intro-outline-half {
+  position: absolute;
+  top: -60px;
+  bottom: -60px;
+  overflow: hidden;
+}
+
+.launch-intro-outline-half.is-right {
+  left: 56px;
+  right: -60px;
+}
+
+.launch-intro-outline-half.is-left {
+  left: -60px;
+  right: 56px;
+}
+
+.launch-intro-outline-turn {
+  position: absolute;
+  top: -2px;
+  width: 120px;
+  height: 240px;
+  overflow: hidden;
+  will-change: transform;
+}
+
+.launch-intro-outline-half.is-right .launch-intro-outline-turn {
+  left: -120px;
+  transform-origin: 100% 50%;
+}
+
+.launch-intro-outline-half.is-left .launch-intro-outline-turn {
+  left: 116px;
+  transform-origin: 0 50%;
+}
+
+.launch-intro-outline-counter {
+  position: absolute;
+  top: 62px;
+  width: 112px;
+  height: 116px;
+  transform-origin: 50% 50%;
+  will-change: transform;
+}
+
+.launch-intro-outline-half.is-right .launch-intro-outline-counter {
+  left: 64px;
+}
+
+.launch-intro-outline-half.is-left .launch-intro-outline-counter {
+  left: -56px;
+}
+
+.launch-intro.is-playing .launch-intro-outline-half.is-right .launch-intro-outline-turn {
+  animation: launch-intro-sweep 0.31s cubic-bezier(0.55, 0, 1, 0.65) 0.92s both;
+}
+
+.launch-intro.is-playing .launch-intro-outline-half.is-right .launch-intro-outline-counter {
+  animation: launch-intro-sweep-back 0.31s cubic-bezier(0.55, 0, 1, 0.65) 0.92s both;
+}
+
+.launch-intro.is-playing .launch-intro-outline-half.is-left .launch-intro-outline-turn {
+  animation: launch-intro-sweep 0.31s cubic-bezier(0, 0.35, 0.45, 1) 1.23s both;
+}
+
+.launch-intro.is-playing .launch-intro-outline-half.is-left .launch-intro-outline-counter {
+  animation: launch-intro-sweep-back 0.31s cubic-bezier(0, 0.35, 0.45, 1) 1.23s both;
+}
+
+/* The name, written out one letter after another. */
 .launch-intro-name {
   margin-top: 26px;
-  padding: 0 6px 6px;
   color: var(--sticky-text-color);
   font-family: var(--notepane-display-font);
   font-size: 62px;
   font-weight: 750;
   letter-spacing: -0.035em;
   line-height: 1.04;
-  animation: launch-intro-write 0.7s cubic-bezier(0.65, 0, 0.35, 1) 1.5s both;
+  white-space: nowrap;
 }
 
-.launch-intro-name-pane {
-  /* The wordmark's purple, with a light that crosses it once. */
-  background-image: linear-gradient(100deg, #8a63f6 0%, #b46cf0 40%, #f3e6ff 50%, #b46cf0 60%, #8a63f6 100%);
-  background-position: 100% 0;
-  background-size: 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: launch-intro-shine 0.9s ease-in-out 2.05s both;
+.launch-intro-letter {
+  position: relative;
+  display: inline-block;
+  opacity: 0;
+  will-change: transform, opacity;
 }
 
-@keyframes launch-intro-veil-in {
+.launch-intro.is-playing .launch-intro-letter {
+  animation: launch-intro-letter 0.5s var(--launch-intro-spring) calc(1.5s + var(--i) * 45ms) both;
+}
+
+.launch-intro-letter.is-pane {
+  color: color-mix(in oklab, var(--launch-intro-pane-from), var(--launch-intro-pane-to) calc(var(--j) * 33%));
+}
+
+/* The light running across "Pane": a lighter copy of each letter that flashes in turn. */
+.launch-intro-letter.is-pane::after {
+  content: attr(data-letter);
+  position: absolute;
+  inset: 0;
+  color: var(--launch-intro-glint);
+  opacity: 0;
+  will-change: opacity;
+}
+
+.launch-intro.is-playing .launch-intro-letter.is-pane::after {
+  animation: launch-intro-glint 0.42s ease-in-out calc(2.05s + var(--j) * 70ms) both;
+}
+
+@keyframes launch-intro-fade-in {
   from {
     opacity: 0;
   }
 }
 
-@keyframes launch-intro-veil-out {
+@keyframes launch-intro-fade-out {
   to {
     opacity: 0;
+  }
+}
+
+@keyframes launch-intro-fade-to-full {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
   }
 }
 
@@ -150,46 +316,66 @@
   to {
     opacity: 0;
     transform: scale(0.96) translateY(-6px);
-    filter: blur(4px);
   }
 }
 
-@keyframes launch-intro-fill {
+@keyframes launch-intro-glow {
   from {
     opacity: 0;
+    transform: scale(0.8);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
 @keyframes launch-intro-fly-back {
   0% {
     opacity: 0;
-    transform: translate(420%, -260%) scale(2.2) rotate(9deg);
+    transform: translate(294px, -137px) scale(2.2) rotate(9deg);
   }
 
   25% {
     opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+    transform: none;
   }
 }
 
 @keyframes launch-intro-fly-middle {
   0% {
     opacity: 0;
-    transform: translate(-460%, 120%) scale(2.4) rotate(-10deg);
+    transform: translate(-322px, 63px) scale(2.4) rotate(-10deg);
   }
 
   25% {
     opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+    transform: none;
   }
 }
 
 @keyframes launch-intro-fly-front {
   0% {
     opacity: 0;
-    transform: translate(60%, 420%) scale(2.6) rotate(6deg);
+    transform: translate(42px, 220px) scale(2.6) rotate(6deg);
   }
 
   25% {
     opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -209,33 +395,53 @@
     opacity: 0;
     transform: scale(0);
   }
-}
 
-@keyframes launch-intro-draw {
   to {
-    stroke-dashoffset: 0;
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
-@keyframes launch-intro-write {
+@keyframes launch-intro-sweep {
   from {
-    opacity: 0.2;
-    clip-path: inset(0 100% 0 0);
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(180deg);
+  }
+}
+
+@keyframes launch-intro-sweep-back {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(-180deg);
+  }
+}
+
+@keyframes launch-intro-letter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
   }
 
   to {
     opacity: 1;
-    clip-path: inset(0 0 0 0);
+    transform: none;
   }
 }
 
-@keyframes launch-intro-shine {
-  from {
-    background-position: 100% 0;
+@keyframes launch-intro-glint {
+  0%,
+  100% {
+    opacity: 0;
   }
 
-  to {
-    background-position: 0 0;
+  50% {
+    opacity: 0.9;
   }
 }
 
