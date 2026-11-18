@@ -359,8 +359,10 @@ test("presses buttons in and eases menu item hovers unless the system asks for r
 
 test("keeps the zoom gauge at the top of the editor after the note scrolls", async ({ page }) => {
   await clickLastEmptyParagraph(page);
+  // Only a long note matters here, so the lines go in whole rather than key by key, which takes
+  // most of a loaded runner's 30 seconds.
   for (let index = 0; index < 60; index += 1) {
-    await page.keyboard.type(`Line ${index}`);
+    await page.keyboard.insertText(`Line ${index}`);
     await page.keyboard.press("Enter");
   }
   const surface = page.getByTestId("sticky-editor-surface");

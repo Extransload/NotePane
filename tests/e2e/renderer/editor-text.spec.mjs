@@ -1268,6 +1268,9 @@ test("shows recent colors and reapplies the latest color with Command+Shift+H", 
 });
 
 test("keeps BlockNote color and delete menus usable inside the app window", async ({ page }) => {
+  // Some thirty menu round trips through every block menu panel: about 8 seconds alone, past 30
+  // next to three other workers on a CI runner.
+  test.slow();
   await loadTemplatePreview(page);
   await clickLastEmptyParagraph(page);
   await page.keyboard.type("FormatTarget");

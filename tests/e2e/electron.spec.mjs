@@ -1552,9 +1552,10 @@ test("Electron note search sees text another sticky window just saved", async ()
   }
 });
 
-// A valid 1x1 PNG, small enough to inline in a test.
+// A valid 96x96 PNG, small enough to inline in a test. Tests click it to select its block: on a
+// smaller image the resize handles BlockNote shows on hover cover its middle and take the click.
 const TINY_PNG_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+  "iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAIAAABt+uBvAAAAjklEQVR42u3QMQ0AAAgDsOlDE0ZxgwNOriZV0FQPhygQJEiQIEGCBAlCkCBBggQJEiQIQYIECRIkSJAgBAkSJEiQIEGCBCFIkCBBggQJEoQgQYIECRIkSBCCBAkSJEiQIEGCECRIkCBBggQJQpAgQYIECRIkCEGCBAkSJEiQIEEIEiRIkCBBggQhSJCgPwvlQl9nU3s9CwAAAABJRU5ErkJggg==";
 
 async function readEditorImage(page) {
   return await page.locator(".bn-editor img.bn-visual-media").first().evaluate((image) => ({
@@ -1656,7 +1657,7 @@ test("Electron copies an asset image to the system clipboard as image data", asy
     await expect(page.getByRole("status").filter({ hasText: "Image copied" })).toBeVisible();
     await expect.poll(() => electronApp.evaluate(
       ({ clipboard }) => clipboard.readImage().getSize(),
-    )).toEqual({ width: 1, height: 1 });
+    )).toEqual({ width: 96, height: 96 });
   } finally {
     await electronApp.close();
   }
