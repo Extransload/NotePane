@@ -98,10 +98,11 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | The launch intro: the app icon split into one layer per part (tile, three windows, three dots) flying into the mark, its box drawn by a turning half-plane sweep and filled, the name written out letter by letter, over an opaque veil in the window's colour; only transform and opacity animate, so the compositor runs it while the app mounts, and the motion starts once the app is first idle (at most 0.5 s). Once per launch in the tabs window: preload asks `app:take-launch-intro` synchronously (`sendSync`, `electron/main.cjs` answers yes once, never in a test run unless `BLOCKNOTE_STICKY_LAUNCH_INTRO=1`), so `App` renders it in its first frame, outside the per-note `StickyEditor`; skipped under reduced motion; the `launchIntro` editor preference | `src/ui/LaunchIntro.jsx`, `src/hooks/useLaunchIntro.js`, `src/styles/intro.css` |
 | Code block syntax colours per theme, re-highlighting on a theme change | `src/editor/codeHighlighter.js` |
 | The theme picker in Preferences | `src/ui/ThemePicker.jsx` |
-| The Settings window (Tern-style floating window): grouped page sidebar (App, Look, Data, System), search over every setting (`SETTINGS_INDEX`), the hold-to-peek eye button, and the cards each page is made of | `src/ui/preferencesWindow.jsx`, `src/ui/PreferencesCard.jsx`, `src/ui/preferencesSections.jsx`, `src/ui/trashPreferences.jsx` |
-| The four Look pages (Theme, Fonts, Background, Tabs) and the controls they share; Background also holds the Window group (Material, Opacity, Menus and popups, Border, Keep text readable) that the old Surfaces page became | `src/ui/lookPreferences.jsx`, `src/ui/settingsControls.jsx` |
+| The Settings window (Tern-style floating window): grouped page sidebar (App: About, Appearance, Background, Tabs, Editor, Keyboard; Data: Trash, Backup), search over every setting (`SETTINGS_INDEX`, whose keywords keep the old names of moved settings), the hold-to-peek eye button, and the cards each page is made of; the Keyboard page's shortcut list | `src/ui/preferencesWindow.jsx`, `src/ui/PreferencesCard.jsx`, `src/ui/preferencesSections.jsx`, `src/ui/trashPreferences.jsx` |
+| The Look pages and the controls they share: Appearance (theme, accent, corners, app font, launch intro), Editor (the note's text, headings, code, layout with text width and table of contents, smooth caret), Background (what sits behind the window, its adjustments and where it shows, then the Glass group: Material, Opacity, Menu blur, Border, Keep text readable, shown only while there is a background) and Tabs | `src/ui/lookPreferences.jsx`, `src/ui/settingsControls.jsx` |
 | The look settings (`editorPreferences.look`): defaults, ranges, the surface style (`getSurfaceStyle`, `applySurfaceStyle`): the window's areas from one material, menus and Settings from their own blur (`FLOATING_BLUR_RANGE`, 0 for clear), all read back from the stored `surfaces`; `readableText`, built-in background pictures; the store keeps a twin normaliser and keeps background pictures through asset clean-up | `src/model/look.js`, `electron/store.cjs` |
 | Applying the look: attributes and `--look-*` variables on `<html>` (`useLookStyles`, its pure half `getLookStyles`) and the rules that read them, `data-look-readable` for the text halo over a see-through window; the shell's stacking context over a background, raised above BlockNote's body-portalled handles while one of its dialogs is open; the default look changes nothing on screen | `src/hooks/useLookStyles.js`, `src/styles/look.css` |
+| Tab colours (`look.tabs`: `barColor`, `activeFill`/`activeText`, `inactiveFill`/`inactiveText`, `fillOpacity`, `border`, `borderColor`, `blur`): `data-tab-*` attributes and `--look-tab-*` variables, a fill without a text colour getting black or white, whichever reads better; hidden numbers and shortcuts narrowing their grid columns and the close button moving over the right end | `getTabColorProperties` in `src/hooks/useLookStyles.js`, tabs section of `src/styles/look.css`, the Tabs page in `src/ui/lookPreferences.jsx` |
 | Picking a background picture: `look:pick-background` stores the file as an asset (at most 32 MB) | `electron/main.cjs`, `electron/preload.cjs` |
 | Preferences > About: version, description, Electron/Chromium versions, the manual update check (`app:info`, `app:check-for-updates`), and the Mac self-updater's progress (status, size, a progress bar) and Restart to update | `src/ui/aboutPreferences.jsx` |
 | The update pill in the tabs header: the download filling it, Restart to update, the restart filling it again, a failed download, or the release page for a copy that cannot replace itself; what each state says and how far it has got, shared with About | `src/ui/UpdatePill.jsx`, `src/model/appUpdate.js`, `src/hooks/useAppUpdate.js`, update pill section of `src/styles/chrome.css` |
@@ -306,7 +307,7 @@ menus portalled to `document.body` inherit them. Stylesheets and components use 
 scheme is internal: it drives tone matching, BlockNote's `theme` prop, `color-scheme` and the wordmark, which keeps its
 brand colours in every theme (the light PNG for light themes, the dark PNG for dark themes).
 
-The theme is chosen in Settings > Look > Theme ("The theme applies to every window."): a radio group of
+The theme is chosen in Settings > Appearance ("The colors of every window, light or dark."): a radio group of
 preview cards, each a small window drawn in that theme's colours. Clicking a card, or moving with the arrow keys,
 applies the theme at once in every open window, sticky windows and their portalled menus included, through the
 `app-theme:update` and `app-theme:changed` IPC broadcast. There is no light/dark toggle: the former Light/Dark switch,
@@ -349,14 +350,14 @@ The main process passes the theme id in each new window's URL, and the renderer 
 so a window opened under a dark theme never shows a light frame. On Windows, where windows are opaque, the window
 background colour is the theme's window colour; on macOS and Linux windows stay transparent.
 
-The Preferences panel is opened from the sidebar footer button, native app menu, or `Command/Ctrl + ,` and keeps app-wide/default settings:
+Settings is opened from the sidebar footer button, the app menu's Settings… item, or `Command/Ctrl + ,` and keeps app-wide/default settings:
 
 - app theme
 - default editor font family and size for newly created sessions
 - keyboard shortcut reference
 
-Preferences opens in the tabs window only, because a sticky window is too small for it. The menu item is disabled in the
-sticky layout, a window that turns sticky closes Preferences, and the shortcut does nothing in a sticky window.
+Settings opens in the tabs window only, because a sticky window is too small for it. The menu item is disabled in the
+sticky layout, a window that turns sticky closes Settings, and the shortcut does nothing in a sticky window.
 
 Session tab color is a per-session setting opened from each session tab's right-click context menu:
 

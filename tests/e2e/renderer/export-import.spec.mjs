@@ -568,8 +568,8 @@ test("labels slash menu shortcuts the way Preferences labels shortcuts", async (
   const isMac = process.platform === "darwin";
   await page.keyboard.press(modifierShortcut(","));
   const preferences = page.getByRole("dialog", { name: "Preferences window" });
-  await preferences.getByRole("tab", { name: "Shortcuts" }).click();
-  await expect(preferences.getByRole("button", { name: "Shortcut for New session" }))
+  await preferences.getByRole("tab", { name: "Keyboard" }).click();
+  await expect(preferences.getByRole("button", { name: "Shortcut for New tab" }))
     .toHaveText(isMac ? "⌘T" : "Ctrl+T");
   await preferences.getByRole("button", { name: "Close preferences" }).click();
 

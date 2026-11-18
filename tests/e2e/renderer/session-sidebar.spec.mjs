@@ -1355,3 +1355,66 @@ test("switches sessions without fading the window in again", async ({ page }) =>
     expect(await fadesRunning()).toEqual([]);
   }
 });
+
+async function openTabsSettings(page) {
+  await page.keyboard.press(modifierShortcut(","));
+  const settings = page.getByRole("dialog", { name: "Preferences window" });
+  await expect(settings).toBeVisible();
+  await settings.getByRole("tab", { name: "Tabs", exact: true }).click();
+  return settings;
+}
+
+// Tab colours as Tern has them: the open tab's fill with readable text, the other tabs' fill, and
+// a border, on tabs without a colour of their own.
+test("colours the open and other tabs from Settings", async ({ page }) => {
+  await createBlankSession(page);
+  const settings = await openTabsSettings(page);
+  await settings.locator("[data-setting-id='tabActiveFill']").getByRole("button", { name: "Green" }).click();
+  await settings.locator("[data-setting-id='tabInactiveFill']").getByRole("button", { name: "Purple" }).click();
+  await settings.locator("[data-setting-id='tabBorder']").getByRole("radio", { name: "None" }).click();
+  await settings.getByRole("button", { name: "Close preferences" }).click();
+
+  // A computed colour as 0..255 channels, whatever syntax the browser reports it in.
+  const look = (row) => row.evaluate((element) => {
+    const canvas = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    const channels = (value) => {
+      canvas.clearRect(0, 0, 1, 1);
+      canvas.fillStyle = value;
+      canvas.fillRect(0, 0, 1, 1);
+      return [...canvas.getImageData(0, 0, 1, 1).data];
+    };
+    const style = getComputedStyle(element);
+    return { background: channels(style.backgroundColor), color: channels(style.color), border: channels(style.borderTopColor) };
+  });
+  const open = page.locator(".session-tab-row.active");
+  const other = page.locator(".session-tab-row:not(.active)").first();
+  // Green #2f9e44 reads better with black text than white.
+  await expect.poll(() => look(open)).toEqual({
+    background: [47, 158, 68, 255],
+    color: [0, 0, 0, 255],
+    border: [0, 0, 0, 0],
+  });
+  await expect.poll(async () => (await look(other)).background).toEqual([139, 92, 246, 255]);
+});
+
+// Numbers and shortcuts turned off give their room to the title, and the delete button still
+// shows on hover.
+test("hidden tab numbers and shortcuts free their space for the title", async ({ page }) => {
+  const row = page.locator(".session-tab-row").first();
+  const titleWidth = () => row.locator(".session-tab-button").evaluate((button) => button.getBoundingClientRect().width);
+  const widthWithBoth = await titleWidth();
+
+  const settings = await openTabsSettings(page);
+  await settings.getByRole("switch", { name: "Show tab numbers" }).click();
+  await settings.getByRole("switch", { name: "Show tab shortcuts" }).click();
+  await settings.getByRole("button", { name: "Close preferences" }).click();
+
+  await expect.poll(titleWidth).toBeGreaterThan(widthWithBoth + 40);
+  await row.hover();
+  const deleteButton = row.getByRole("button", { name: /^Delete session/ });
+  await expect.poll(() => deleteButton.evaluate((button) => getComputedStyle(button).opacity)).toBe("1");
+  const rowBox = await row.boundingBox();
+  const deleteBox = await deleteButton.boundingBox();
+  expect(deleteBox.x + deleteBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+  expect(deleteBox.x).toBeGreaterThan(rowBox.x + rowBox.width / 2);
+});

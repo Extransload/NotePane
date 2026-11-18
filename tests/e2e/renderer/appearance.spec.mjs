@@ -407,7 +407,7 @@ test("changes editor typography globally from preferences", async ({ page }) => 
   await page.keyboard.press(modifierShortcut(","));
   const preferencesPanel = page.getByRole("dialog", { name: "Preferences window" });
   await expect(preferencesPanel).toBeVisible();
-  await expect(preferencesPanel.getByRole("tab", { name: "Theme" }))
+  await expect(preferencesPanel.getByRole("tab", { name: "Appearance" }))
     .toHaveAttribute("aria-selected", "true");
   const appThemeLabelGap = await preferencesPanel
     .locator(".settings-row")
@@ -420,10 +420,10 @@ test("changes editor typography globally from preferences", async ({ page }) => 
       return Math.round(descriptionRect.top - titleRect.bottom);
     });
   expect(appThemeLabelGap).toBeGreaterThanOrEqual(2);
-  // The workspace backup has its own page under Data.
-  await expect(preferencesPanel.getByText("Workspace backup")).toHaveCount(0);
+  // The backup has its own page under Data.
+  await expect(preferencesPanel.getByText("Export a backup")).toHaveCount(0);
   await preferencesPanel.getByRole("tab", { name: "Backup" }).click();
-  await expect(preferencesPanel.getByText("Workspace backup")).toBeVisible();
+  await expect(preferencesPanel.getByText("Export a backup")).toBeVisible();
   const exportBackupButton = preferencesPanel.getByRole("button", {
     name: "Export backup",
   });
@@ -438,11 +438,8 @@ test("changes editor typography globally from preferences", async ({ page }) => 
   await importBackupButton.click();
   await expect(page.locator(".sticky-toast-error"))
     .toHaveText("Data restore is available in the desktop app.");
-  await expect(page.locator("#preferences-fonts")).toHaveCount(0);
-  await preferencesPanel.getByRole("tab", { name: "Fonts" }).click();
-  await expect(preferencesPanel.getByRole("tab", { name: "Fonts" }))
-    .toHaveAttribute("aria-selected", "true");
-  // The app font sits with the editor font on the Fonts page.
+  // The app font sits with the rest of the app's look on the Appearance page.
+  await preferencesPanel.getByRole("tab", { name: "Appearance" }).click();
   const appFontRow = preferencesPanel.locator(".app-font-family-setting");
   await expect(appFontRow.getByText("App font", { exact: true })).toBeVisible();
   await expect(appFontRow.getByLabel("App font family")).toHaveValue("Inter");
@@ -453,10 +450,15 @@ test("changes editor typography globally from preferences", async ({ page }) => 
     maxWidth: 238,
   });
   await page.getByRole("option", { name: "Avenir" }).click();
-  await expect(page.locator("#preferences-fonts .preferences-section-title"))
-    .toHaveText("Fonts");
+  // The note's font sits with its text on the Editor page.
+  await expect(page.locator("#preferences-fonts")).toHaveCount(0);
+  await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
+  await expect(preferencesPanel.getByRole("tab", { name: "Editor" }))
+    .toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#preferences-editor .preferences-section-title"))
+    .toHaveText("Editor");
   const fontFamilyRow = preferencesPanel.locator(".editor-font-family-setting");
-  await expect(fontFamilyRow.getByText("Editor font", { exact: true })).toBeVisible();
+  await expect(fontFamilyRow.getByText("Font", { exact: true })).toBeVisible();
   await expect(fontFamilyRow.getByLabel("Editor font family")).toHaveValue("System");
 
   await fontFamilyRow.getByLabel("Editor font family").fill("gar");
@@ -540,24 +542,23 @@ test("supports light/dark mode and readable sidebar tab background customization
   await expect(preferencesPanel).toBeVisible();
   await expect(preferencesPanel.getByRole("tablist", { name: "Preferences pages" }))
     .toBeVisible();
-  await expect(preferencesPanel.getByRole("tab", { name: "Theme" }))
+  await expect(preferencesPanel.getByRole("tab", { name: "Appearance" }))
     .toHaveAttribute("aria-selected", "true");
   await expect(preferencesPanel.getByRole("radiogroup", { name: "App theme" })).toBeVisible();
-  await expect(preferencesPanel.getByText("Keyboard shortcuts")).toHaveCount(0);
+  await expect(preferencesPanel.getByRole("list", { name: "Keyboard shortcuts" })).toHaveCount(0);
   await expect(preferencesPanel.getByLabel("Editor font family")).toHaveCount(0);
-  await preferencesPanel.getByRole("tab", { name: "Fonts" }).click();
-  await expect(preferencesPanel.getByLabel("Editor font family")).toBeVisible();
-  await expect(preferencesPanel.getByRole("radiogroup", { name: "App theme" })).toHaveCount(0);
   await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
+  await expect(preferencesPanel.getByLabel("Editor font family")).toBeVisible();
   await expect(preferencesPanel.getByRole("switch", { name: "Show table of contents" }))
     .toBeVisible();
+  await expect(preferencesPanel.getByRole("radiogroup", { name: "App theme" })).toHaveCount(0);
+  await preferencesPanel.getByRole("tab", { name: "Keyboard" }).click();
+  await expect(preferencesPanel.getByRole("list", { name: "Keyboard shortcuts" })).toBeVisible();
   await expect(preferencesPanel.getByLabel("Editor font family")).toHaveCount(0);
-  await preferencesPanel.getByRole("tab", { name: "Shortcuts" }).click();
-  await expect(preferencesPanel.getByText("Keyboard shortcuts")).toBeVisible();
   await preferencesPanel.getByRole("tab", { name: "Trash" }).click();
   await expect(preferencesPanel.getByText("Trash is empty.")).toBeVisible();
-  await expect(preferencesPanel.getByText("Keyboard shortcuts")).toHaveCount(0);
-  await expect(preferencesPanel.getByText("Appearance")).toHaveCount(0);
+  await expect(preferencesPanel.getByRole("list", { name: "Keyboard shortcuts" })).toHaveCount(0);
+  await expect(preferencesPanel.getByRole("tabpanel").getByText("Appearance")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Color wheel mode" })).toHaveCount(0);
   await expect(page.getByRole("group", { name: "Tab color target" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Tab background" })).toHaveCount(0);
@@ -739,10 +740,10 @@ test("customizes keyboard shortcuts from preferences", async ({ page }) => {
   await page.keyboard.press(modifierShortcut(","));
   const preferencesPanel = page.getByRole("dialog", { name: "Preferences window" });
   await expect(preferencesPanel).toBeVisible();
-  await preferencesPanel.getByRole("tab", { name: "Shortcuts" }).click();
+  await preferencesPanel.getByRole("tab", { name: "Keyboard" }).click();
 
   const preferencesShortcut = preferencesPanel.getByRole("button", {
-    name: "Shortcut for Preferences",
+    name: "Shortcut for Open settings",
   });
   await expect(preferencesShortcut).toContainText(",");
   await expect(preferencesShortcut).not.toContainText("Comma");
@@ -785,7 +786,7 @@ test("customizes keyboard shortcuts from preferences", async ({ page }) => {
 
   await page.keyboard.press(modifierShortcut(","));
   await expect(preferencesPanel).toBeVisible();
-  await preferencesPanel.getByRole("tab", { name: "Shortcuts" }).click();
+  await preferencesPanel.getByRole("tab", { name: "Keyboard" }).click();
   await preferencesPanel.getByRole("switch", {
     name: "Enable Toggle sidebar shortcut",
   }).click();
@@ -1612,7 +1613,7 @@ test("shows the open note's title and its save status in the tabs header", async
 test("lists keyboard shortcuts as dense aligned rows", async ({ page }) => {
   await page.keyboard.press(modifierShortcut(","));
   const preferences = page.getByRole("dialog", { name: "Preferences window" });
-  await preferences.getByRole("tab", { name: "Shortcuts" }).click();
+  await preferences.getByRole("tab", { name: "Keyboard" }).click();
   const rows = preferences.getByRole("listitem");
   await expect(rows.first()).toBeVisible();
   const layout = await preferences.getByRole("list", { name: "Keyboard shortcuts" }).evaluate((list) =>
@@ -1637,7 +1638,7 @@ const RELEASES_URL = "https://github.com/Extransload/NotePane/releases";
 async function openAboutPage(page) {
   await page.keyboard.press(modifierShortcut(","));
   const preferences = page.getByRole("dialog", { name: "Preferences window" });
-  await expect(preferences.getByRole("tab").last()).toHaveText("About");
+  await expect(preferences.getByRole("tab").first()).toHaveText("About");
   await preferences.getByRole("tab", { name: "About" }).click();
   return preferences.getByRole("tabpanel", { name: "About" });
 }

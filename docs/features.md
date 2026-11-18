@@ -23,7 +23,7 @@
   Dracula and Tokyo Night, then 41 palettes adapted from TablePeek's theme catalogue (TablePeek's own two themes are
   not offered; a window that had one takes NotePane Light or Dark), and Neon Noir: the dark neon noir Tern theme as
   customised here (Dracula's surfaces, the iTerm2 palette, a teal accent)
-- Theme picker in Settings > Look > Theme: preview cards that apply the theme at once to every window;
+- Theme picker in Settings > Appearance: preview cards that apply the theme at once to every window;
   All / Light / Dark chips and a name filter narrow the cards, and arrow keys move within the cards shown
 - Every colour comes from the selected theme, code block syntax colours included
 - Flat surfaces: menus, toolbars, the colour panel, sticky settings, toasts and the search palette draw one soft
@@ -44,7 +44,10 @@
   Settings blurs instead of showing through sharp; the dim behind Settings and the palette fades by its colour, so
   the blur holds from the first frame, and a block's handles never show over them), Border, and
   Keep text readable (a soft halo behind text while the background shows through, on by default); tab style,
-  height, radius, numbers, shortcuts, new tab colour and colour strength
+  height, radius, numbers, shortcuts, new tab colour and colour strength; and tab colours as in Tern, for tabs
+  without a colour of their own: the tab bar, the open tab and the other tabs (fill, and text that reads well on it
+  unless chosen), fill opacity, border (the style's, none, subtle or strong, with a colour) and a blur. Turning
+  numbers or shortcuts off gives their room to the title; the close button then shows at the tab's right end on hover
 - Preferences > About: the NotePane wordmark, "Version x.y.z", a short description of the app and, in the desktop
   app, the Electron and Chromium versions. Its Updates card has **Check for updates**, with a status line (checking,
   up to date, "NotePane x.y.z is available", "installs when NotePane quits" on Windows, "Update checks run in the
@@ -55,7 +58,7 @@
   progress bar. Then **Restart to update** shows in both (the sticky layout asks in a dialog): it saves the notes,
   quits, swaps the new app in and opens it, the pill filling again while it restarts. A failed download says so and
   opens the release page; a copy run from the disk image or a folder it cannot write offers that page instead
-- Preferences > Shortcuts lists every command as a 40px table row: name, on/off switch, the keys (click to record
+- Settings > Keyboard lists every command as a 40px table row: name, on/off switch, the keys (click to record
   new ones) and Reset
 - Default editor font family for every session; there is no font size setting, text size follows the app zoom
 - App zoom with `Command/Ctrl + =`, `-` and `0`, from 50% to 200%: every window zooms together, a gauge shows the zoom
@@ -104,9 +107,9 @@
 - A reload (Cmd/Ctrl+R) keeps the window's colours: the new page paints the shell's last background and corners from
   its first frame, and the whole app fades in once the note shows (at once with reduced motion); a start slower than
   a moment shows a small spinner
-- Shortcut labels read the same everywhere NotePane shows them (Preferences, tooltips, slash menu badges, the
+- Shortcut labels read the same everywhere NotePane shows them (Settings, tooltips, slash menu badges, the
   formatting toolbar's merge and colour buttons): `⌘⌥⇧1` on a Mac, `Ctrl+Alt+Shift+1` elsewhere
-- Sidebar footer actions (version history, export, Preferences, layout, editor width) share one muted chrome tone;
+- Sidebar footer actions (version history, export, Settings, layout, editor width) share one muted chrome tone;
   the theme's accent marks only the button under the pointer and a pressed toggle
 - Window bounds persistence
 - Editor area is explicitly non-drag so BlockNote mouse interactions remain intact
@@ -172,7 +175,7 @@ BlockNote handles editor interaction directly.
 - Toggles and checklists keep the caret in sight: closing a toggle over the caret moves it to the end of the toggle's
   title, `Backspace` at the start of the line below a closed toggle joins that line to the title (its hidden lines
   stay), and ticking a checklist box leaves the caret where it was, so typing goes on there
-- Launch intro (Settings > Look > Theme, on by default): as the app opens in Tabs mode, three windows fly in from
+- Launch intro (Settings > Appearance, on by default): as the app opens in Tabs mode, three windows fly in from
   round the window and stack into the NotePane mark, its box is drawn round them and filled, and the name is written
   out, for about three seconds, over the window's own colour: the app does not show until the intro clears. It plays
   once per launch, never in a sticky window, a later window or a reload, and never under reduced motion. Any key or

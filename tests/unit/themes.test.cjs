@@ -964,7 +964,11 @@ test("every token a stylesheet or script reads is defined", async () => {
       },
       background: { type: "picture", blur: 8, tintAmount: 20 },
       surfaces: Object.fromEntries(["sidebar", "header", "editor", "menus", "settings"].map((area) => [area, surface])),
-      tabs: { style: "filled", height: "tall", radius: 10, showNumbers: false, showShortcuts: false, colorStrength: 60 },
+      tabs: {
+        style: "filled", height: "tall", radius: 10, showNumbers: false, showShortcuts: false, colorStrength: 60,
+        barColor: "#123456", activeFill: "#123456", activeText: "#ffffff", inactiveFill: "#123456",
+        inactiveText: "#ffffff", fillOpacity: 50, border: "subtle", borderColor: "#123456", blur: 8,
+      },
     }).properties);
   });
   const setByStyleFunctions = new Set([

@@ -23,7 +23,7 @@ function takeLaunchIntro() {
 
 /**
  * Whether this window opens with the launch intro. The main process answers yes once per
- * launch, to the first window that asks, when Settings > Look > Theme > Show intro on launch is
+ * launch, to the first window that asks, when Settings > Appearance > Show intro on launch is
  * on and the app opens in Tabs mode, so a sticky window, a new window or a reload never plays
  * it. The answer is synchronous, so the intro is in the app's very first frame and nothing of the
  * app shows before it. The browser preview has no launch and never plays it. Reduced motion skips

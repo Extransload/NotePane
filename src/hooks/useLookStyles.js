@@ -9,6 +9,11 @@ import {
   normalizeLook,
   resolveBackgroundPictureUrl,
 } from "../model/look.js";
+import {
+  BLACK,
+  WHITE,
+  getContrastingTextColor,
+} from "../style/colorMath.js";
 
 const CORNER_SCALES = { sharp: 0.4, default: 1, round: 1.6 };
 
@@ -135,8 +140,48 @@ export function getLookStyles(look, { scheme = "light", layoutMode = "tabs" } = 
     attributes["data-tab-strength"] = "";
     properties["--look-tab-strength"] = `${tabs.colorStrength}%`;
   }
+  Object.assign(properties, getTabColorProperties(tabs, attributes));
 
   return { attributes, properties };
+}
+
+// Tabs without a colour of their own take these colours (src/styles/look.css); each one only
+// while it is set, so the theme's tab look stays otherwise. A fill without a text colour gets
+// black or white text, whichever reads better on it.
+function getTabColorProperties(tabs, attributes) {
+  const properties = {};
+  const readableOn = (fill) => getContrastingTextColor(fill, BLACK, WHITE);
+  if (tabs.barColor) {
+    attributes["data-tab-bar"] = "";
+    properties["--look-tab-bar-bg"] = tabs.barColor;
+  }
+  const setFillAndText = (kind, fill, textOverride) => {
+    if (fill) {
+      attributes[`data-tab-${kind}-fill`] = "";
+      properties[`--look-tab-${kind}-bg`] = fill;
+    }
+    const text = textOverride ?? (fill ? readableOn(fill) : null);
+    if (text) {
+      attributes[`data-tab-${kind}-text`] = "";
+      properties[`--look-tab-${kind}-text`] = text;
+    }
+  };
+  setFillAndText("active", tabs.activeFill, tabs.activeText);
+  setFillAndText("inactive", tabs.inactiveFill, tabs.inactiveText);
+  if (tabs.fillOpacity !== DEFAULT_LOOK.tabs.fillOpacity) {
+    properties["--look-tab-fill-opacity"] = `${tabs.fillOpacity}%`;
+  }
+  if (tabs.border !== "auto" || tabs.borderColor) {
+    attributes["data-tab-border"] = tabs.border;
+    if (tabs.borderColor) {
+      properties["--look-tab-border-color"] = tabs.borderColor;
+    }
+  }
+  if (tabs.blur > 0) {
+    attributes["data-tab-blur"] = "";
+    properties["--look-tab-blur"] = `${tabs.blur}px`;
+  }
+  return properties;
 }
 
 function getBackdropImage(background) {

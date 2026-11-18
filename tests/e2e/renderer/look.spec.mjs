@@ -52,7 +52,7 @@ test("a background picture shows through frosted glass, and text stays readable"
   // At 0 the panels are clear.
   await menuBlur.focus();
   await page.keyboard.press("Home");
-  await expect(menuBlur).toHaveAttribute("aria-valuetext", "Clear");
+  await expect(menuBlur).toHaveAttribute("aria-valuetext", "None");
   await expect.poll(() => rootVariable(page, "--look-settings-filter")).toBe("none");
   await expect.poll(() => settings(page).evaluate((element) => getComputedStyle(element).backdropFilter))
     .toBe("none");
@@ -77,7 +77,7 @@ test("a background picture shows through frosted glass, and text stays readable"
 });
 
 test("heading font, tab style and accent apply to the app at once", async ({ page }) => {
-  await openLookPage(page, "Fonts");
+  await openLookPage(page, "Editor");
   await settings(page).getByRole("radiogroup", { name: "Font" }).first().waitFor();
   await settings(page).locator("[data-setting-id='headingFont']").getByRole("radio", { name: "Serif" }).click();
   await expect.poll(() =>
@@ -88,7 +88,7 @@ test("heading font, tab style and accent apply to the app at once", async ({ pag
   await settings(page).locator("[data-setting-id='tabStyle']").getByRole("radio", { name: "Filled" }).click();
   await expect.poll(() => rootAttribute(page, "data-tab-style")).toBe("filled");
 
-  await openLookPage(page, "Theme");
+  await openLookPage(page, "Appearance");
   await settings(page).locator("[data-setting-id='accentColor']").getByRole("button", { name: /green/i }).click();
   await expect.poll(() => rootVariable(page, "--notepane-control-accent")).toBe("#2f9e44");
 });

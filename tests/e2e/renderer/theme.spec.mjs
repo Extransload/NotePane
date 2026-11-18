@@ -97,7 +97,7 @@ test("picker lists all themes and marks the active one", async ({ page }) => {
   const preferences = await openPreferences(page);
 
   await expect(preferences.getByText("App theme", { exact: true })).toBeVisible();
-  await expect(preferences.getByText("Applies to every window.", { exact: false })).toBeVisible();
+  await expect(preferences.getByText("The colors of every window", { exact: false })).toBeVisible();
   const picker = preferences.getByRole("radiogroup", { name: "App theme" });
   const cards = picker.getByRole("radio");
   await expect(cards).toHaveCount(PICKER_LABELS.length);
@@ -226,7 +226,7 @@ test("the shortcut list no longer offers Toggle light / dark", async ({ page }) 
   await page.goto("/");
   await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
   const preferences = await openPreferences(page);
-  await preferences.getByRole("tab", { name: "Shortcuts" }).click();
+  await preferences.getByRole("tab", { name: "Keyboard" }).click();
 
   await expect(preferences.getByText("Toggle tabs / sticky", { exact: true })).toBeVisible();
   await expect(preferences.getByText("Toggle light / dark")).toHaveCount(0);

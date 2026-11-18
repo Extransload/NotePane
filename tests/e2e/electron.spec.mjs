@@ -79,7 +79,7 @@ test("Electron app opens a sticky window and persists editor content", async () 
     await page.getByLabel("Session name").fill("Project note");
     await page.keyboard.press("Enter");
     await chooseAppTheme(page, "notepane-dark");
-    await clickMenuItem(electronApp, "Preferences");
+    await clickMenuItem(electronApp, "Settings…");
     await expect(page.getByRole("dialog", { name: "Preferences window" }))
       .toBeVisible();
     await expect(page.getByLabel("RGB session tab color value")).toHaveCount(0);
@@ -466,14 +466,14 @@ test("Preferences opens in the tabs window and never in the sticky layout", asyn
     await expect(tabsPage.getByTestId("sticky-editor-surface")).toBeVisible();
     const preferences = tabsPage.getByRole("dialog", { name: "Preferences window" });
 
-    expect(await isMenuItemEnabled(electronApp, "Preferences")).toBe(true);
-    await clickMenuItem(electronApp, "Preferences");
+    expect(await isMenuItemEnabled(electronApp, "Settings…")).toBe(true);
+    await clickMenuItem(electronApp, "Settings…");
     await expect(preferences).toBeVisible();
 
     // The sticky layout has no tabs window to open it in. Outside Windows the tabs window turns
     // into a sticky window in place, so Preferences left open there closes.
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
-    await expect.poll(() => isMenuItemEnabled(electronApp, "Preferences")).toBe(false);
+    await expect.poll(() => isMenuItemEnabled(electronApp, "Settings…")).toBe(false);
     if (process.platform !== "win32") {
       await expect(tabsPage.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
       await expect(preferences).toHaveCount(0);
@@ -624,7 +624,7 @@ test("Electron exports and imports a complete portable workspace backup", async 
     await page.getByRole("button", { name: "Preferences" }).click();
     const preferences = page.getByRole("dialog", { name: "Preferences window" });
     await preferences.getByRole("tab", { name: "Backup" }).click();
-    await expect(preferences.getByText("Workspace backup")).toBeVisible();
+    await expect(preferences.getByText("Export a backup")).toBeVisible();
 
     await preferences.getByRole("button", { name: "Export backup" }).click();
     await expect(page.locator(".sticky-toast-success")).toHaveText("Backup exported");
@@ -1020,8 +1020,10 @@ test("Electron reopens a window saved on a disconnected display inside the scree
     }));
     expect(bounds.x).toBeGreaterThanOrEqual(workArea.x);
     expect(bounds.y).toBeGreaterThanOrEqual(workArea.y);
-    expect(bounds.x + bounds.width).toBeLessThanOrEqual(workArea.x + workArea.width);
-    expect(bounds.y + bounds.height).toBeLessThanOrEqual(workArea.y + workArea.height);
+    // macOS may nudge a window that fills the work area's height by a pixel as it places it under
+    // the menu bar (seen on CI's display: 706 against 705); a window off-screen is many times that.
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(workArea.x + workArea.width + 1);
+    expect(bounds.y + bounds.height).toBeLessThanOrEqual(workArea.y + workArea.height + 1);
   } finally {
     await electronApp.close();
   }
@@ -2372,7 +2374,7 @@ test("Electron returns to tab session mode after every sticky window is closed",
       });
     }, { timeout: 20_000 }).toBe("tabs");
     // The menu follows the layout back, so Preferences opens again.
-    expect(await isMenuItemEnabled(electronApp, "Preferences")).toBe(true);
+    expect(await isMenuItemEnabled(electronApp, "Settings…")).toBe(true);
   } finally {
     await electronApp.close();
   }
@@ -2829,9 +2831,18 @@ test("prettifies WebAssembly-formatted code blocks in the built app", async () =
       const codeBlock = page.locator(`.bn-block-outer[data-id='code-${language}'] [data-content-type='codeBlock']`);
       await codeBlock.hover();
       const toolbar = page.getByRole("toolbar", { name: `${label} code block actions`, exact: true });
-      await toolbar.getByRole("button", { name: `Prettify ${label} code`, exact: true }).click();
-      await expect(toolbar.getByRole("button", { name: `${label} code prettified`, exact: true }))
-        .toHaveText("Formatted");
+      const prettify = toolbar.getByRole("button", { name: `Prettify ${label} code`, exact: true });
+      // "Formatted" shows for 1.6s. A runner busy with a formatter's WebAssembly (Syntax Tree's
+      // Ruby is the largest) can answer a poll only after that, so the button's texts are
+      // recorded from the click on, and the one it showed is read from the record.
+      await prettify.evaluate((button) => {
+        const shown = [];
+        window.__prettifyTexts = shown;
+        new MutationObserver(() => shown.push(button.textContent))
+          .observe(button, { childList: true, characterData: true, subtree: true });
+      });
+      await prettify.click();
+      await expect.poll(() => page.evaluate(() => window.__prettifyTexts)).toContain("Formatted");
       expect(await codeBlock.locator("code").evaluate((code) => code.textContent)).toBe(output);
     }
   } finally {
@@ -3161,7 +3172,7 @@ async function clickMenuItem(electronApp, label) {
     }
     item.click();
 
-    // On Windows a label carries its shortcut after a tab ("Preferences\tCtrl+,").
+    // On Windows a label carries its shortcut after a tab ("Settings…\tCtrl+,").
     function findMenuItem(menuOrSubmenu, labelToFind) {
       for (const item of menuOrSubmenu.items) {
         if (item.label.split("\t")[0] === labelToFind) {
@@ -3183,7 +3194,7 @@ async function isMenuItemEnabled(electronApp, label) {
   return electronApp.evaluate(({ Menu }, targetLabel) => {
     const findMenuItem = (menu) => {
       for (const item of menu.items) {
-        // On Windows a label carries its shortcut after a tab ("Preferences\tCtrl+,").
+        // On Windows a label carries its shortcut after a tab ("Settings…\tCtrl+,").
         if (item.label.split("\t")[0] === targetLabel) {
           return item;
         }

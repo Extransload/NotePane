@@ -17,22 +17,6 @@ import {
   TrashSidebarIcon,
 } from "./icons.jsx";
 
-export function PreferenceToggleSwitch({ checked, ariaLabel, onChange }) {
-  return (
-    <button
-      type="button"
-      className="preference-toggle-switch"
-      role="switch"
-      aria-label={ariaLabel}
-      aria-checked={checked ? "true" : "false"}
-      onMouseDown={preventFocusLoss}
-      onClick={() => onChange?.(!checked)}
-    >
-      <span aria-hidden="true">{checked ? "On" : "Off"}</span>
-    </button>
-  );
-}
-
 const SAVE_STATUS_LABELS = {
   saving: "Saving...",
   saved: "Saved",

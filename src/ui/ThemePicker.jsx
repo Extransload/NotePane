@@ -39,7 +39,7 @@ function filterThemes(themes, scheme, query) {
 }
 
 /**
- * Preferences > General > App theme: one card per theme, as a radio group. Each card previews
+ * Settings > Appearance > App theme: one card per theme, as a radio group. Each card previews
  * its theme with a small window painted in that theme's own palette, the one place that colours
  * with a theme other than the active one; the card around it takes the active theme's tokens.
  *

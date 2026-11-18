@@ -24,6 +24,13 @@
   margin-top: 4px;
 }
 
+/* A group's one-line description sits between its label and its card. */
+.settings-group-description {
+  margin: -4px 2px 8px;
+  color: var(--sticky-panel-muted);
+  font: 400 12px/1.45 var(--notepane-ui-font);
+}
+
 .settings-card {
   display: grid;
   min-width: 0;
@@ -123,14 +130,6 @@
 
 .settings-row-control .editor-font-setting-control {
   width: 100%;
-}
-
-.settings-inline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
 }
 
 /* Every focusable control in a card shares one focus ring in the accent. */

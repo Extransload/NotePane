@@ -774,15 +774,14 @@ test("turns the sidebar compact in a narrow window without losing the wide-windo
 });
 
 const PREFERENCE_PAGE_NAMES = [
-  "Editor",
-  "Theme",
-  "Fonts",
+  "About",
+  "Appearance",
   "Background",
   "Tabs",
+  "Editor",
+  "Keyboard",
   "Trash",
   "Backup",
-  "Shortcuts",
-  "About",
 ];
 
 test("lays Preferences out as a sidebar of pages beside a scrolling page of cards", async ({ page }) => {
@@ -801,7 +800,7 @@ test("lays Preferences out as a sidebar of pages beside a scrolling page of card
   expect(await sidebar.locator("[role='tab'] svg").count()).toBe(PREFERENCE_PAGE_NAMES.length);
   // Group headings label the pages without being tabs themselves.
   await expect(sidebar.locator(".preferences-nav-heading"))
-    .toHaveText(["App", "Look", "Data", "System"]);
+    .toHaveText(["App", "Data"]);
 
   for (const pageName of PREFERENCE_PAGE_NAMES) {
     await sidebar.getByRole("tab", { name: pageName }).click();
@@ -829,7 +828,7 @@ test("lays Preferences out as a sidebar of pages beside a scrolling page of card
   }
 
   // The page scrolls on its own; the sidebar stays put.
-  await sidebar.getByRole("tab", { name: "Theme" }).click();
+  await sidebar.getByRole("tab", { name: "Appearance" }).click();
   const body = preferences.locator(".preferences-page-body");
   await body.evaluate((element) => element.scrollTo(0, element.scrollHeight));
   await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
@@ -852,7 +851,7 @@ test("finds a setting from the Preferences search and opens its page", async ({ 
   await search.fill("line height");
   const results = preferences.getByRole("listbox", { name: "Settings search results" });
   await expect(results.getByRole("option").first()).toContainText("Line height");
-  await expect(results.getByRole("option").first()).toContainText("Look › Fonts");
+  await expect(results.getByRole("option").first()).toContainText("App › Editor");
   await expect(preferences.getByRole("heading", { level: 2 })).toHaveText("Search");
 
   // Escape in a filled field clears it and leaves the window open.
@@ -866,7 +865,7 @@ test("finds a setting from the Preferences search and opens its page", async ({ 
 
   await search.fill("line height");
   await page.keyboard.press("Enter");
-  await expect(preferences.getByRole("tab", { name: "Fonts" }))
+  await expect(preferences.getByRole("tab", { name: "Editor" }))
     .toHaveAttribute("aria-selected", "true");
   await expect(search).toHaveValue("");
   const row = preferences.locator("[data-setting-id='lineHeight']");
@@ -874,14 +873,14 @@ test("finds a setting from the Preferences search and opens its page", async ({ 
   await expect(row).toBeInViewport();
 
   // A row this window does not render itself is found by its control.
-  await search.fill("table of contents");
-  const tocResult = results.getByRole("option").first();
-  await expect(tocResult).toContainText("App › Editor");
-  await tocResult.click();
-  await expect(preferences.getByRole("tab", { name: "Editor" }))
+  await search.fill("check for updates");
+  const updatesResult = results.getByRole("option").first();
+  await expect(updatesResult).toContainText("App › About");
+  await updatesResult.click();
+  await expect(preferences.getByRole("tab", { name: "About" }))
     .toHaveAttribute("aria-selected", "true");
-  await expect(preferences.locator(".preference-setting-row[data-search-hit]"))
-    .toContainText("Table of contents");
+  await expect(preferences.locator(".about-update-row[data-search-hit]"))
+    .toContainText("Latest version");
 
   // With the field empty, Escape closes the window as before.
   await search.focus();

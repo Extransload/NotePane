@@ -173,7 +173,7 @@ export function TrashPreferencesSection({
   return (
     <PreferencesCard
       title="Deleted notes"
-      description="Deleted sessions are hidden from tabs and sticky windows until restored."
+      description="Deleted notes stay here until you restore them or delete them permanently."
       className="preferences-trash-section"
     >
       {visibleTrashedNotes.length === 0 ? (
@@ -441,7 +441,7 @@ export function TrashPreviewDialog({ note, onClose }) {
               </p>
             ))
           ) : (
-            <div className="trash-preview-empty">No text content in this note.</div>
+            <div className="trash-preview-empty">This note has no text.</div>
           )}
         </div>
       </div>

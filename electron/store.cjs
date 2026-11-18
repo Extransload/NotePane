@@ -2111,6 +2111,15 @@ const DEFAULT_LOOK = Object.freeze({
     showShortcuts: true,
     colorStrength: 100,
     newTabColor: "none",
+    barColor: null,
+    activeFill: null,
+    activeText: null,
+    inactiveFill: null,
+    inactiveText: null,
+    fillOpacity: 100,
+    border: "auto",
+    borderColor: null,
+    blur: 0,
   }),
 });
 
@@ -2218,6 +2227,15 @@ function normalizeLook(value) {
       showShortcuts: normalizeLookBoolean(tabs.showShortcuts, defaultTabs.showShortcuts),
       colorStrength: normalizeLookNumber(tabs.colorStrength, defaultTabs.colorStrength, 20, 100, 1),
       newTabColor: normalizeLookChoice(tabs.newTabColor, ["none", "cycle"], defaultTabs.newTabColor),
+      barColor: normalizeHexColor(tabs.barColor, null),
+      activeFill: normalizeHexColor(tabs.activeFill, null),
+      activeText: normalizeHexColor(tabs.activeText, null),
+      inactiveFill: normalizeHexColor(tabs.inactiveFill, null),
+      inactiveText: normalizeHexColor(tabs.inactiveText, null),
+      fillOpacity: normalizeLookNumber(tabs.fillOpacity, defaultTabs.fillOpacity, 10, 100, 5),
+      border: normalizeLookChoice(tabs.border, ["auto", "none", "subtle", "strong"], defaultTabs.border),
+      borderColor: normalizeHexColor(tabs.borderColor, null),
+      blur: normalizeLookNumber(tabs.blur, defaultTabs.blur, 0, 24, 2),
     },
   };
 }

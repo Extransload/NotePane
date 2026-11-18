@@ -95,6 +95,17 @@ export const DEFAULT_LOOK = Object.freeze({
     showShortcuts: true,
     colorStrength: 100,
     newTabColor: "none",
+    // Colours for tabs without a colour of their own, as Tern's tab theming has them; null keeps
+    // the theme's. The text colour left null reads well on the chosen fill.
+    barColor: null,
+    activeFill: null,
+    activeText: null,
+    inactiveFill: null,
+    inactiveText: null,
+    fillOpacity: 100,
+    border: "auto",
+    borderColor: null,
+    blur: 0,
   }),
 });
 
@@ -212,6 +223,8 @@ function normalizeSurface(value, fallback) {
   };
 }
 
+export const TAB_BORDERS = ["auto", "none", "subtle", "strong"];
+
 function normalizeTabs(value) {
   const source = asObject(value);
   const fallback = DEFAULT_LOOK.tabs;
@@ -223,6 +236,15 @@ function normalizeTabs(value) {
     showShortcuts: normalizeBoolean(source.showShortcuts, fallback.showShortcuts),
     colorStrength: normalizeNumber(source.colorStrength, fallback.colorStrength, 20, 100, 1),
     newTabColor: normalizeChoice(source.newTabColor, ["none", "cycle"], fallback.newTabColor),
+    barColor: normalizeHex(source.barColor, null),
+    activeFill: normalizeHex(source.activeFill, null),
+    activeText: normalizeHex(source.activeText, null),
+    inactiveFill: normalizeHex(source.inactiveFill, null),
+    inactiveText: normalizeHex(source.inactiveText, null),
+    fillOpacity: normalizeNumber(source.fillOpacity, fallback.fillOpacity, 10, 100, 5),
+    border: normalizeChoice(source.border, TAB_BORDERS, fallback.border),
+    borderColor: normalizeHex(source.borderColor, null),
+    blur: normalizeNumber(source.blur, fallback.blur, 0, 24, 2),
   };
 }
 

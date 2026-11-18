@@ -11,6 +11,9 @@ import {
   preventFocusLoss,
 } from "../editor/images.js";
 import {
+  DEFAULT_EDITOR_PREFERENCES,
+} from "../constants.js";
+import {
   formatKeyboardShortcutLabel,
 } from "../model/keyboardShortcuts.js";
 import {
@@ -27,6 +30,8 @@ import {
   normalizeEditorPreferences,
 } from "../model/preferences.js";
 import {
+  BLACK,
+  WHITE,
   isHexColor,
 } from "../style/colorMath.js";
 import {
@@ -46,9 +51,9 @@ import {
   ThemePicker,
 } from "./ThemePicker.jsx";
 
-// The Look pages of Settings: Theme, Fonts, Background, Surfaces and Tabs. Each page draws only
-// its groups; the window draws the page title. `look` arrives normalized, and every change hands
-// a whole new look to `onLookChange`, leaving the old object untouched.
+// The Look pages of Settings: Appearance, Editor, Background and Tabs. Each page draws only its
+// groups; the window draws the page title. `look` arrives normalized, and every change hands a
+// whole new look to `onLookChange`, leaving the old object untouched.
 
 const formatPx = (value) => `${value}px`;
 const formatPercent = (value) => `${value}%`;
@@ -100,12 +105,17 @@ const CORNER_OPTIONS = [
   { value: "round", label: "Round" },
 ];
 
-export function ThemeLookPage({
+// Settings > Appearance: the theme, then the accent, corners and font of the app around the
+// notes, then the launch intro.
+export function AppearanceLookPage({
   look,
   onLookChange,
   appThemeId,
   themes,
   onAppThemeChange,
+  appFontFamily,
+  appFontOptions,
+  onAppFontFamilyChange,
   launchIntro,
   onLaunchIntroChange,
 }) {
@@ -120,18 +130,18 @@ export function ThemeLookPage({
         <SettingRow
           id="appTheme"
           title="App theme"
-          description="Applies to every window. The theme sets light or dark."
+          description="The colors of every window, light or dark."
           wide
           className="app-theme-setting"
         >
           <ThemePicker themeId={appThemeId} themes={themes} onChange={onAppThemeChange} />
         </SettingRow>
       </SettingsGroup>
-      <SettingsGroup label="Accent and shape">
+      <SettingsGroup label="Style">
         <SettingRow
           id="accentColor"
           title="Accent color"
-          description="Buttons, switches, focus rings and selection."
+          description="Colors buttons, switches and selections."
           changed={look.accentColor !== DEFAULT_LOOK.accentColor}
           onReset={() => setLook({ accentColor: DEFAULT_LOOK.accentColor })}
         >
@@ -140,7 +150,7 @@ export function ThemeLookPage({
             value={look.accentColor}
             options={ACCENT_OPTIONS}
             allowNone
-            noneLabel="Theme accent"
+            noneLabel="Theme's accent"
             allowCustom
             customFallback={readThemeColor(
               pageRef.current,
@@ -162,7 +172,7 @@ export function ThemeLookPage({
         <SettingRow
           id="corners"
           title="Corners"
-          description="Windows, menus, cards and buttons."
+          description="How round windows, menus and buttons are."
           changed={look.corners !== DEFAULT_LOOK.corners}
           onReset={() => setLook({ corners: DEFAULT_LOOK.corners })}
         >
@@ -173,12 +183,28 @@ export function ThemeLookPage({
             onChange={(corners) => setLook({ corners })}
           />
         </SettingRow>
+        <SettingRow
+          id="appFontFamily"
+          title="App font"
+          description="The font of the sidebar, menus and Settings."
+          className="app-font-family-setting"
+        >
+          <EditorFontFamilyControl
+            className="preferences-font-family-control"
+            fontFamily={appFontFamily}
+            fontOptions={appFontOptions}
+            inputAriaLabel="App font family"
+            menuButtonAriaLabel="Open app font menu"
+            optionsAriaLabel="App font family options"
+            onFontFamilyChange={onAppFontFamilyChange}
+          />
+        </SettingRow>
       </SettingsGroup>
       <SettingsGroup label="Launch">
         <SettingRow
           id="launchIntro"
           title="Show intro on launch"
-          description="The NotePane mark plays in as the app opens. Any key or click skips it."
+          description="The NotePane logo plays as the app opens; any key or click skips it."
           changed={launchIntro !== true}
           onReset={() => onLaunchIntroChange(true)}
         >
@@ -209,28 +235,25 @@ const CODE_FONT_OPTIONS = [
   { value: "courier", label: "Courier" },
 ];
 
-export function FontsLookPage({
+// Settings > Editor: everything about the note itself, read top to bottom as the note is: its
+// text, headings and code, then how the page is laid out, then typing.
+export function EditorLookPage({
   look,
   onLookChange,
   editorPreferences,
   fontOptions,
-  appFontOptions,
   onEditorPreferencesChange,
-  onAppFontFamilyChange,
 }) {
   const normalizedEditorPreferences = normalizeEditorPreferences(editorPreferences);
   const [fonts, setFonts, resetFonts] = useLookSection(look, onLookChange, "fonts");
   const { keyboardShortcuts } = normalizedEditorPreferences;
 
-  const updateEditorFontFamily = useCallback(
-    (nextEditorFontFamily) => {
-      onEditorPreferencesChange?.({
-        ...normalizedEditorPreferences,
-        editorFontFamily: normalizeEditorFontFamily(nextEditorFontFamily),
-      });
-    },
-    [normalizedEditorPreferences, onEditorPreferencesChange],
-  );
+  const setEditorPreference = (key, value) =>
+    onEditorPreferencesChange?.({ ...normalizedEditorPreferences, [key]: value });
+  const resetEditorPreference = (key) => ({
+    changed: normalizedEditorPreferences[key] !== DEFAULT_EDITOR_PREFERENCES[key],
+    onReset: () => setEditorPreference(key, DEFAULT_EDITOR_PREFERENCES[key]),
+  });
 
   return (
     <div className="look-page">
@@ -245,42 +268,20 @@ export function FontsLookPage({
         </div>
       </SettingsGroup>
       <SettingsGroup
-        label="Fonts"
-        note={`Fonts apply to every session tab. Zoom the app with ${formatKeyboardShortcutLabel(
+        label="Text"
+        note={`Applies to every note. ${formatKeyboardShortcutLabel(
           keyboardShortcuts.zoomIn,
-        )} and ${formatKeyboardShortcutLabel(keyboardShortcuts.zoomOut)}.`}
+        )} and ${formatKeyboardShortcutLabel(keyboardShortcuts.zoomOut)} zoom the whole app.`}
       >
-        <SettingRow
-          id="editorFontFamily"
-          title="Editor font"
-          description="Default typeface for note text."
-          className="editor-font-family-setting"
-        >
+        <SettingRow id="editorFontFamily" title="Font" className="editor-font-family-setting">
           <EditorFontFamilyControl
             className="preferences-font-family-control"
             fontFamily={normalizedEditorPreferences.editorFontFamily}
             fontOptions={fontOptions}
-            onFontFamilyChange={updateEditorFontFamily}
+            onFontFamilyChange={(fontFamily) =>
+              setEditorPreference("editorFontFamily", normalizeEditorFontFamily(fontFamily))}
           />
         </SettingRow>
-        <SettingRow
-          id="appFontFamily"
-          title="App font"
-          description="Interface typeface for chrome, menus, and preferences."
-          className="app-font-family-setting"
-        >
-          <EditorFontFamilyControl
-            className="preferences-font-family-control"
-            fontFamily={normalizedEditorPreferences.appFontFamily}
-            fontOptions={appFontOptions}
-            inputAriaLabel="App font family"
-            menuButtonAriaLabel="Open app font menu"
-            optionsAriaLabel="App font family options"
-            onFontFamilyChange={onAppFontFamilyChange}
-          />
-        </SettingRow>
-      </SettingsGroup>
-      <SettingsGroup label="Editor text">
         <SettingRow id="editorSize" title="Size" {...resetFonts("editorSize")}>
           <Slider
             label="Text size"
@@ -316,34 +317,18 @@ export function FontsLookPage({
         </SettingRow>
         <SettingRow
           id="blockSpacing"
-          title="Space between blocks"
-          description="Extra room between paragraphs, headings and lists."
+          title="Paragraph spacing"
+          description="Extra space between paragraphs, headings and lists."
           {...resetFonts("blockSpacing")}
         >
           <Slider
-            label="Space between blocks"
+            label="Paragraph spacing"
             value={fonts.blockSpacing}
             min={0}
             max={24}
             step={1}
             format={formatPx}
             onChange={(blockSpacing) => setFonts({ blockSpacing })}
-          />
-        </SettingRow>
-        <SettingRow
-          id="textWidth"
-          title="Text width"
-          description="How wide the text runs in the reading layout."
-          {...resetFonts("textWidth")}
-        >
-          <Slider
-            label="Text width"
-            value={fonts.textWidth}
-            min={560}
-            max={1100}
-            step={20}
-            format={formatPx}
-            onChange={(textWidth) => setFonts({ textWidth })}
           />
         </SettingRow>
       </SettingsGroup>
@@ -388,13 +373,60 @@ export function FontsLookPage({
         <SettingRow
           id="codeLigatures"
           title="Ligatures"
-          description="Draw => and != as single glyphs where the font has them."
+          description="Shows => and != as single symbols when the font has them."
           {...resetFonts("codeLigatures")}
         >
           <Switch
             label="Code ligatures"
             checked={fonts.codeLigatures}
             onChange={(codeLigatures) => setFonts({ codeLigatures })}
+          />
+        </SettingRow>
+      </SettingsGroup>
+      <SettingsGroup label="Layout">
+        <SettingRow
+          id="textWidth"
+          title="Text width"
+          description="How long a line of text gets in a wide window."
+          {...resetFonts("textWidth")}
+        >
+          <Slider
+            label="Text width"
+            value={fonts.textWidth}
+            min={560}
+            max={1100}
+            step={20}
+            format={formatPx}
+            onChange={(textWidth) => setFonts({ textWidth })}
+          />
+        </SettingRow>
+        <SettingRow
+          id="tableOfContents"
+          title="Table of contents"
+          description={`Lists the note's headings on the right in the tabs layout (${formatKeyboardShortcutLabel(
+            keyboardShortcuts.toggleTableOfContents,
+          )}).`}
+          {...resetEditorPreference("showTableOfContents")}
+        >
+          <Switch
+            label="Show table of contents"
+            checked={normalizedEditorPreferences.showTableOfContents}
+            onChange={(showTableOfContents) =>
+              setEditorPreference("showTableOfContents", showTableOfContents)}
+          />
+        </SettingRow>
+      </SettingsGroup>
+      <SettingsGroup label="Typing">
+        <SettingRow
+          id="smoothCaret"
+          title="Smooth caret"
+          description="The cursor glides as you type."
+          {...resetEditorPreference("smoothCaret")}
+        >
+          <Switch
+            label="Smooth caret"
+            checked={normalizedEditorPreferences.smoothCaret}
+            onChange={(smoothCaret) => setEditorPreference("smoothCaret", smoothCaret)}
           />
         </SettingRow>
       </SettingsGroup>
@@ -415,6 +447,18 @@ const BACKGROUND_FIT_OPTIONS = [
   { value: "tile", label: "Tile" },
 ];
 
+const MATERIAL_LABELS = { solid: "Solid", frosted: "Frosted", clear: "Clear" };
+const MATERIAL_OPTIONS = SURFACE_MATERIALS.map((value) => ({ value, label: MATERIAL_LABELS[value] }));
+
+const BORDER_OPTIONS = [
+  { value: "none", label: "None" },
+  { value: "hairline", label: "Thin" },
+  { value: "strong", label: "Strong" },
+];
+
+// Settings > Background, in two steps: what sits behind the window (its kind, its picture or
+// colours, how it is adjusted, where it shows), then, once there is one, the glass the window
+// lays over it.
 export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
   const [background, setBackground, resetBackground] = useLookSection(
     look,
@@ -459,9 +503,13 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
     });
   };
 
+  // Every glass setting acts only while a background shows (src/hooks/useLookStyles.js); blur
+  // has nothing to soften on a flat colour.
   const hasBackground = background.type !== "none";
+  const canBlur = background.type === "picture" || background.type === "gradient";
   const surfaceStyle = getSurfaceStyle(look);
   const defaultSurfaceStyle = getSurfaceStyle(DEFAULT_LOOK);
+  const isSolid = surfaceStyle.material === "solid";
   const setSurfaceStyle = (patch) => onLookChange(applySurfaceStyle(look, { ...surfaceStyle, ...patch }));
   const resetSurfaceStyle = (key) => ({
     changed: surfaceStyle[key] !== defaultSurfaceStyle[key],
@@ -470,11 +518,14 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
 
   return (
     <div className="look-page">
-      <SettingsGroup label="Background">
+      <SettingsGroup
+        label="Background"
+        note={hasBackground ? null : "With a background, glass settings for the window appear here."}
+      >
         <SettingRow
           id="backgroundType"
           title="Background"
-          description="Shown behind every window."
+          description="What shows behind your notes and the sidebar."
           {...resetBackground("type")}
         >
           <Segmented
@@ -495,14 +546,14 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
         )}
         {background.type === "gradient" && (
           <>
-            <SettingRow id="backgroundGradient" title="From" {...resetBackground("from")}>
+            <SettingRow id="backgroundGradient" title="Start color" {...resetBackground("from")}>
               <ColorInput
                 label="Gradient start color"
                 value={background.from}
                 onChange={(from) => setBackground({ from })}
               />
             </SettingRow>
-            <SettingRow id="backgroundGradientTo" title="To" {...resetBackground("to")}>
+            <SettingRow id="backgroundGradientTo" title="End color" {...resetBackground("to")}>
               <ColorInput
                 label="Gradient end color"
                 value={background.to}
@@ -527,7 +578,7 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
             <SettingRow
               id="backgroundPicture"
               title="Picture"
-              description="Pictures you add stay on this Mac."
+              description="Pictures you add stay on this computer."
               wide
               {...resetBackground("picture")}
             >
@@ -566,7 +617,7 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
                         type="button"
                         className="settings-picture-remove"
                         aria-label={`Remove picture ${index + 1}`}
-                        title="Remove"
+                        title="Remove picture"
                         onMouseDown={preventFocusLoss}
                         onClick={() => removePicture(url)}
                       >
@@ -579,7 +630,7 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
                   type="button"
                   className="settings-picture-tile is-add"
                   aria-label="Add picture"
-                  title="Add a PNG, JPEG, WebP or GIF picture"
+                  title="Add a picture (PNG, JPEG, WebP or GIF)"
                   disabled={!onPickBackground || isPicking}
                   onMouseDown={preventFocusLoss}
                   onClick={() => void addPicture()}
@@ -588,9 +639,14 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
                 </button>
               </div>
             </SettingRow>
-            <SettingRow id="backgroundFit" title="Fit" {...resetBackground("fit")}>
+            <SettingRow
+              id="backgroundFit"
+              title="Size"
+              description="Fill covers the window, Fit shows the whole picture, Tile repeats it."
+              {...resetBackground("fit")}
+            >
               <Segmented
-                label="Picture fit"
+                label="Picture size"
                 value={background.fit}
                 options={BACKGROUND_FIT_OPTIONS}
                 onChange={(fit) => setBackground({ fit })}
@@ -599,7 +655,7 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
             <SettingRow
               id="backgroundPosition"
               title="Position"
-              description="Which part stays in view when the window is a different shape."
+              description="Which edge or corner the picture lines up with."
               {...resetBackground("position")}
             >
               <PositionGrid
@@ -610,99 +666,21 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
             </SettingRow>
           </>
         )}
-      </SettingsGroup>
-      <SettingsGroup
-        label="Window"
-        note={hasBackground ? null : "These show once there is a background above."}
-      >
-        <SettingRow
-          id="surfaceMaterial"
-          title="Material"
-          description="What the window is made of, over the background."
-          {...resetSurfaceStyle("material")}
-        >
-          <Segmented
-            label="Material"
-            value={surfaceStyle.material}
-            options={MATERIAL_OPTIONS}
-            onChange={(material) => setSurfaceStyle({ material })}
-          />
-        </SettingRow>
-        {surfaceStyle.material !== "solid" && (
-          <SettingRow
-            id="surfaceOpacity"
-            title="Opacity"
-            description="How much the window hides the background. Menus and popups stay at least 80%."
-            {...resetSurfaceStyle("opacity")}
-          >
+        {canBlur && (
+          <SettingRow id="backgroundBlur" title="Blur" {...resetBackground("blur")}>
             <Slider
-              label="Window opacity"
-              value={surfaceStyle.opacity}
-              min={10}
-              max={95}
-              step={5}
-              format={formatPercent}
-              onChange={(opacity) => setSurfaceStyle({ opacity })}
+              label="Background blur"
+              value={background.blur}
+              min={0}
+              max={64}
+              step={1}
+              format={formatPx}
+              onChange={(blur) => setBackground({ blur })}
             />
           </SettingRow>
         )}
-        <SettingRow
-          id="floatingBlur"
-          title="Menus and popups"
-          description="Menus, the search palette and Settings float over your note: how much they blur the text under them. 0 leaves them clear."
-          {...resetSurfaceStyle("floatingBlur")}
-        >
-          <Slider
-            label="Menu blur"
-            value={surfaceStyle.floatingBlur}
-            min={FLOATING_BLUR_RANGE.min}
-            max={FLOATING_BLUR_RANGE.max}
-            step={FLOATING_BLUR_RANGE.step}
-            format={(blur) => (blur === 0 ? "Clear" : formatPx(blur))}
-            onChange={(floatingBlur) => setSurfaceStyle({ floatingBlur })}
-          />
-        </SettingRow>
-        <SettingRow
-          id="surfaceBorder"
-          title="Border"
-          description="The line round the sidebar, title bar and menus."
-          {...resetSurfaceStyle("border")}
-        >
-          <Segmented
-            label="Border"
-            value={surfaceStyle.border}
-            options={BORDER_OPTIONS}
-            onChange={(border) => setSurfaceStyle({ border })}
-          />
-        </SettingRow>
-        <SettingRow
-          id="readableText"
-          title="Keep text readable"
-          description="While the background shows through, text gets a soft halo of the window colour."
-          changed={look.readableText !== DEFAULT_LOOK.readableText}
-          onReset={() => onLookChange({ ...look, readableText: DEFAULT_LOOK.readableText })}
-        >
-          <Switch
-            label="Keep text readable"
-            checked={look.readableText}
-            onChange={(readableText) => onLookChange({ ...look, readableText })}
-          />
-        </SettingRow>
-      </SettingsGroup>
-      {hasBackground && (
-        <>
-          <SettingsGroup label="Adjust">
-            <SettingRow id="backgroundBlur" title="Blur" {...resetBackground("blur")}>
-              <Slider
-                label="Background blur"
-                value={background.blur}
-                min={0}
-                max={64}
-                step={1}
-                format={formatPx}
-                onChange={(blur) => setBackground({ blur })}
-              />
-            </SettingRow>
+        {hasBackground && (
+          <>
             <SettingRow
               id="backgroundBrightness"
               title="Brightness"
@@ -736,43 +714,32 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
             <SettingRow
               id="backgroundTint"
               title="Tint"
-              description="A colour laid over the background so text stays readable."
-              {...resetBackground("tint", "tintAmount")}
+              description="Washes the background with a color."
+              {...resetBackground("tintAmount")}
             >
-              <div className="settings-inline">
+              <Slider
+                label="Tint amount"
+                value={background.tintAmount}
+                min={0}
+                max={80}
+                step={1}
+                format={formatPercent}
+                onChange={(tintAmount) => setBackground({ tintAmount })}
+              />
+            </SettingRow>
+            {background.tintAmount > 0 && (
+              <SettingRow id="backgroundTintColor" title="Tint color" {...resetBackground("tint")}>
                 <ColorInput
                   label="Tint color"
                   value={background.tint}
                   onChange={(tint) => setBackground({ tint })}
                 />
-                <Slider
-                  label="Tint amount"
-                  value={background.tintAmount}
-                  min={0}
-                  max={80}
-                  step={1}
-                  format={formatPercent}
-                  onChange={(tintAmount) => setBackground({ tintAmount })}
-                />
-              </div>
-            </SettingRow>
-          </SettingsGroup>
-          <SettingsGroup label="Where">
-            <SettingRow
-              id="backgroundBehindStickies"
-              title="Behind sticky windows too"
-              {...resetBackground("behindStickies")}
-            >
-              <Switch
-                label="Behind sticky windows too"
-                checked={background.behindStickies}
-                onChange={(behindStickies) => setBackground({ behindStickies })}
-              />
-            </SettingRow>
+              </SettingRow>
+            )}
             <SettingRow
               id="backgroundDimInDark"
               title="Dim in dark mode"
-              description="Darkens the background by a third when the theme is dark."
+              description="Darkens the background by a third while the theme is dark."
               {...resetBackground("dimInDark")}
             >
               <Switch
@@ -781,21 +748,105 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
                 onChange={(dimInDark) => setBackground({ dimInDark })}
               />
             </SettingRow>
-          </SettingsGroup>
-        </>
+            <SettingRow
+              id="backgroundBehindStickies"
+              title="Show behind sticky notes"
+              {...resetBackground("behindStickies")}
+            >
+              <Switch
+                label="Show behind sticky notes"
+                checked={background.behindStickies}
+                onChange={(behindStickies) => setBackground({ behindStickies })}
+              />
+            </SettingRow>
+          </>
+        )}
+      </SettingsGroup>
+      {hasBackground && (
+        <SettingsGroup
+          label="Glass"
+          description="How much of the background shows through the window."
+        >
+          <SettingRow
+            id="surfaceMaterial"
+            title="Material"
+            description="Solid hides the background, Frosted blurs it, Clear shows it sharp."
+            {...resetSurfaceStyle("material")}
+          >
+            <Segmented
+              label="Material"
+              value={surfaceStyle.material}
+              options={MATERIAL_OPTIONS}
+              onChange={(material) => setSurfaceStyle({ material })}
+            />
+          </SettingRow>
+          {!isSolid && (
+            <SettingRow
+              id="surfaceOpacity"
+              title="Opacity"
+              description="How much the window covers the background."
+              {...resetSurfaceStyle("opacity")}
+            >
+              <Slider
+                label="Window opacity"
+                value={surfaceStyle.opacity}
+                min={10}
+                max={95}
+                step={5}
+                format={formatPercent}
+                onChange={(opacity) => setSurfaceStyle({ opacity })}
+              />
+            </SettingRow>
+          )}
+          <SettingRow
+            id="floatingBlur"
+            title="Menu blur"
+            description="How much menus, the search palette and Settings blur what is behind them."
+            {...resetSurfaceStyle("floatingBlur")}
+          >
+            <Slider
+              label="Menu blur"
+              value={surfaceStyle.floatingBlur}
+              min={FLOATING_BLUR_RANGE.min}
+              max={FLOATING_BLUR_RANGE.max}
+              step={FLOATING_BLUR_RANGE.step}
+              format={(blur) => (blur === 0 ? "None" : formatPx(blur))}
+              onChange={(floatingBlur) => setSurfaceStyle({ floatingBlur })}
+            />
+          </SettingRow>
+          <SettingRow
+            id="surfaceBorder"
+            title="Border"
+            description="The line around the sidebar, title bar and menus."
+            {...resetSurfaceStyle("border")}
+          >
+            <Segmented
+              label="Border"
+              value={surfaceStyle.border}
+              options={BORDER_OPTIONS}
+              onChange={(border) => setSurfaceStyle({ border })}
+            />
+          </SettingRow>
+          {!isSolid && (
+            <SettingRow
+              id="readableText"
+              title="Keep text readable"
+              description="A soft glow behind text keeps it clear of the background."
+              changed={look.readableText !== DEFAULT_LOOK.readableText}
+              onReset={() => onLookChange({ ...look, readableText: DEFAULT_LOOK.readableText })}
+            >
+              <Switch
+                label="Keep text readable"
+                checked={look.readableText}
+                onChange={(readableText) => onLookChange({ ...look, readableText })}
+              />
+            </SettingRow>
+          )}
+        </SettingsGroup>
       )}
     </div>
   );
 }
-
-const MATERIAL_LABELS = { solid: "Solid", frosted: "Frosted", clear: "Clear" };
-const MATERIAL_OPTIONS = SURFACE_MATERIALS.map((value) => ({ value, label: MATERIAL_LABELS[value] }));
-
-const BORDER_OPTIONS = [
-  { value: "none", label: "None" },
-  { value: "hairline", label: "Hairline" },
-  { value: "strong", label: "Strong" },
-];
 
 const TAB_STYLE_OPTIONS = [
   { value: "plain", label: "Plain" },
@@ -814,6 +865,43 @@ const NEW_TAB_COLOR_OPTIONS = [
   { value: "cycle", label: "In order" },
 ];
 
+// Fills for tabs: the accent choices, as Tern offers its tab tints.
+const TAB_FILL_OPTIONS = Object.entries(LOOK_ACCENTS).map(([name, color]) => ({
+  value: color,
+  label: name.charAt(0).toUpperCase() + name.slice(1),
+  color,
+}));
+
+const TAB_TEXT_OPTIONS = [
+  { value: WHITE, label: "White", color: WHITE },
+  { value: BLACK, label: "Black", color: BLACK },
+];
+
+const TAB_BORDER_OPTIONS = [
+  { value: "auto", label: "Auto" },
+  { value: "none", label: "None" },
+  { value: "subtle", label: "Subtle" },
+  { value: "strong", label: "Strong" },
+];
+
+// One colour row of the Tabs page: a swatch row whose first swatch keeps the theme's colour.
+function TabColorRow({ id, title, description, noneLabel, options, value, onChange, reset }) {
+  return (
+    <SettingRow id={id} title={title} description={description} {...reset}>
+      <SwatchPicker
+        label={title}
+        value={value}
+        options={options}
+        allowNone
+        noneLabel={noneLabel}
+        allowCustom
+        customFallback={options[0]?.color}
+        onChange={onChange}
+      />
+    </SettingRow>
+  );
+}
+
 export function TabsLookPage({ look, onLookChange }) {
   const [tabs, setTabs, resetTabs] = useLookSection(look, onLookChange, "tabs");
 
@@ -823,7 +911,7 @@ export function TabsLookPage({ look, onLookChange }) {
         <SettingRow
           id="tabStyle"
           title="Style"
-          description="How tabs without a colour of their own are told apart."
+          description="How tabs without a color of their own are drawn."
           {...resetTabs("style")}
         >
           <Segmented
@@ -841,7 +929,7 @@ export function TabsLookPage({ look, onLookChange }) {
             onChange={(height) => setTabs({ height })}
           />
         </SettingRow>
-        <SettingRow id="tabRadius" title="Corner radius" {...resetTabs("radius")}>
+        <SettingRow id="tabRadius" title="Corners" description="How round each tab is." {...resetTabs("radius")}>
           <Slider
             label="Tab corner radius"
             value={tabs.radius}
@@ -852,31 +940,121 @@ export function TabsLookPage({ look, onLookChange }) {
             onChange={(radius) => setTabs({ radius })}
           />
         </SettingRow>
-        <SettingRow id="tabShowNumbers" title="Show numbers" {...resetTabs("showNumbers")}>
-          <Switch
-            label="Show tab numbers"
-            checked={tabs.showNumbers}
-            onChange={(showNumbers) => setTabs({ showNumbers })}
+        <SettingRow
+          id="tabBorder"
+          title="Border"
+          description="Auto keeps the border the style draws."
+          {...resetTabs("border")}
+        >
+          <Segmented
+            label="Tab border"
+            value={tabs.border}
+            options={TAB_BORDER_OPTIONS}
+            onChange={(border) => setTabs({ border })}
+          />
+        </SettingRow>
+        {tabs.border !== "none" && (
+          <TabColorRow
+            id="tabBorderColor"
+            title="Border color"
+            noneLabel="Theme color"
+            options={TAB_FILL_OPTIONS}
+            value={tabs.borderColor}
+            onChange={(borderColor) => setTabs({ borderColor })}
+            reset={resetTabs("borderColor")}
+          />
+        )}
+      </SettingsGroup>
+      <SettingsGroup
+        label="Colors"
+        note="For tabs without a color of their own. Right-click a tab to give it one."
+      >
+        <TabColorRow
+          id="tabBarColor"
+          title="Tab bar"
+          description="The sidebar behind the tabs."
+          noneLabel="Theme color"
+          options={TAB_FILL_OPTIONS}
+          value={tabs.barColor}
+          onChange={(barColor) => setTabs({ barColor })}
+          reset={resetTabs("barColor")}
+        />
+        <TabColorRow
+          id="tabActiveFill"
+          title="Open tab"
+          description="The tab of the note you are in."
+          noneLabel="Theme color"
+          options={TAB_FILL_OPTIONS}
+          value={tabs.activeFill}
+          onChange={(activeFill) => setTabs({ activeFill })}
+          reset={resetTabs("activeFill")}
+        />
+        <TabColorRow
+          id="tabActiveText"
+          title="Open tab text"
+          description="Automatic picks whichever reads better on the tab."
+          noneLabel="Automatic"
+          options={TAB_TEXT_OPTIONS}
+          value={tabs.activeText}
+          onChange={(activeText) => setTabs({ activeText })}
+          reset={resetTabs("activeText")}
+        />
+        <TabColorRow
+          id="tabInactiveFill"
+          title="Other tabs"
+          noneLabel="Theme color"
+          options={TAB_FILL_OPTIONS}
+          value={tabs.inactiveFill}
+          onChange={(inactiveFill) => setTabs({ inactiveFill })}
+          reset={resetTabs("inactiveFill")}
+        />
+        <TabColorRow
+          id="tabInactiveText"
+          title="Other tabs text"
+          noneLabel="Automatic"
+          options={TAB_TEXT_OPTIONS}
+          value={tabs.inactiveText}
+          onChange={(inactiveText) => setTabs({ inactiveText })}
+          reset={resetTabs("inactiveText")}
+        />
+        <SettingRow
+          id="tabFillOpacity"
+          title="Opacity"
+          description="How solid the tab colors are."
+          {...resetTabs("fillOpacity")}
+        >
+          <Slider
+            label="Tab fill opacity"
+            value={tabs.fillOpacity}
+            min={10}
+            max={100}
+            step={5}
+            format={formatPercent}
+            onChange={(fillOpacity) => setTabs({ fillOpacity })}
           />
         </SettingRow>
         <SettingRow
-          id="tabShowShortcuts"
-          title="Show shortcuts"
-          description="The ⌘1 to ⌘9 shortcut beside each tab."
-          {...resetTabs("showShortcuts")}
+          id="tabBlur"
+          title="Blur"
+          description="How much the tabs blur a background behind them."
+          {...resetTabs("blur")}
         >
-          <Switch
-            label="Show tab shortcuts"
-            checked={tabs.showShortcuts}
-            onChange={(showShortcuts) => setTabs({ showShortcuts })}
+          <Slider
+            label="Tab blur"
+            value={tabs.blur}
+            min={0}
+            max={24}
+            step={2}
+            format={(blur) => (blur === 0 ? "None" : formatPx(blur))}
+            onChange={(blur) => setTabs({ blur })}
           />
         </SettingRow>
       </SettingsGroup>
-      <SettingsGroup label="Color">
+      <SettingsGroup label="Colored tabs">
         <SettingRow
           id="tabNewColor"
           title="New tab color"
-          description="In order gives each new tab the next pastel. Right-click a tab to colour it."
+          description="In order gives each new tab the next pastel; right-click a tab to pick one."
           {...resetTabs("newTabColor")}
         >
           <Segmented
@@ -889,7 +1067,7 @@ export function TabsLookPage({ look, onLookChange }) {
         <SettingRow
           id="tabColorStrength"
           title="Color strength"
-          description="How strongly a coloured tab is filled."
+          description="How strongly a colored tab is filled."
           {...resetTabs("colorStrength")}
         >
           <Slider
@@ -900,6 +1078,32 @@ export function TabsLookPage({ look, onLookChange }) {
             step={1}
             format={formatPercent}
             onChange={(colorStrength) => setTabs({ colorStrength })}
+          />
+        </SettingRow>
+      </SettingsGroup>
+      <SettingsGroup label="Show">
+        <SettingRow
+          id="tabShowNumbers"
+          title="Numbers"
+          description="Off gives the title the room."
+          {...resetTabs("showNumbers")}
+        >
+          <Switch
+            label="Show tab numbers"
+            checked={tabs.showNumbers}
+            onChange={(showNumbers) => setTabs({ showNumbers })}
+          />
+        </SettingRow>
+        <SettingRow
+          id="tabShowShortcuts"
+          title="Shortcuts"
+          description="The ⌘1 to ⌘9 key beside each tab."
+          {...resetTabs("showShortcuts")}
+        >
+          <Switch
+            label="Show tab shortcuts"
+            checked={tabs.showShortcuts}
+            onChange={(showShortcuts) => setTabs({ showShortcuts })}
           />
         </SettingRow>
       </SettingsGroup>

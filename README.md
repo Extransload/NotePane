@@ -124,8 +124,8 @@ only commands, from a new folder to a theme or a Settings page.
   <img src="docs/images/background.png" alt="NotePane over a snowy mountain photo, the sidebar and editor in frosted glass" width="820">
 </div>
 
-Settings › Look › Background puts a picture, colour or gradient behind the app and sets the glass over it, with a
-blur of their own for menus and popups.
+Settings › Background puts a picture, color or gradient behind the app, and its Glass group sets how much of it shows
+through the window, with a blur of their own for menus and popups.
 
 <div align="center">
   <img src="docs/images/settings.png" alt="The Settings window open on the Background page, with Material, Opacity and the blur of menus and popups" width="820">
@@ -239,7 +239,7 @@ their first line until you rename one by double-clicking its tab.
 | `⌘=` / `⌘-` / `⌘0` | Zoom every window |
 
 These are the default macOS shortcuts (`⌘` = Command, `⇧` = Shift).
-On Windows, use Ctrl instead of Command. Every shortcut can be changed in Settings › Shortcuts.
+On Windows, use Ctrl instead of Command. Every shortcut can be changed in Settings › Keyboard.
 See the [usage guide](docs/usage.md) for more.
 
 ---

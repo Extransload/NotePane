@@ -314,9 +314,110 @@ html[data-tab-height="tall"] .session-sidebar:not(.is-compact) .session-tab-row 
   border-radius: var(--look-tab-radius, 7px);
 }
 
-html[data-tab-numbers="hidden"] .session-index-label,
+/* Hidden numbers and shortcuts give their space to the title. The number column narrows to a
+   gutter; the delete button that shares it moves over the right end of the tab and shows on
+   hover, so a tab can still be closed. */
+html[data-tab-numbers="hidden"] .session-sidebar:not(.is-compact) .session-tab-row {
+  --session-tab-index-width: 10px;
+}
+
+html[data-tab-shortcuts="hidden"] .session-sidebar:not(.is-compact) .session-tab-row {
+  --session-tab-shortcut-width: 6px;
+}
+
 html[data-tab-shortcuts="hidden"] .session-shortcut {
-  visibility: hidden;
+  display: none;
+}
+
+html[data-tab-numbers="hidden"] .session-sidebar:not(.is-compact) .session-index-button {
+  grid-row: 1;
+  grid-column: 3;
+  justify-self: end;
+  width: 26px;
+  margin-right: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease;
+}
+
+html[data-tab-numbers="hidden"] .session-index-label {
+  display: none;
+}
+
+html[data-tab-numbers="hidden"] .session-tab-row:hover .session-index-button,
+html[data-tab-numbers="hidden"] .session-index-button:focus-visible {
+  opacity: 1;
+}
+
+/* While it shows over the shortcut, the delete button takes its place. */
+html[data-tab-numbers="hidden"] .session-tab-row:hover .session-shortcut {
+  opacity: 0;
+}
+
+/* Tab colours (Settings › Look › Tabs), for tabs without a colour of their own: the tab bar's
+   background, the open tab's and the other tabs' fill and text, how opaque those fills are, the
+   border and a blur of what lies behind the tabs. Each applies only while it is set. */
+html[data-tab-bar] .session-sidebar {
+  --sticky-sidebar-bg: var(--look-tab-bar-bg);
+}
+
+html[data-tab-active-fill] .session-tab-row.is-plain {
+  --session-tab-active-bg: color-mix(
+    in srgb,
+    var(--look-tab-active-bg) var(--look-tab-fill-opacity, 100%),
+    transparent
+  );
+}
+
+html[data-tab-active-text] .session-tab-row.is-plain.active {
+  color: var(--look-tab-active-text);
+}
+
+html[data-tab-inactive-fill] .session-tab-row.is-plain {
+  --session-tab-inactive-bg: color-mix(
+    in srgb,
+    var(--look-tab-inactive-bg) var(--look-tab-fill-opacity, 100%),
+    transparent
+  );
+  --session-tab-hover-bg: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--look-tab-inactive-bg) 88%, var(--sticky-text-color))
+      var(--look-tab-fill-opacity, 100%),
+    transparent
+  );
+}
+
+html[data-tab-inactive-text] .session-tab-row.is-plain:not(.active) {
+  color: var(--look-tab-inactive-text);
+}
+
+html[data-tab-border="none"] .session-tab-row,
+html[data-tab-border="none"] .session-tab-row.active {
+  border-color: transparent;
+}
+
+html[data-tab-border="subtle"] .session-tab-row,
+html[data-tab-border="subtle"] .session-tab-row.active {
+  border-color: var(
+    --look-tab-border-color,
+    color-mix(in srgb, var(--sticky-text-color) 14%, transparent)
+  );
+}
+
+html[data-tab-border="strong"] .session-tab-row,
+html[data-tab-border="strong"] .session-tab-row.active {
+  border-color: var(
+    --look-tab-border-color,
+    color-mix(in srgb, var(--sticky-text-color) 34%, transparent)
+  );
+}
+
+/* A colour alone, with the border left to the style, recolours the border the style draws. */
+html[data-tab-border="auto"] .session-tab-row.is-plain {
+  --session-tab-border-color: var(--look-tab-border-color);
+}
+
+html[data-tab-blur] .session-sidebar:not(.is-compact) .session-tab-row {
+  backdrop-filter: blur(var(--look-tab-blur)) saturate(140%);
 }
 
 /* A tab with its own colour gets that colour inline (getSessionTabStyle in

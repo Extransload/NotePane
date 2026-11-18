@@ -2564,8 +2564,9 @@ test("snaps the smooth caret without a glide when reduced motion is requested", 
 // on the line its column reaches; the drawn caret is where the native one would be.
 test("draws the smooth caret at the end of a wrapped line after Cmd+Right and the arrows", async ({ page }) => {
   await clickLastEmptyParagraph(page);
-  const words = Array.from({ length: 60 }, (_, index) => `word${index}`).join(" ");
-  await page.keyboard.insertText(words);
+  // One word of one letter, broken across lines: every line holds the same number of letters and
+  // ends at a wrap with no space after it, whatever the font, so End and Down both land on a wrap.
+  await page.keyboard.insertText("x".repeat(400));
   await page.keyboard.press(modifierShortcut("ArrowUp"));
   await waitForEditorSelection(page);
   await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowRight" : "End");
@@ -2577,15 +2578,10 @@ test("draws the smooth caret at the end of a wrapped line after Cmd+Right and th
   await expect.poll(atWrap).toBe(true);
   await expectSmoothCaretAtSelection(page);
 
-  // Down keeps the column at the right edge; the line it lands on may end before a space, so it
-  // goes on until a line ends at a wrap.
-  let landedOnWrap = false;
-  for (let line = 0; line < 4 && !landedOnWrap; line += 1) {
-    await page.keyboard.press("ArrowDown");
-    await waitForEditorSelection(page);
-    landedOnWrap = await atWrap();
-  }
-  expect(landedOnWrap).toBe(true);
+  // Down keeps the column at the right edge, the end of the next line.
+  await page.keyboard.press("ArrowDown");
+  await waitForEditorSelection(page);
+  await expect.poll(atWrap).toBe(true);
   await expectSmoothCaretAtSelection(page);
 });
 

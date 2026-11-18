@@ -1045,7 +1045,7 @@ function buildMenu() {
         { role: "about" },
         { type: "separator" },
         {
-          label: getMenuItemLabel("Preferences", "preferences"),
+          label: getMenuItemLabel("Settings…", "preferences"),
           accelerator:
             process.platform === "win32"
               ? undefined

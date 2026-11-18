@@ -56,7 +56,7 @@ function describeUpdateCheck(update) {
     case "error":
       return { text: "Could not check for updates", detail: update.message, tone: "error" };
     default:
-      return { text: "Look for a newer NotePane on GitHub Releases." };
+      return { text: "Check now to see if a newer NotePane is out." };
   }
 }
 
@@ -78,13 +78,13 @@ function describeSelfUpdate(selfUpdate) {
     case "verifying":
       return {
         text: `Checking NotePane ${selfUpdate.version}…`,
-        detail: "Making sure the download is the release, then unpacking it.",
+        detail: "Verifying the download, then unpacking it.",
         tone: "active",
       };
     case "ready":
       return {
         text: `NotePane ${selfUpdate.version} is ready`,
-        detail: "Restart to start using it. Your notes are saved first.",
+        detail: "Restart to use it; your notes are saved first.",
         tone: "active",
       };
     case "installing":
@@ -96,7 +96,7 @@ function describeSelfUpdate(selfUpdate) {
     case "manual":
       return {
         text: `NotePane ${selfUpdate.version} is available`,
-        detail: "This copy cannot replace itself: it runs from the disk image or from a folder you cannot write to. Download it from its release page.",
+        detail: "NotePane can't update itself from the disk image or a read-only folder; download the new version instead.",
       };
     case "error":
       return {
@@ -176,11 +176,11 @@ export function AboutPreferencesSection() {
       </section>
       <PreferencesCard
         title="Updates"
-        description="The installed app also checks at startup and every six hours."
+        description="The installed app also checks at launch and every six hours."
       >
         <div className="preference-setting-row about-update-row">
           <div className="about-update-text">
-            <div className="preference-setting-title">NotePane {version}</div>
+            <div className="preference-setting-title">Latest version</div>
             <div
               className={`preferences-section-description about-update-status${
                 tone === "error" ? " is-error" : tone === "active" ? " is-active" : ""
@@ -253,7 +253,7 @@ export function AboutPreferencesSection() {
           <div>
             <div className="preference-setting-title">What's new</div>
             <div className="preferences-section-description">
-              Every version and what changed in it, on GitHub.
+              What changed in each version, on GitHub.
             </div>
           </div>
           <a

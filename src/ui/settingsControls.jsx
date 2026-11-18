@@ -21,10 +21,13 @@ import {
 // muted description on the left and its control on the right. Like the rest of Preferences, a
 // click on a button does not take focus from the editor behind the window.
 
-export function SettingsGroup({ label, note, children }) {
+// `description` is one line under the label saying what the whole group is for; `note` sits
+// under the card.
+export function SettingsGroup({ label, description, note, children }) {
   return (
     <section className="settings-group" aria-label={label}>
       {label && <h3 className="settings-group-label">{label}</h3>}
+      {description && <p className="settings-group-description">{description}</p>}
       <div className="settings-card">{children}</div>
       {note && <p className="settings-group-note">{note}</p>}
     </section>

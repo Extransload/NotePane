@@ -39,7 +39,7 @@ for Option. Configurable shortcuts can be changed in Preferences.
 
 | Shortcut | Action |
 | --- | --- |
-| `⌘,` | Preferences |
+| `⌘,` | Settings |
 | `⌘⇧E` | Export menu |
 | `⌘=` / `⌘-` / `⌘0` | Zoom the whole app in, out, or back to 100% |
 
@@ -47,7 +47,7 @@ Zoom works like Notion's: every window scales together, from 50% to 200%, and
 the zoom is kept after a restart. While you zoom, a gauge at the top of the
 editor shows where the zoom sits between the smallest and the largest step.
 
-Choose the app theme in Settings > Look > Theme. 51 themes are
+Choose the app theme in Settings > Appearance. 51 themes are
 available: NotePane Light (the default), NotePane Dark, Catppuccin Latte,
 Frappé, Macchiato and Mocha, Nord, Dracula and Tokyo Night, then 41 more
 palettes such as Aura, Ayu, GitHub, Gruvbox and Rosé Pine, and Neon Noir. Click a card, or

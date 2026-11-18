@@ -445,71 +445,6 @@
   color: color-mix(in srgb, var(--sticky-panel-text) 86%, var(--notepane-import-tint));
 }
 
-.preference-toggle-switch {
-  display: grid;
-  position: relative;
-  width: 58px;
-  height: 28px;
-  flex: 0 0 auto;
-  place-items: center;
-  padding: 0;
-  border: 1px solid var(--chrome-icon-button-border);
-  border-radius: 999px;
-  background: var(--chrome-icon-button-bg);
-  color: var(--sticky-panel-muted);
-  box-shadow: var(--chrome-icon-button-shadow);
-  font: 760 10px/1 var(--notepane-ui-font);
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-  transition:
-    background 140ms ease,
-    border-color 140ms ease,
-    color 140ms ease,
-    transform 140ms ease;
-}
-
-.preference-toggle-switch::before {
-  position: absolute;
-  top: 4px;
-  left: 4px;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--sticky-panel-text) 22%, transparent);
-  content: "";
-  transition:
-    background 140ms ease,
-    transform 140ms ease;
-}
-
-.preference-toggle-switch span {
-  position: relative;
-  z-index: 1;
-  transform: translateX(9px);
-}
-
-.preference-toggle-switch:hover {
-  border-color: var(--chrome-icon-button-hover-border);
-  background: var(--chrome-icon-button-hover-bg);
-  color: var(--sticky-panel-text);
-  transform: translateY(-1px);
-}
-
-.preference-toggle-switch[aria-checked="true"] {
-  border-color: color-mix(in srgb, var(--icon-tone-sidebar) 42%, var(--chrome-icon-button-border));
-  background: color-mix(in srgb, var(--icon-tone-sidebar) 18%, var(--chrome-icon-button-bg));
-  color: var(--sticky-panel-text);
-}
-
-.preference-toggle-switch[aria-checked="true"]::before {
-  background: var(--icon-tone-sidebar);
-  transform: translateX(30px);
-}
-
-.preference-toggle-switch[aria-checked="true"] span {
-  transform: translateX(-9px);
-}
-
 .trash-empty-state {
   display: grid;
   min-height: 96px;
@@ -972,6 +907,10 @@
 
 .shortcut-row:first-child {
   border-top: 0;
+}
+
+.shortcut-row .settings-switch {
+  justify-self: center;
 }
 
 .shortcut-row:hover {

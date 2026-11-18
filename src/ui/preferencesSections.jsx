@@ -27,9 +27,6 @@ import {
   normalizeKeyboardShortcuts,
 } from "../model/keyboardShortcuts.js";
 import {
-  normalizeEditorPreferences,
-} from "../model/preferences.js";
-import {
   formatColorValues,
   hexToHsv,
   hsvToHex,
@@ -50,8 +47,8 @@ import {
   ColorWheel,
 } from "./ColorWheel.jsx";
 import {
-  PreferenceToggleSwitch,
-} from "./controls.jsx";
+  Switch,
+} from "./settingsControls.jsx";
 import {
   PreferencesCard,
 } from "./PreferencesCard.jsx";
@@ -280,91 +277,30 @@ export function ColorSettingsSection({
   );
 }
 
-export function EditorPreferencesSection({
-  editorPreferences,
-  onEditorPreferencesChange,
-}) {
-  const normalizedEditorPreferences = normalizeEditorPreferences(editorPreferences);
-
-  const updateTableOfContentsVisibility = useCallback(
-    (showTableOfContents) => {
-      onEditorPreferencesChange?.({
-        ...normalizedEditorPreferences,
-        showTableOfContents: Boolean(showTableOfContents),
-      });
-    },
-    [normalizedEditorPreferences, onEditorPreferencesChange],
-  );
-  const updateSmoothCaret = useCallback(
-    (smoothCaret) => {
-      onEditorPreferencesChange?.({
-        ...normalizedEditorPreferences,
-        smoothCaret: Boolean(smoothCaret),
-      });
-    },
-    [normalizedEditorPreferences, onEditorPreferencesChange],
-  );
-
-  // The editor and app fonts live on the Fonts page with the rest of the type settings.
-  return (
-    <>
-      <PreferencesCard title="Behaviour" description="What the editor shows around a note.">
-        <div className="preference-setting-row">
-          <div>
-            <div className="preference-setting-title">Table of contents</div>
-            <div className="preferences-section-description">
-              Show the right rail from heading levels in tab mode.
-              Toggle it from View or {formatKeyboardShortcutLabel(
-                normalizedEditorPreferences.keyboardShortcuts.toggleTableOfContents,
-              )}.
-            </div>
-          </div>
-          <PreferenceToggleSwitch
-            checked={normalizedEditorPreferences.showTableOfContents}
-            ariaLabel="Show table of contents"
-            onChange={updateTableOfContentsVisibility}
-          />
-        </div>
-        <div className="preference-setting-row">
-          <div>
-            <div className="preference-setting-title">Smooth caret</div>
-            <div className="preferences-section-description">
-              The cursor glides as you type, in the theme's accent colour.
-            </div>
-          </div>
-          <PreferenceToggleSwitch
-            checked={normalizedEditorPreferences.smoothCaret}
-            ariaLabel="Smooth caret"
-            onChange={updateSmoothCaret}
-          />
-        </div>
-      </PreferencesCard>
-    </>
-  );
-}
-
+// In the order a person looks for them: notes, then tabs, then what the window shows, then the
+// app itself. `keywords` keeps a renamed command's old name findable in Settings search.
 export const PREFERENCE_SHORTCUT_COMMANDS = [
-  { id: "newSession", label: "New session" },
+  { id: "newSession", label: "New tab", keywords: "new session" },
   { id: "newNote", label: "New note" },
-  { id: "selectTabByNumber", label: "Open tab by number", fixedShortcut: true },
-  { id: "closeWindow", label: "Close window" },
-  { id: "focusEditor", label: "Focus editor" },
   { id: "searchNotes", label: "Search notes" },
   { id: "findInNote", label: "Find in note" },
+  { id: "focusEditor", label: "Focus editor" },
+  { id: "exportPdf", label: "Export PDF" },
+  { id: "selectTabByNumber", label: "Open tab by number", fixedShortcut: true },
   { id: "previousTab", label: "Previous tab" },
   { id: "nextTab", label: "Next tab" },
   { id: "moveTabLeft", label: "Move tab left" },
   { id: "moveTabRight", label: "Move tab right" },
+  { id: "closeWindow", label: "Close tab or window", keywords: "close window" },
   { id: "toggleSidebar", label: "Toggle sidebar" },
-  { id: "toggleLayoutMode", label: "Toggle tabs / sticky" },
-  { id: "toggleEditorWidth", label: "Toggle editor width" },
   { id: "toggleTableOfContents", label: "Toggle table of contents" },
-  { id: "exportPdf", label: "Export PDF" },
-  { id: "preferences", label: "Preferences" },
+  { id: "toggleEditorWidth", label: "Toggle editor width" },
+  { id: "toggleLayoutMode", label: "Toggle tabs / sticky" },
+  { id: "toggleAlwaysOnTop", label: "Toggle always on top" },
   { id: "zoomIn", label: "Zoom in" },
   { id: "zoomOut", label: "Zoom out" },
   { id: "resetZoom", label: "Reset zoom" },
-  { id: "toggleAlwaysOnTop", label: "Toggle always on top" },
+  { id: "preferences", label: "Open settings", keywords: "preferences" },
 ];
 
 export function KeyboardShortcutsSection({
@@ -473,8 +409,8 @@ export function KeyboardShortcutsSection({
 
   return (
     <PreferencesCard
-      title="Keyboard shortcuts"
-      description="Turn a command's shortcut on or off, click its keys to record new ones, or reset them."
+      title="Shortcuts"
+      description="Click a shortcut to record new keys; Escape cancels."
       className="preferences-shortcuts-section"
     >
       <div className="shortcut-list-header" aria-hidden="true">
@@ -503,12 +439,10 @@ export function KeyboardShortcutsSection({
               data-shortcut-enabled={isEnabled ? "true" : "false"}
             >
               <span className="shortcut-command-label">{command.label}</span>
-              <PreferenceToggleSwitch
+              <Switch
+                label={`Enable ${command.label} shortcut`}
                 checked={isEnabled}
-                ariaLabel={`Enable ${command.label} shortcut`}
-                onChange={(nextEnabled) =>
-                  updateShortcutEnabled(command, nextEnabled)
-                }
+                onChange={(nextEnabled) => updateShortcutEnabled(command, nextEnabled)}
               />
               {command.fixedShortcut ? (
                 <span className="shortcut-fixed-label">{shortcutLabel}</span>

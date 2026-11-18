@@ -10,7 +10,6 @@ import {
   SlidersHorizontal,
   Sun,
   Trash2,
-  Type,
   Upload,
   X,
 } from "lucide-react";
@@ -48,13 +47,12 @@ import {
   AboutPreferencesSection,
 } from "./aboutPreferences.jsx";
 import {
+  AppearanceLookPage,
   BackgroundLookPage,
-  FontsLookPage,
+  EditorLookPage,
   TabsLookPage,
-  ThemeLookPage,
 } from "./lookPreferences.jsx";
 import {
-  EditorPreferencesSection,
   KeyboardShortcutsSection,
   PREFERENCE_SHORTCUT_COMMANDS,
 } from "./preferencesSections.jsx";
@@ -68,19 +66,20 @@ import {
 
 const PICKER_THEMES = listBuiltInThemes();
 
-// The sidebar's groups, in order. A group heading only labels its pages; it is not a tab.
+// The sidebar's groups, in order, as Tern lays out its Settings: About first, so an update is one
+// glance away, then how the app looks, then the note itself, then the keys. A group heading only
+// labels its pages; it is not a tab. Page ids stay as stored by older versions (`theme` is
+// Appearance, `shortcuts` is Keyboard).
 export const PREFERENCE_PAGE_GROUPS = [
   {
     label: "App",
-    pages: [{ id: "editor", label: "Editor", Icon: FileText }],
-  },
-  {
-    label: "Look",
     pages: [
-      { id: "theme", label: "Theme", Icon: Sun },
-      { id: "fonts", label: "Fonts", Icon: Type },
+      { id: "about", label: "About", Icon: Info },
+      { id: "theme", label: "Appearance", Icon: Sun },
       { id: "background", label: "Background", Icon: ImageIcon },
       { id: "tabs", label: "Tabs", Icon: AppWindow },
+      { id: "editor", label: "Editor", Icon: FileText },
+      { id: "shortcuts", label: "Keyboard", Icon: Keyboard },
     ],
   },
   {
@@ -88,13 +87,6 @@ export const PREFERENCE_PAGE_GROUPS = [
     pages: [
       { id: "trash", label: "Trash", Icon: Trash2 },
       { id: "backup", label: "Backup", Icon: Download },
-    ],
-  },
-  {
-    label: "System",
-    pages: [
-      { id: "shortcuts", label: "Shortcuts", Icon: Keyboard },
-      { id: "about", label: "About", Icon: Info },
     ],
   },
 ];
@@ -106,10 +98,11 @@ export const PREFERENCE_PAGES = PREFERENCE_PAGE_GROUPS.flatMap(({ label, pages }
 const DEFAULT_PREFERENCE_PAGE_ID = "theme";
 
 // Pages that were merged into others keep opening where their settings went: the app theme left
-// General for Theme, and Surfaces became the Window group of Background.
+// General for Appearance, Surfaces became the Glass group of Background, and Fonts joined Editor.
 const RENAMED_PREFERENCE_PAGES = {
   general: "theme",
   surfaces: "background",
+  fonts: "editor",
 };
 
 export function normalizePreferencePageId(pageId) {
@@ -125,68 +118,78 @@ function getPreferencePage(pageId) {
 
 /**
  * Every setting the search field can find. `id` is the row's `data-setting-id`; rows this window
- * does not render itself (Editor, Trash, Shortcuts, About) are found by `selector` instead. A row
- * that only shows for some choices (a picture's fit while the background is a colour) opens its
- * page without a highlight.
+ * does not render itself (Trash, Keyboard, About) are found by `selector` instead. A row that
+ * only shows for some choices (a picture's size while the background is a color) opens its page
+ * without a highlight. Keywords keep the names settings had before, so old words still find them.
  */
 export const SETTINGS_INDEX = [
-  { page: "theme", id: "appTheme", title: "App theme", description: "The colours every NotePane window uses.", keywords: "colour color dark light mode palette scheme" },
-  { page: "theme", id: "accentColor", title: "Accent color", description: "Buttons, switches, focus rings and selection.", keywords: "accent colour color highlight tint blue purple green orange pink" },
-  { page: "theme", id: "corners", title: "Corners", description: "How round windows, menus and buttons are.", keywords: "radius rounded round sharp square" },
-  { page: "theme", id: "launchIntro", title: "Show intro on launch", description: "The NotePane mark plays in as the app opens.", keywords: "intro splash launch start opening animation logo" },
-  { page: "fonts", id: "editorFontFamily", title: "Editor font", description: "The typeface notes are written in.", keywords: "font family typeface editor" },
-  { page: "fonts", id: "appFontFamily", title: "App font", description: "The typeface of the sidebar, menus and Settings.", keywords: "font family typeface interface ui chrome" },
-  { page: "fonts", id: "editorSize", title: "Size", description: "How large the editor text is.", keywords: "font size text bigger smaller scale" },
-  { page: "fonts", id: "lineHeight", title: "Line height", description: "The space between lines of a paragraph.", keywords: "leading line spacing" },
-  { page: "fonts", id: "letterSpacing", title: "Letter spacing", description: "The space between letters.", keywords: "tracking kerning" },
-  { page: "fonts", id: "blockSpacing", title: "Block spacing", description: "Extra space between blocks.", keywords: "paragraph gap spacing" },
-  { page: "fonts", id: "textWidth", title: "Text width", description: "How wide the reading column is.", keywords: "width column measure reading layout" },
-  { page: "fonts", id: "headingFont", title: "Heading font", description: "The typeface of headings.", keywords: "headings title serif display rounded" },
-  { page: "fonts", id: "headingWeight", title: "Heading weight", description: "How bold headings are.", keywords: "headings bold weight" },
-  { page: "fonts", id: "codeFont", title: "Code font", description: "The typeface of code blocks and inline code.", keywords: "monospace mono menlo jetbrains courier code" },
-  { page: "fonts", id: "codeSize", title: "Code size", description: "How large code is.", keywords: "code font size" },
-  { page: "fonts", id: "codeLigatures", title: "Code ligatures", description: "Join character pairs such as => in code.", keywords: "ligature code font" },
-  { page: "background", id: "backgroundType", title: "Background", description: "None, a colour, a gradient or a picture behind the app.", keywords: "wallpaper backdrop picture image colour color gradient" },
-  { page: "background", id: "backgroundColor", title: "Background colour", description: "The colour behind the app.", keywords: "background colour color solid" },
-  { page: "background", id: "backgroundGradient", title: "Gradient", description: "The colour the gradient starts from.", keywords: "gradient from start colour color background" },
-  { page: "background", id: "backgroundGradientTo", title: "Gradient end", description: "The colour the gradient ends on.", keywords: "gradient to end colour color background" },
-  { page: "background", id: "backgroundGradientAngle", title: "Gradient angle", description: "Which way the gradient runs.", keywords: "gradient angle direction rotate background" },
+  { page: "about", id: "aboutVersion", selector: ".about-card", title: "Version", description: "Which NotePane you are running.", keywords: "about version electron chromium" },
+  { page: "about", id: "checkForUpdates", selector: ".about-update-row", title: "Check for updates", description: "Looks for a newer NotePane.", keywords: "updates upgrade new version download latest" },
+  { page: "about", id: "releaseNotes", selector: '.preferences-card a[href$="/releases"]', title: "What's new", description: "What changed in each version.", keywords: "release notes changelog github" },
+  { page: "theme", id: "appTheme", title: "App theme", description: "The colors of every window, light or dark.", keywords: "theme colour color dark light mode palette scheme" },
+  { page: "theme", id: "accentColor", title: "Accent color", description: "Colors buttons, switches and selections.", keywords: "accent colour color highlight tint blue purple green orange pink" },
+  { page: "theme", id: "corners", title: "Corners", description: "How round windows, menus and buttons are.", keywords: "radius rounded round sharp square shape" },
+  { page: "theme", id: "appFontFamily", title: "App font", description: "The font of the sidebar, menus and Settings.", keywords: "font fonts family typeface interface ui chrome" },
+  { page: "theme", id: "launchIntro", title: "Show intro on launch", description: "The NotePane logo plays as the app opens.", keywords: "intro splash launch start opening animation logo" },
+  { page: "editor", id: "editorFontFamily", title: "Editor font", description: "The font notes are written in.", keywords: "font fonts family typeface text" },
+  { page: "editor", id: "editorSize", title: "Text size", description: "How large note text is.", keywords: "font fonts size text bigger smaller scale" },
+  { page: "editor", id: "lineHeight", title: "Line height", description: "Space between the lines of a paragraph.", keywords: "leading line spacing fonts" },
+  { page: "editor", id: "letterSpacing", title: "Letter spacing", description: "Space between letters.", keywords: "tracking kerning fonts" },
+  { page: "editor", id: "blockSpacing", title: "Paragraph spacing", description: "Extra space between paragraphs, headings and lists.", keywords: "block spacing space between blocks paragraph gap fonts" },
+  { page: "editor", id: "headingFont", title: "Heading font", description: "The font of headings.", keywords: "headings title serif display rounded fonts" },
+  { page: "editor", id: "headingWeight", title: "Heading weight", description: "How bold headings are.", keywords: "headings bold weight fonts" },
+  { page: "editor", id: "codeFont", title: "Code font", description: "The font of code blocks and inline code.", keywords: "monospace mono menlo jetbrains courier code fonts" },
+  { page: "editor", id: "codeSize", title: "Code size", description: "How large code is.", keywords: "code font fonts size" },
+  { page: "editor", id: "codeLigatures", title: "Code ligatures", description: "Shows => and != as single symbols.", keywords: "ligature code font fonts" },
+  { page: "editor", id: "textWidth", title: "Text width", description: "How long a line of text gets in a wide window.", keywords: "width column measure reading layout line length fonts" },
+  { page: "editor", id: "tableOfContents", title: "Table of contents", description: "Lists the note's headings on the right in the tabs layout.", keywords: "toc outline headings rail navigation layout" },
+  { page: "editor", id: "smoothCaret", title: "Smooth caret", description: "The cursor glides as you type.", keywords: "caret cursor smooth animation glide blink typing" },
+  { page: "background", id: "backgroundType", title: "Background", description: "What shows behind your notes and the sidebar.", keywords: "wallpaper backdrop picture image colour color gradient none" },
+  { page: "background", id: "backgroundColor", title: "Background color", description: "The flat color behind the window.", keywords: "background colour color solid" },
+  { page: "background", id: "backgroundGradient", title: "Gradient start color", description: "The color the gradient starts from.", keywords: "gradient from start colour color background" },
+  { page: "background", id: "backgroundGradientTo", title: "Gradient end color", description: "The color the gradient ends on.", keywords: "gradient to end colour color background" },
+  { page: "background", id: "backgroundGradientAngle", title: "Gradient angle", description: "Which way the gradient runs.", keywords: "gradient angle direction rotate degrees background" },
   { page: "background", id: "backgroundPicture", title: "Picture", description: "A built-in picture or one of your own.", keywords: "picture image photo wallpaper upload add" },
-  { page: "background", id: "backgroundFit", title: "Fit", description: "Cover the window, fit inside it, or tile.", keywords: "cover contain tile repeat fill picture" },
-  { page: "background", id: "backgroundPosition", title: "Position", description: "Which part of the picture stays in view.", keywords: "align anchor focus picture" },
-  { page: "background", id: "backgroundBlur", title: "Background blur", description: "Soften the background.", keywords: "blur soften background" },
-  { page: "background", id: "backgroundBrightness", title: "Brightness", description: "Lighten or darken the background.", keywords: "brightness light dark exposure" },
-  { page: "background", id: "backgroundSaturation", title: "Saturation", description: "More or less colour in the background.", keywords: "saturation colour color grayscale vivid" },
-  { page: "background", id: "backgroundTint", title: "Tint", description: "Wash the background with a colour.", keywords: "tint overlay colour color wash" },
-  { page: "background", id: "backgroundBehindStickies", title: "Behind sticky notes", description: "Show the background in sticky note windows too.", keywords: "sticky notes windows background" },
-  { page: "background", id: "backgroundDimInDark", title: "Dim in dark mode", description: "Darken the background while the theme is dark.", keywords: "dim dark mode night background" },
+  { page: "background", id: "backgroundFit", title: "Picture size", description: "Fill the window, fit the whole picture, or tile it.", keywords: "fit cover contain tile repeat fill picture size scale" },
+  { page: "background", id: "backgroundPosition", title: "Picture position", description: "Which edge or corner the picture lines up with.", keywords: "align anchor focus picture position" },
+  { page: "background", id: "backgroundBlur", title: "Background blur", description: "Softens the picture or gradient.", keywords: "blur soften background picture adjust" },
+  { page: "background", id: "backgroundBrightness", title: "Background brightness", description: "Lightens or darkens the background.", keywords: "brightness light dark exposure adjust" },
+  { page: "background", id: "backgroundSaturation", title: "Background saturation", description: "More or less color in the background.", keywords: "saturation colour color grayscale vivid adjust" },
+  { page: "background", id: "backgroundTint", title: "Tint", description: "How strongly a color washes over the background.", keywords: "tint amount strength overlay colour color wash adjust" },
+  { page: "background", id: "backgroundTintColor", title: "Tint color", description: "The color washed over the background.", keywords: "tint overlay colour color wash adjust" },
+  { page: "background", id: "backgroundDimInDark", title: "Dim in dark mode", description: "Darkens the background while the theme is dark.", keywords: "dim dark mode night background" },
+  { page: "background", id: "backgroundBehindStickies", title: "Show behind sticky notes", description: "Sticky note windows show the background too.", keywords: "behind sticky notes windows background where" },
   { page: "background", id: "surfaceMaterial", title: "Material", description: "Solid, frosted or clear glass over the background.", keywords: "material glass frosted clear solid surfaces transparent see-through window" },
-  { page: "background", id: "surfaceOpacity", title: "Opacity", description: "How much the window hides the background.", keywords: "opacity transparency transparent see-through glass surfaces window" },
-  { page: "background", id: "floatingBlur", title: "Menus and popups", description: "How much menus, the palette and Settings blur what is under them.", keywords: "menus popups popover floating blur strength frosted glass clear palette dropdown overlap readable" },
-  { page: "background", id: "surfaceBorder", title: "Border", description: "The line round the sidebar, title bar and menus.", keywords: "border outline hairline edge line surfaces" },
-  { page: "background", id: "readableText", title: "Keep text readable", description: "A soft halo behind text over a background.", keywords: "readable contrast legibility halo text shadow" },
-  { page: "tabs", id: "tabStyle", title: "Tab style", description: "How tabs without their own colour are drawn.", keywords: "tabs plain outline filled style" },
+  { page: "background", id: "surfaceOpacity", title: "Opacity", description: "How much the window covers the background.", keywords: "opacity transparency transparent see-through glass surfaces window" },
+  { page: "background", id: "floatingBlur", title: "Menu blur", description: "How much menus, the palette and Settings blur what is behind them.", keywords: "menus popups popover floating blur strength frosted glass clear palette dropdown overlap" },
+  { page: "background", id: "surfaceBorder", title: "Border", description: "The line around the sidebar, title bar and menus.", keywords: "border outline hairline thin edge line surfaces glass" },
+  { page: "background", id: "readableText", title: "Keep text readable", description: "A soft glow behind text over a background.", keywords: "readable contrast legibility halo glow text shadow glass" },
+  { page: "tabs", id: "tabStyle", title: "Tab style", description: "How tabs without a color of their own are drawn.", keywords: "tabs plain outline filled style" },
   { page: "tabs", id: "tabHeight", title: "Tab height", description: "Compact, regular or tall tabs.", keywords: "tabs height compact tall size" },
-  { page: "tabs", id: "tabRadius", title: "Tab corner radius", description: "How round tabs are.", keywords: "tabs radius corners rounded" },
-  { page: "tabs", id: "tabShowNumbers", title: "Show numbers", description: "Number each tab in the sidebar.", keywords: "tabs numbers index" },
-  { page: "tabs", id: "tabShowShortcuts", title: "Show shortcuts", description: "Show each tab's keyboard shortcut.", keywords: "tabs shortcuts keys hints" },
-  { page: "tabs", id: "tabNewColor", title: "New tab colour", description: "Give each new tab the next pastel colour.", keywords: "tabs colour color new cycle pastel" },
-  { page: "tabs", id: "tabColorStrength", title: "Colour strength", description: "How strongly a coloured tab is filled.", keywords: "tabs colour color strength intensity" },
-  { page: "editor", id: "tableOfContents", selector: '[aria-label="Show table of contents"]', title: "Table of contents", description: "Show the right rail of headings in tab mode.", keywords: "toc outline headings rail navigation" },
-  { page: "editor", id: "smoothCaret", selector: '[aria-label="Smooth caret"]', title: "Smooth caret", description: "The cursor glides as you type.", keywords: "caret cursor smooth animation glide blink" },
-  { page: "trash", id: "trashDeletedNotes", selector: ".preferences-trash-section", title: "Deleted notes", description: "Restore or permanently delete notes in the Trash.", keywords: "trash deleted restore purge bin recycle" },
-  { page: "backup", id: "exportBackup", title: "Workspace backup", description: "Save the whole workspace to a .notepane file.", keywords: "backup export save data file" },
-  { page: "backup", id: "importBackup", title: "Restore a backup", description: "Replace the workspace with a .notepane file.", keywords: "backup import restore data file" },
-  { page: "about", id: "aboutVersion", selector: ".about-card", title: "Version", description: "Which NotePane is running.", keywords: "about version electron chromium" },
-  { page: "about", id: "checkForUpdates", selector: ".about-update-row", title: "Check for updates", description: "Look for a newer NotePane.", keywords: "updates upgrade new version download" },
-  { page: "about", id: "releaseNotes", selector: '.preferences-card a[href$="/releases"]', title: "What's new", description: "Every version and what changed in it.", keywords: "release notes changelog github" },
+  { page: "tabs", id: "tabRadius", title: "Tab corners", description: "How round each tab is.", keywords: "tabs radius corners rounded corner radius" },
+  { page: "tabs", id: "tabBorder", title: "Tab border", description: "The line around each tab.", keywords: "tabs border outline line stroke" },
+  { page: "tabs", id: "tabBorderColor", title: "Tab border color", description: "The color of the line around each tab.", keywords: "tabs border outline colour color" },
+  { page: "tabs", id: "tabBarColor", title: "Tab bar", description: "The sidebar behind the tabs.", keywords: "tabs bar sidebar background colour color" },
+  { page: "tabs", id: "tabActiveFill", title: "Open tab", description: "The tab of the note you are in.", keywords: "tabs active current selected fill background colour color" },
+  { page: "tabs", id: "tabActiveText", title: "Open tab text", description: "Text color of the open tab.", keywords: "tabs active current text foreground colour color" },
+  { page: "tabs", id: "tabInactiveFill", title: "Other tabs", description: "Fill of the tabs you are not in.", keywords: "tabs inactive other fill background colour color" },
+  { page: "tabs", id: "tabInactiveText", title: "Other tabs text", description: "Text color of the other tabs.", keywords: "tabs inactive other text foreground colour color" },
+  { page: "tabs", id: "tabFillOpacity", title: "Tab opacity", description: "How solid the tab colors are.", keywords: "tabs opacity transparency alpha fill" },
+  { page: "tabs", id: "tabBlur", title: "Tab blur", description: "How much the tabs blur a background behind them.", keywords: "tabs blur frosted glass" },
+  { page: "tabs", id: "tabNewColor", title: "New tab color", description: "Give each new tab the next pastel.", keywords: "tabs colour color new cycle pastel" },
+  { page: "tabs", id: "tabColorStrength", title: "Color strength", description: "How strongly a colored tab is filled.", keywords: "tabs colour color strength intensity" },
+  { page: "tabs", id: "tabShowNumbers", title: "Show tab numbers", description: "Off gives the title the room.", keywords: "tabs numbers index show hide" },
+  { page: "tabs", id: "tabShowShortcuts", title: "Show tab shortcuts", description: "The ⌘1 to ⌘9 key beside each tab.", keywords: "tabs shortcuts keys hints show hide" },
+  { page: "trash", id: "trashDeletedNotes", selector: ".preferences-trash-section", title: "Deleted notes", description: "Restore deleted notes or delete them for good.", keywords: "trash deleted restore purge bin recycle" },
+  { page: "backup", id: "exportBackup", title: "Export a backup", description: "Saves every note and setting to a .notepane file.", keywords: "backup export save data file workspace" },
+  { page: "backup", id: "importBackup", title: "Import a backup", description: "Replaces your notes with a .notepane file.", keywords: "backup import restore data file workspace" },
   ...PREFERENCE_SHORTCUT_COMMANDS.map((command) => ({
     page: "shortcuts",
     id: `shortcut-${command.id}`,
     selector: `[aria-label="Enable ${command.label} shortcut"]`,
     title: command.label,
     description: "Keyboard shortcut",
-    keywords: "shortcut keys hotkey keyboard",
+    keywords: `shortcut shortcuts keys hotkey keyboard ${command.keywords ?? ""}`.trim(),
   })),
 ];
 
@@ -238,7 +241,8 @@ function findSettingElement(container, entry) {
 /**
  * The Settings window, laid out like Tern's: a sidebar (brand, search, pages under group
  * headings, version) beside the active page, whose title sits above cards that scroll on their
- * own. Look pages come from src/ui/lookPreferences.jsx; the rest are PreferencesCard sections.
+ * own. Look pages (Appearance, Background, Tabs, Editor) come from src/ui/lookPreferences.jsx;
+ * About, Keyboard and Trash are PreferencesCard sections.
  */
 export function PreferencesWindow({
   initialPage = DEFAULT_PREFERENCE_PAGE_ID,
@@ -471,11 +475,11 @@ export function PreferencesWindow({
   const activePageTitle = isSearching ? "Search" : activePageEntry.label;
 
   const renderBackupPage = () => (
-    <SettingsGroup label="Workspace">
+    <SettingsGroup label="Backup file">
       <SettingRow
         id="exportBackup"
-        title="Workspace backup"
-        description="Every active note, Trash item and preference in one portable .notepane file, for NotePane on macOS and Windows."
+        title="Export a backup"
+        description="Saves every note, the Trash and your settings in one .notepane file, for Mac or Windows."
       >
         <button
           type="button"
@@ -485,13 +489,13 @@ export function PreferencesWindow({
           onClick={() => void runBackupOperation("export", onExportBackup)}
         >
           <Download size={13} aria-hidden="true" />
-          {backupOperation === "export" ? "Exporting..." : "Export backup"}
+          {backupOperation === "export" ? "Exporting…" : "Export backup"}
         </button>
       </SettingRow>
       <SettingRow
         id="importBackup"
-        title="Restore a backup"
-        description="Import replaces the current workspace after making an automatic safety backup."
+        title="Import a backup"
+        description="Replaces all notes and settings with a .notepane file; a safety copy is saved first."
       >
         <button
           type="button"
@@ -501,7 +505,7 @@ export function PreferencesWindow({
           onClick={() => void runBackupOperation("import", onImportBackup)}
         >
           <Upload size={13} aria-hidden="true" />
-          {backupOperation === "import" ? "Importing..." : "Import backup"}
+          {backupOperation === "import" ? "Importing…" : "Import backup"}
         </button>
       </SettingRow>
     </SettingsGroup>
@@ -512,21 +516,12 @@ export function PreferencesWindow({
     switch (activePage) {
       case "editor":
         return (
-          <EditorPreferencesSection
-            editorPreferences={editorPreferences}
-            onEditorPreferencesChange={onEditorPreferencesChange}
-          />
-        );
-      case "fonts":
-        return (
-          <FontsLookPage
+          <EditorLookPage
             look={look}
             onLookChange={updateLook}
             editorPreferences={editorPreferences}
             fontOptions={fontOptions}
-            appFontOptions={appFontOptions}
             onEditorPreferencesChange={onEditorPreferencesChange}
-            onAppFontFamilyChange={updateAppFontFamily}
           />
         );
       case "background":
@@ -564,12 +559,15 @@ export function PreferencesWindow({
         return <AboutPreferencesSection />;
       default:
         return (
-          <ThemeLookPage
+          <AppearanceLookPage
             look={look}
             onLookChange={updateLook}
             appThemeId={appThemeId}
             themes={PICKER_THEMES}
             onAppThemeChange={onAppThemeChange}
+            appFontFamily={normalizedEditorPreferences.appFontFamily}
+            appFontOptions={appFontOptions}
+            onAppFontFamilyChange={updateAppFontFamily}
             launchIntro={normalizedEditorPreferences.launchIntro}
             onLaunchIntroChange={updateLaunchIntro}
           />
