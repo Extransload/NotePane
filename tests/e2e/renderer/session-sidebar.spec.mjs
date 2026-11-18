@@ -1481,6 +1481,28 @@ test("hidden tab numbers and shortcuts free their space for the title", async ({
   expect(deleteBox.x).toBeGreaterThan(rowBox.x + rowBox.width / 2);
 });
 
+// Numbers off with shortcuts on: the shortcut stays on the title's line, at the tab's right end.
+test("hidden tab numbers keep each tab's shortcut on the title's line", async ({ page }) => {
+  const row = page.locator(".session-tab-row").first();
+  const rowHeight = (await row.boundingBox()).height;
+
+  const settings = await openTabsSettings(page);
+  await settings.getByRole("switch", { name: "Show tab numbers" }).click();
+  await settings.getByRole("button", { name: "Close preferences" }).click();
+
+  const middle = (box) => box.y + box.height / 2;
+  await expect.poll(async () => {
+    const rowBox = await row.boundingBox();
+    const titleBox = await row.locator(".session-name").boundingBox();
+    const shortcutBox = await row.locator(".session-shortcut").boundingBox();
+    return {
+      height: rowBox.height,
+      sameLine: Math.abs(middle(titleBox) - middle(shortcutBox)) <= 2,
+      atRightEnd: shortcutBox.x > titleBox.x + titleBox.width,
+    };
+  }).toEqual({ height: rowHeight, sameLine: true, atRightEnd: true });
+});
+
 test("a first line longer than a title ends the tab's name in an ellipsis", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   await page.keyboard.insertText("A very long first line that goes on well past the forty-eight characters");

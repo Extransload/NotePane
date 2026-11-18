@@ -342,6 +342,15 @@ html[data-tab-numbers="hidden"] .session-sidebar:not(.is-compact) .session-index
   transition: opacity 120ms ease, color 120ms ease;
 }
 
+/* With the delete button placed by hand, the title and the shortcut are too, or the shortcut
+   would flow onto a second line below the title. */
+html[data-tab-numbers="hidden"] .session-sidebar:not(.is-compact) .session-tab-row > .session-tab-button {
+  grid-area: 1 / 2;
+}
+
+html[data-tab-numbers="hidden"] .session-sidebar:not(.is-compact) .session-tab-trailing {
+  grid-area: 1 / 3;
+}
 html[data-tab-numbers="hidden"] .session-index-label {
   display: none;
 }
