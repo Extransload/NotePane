@@ -1793,28 +1793,51 @@ for (const { name, updateMode, result, status, detail } of [
   });
 }
 
-// The Mac build downloads a release by itself; once it is in, Restart to update shows in the
-// tabs header and on the About page, and either one starts the install.
-test("a downloaded release offers Restart to update in the header and on the About page", async ({ page }) => {
+// The Mac build downloads a release by itself: the header's pill and the About page fill with the
+// download, then offer Restart to update, either of which starts the install, and fill again while
+// the app restarts.
+test("a release downloading by itself shows its progress, then offers Restart to update", async ({ page }) => {
   await page.addInitScript(stubAboutBridge, { updateMode: "self", result: null });
   await page.reload();
   await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  const header = page.getByTestId("sticky-header");
+  const headerPill = header.locator(".update-pill");
   const pill = page.getByRole("button", { name: "Restart to update to NotePane 1.5.0" });
-  await page.evaluate(() => window.__appUpdate.emit({ status: "downloading", version: "1.5.0" }));
-  await expect(pill).toHaveCount(0);
+  const pillFill = () => headerPill.locator(".gauge-fill")
+    .evaluate((fill) => new DOMMatrixReadOnly(getComputedStyle(fill).transform).a);
+
+  await page.evaluate(() => window.__appUpdate.emit({
+    status: "downloading", version: "1.5.0", downloaded: 25_000_000, total: 100_000_000,
+  }));
+  await expect(headerPill).toHaveText("Downloading 25%");
+  await expect(headerPill).toBeDisabled();
+  await expect.poll(pillFill).toBeCloseTo(0.25, 2);
 
   const about = await openAboutPage(page);
   const statusLine = about.getByTestId("update-status");
-  await expect(statusLine).toHaveText("Downloading NotePane 1.5.0…");
+  await expect(statusLine).toHaveText("Downloading NotePane 1.5.0… 25%");
+  await expect(about).toContainText("25 MB of 100 MB");
+  await expect(about.getByRole("progressbar", { name: "Update progress" })).toHaveAttribute("aria-valuenow", "25");
+
+  await page.evaluate(() => window.__appUpdate.emit({ status: "verifying", version: "1.5.0" }));
+  await expect(statusLine).toHaveText("Checking NotePane 1.5.0…");
   await page.evaluate(() => window.__appUpdate.emit({ status: "ready", version: "1.5.0" }));
   await expect(statusLine).toHaveText("NotePane 1.5.0 is ready");
+  await expect(about.getByRole("progressbar")).toHaveCount(0);
   await about.getByRole("button", { name: "Restart to update" }).click();
   await expect.poll(() => page.evaluate(() => window.__appUpdate.calls)).toEqual(["install"]);
 
   await page.keyboard.press("Escape");
   await expect(pill).toBeVisible();
+  await expect(pill).toBeEnabled();
   await pill.click();
   await expect.poll(() => page.evaluate(() => window.__appUpdate.calls)).toEqual(["install", "install"]);
+
+  // Restarting: the pill fills again, with no end it can know.
+  await page.evaluate(() => window.__appUpdate.emit({ status: "installing", version: "1.5.0" }));
+  await expect(headerPill).toHaveText("Restarting…");
+  await expect(headerPill).toBeDisabled();
+  await expect(headerPill.locator(".gauge")).toHaveClass(/\bis-indeterminate\b/);
 });
 
 test("a copy that cannot replace itself offers the release page instead", async ({ page }) => {

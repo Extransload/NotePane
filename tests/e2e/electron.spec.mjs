@@ -619,8 +619,7 @@ test("Electron exports and imports a complete portable workspace backup", async 
   try {
     const page = await electronApp.firstWindow();
     await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
-    await page.getByText("Current data before import", { exact: true }).click();
-    await page.keyboard.press("End");
+    await clickToEndOf(page, page.getByText("Current data before import", { exact: true }));
     await page.keyboard.insertText(" with an immediate edit");
     await page.getByRole("button", { name: "Preferences" }).click();
     const preferences = page.getByRole("dialog", { name: "Preferences window" });
@@ -856,8 +855,7 @@ test("Electron flushes typing still waiting on the save debounce when windows ar
     const editor = page.getByTestId("sticky-editor-surface");
     await expect(editor).toContainText("first body");
 
-    await editor.getByText("first body").click();
-    await page.keyboard.press("End");
+    await clickToEndOf(page, editor.getByText("first body"));
     await page.keyboard.insertText(" typed right before teardown");
     // Ask right away, well inside the renderer's save debounce.
     const results = await electronApp.evaluate(() => globalThis.notepaneFlushEditorWindows());
@@ -952,8 +950,7 @@ test("Electron saves the latest typing when a new session is created right away"
     const editor = page.getByTestId("sticky-editor-surface");
     await expect(editor).toContainText("first body");
 
-    await editor.getByText("first body").click();
-    await page.keyboard.press("End");
+    await clickToEndOf(page, editor.getByText("first body"));
     await page.keyboard.insertText(" typed just before new tab");
     await page.keyboard.press(modifierShortcut("T"));
     await expect(page.getByRole("tab")).toHaveCount(2);
@@ -1433,7 +1430,10 @@ test("Electron note search leaves focus in the find field of the tab it opens", 
     const findBar = page.getByRole("search", { name: "Find in note" });
     await expect(findBar).toContainText("1 / 2");
     const blocks = editor.locator(".bn-block-content");
-    const blockCount = await blocks.count();
+    // The blocks by their type and text, so a change says which block it was.
+    const readBlocks = () => blocks.evaluateAll((elements) =>
+      elements.map((element) => `${element.dataset.contentType}: ${element.textContent}`));
+    const blocksBefore = await readBlocks();
     await expect(findBar.getByRole("textbox", { name: "Find in note" })).toBeFocused();
 
     // Enter steps to the next match and Escape closes find; neither edits the note.
@@ -1441,7 +1441,7 @@ test("Electron note search leaves focus in the find field of the tab it opens", 
     await expect(findBar).toContainText("2 / 2");
     await page.keyboard.press("Escape");
     await expect(findBar).toHaveCount(0);
-    await expect(blocks).toHaveCount(blockCount);
+    await expect.poll(readBlocks).toEqual(blocksBefore);
   } finally {
     await electronApp.close();
   }
@@ -1532,8 +1532,7 @@ test("Electron note search sees text another sticky window just saved", async ()
     // The title is set by hand, so this edit does not broadcast a title change.
     await secondStickyPage.bringToFront();
     const secondEditor = secondStickyPage.getByTestId("sticky-editor-surface");
-    await secondEditor.getByText("second body").click();
-    await secondStickyPage.keyboard.press("End");
+    await clickToEndOf(secondStickyPage, secondEditor.getByText("second body"));
     await secondStickyPage.keyboard.insertText(" freshword");
     await expect.poll(async () => {
       const note = await firstStickyPage.evaluate(() => window.blocknoteSticky.getNote("second-note"));
@@ -2700,8 +2699,7 @@ test("Electron opens version history from a minimum-size sticky window", async (
     await expect.poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight]))
       .toEqual([320, 260]);
 
-    await page.locator(".bn-editor").getByText("alpha body").click();
-    await page.keyboard.press("End");
+    await clickToEndOf(page, page.locator(".bn-editor").getByText("alpha body"));
     await page.keyboard.insertText(" sticky snapshot");
     await page.keyboard.press(modifierShortcut("S"));
     await expect(page.locator(".sticky-toast-success")).toHaveText("Saved");
@@ -3211,6 +3209,20 @@ async function chooseBlankSessionTemplate(page) {
 
 function modifierShortcut(key) {
   return `${process.platform === "darwin" ? "Meta" : "Control"}+${key}`;
+}
+
+// Clicks into a line of text, then puts the caret at its end. ProseMirror reads a click's caret a
+// moment after the mouse is up and puts the DOM caret back where it read it, so an End pressed in
+// between can be undone; End is pressed again until the editor's own caret is at the end.
+async function clickToEndOf(page, text) {
+  await text.click();
+  await expect(async () => {
+    await page.keyboard.press("End");
+    expect(await page.evaluate(() => {
+      const { $head } = document.querySelector(".bn-editor").editor.view.state.selection;
+      return $head.parentOffset === $head.parent.content.size;
+    })).toBe(true);
+  }).toPass();
 }
 
 // Opens Settings with its shortcut. A press that lands before the window's shortcut listener is in

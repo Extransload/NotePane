@@ -12,7 +12,11 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 const { pipeline } = require("node:stream/promises");
-const { Readable } = require("node:stream");
+const { Readable, Transform } = require("node:stream");
+
+// How often the download reports its progress: often enough for a smooth gauge, rarely enough
+// not to flood the windows with messages.
+const PROGRESS_INTERVAL_MS = 120;
 
 // Positional arguments: the process to wait for, the installed bundle, the new bundle, and the
 // command that opens the result.
@@ -90,6 +94,8 @@ function createMacSelfUpdater({
     onState(state);
   };
 
+  // Reports `downloading` with the bytes so far and the size the server gave (null when it gave
+  // none), then `verifying` while the zip is checked and unpacked.
   const download = async (version, file) => {
     const directory = path.join(tempDir, `NotePane-update-${version}`);
     fs.rmSync(directory, { recursive: true, force: true });
@@ -99,7 +105,24 @@ function createMacSelfUpdater({
     if (!response.ok || !response.body) {
       throw new Error(`The download failed (${response.status}).`);
     }
-    await pipeline(Readable.fromWeb(response.body), fs.createWriteStream(zipPath));
+    const total = Number(response.headers?.get?.("content-length")) || null;
+    let downloaded = 0;
+    let reportedAt = 0;
+    const report = () => setState({ status: "downloading", version, downloaded, total });
+    const counter = new Transform({
+      transform(chunk, _encoding, callback) {
+        downloaded += chunk.length;
+        const now = Date.now();
+        if (now - reportedAt >= PROGRESS_INTERVAL_MS) {
+          reportedAt = now;
+          report();
+        }
+        callback(null, chunk);
+      },
+    });
+    await pipeline(Readable.fromWeb(response.body), counter, fs.createWriteStream(zipPath));
+    report();
+    setState({ status: "verifying", version });
     if ((await sha512Base64(zipPath)) !== file.sha512) {
       throw new Error("The download does not match the release.");
     }
@@ -129,7 +152,7 @@ function createMacSelfUpdater({
       setState({ status: "manual", version });
       return Promise.resolve(state);
     }
-    setState({ status: "downloading", version });
+    setState({ status: "downloading", version, downloaded: 0, total: null });
     preparing = download(version, file)
       .then((app) => {
         staged = { version, app };

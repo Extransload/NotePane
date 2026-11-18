@@ -1,5 +1,6 @@
 import { SuggestionMenu } from "@blocknote/core/extensions";
 import { closeHistory } from "@tiptap/pm/history";
+import { TextSelection } from "@tiptap/pm/state";
 
 export function handleToggleSpace(editor, event) {
   const selection = editor?.prosemirrorView?.state.selection;
@@ -137,7 +138,7 @@ export function handleToggleBackspace(editor, event) {
     currentBlock.props?.isToggleable !== true ||
     hasInlineContent(currentBlock)
   ) {
-    return false;
+    return currentBlock.type === "paragraph" && joinToClosedToggleAbove(editor, currentBlock);
   }
 
   clearStoredToggleState(currentBlock.id);
@@ -151,6 +152,99 @@ export function handleToggleBackspace(editor, event) {
   });
   editor.setTextCursorPosition(heading, "start");
   return true;
+}
+
+// The toggle whose title is the line on screen right above `blockId`, when that toggle is closed:
+// ProseMirror's Backspace would join the block to the toggle's last line, which is hidden.
+function closedToggleAbove(editor, blockId) {
+  let above = editor.getPrevBlock(blockId);
+  while (above?.children?.length) {
+    if (isToggleBlock(above) && !isToggleShown(editor, above.id)) {
+      return above;
+    }
+    above = above.children.at(-1);
+  }
+  return null;
+}
+
+// Backspace at the start of the line below a closed toggle joins that line to the toggle's title, the
+// line above it on screen, as in Notion; the hidden lines stay. Lines nested in it take its place.
+// List items and headings first turn into a paragraph, as BlockNote's Backspace does.
+function joinToClosedToggleAbove(editor, block) {
+  const view = editor.prosemirrorView;
+  const toggle = closedToggleAbove(editor, block.id);
+  if (!view || !toggle) {
+    return false;
+  }
+  const { state } = view;
+  const { $from } = state.selection;
+  const container = $from.node($from.depth - 1);
+  const target = findBlockContainer(state.doc, toggle.id);
+  if (container?.type.name !== "blockContainer" || !target) {
+    return false;
+  }
+  const containerStart = $from.before($from.depth - 1);
+  const containerEnd = containerStart + container.nodeSize;
+  const nested = container.lastChild.type.name === "blockGroup" ? container.lastChild : null;
+  const titleEnd = target.pos + target.node.firstChild.nodeSize;
+  const tr = nested
+    ? state.tr.replaceWith(containerStart, containerEnd, nested.content)
+    : state.tr.delete(containerStart, containerEnd);
+  tr.insert(titleEnd, $from.parent.content);
+  tr.setSelection(TextSelection.create(tr.doc, titleEnd));
+  view.dispatch(tr.scrollIntoView());
+  return true;
+}
+
+/**
+ * Closing a toggle hides its lines. A caret left in one would sit in hidden text, drawn nowhere,
+ * where Enter splits the line out of sight, so it moves to the end of the toggle's title first, as
+ * in Notion. Runs in the capture phase of the chevron's click, before BlockNote closes the toggle.
+ */
+export function moveSelectionOutOfClosingToggle(editor, event) {
+  const view = editor?.prosemirrorView;
+  const wrapper = event.target instanceof Element
+    ? event.target.closest(".bn-toggle-button")?.parentElement
+    : null;
+  if (
+    event.button !== 0 ||
+    !view ||
+    !wrapper?.matches(".bn-toggle-wrapper") ||
+    !view.dom.contains(wrapper) ||
+    wrapper.getAttribute("data-show-children") !== "true"
+  ) {
+    return false;
+  }
+  const blockId = wrapper.closest(".bn-block-outer")?.getAttribute("data-id");
+  const toggle = blockId ? findBlockContainer(view.state.doc, blockId) : null;
+  const title = toggle?.node.firstChild;
+  const children = toggle?.node.lastChild;
+  if (!title || children?.type.name !== "blockGroup") {
+    return false;
+  }
+  const childrenStart = toggle.pos + 1 + title.nodeSize;
+  const { head } = view.state.selection;
+  if (head <= childrenStart || head >= childrenStart + children.nodeSize) {
+    return false;
+  }
+  const titleEnd = toggle.pos + title.nodeSize;
+  view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, titleEnd)));
+  return true;
+}
+
+function findBlockContainer(doc, blockId) {
+  let found = null;
+  doc.descendants((node, pos) => {
+    if (found) {
+      return false;
+    }
+    if (node.type.name === "blockContainer" && node.attrs.id === blockId) {
+      found = { node, pos };
+      return false;
+    }
+    return node.type.spec.group !== "blockContent";
+  });
+  return found;
 }
 
 function toggleWrapperOf(editor, blockId) {

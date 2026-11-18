@@ -97,7 +97,13 @@ function createHarness({ zipBytes = Buffer.from("zip bytes"), listedSha512, unpa
 test("downloads, checks and unpacks a release, then installs it as the app quits", MAC_ONLY, async () => {
   const harness = createHarness({});
   await harness.updater.prepare(harness.updateInfo);
-  assert.deepEqual(harness.states.map(({ status }) => status), ["downloading", "ready"]);
+  // Downloading (with its progress), then checking the download, then ready.
+  const statuses = harness.states.map(({ status }) => status)
+    .filter((status, index, all) => status !== all[index - 1]);
+  assert.deepEqual(statuses, ["downloading", "verifying", "ready"]);
+  const progress = harness.states.filter(({ status }) => status === "downloading");
+  assert.equal(progress[0].downloaded, 0);
+  assert.equal(progress.at(-1).downloaded, Buffer.from("zip bytes").length);
   assert.equal(harness.updater.isReady(), true);
   assert.deepEqual(harness.runs[0], [
     "fetch",

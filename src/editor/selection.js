@@ -22,6 +22,27 @@ export function hasVisibleTextSelection() {
   return Boolean(selection && !selection.isCollapsed && selection.toString());
 }
 
+/**
+ * A press on a checklist box leaves focus and the caret where they were, as BlockNote's toggle
+ * chevron does. The box would take focus, and BlockNote draws a ticked item again, which removes
+ * that box, so focus fell to the page and nothing typed next reached the note. The click still
+ * ticks the box.
+ */
+export function keepFocusOffChecklistBox(editor, event) {
+  const { target } = event;
+  if (
+    event.button !== 0 ||
+    !(target instanceof HTMLInputElement) ||
+    target.type !== "checkbox" ||
+    !target.closest('[data-content-type="checkListItem"]') ||
+    !editor.prosemirrorView?.dom.contains(target)
+  ) {
+    return false;
+  }
+  event.preventDefault();
+  return true;
+}
+
 export function selectAllBlocks(editor) {
   if (editor.document.length === 0) {
     return;

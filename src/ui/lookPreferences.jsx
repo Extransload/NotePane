@@ -647,36 +647,21 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
           </SettingRow>
         )}
         <SettingRow
-          id="floatingMaterial"
+          id="floatingBlur"
           title="Menus and popups"
-          description="Menus, the search palette and Settings float over your note. Frosted blurs the text under them."
-          {...resetSurfaceStyle("floating")}
+          description="Menus, the search palette and Settings float over your note: how much they blur the text under them. 0 leaves them clear."
+          {...resetSurfaceStyle("floatingBlur")}
         >
-          <Segmented
-            label="Menus and popups"
-            value={surfaceStyle.floating}
-            options={MATERIAL_OPTIONS}
-            onChange={(floating) => setSurfaceStyle({ floating })}
+          <Slider
+            label="Menu blur"
+            value={surfaceStyle.floatingBlur}
+            min={FLOATING_BLUR_RANGE.min}
+            max={FLOATING_BLUR_RANGE.max}
+            step={FLOATING_BLUR_RANGE.step}
+            format={(blur) => (blur === 0 ? "Clear" : formatPx(blur))}
+            onChange={(floatingBlur) => setSurfaceStyle({ floatingBlur })}
           />
         </SettingRow>
-        {surfaceStyle.floating === "frosted" && (
-          <SettingRow
-            id="floatingBlur"
-            title="Menu blur"
-            description="How strongly menus and popups blur what is under them."
-            {...resetSurfaceStyle("floatingBlur")}
-          >
-            <Slider
-              label="Menu blur"
-              value={surfaceStyle.floatingBlur}
-              min={FLOATING_BLUR_RANGE.min}
-              max={FLOATING_BLUR_RANGE.max}
-              step={FLOATING_BLUR_RANGE.step}
-              format={formatPx}
-              onChange={(floatingBlur) => setSurfaceStyle({ floatingBlur })}
-            />
-          </SettingRow>
-        )}
         <SettingRow
           id="surfaceBorder"
           title="Border"

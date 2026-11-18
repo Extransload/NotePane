@@ -1827,12 +1827,44 @@ html[data-backdrop] .is-two-pane .preferences-window-sidebar {
   font-variant-numeric: tabular-nums;
 }
 
+/* Takes the row's free width, so the progress bar under the status spans it. */
 .about-update-text {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
 .about-update-status.is-error {
   color: var(--sticky-danger-color);
+}
+
+/* An update on its way or ready: the status line takes full weight, so it reads at a glance
+   rather than as one more grey line. */
+.about-update-status.is-active {
+  color: var(--sticky-panel-text);
+  font-weight: 650;
+}
+
+/* The update's gauge (src/ui/Gauge.jsx) as a bar under the status. */
+.about-update-progress {
+  height: 6px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--notepane-control-accent) 12%, transparent);
+}
+
+.about-update-progress .gauge-fill {
+  background: var(--notepane-control-accent);
+}
+
+.preference-data-button.is-primary {
+  border-color: var(--notepane-control-accent);
+  background: var(--notepane-control-accent);
+  color: var(--sticky-panel-bg);
+}
+
+.preference-data-button.is-primary:hover:not(:disabled) {
+  border-color: var(--notepane-control-accent);
+  background: color-mix(in srgb, var(--notepane-control-accent) 86%, var(--sticky-text-color));
 }
 
 .about-update-status-text {

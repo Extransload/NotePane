@@ -868,6 +868,50 @@ test("a toggle opened by Enter or by find in note ends fully open", async ({ pag
   await expect(page.locator(".bn-editor").getByText("hidden needle")).toBeVisible();
 });
 
+// Closing a toggle hides its lines. A caret left in one sat in hidden text, drawn nowhere, where
+// Enter split the hidden line; it moves to the end of the toggle's title instead.
+test("moves the caret to the toggle's title when the toggle closes over it", async ({ page }) => {
+  const toggle = await typeToggleWithChildren(page, "Caret toggle", ["Hidden line"]);
+  await toggle.locator(".bn-toggle-button").click();
+  await expect(toggle.locator(".bn-toggle-wrapper")).toHaveAttribute("data-show-children", "false");
+
+  await expect.poll(() => toggle.evaluate((content) => {
+    const selection = window.getSelection();
+    const title = content.querySelector(".bn-inline-content");
+    return document.activeElement === content.closest(".ProseMirror") &&
+      selection.isCollapsed &&
+      title.contains(selection.focusNode) &&
+      selection.getRangeAt(0).getClientRects()[0]?.height > 0;
+  })).toBe(true);
+  await page.keyboard.type("!");
+  await expect(toggle.locator(".bn-inline-content").first()).toHaveText("Caret toggle!");
+  await toggle.locator(".bn-toggle-button").click();
+  await expect(page.locator(".bn-editor").getByText("Hidden line", { exact: true })).toBeVisible();
+});
+
+// Backspace at the start of the line below a closed toggle joined that line to the toggle's last,
+// hidden line, so the text and the caret went out of sight. It joins the toggle's title instead,
+// the line above it on screen, and the hidden lines stay where they were.
+test("joins the line below a closed toggle to its title with Backspace", async ({ page }) => {
+  const toggle = await typeToggleWithChildren(page, "Closed title", ["Hidden line"]);
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("Next line");
+  await toggle.locator(".bn-toggle-button").click();
+  await expect(toggle.locator(".bn-toggle-wrapper")).toHaveAttribute("data-show-children", "false");
+
+  await page.locator(".bn-editor").getByText("Next line", { exact: true }).click();
+  await page.keyboard.press(modifierShortcut("ArrowLeft"));
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("|");
+  await expect(toggle.locator(".bn-inline-content").first()).toHaveText("Closed title|Next line");
+  await expect(toggle.locator(".bn-toggle-wrapper")).toHaveAttribute("data-show-children", "false");
+
+  await toggle.locator(".bn-toggle-button").click();
+  await expect(page.locator(".bn-editor").getByText("Hidden line", { exact: true })).toBeVisible();
+});
+
 test("opens and closes toggles without motion when reduced motion is requested", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   const toggle = await typeToggleWithChildren(page, "Still toggle", ["Still child"]);

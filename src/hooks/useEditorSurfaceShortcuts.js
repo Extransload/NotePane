@@ -16,6 +16,7 @@ import {
   isCurrentTableCellContentSelected,
   isCurrentTableFullySelected,
   isCurrentTableSelection,
+  keepFocusOffChecklistBox,
   moveSelectedTableCell,
   moveTableTextCursorToAdjacentCell,
   selectAllBlocks,
@@ -45,6 +46,7 @@ import {
   handleToggleBackspace,
   handleToggleEnter,
   handleToggleSpace,
+  moveSelectionOutOfClosingToggle,
 } from "../editor/toggleKeyboard.js";
 import {
   isEditableFormTarget,
@@ -93,7 +95,8 @@ function blockContainerIdAt($pos) {
  * Every capture-phase handler that the editor surface needs: toggle-list keys,
  * table cell navigation and merge/split, the text selection toolbar escape,
  * Escape's widening selection, a code block's edge keys,
- * column auto-fit on double click, and Tab handling. They are registered as a
+ * column auto-fit on double click, a toggle closing over the caret, a checklist
+ * box ticked without taking focus, and Tab handling. They are registered as a
  * single unit so their capture order stays fixed.
  */
 export function useEditorSurfaceShortcuts({
@@ -576,6 +579,16 @@ export function useEditorSurfaceShortcuts({
       }
     };
 
+    // A toggle's chevron closing it over the caret: the caret moves to its title first.
+    const handleToggleButtonClickCapture = (event) => {
+      moveSelectionOutOfClosingToggle(editor, event);
+    };
+
+    // A checklist box ticks without taking focus, so typing goes on where the caret was.
+    const handleChecklistBoxMouseDownCapture = (event) => {
+      keepFocusOffChecklistBox(editor, event);
+    };
+
     document.addEventListener("keydown", handleTableLineDeleteKeyDownCapture, true);
     document.addEventListener("keydown", handleCodeBlockEdgeKeyDownCapture, true);
     document.addEventListener("keydown", handleEditorKeyDownCapture, true);
@@ -584,6 +597,8 @@ export function useEditorSurfaceShortcuts({
     document.addEventListener("keydown", handleEscapeKeyDownCapture, true);
     document.addEventListener("keydown", handleTableCellMergeSplitKeyDownCapture, true);
     document.addEventListener("dblclick", handleTableColumnDoubleClickCapture, true);
+    document.addEventListener("click", handleToggleButtonClickCapture, true);
+    document.addEventListener("mousedown", handleChecklistBoxMouseDownCapture, true);
     window.addEventListener("mousedown", handleTableColumnResizeMouseDownCapture, true);
     window.addEventListener("mousemove", handleTableColumnResizeMouseMoveCapture, true);
     window.addEventListener("mouseup", handleTableColumnResizeMouseUpCapture, true);
@@ -597,6 +612,8 @@ export function useEditorSurfaceShortcuts({
       document.removeEventListener("keydown", handleEscapeKeyDownCapture, true);
       document.removeEventListener("keydown", handleTableCellMergeSplitKeyDownCapture, true);
       document.removeEventListener("dblclick", handleTableColumnDoubleClickCapture, true);
+      document.removeEventListener("click", handleToggleButtonClickCapture, true);
+      document.removeEventListener("mousedown", handleChecklistBoxMouseDownCapture, true);
       window.removeEventListener("mousedown", handleTableColumnResizeMouseDownCapture, true);
       window.removeEventListener("mousemove", handleTableColumnResizeMouseMoveCapture, true);
       window.removeEventListener("mouseup", handleTableColumnResizeMouseUpCapture, true);

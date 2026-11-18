@@ -63,8 +63,9 @@
   }
 }
 
-/* "Restart to update" (src/ui/UpdatePill.jsx), at the right of the tabs header: an accent pill
-   that washes in once a release has downloaded. */
+/* The update pill (src/ui/UpdatePill.jsx), at the right of the tabs header: an accent pill that
+   shows the download filling it, then washes into "Restart to update", then fills again while
+   the app restarts. */
 .update-pill {
   display: inline-flex;
   flex: 0 0 auto;
@@ -78,6 +79,7 @@
   background: color-mix(in srgb, var(--notepane-control-accent) 14%, transparent);
   color: var(--sticky-text-color);
   font: 650 12px/1 var(--notepane-ui-font);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
   cursor: pointer;
   -webkit-app-region: no-drag;
@@ -90,17 +92,29 @@
   background: color-mix(in srgb, var(--notepane-control-accent) 24%, transparent);
 }
 
+/* Busy (downloading, checking, restarting): the gauge is the news, so the pill stays at full
+   strength and only stops taking clicks. */
 .update-pill:disabled {
   cursor: default;
-  opacity: 0.75;
+}
+
+.update-pill.is-failed {
+  border-color: color-mix(in srgb, var(--sticky-danger-color) 55%, transparent);
+  background: color-mix(in srgb, var(--sticky-danger-color) 12%, transparent);
 }
 
 .update-pill svg {
   color: var(--notepane-control-accent);
 }
 
-.update-pill .is-spinning {
-  animation: updatePillSpin 900ms linear infinite;
+.update-pill.is-failed svg {
+  color: var(--sticky-danger-color);
+}
+
+/* A new label comes into focus. An inline-block, so it can move. */
+.update-pill-label {
+  display: inline-block;
+  animation: updatePillLabelIn 320ms var(--notepane-motion-ease-out, ease-out) both;
 }
 
 @keyframes updatePillIn {
@@ -111,16 +125,91 @@
   }
 }
 
-@keyframes updatePillSpin {
+@keyframes updatePillLabelIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+
+/* A gauge (src/ui/Gauge.jsx) fills its host from the left, behind the host's contents. */
+.gauge-host {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.gauge {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.gauge-fill {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--notepane-control-accent) 34%, transparent);
+  transform: scaleX(var(--gauge-progress, 0));
+  transform-origin: left center;
+  transition: transform 260ms var(--notepane-motion-ease-out, ease-out);
+}
+
+/* Work of unknown length creeps toward 90%, ever slower, with a light running across it. */
+.gauge.is-indeterminate .gauge-fill {
+  animation: gaugeCreep 24s cubic-bezier(0.05, 0.75, 0.2, 1) forwards;
+}
+
+.gauge.is-indeterminate .gauge-fill::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--notepane-control-accent) 40%, transparent),
+    transparent
+  );
+  content: "";
+  animation: gaugeShimmer 1.2s linear infinite;
+}
+
+@keyframes gaugeCreep {
+  from {
+    transform: scaleX(0.06);
+  }
+
   to {
-    transform: rotate(360deg);
+    transform: scaleX(0.9);
+  }
+}
+
+@keyframes gaugeShimmer {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .update-pill,
-  .update-pill .is-spinning {
+  .update-pill-label,
+  .gauge.is-indeterminate .gauge-fill::after {
     animation: none;
+  }
+
+  .gauge-fill {
+    transition: none;
+  }
+
+  /* Without movement a busy gauge is half full until the work ends. */
+  .gauge.is-indeterminate .gauge-fill {
+    animation: none;
+    transform: scaleX(0.5);
   }
 }
 

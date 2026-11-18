@@ -111,17 +111,24 @@ Press `⌘⇧T` to move between them.
   <img src="docs/images/search.png" alt="The search palette filtered to the launch tag, with folder and tag chips" width="820">
 </div>
 
-`⌘P` opens the search palette. Type words, `#tag` or `folder:Name`, or press the chips; matching commands show
-above the notes, and `>` lists only commands.
+`⌘P` opens the search palette. Type words, `#tag` or `folder:Name`, or press the chips.
+
+<div align="center">
+  <img src="docs/images/commands.png" alt="The palette listing commands with their shortcuts after typing >" width="820">
+</div>
+
+The same palette runs commands: words list the matching commands above the notes, and `>` lists
+only commands, from a new folder to a theme or a Settings page.
 
 <div align="center">
   <img src="docs/images/background.png" alt="NotePane over a snowy mountain photo, the sidebar and editor in frosted glass" width="820">
 </div>
 
-Settings › Look › Background puts a picture, colour or gradient behind the app and sets the glass over it.
+Settings › Look › Background puts a picture, colour or gradient behind the app and sets the glass over it, with a
+blur of their own for menus and popups.
 
 <div align="center">
-  <img src="docs/images/settings.png" alt="The Settings window open on the Background page, with Material, Opacity and Border" width="820">
+  <img src="docs/images/settings.png" alt="The Settings window open on the Background page, with Material, Opacity and the blur of menus and popups" width="820">
 </div>
 
 ---

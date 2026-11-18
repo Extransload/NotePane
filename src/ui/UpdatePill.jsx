@@ -1,44 +1,50 @@
-import { Download, RefreshCw } from "lucide-react";
+import { AlertCircle, Download, RefreshCw } from "lucide-react";
 import { preventFocusLoss } from "../editor/images.js";
+import {
+  getUpdatePillLabel,
+  getUpdateProgress,
+  isUpdateBusy,
+} from "../model/appUpdate.js";
+import { Gauge } from "./Gauge.jsx";
 
 /**
- * "Restart to update" in the tabs window's header, as TablePeek has it: shown once a newer
- * release has downloaded on its own. A click saves the notes, quits, swaps the new app in and
- * opens it. A copy that cannot replace itself offers the release page instead. Nothing shows
- * while nothing is waiting.
+ * The update in the tabs window's header, as TablePeek shows it: once a newer release starts
+ * downloading on its own, an accent pill fills with the download, then reads "Restart to update";
+ * a click saves the notes, quits, swaps the new app in and opens it, the pill filling again while
+ * it restarts. A failed download says so and opens the release page; a copy that cannot replace
+ * itself offers that page from the start. Nothing shows while nothing is on its way.
  */
 export function UpdatePill({ update, onInstall, onOpenRelease }) {
-  if (update.status === "ready" || update.status === "installing") {
-    const installing = update.status === "installing";
-    return (
-      <button
-        type="button"
-        className="update-pill has-tooltip"
-        data-tooltip={`NotePane ${update.version}`}
-        aria-label={installing ? "Restarting to update" : `Restart to update to NotePane ${update.version}`}
-        disabled={installing}
-        onMouseDown={preventFocusLoss}
-        onClick={onInstall}
-      >
-        <RefreshCw size={13} aria-hidden="true" className={installing ? "is-spinning" : undefined} />
-        {installing ? "Restarting…" : "Restart to update"}
-      </button>
-    );
+  const label = getUpdatePillLabel(update);
+  if (label === null) {
+    return null;
   }
-  if (update.status === "manual") {
-    return (
-      <button
-        type="button"
-        className="update-pill has-tooltip"
-        data-tooltip="Opens the release page"
-        aria-label={`Download NotePane ${update.version}`}
-        onMouseDown={preventFocusLoss}
-        onClick={onOpenRelease}
-      >
-        <Download size={13} aria-hidden="true" />
-        {`NotePane ${update.version}`}
-      </button>
-    );
-  }
-  return null;
+  const busy = isUpdateBusy(update);
+  const failed = update.status === "error";
+  const opensRelease = failed || update.status === "manual";
+  const Icon = failed ? AlertCircle : update.status === "manual" ? Download : RefreshCw;
+  const tooltip = failed
+    ? `${update.message ?? "The download failed"}. Opens the release page.`
+    : update.status === "manual"
+      ? "Opens the release page"
+      : `NotePane ${update.version}`;
+  return (
+    <button
+      type="button"
+      className={`update-pill gauge-host has-tooltip${failed ? " is-failed" : ""}`}
+      data-tooltip={tooltip}
+      data-update-status={update.status}
+      aria-label={update.status === "ready"
+        ? `Restart to update to NotePane ${update.version}`
+        : update.status === "manual" ? `Download NotePane ${update.version}` : label}
+      disabled={busy}
+      onMouseDown={preventFocusLoss}
+      onClick={opensRelease ? onOpenRelease : onInstall}
+    >
+      {busy && <Gauge progress={getUpdateProgress(update)} />}
+      <Icon size={13} aria-hidden="true" />
+      {/* Keyed by the state, not the percentage, so each new step comes into focus once. */}
+      <span key={update.status} className="update-pill-label">{label}</span>
+    </button>
+  );
 }

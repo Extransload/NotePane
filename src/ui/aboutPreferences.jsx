@@ -20,6 +20,14 @@ import {
   useAppUpdate,
 } from "../hooks/useAppUpdate.js";
 import {
+  formatDownloadSize,
+  getUpdateProgress,
+  isUpdateBusy,
+} from "../model/appUpdate.js";
+import {
+  Gauge,
+} from "./Gauge.jsx";
+import {
   NotePaneWordmark,
 } from "./icons.jsx";
 import {
@@ -55,16 +63,36 @@ function describeUpdateCheck(update) {
 // What the Mac self-updater (useAppUpdate) has to say, when it is past a plain check: a download
 // on its way, a release ready to install, or one this copy cannot install itself.
 function describeSelfUpdate(selfUpdate) {
+  const progress = getUpdateProgress(selfUpdate);
   switch (selfUpdate.status) {
     case "downloading":
-      return { text: `Downloading NotePane ${selfUpdate.version}…` };
+      return {
+        text: progress === null
+          ? `Downloading NotePane ${selfUpdate.version}…`
+          : `Downloading NotePane ${selfUpdate.version}… ${Math.floor(progress * 100)}%`,
+        detail: selfUpdate.total > 0
+          ? `${formatDownloadSize(selfUpdate.downloaded)} of ${formatDownloadSize(selfUpdate.total)}`
+          : null,
+        tone: "active",
+      };
+    case "verifying":
+      return {
+        text: `Checking NotePane ${selfUpdate.version}…`,
+        detail: "Making sure the download is the release, then unpacking it.",
+        tone: "active",
+      };
     case "ready":
       return {
         text: `NotePane ${selfUpdate.version} is ready`,
         detail: "Restart to start using it. Your notes are saved first.",
+        tone: "active",
       };
     case "installing":
-      return { text: "Restarting to update…" };
+      return {
+        text: "Restarting to update…",
+        detail: "NotePane saves your notes, swaps in the new version and opens again.",
+        tone: "active",
+      };
     case "manual":
       return {
         text: `NotePane ${selfUpdate.version} is available`,
@@ -155,7 +183,7 @@ export function AboutPreferencesSection() {
             <div className="preference-setting-title">NotePane {version}</div>
             <div
               className={`preferences-section-description about-update-status${
-                tone === "error" ? " is-error" : ""
+                tone === "error" ? " is-error" : tone === "active" ? " is-active" : ""
               }`}
               role="status"
               data-testid="update-status"
@@ -167,12 +195,26 @@ export function AboutPreferencesSection() {
             {detail && (
               <div className="preferences-section-description about-update-detail">{detail}</div>
             )}
+            {!checking && isUpdateBusy(selfUpdate) && (
+              <div
+                className="about-update-progress gauge-host"
+                role="progressbar"
+                aria-label="Update progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={getUpdateProgress(selfUpdate) === null
+                  ? undefined
+                  : Math.floor(getUpdateProgress(selfUpdate) * 100)}
+              >
+                <Gauge progress={getUpdateProgress(selfUpdate)} />
+              </div>
+            )}
           </div>
           <div className="preference-backup-actions">
             {selfUpdate.status === "ready" && (
               <button
                 type="button"
-                className="preference-data-button"
+                className="preference-data-button is-primary"
                 onMouseDown={preventFocusLoss}
                 onClick={installUpdate}
               >

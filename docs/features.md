@@ -39,10 +39,10 @@
 - Look: accent colour and corner shape; editor font, size, line height, letter spacing, block spacing, text width,
   heading font and weight, code font, size and ligatures; a background (colour, gradient or picture, with fit,
   position, blur, brightness, saturation and tint) and, on the same page as Tern sets its window, the window over it:
-  Material (Solid, Frosted or Clear), one Opacity for every area (menus and Settings stay at least 80%), a material
-  of their own for Menus and popups (Frosted by default, so the note under an open menu, the search palette or
-  Settings blurs instead of showing through sharp, with a Menu blur slider for how strongly; the dim behind
-  Settings and the palette fades by its colour, so the blur holds from the first frame), Border, and
+  Material (Solid, Frosted or Clear), one Opacity for every area (menus and Settings stay at least 80%), a blur of
+  their own for Menus and popups (24px by default, 0 for clear: the note under an open menu, the search palette or
+  Settings blurs instead of showing through sharp; the dim behind Settings and the palette fades by its colour, so
+  the blur holds from the first frame, and a block's handles never show over them), Border, and
   Keep text readable (a soft halo behind text while the background shows through, on by default); tab style,
   height, radius, numbers, shortcuts, new tab colour and colour strength
 - Preferences > About: the NotePane wordmark, "Version x.y.z", a short description of the app and, in the desktop
@@ -50,9 +50,11 @@
   up to date, "NotePane x.y.z is available", "installs when NotePane quits" on Windows, "Update checks run in the
   installed app" in development, test builds and the browser preview, or "Could not check for updates" with the
   reason), and a **Release notes** link to the GitHub releases page
-- Updates on a Mac as in TablePeek: a newer release downloads by itself, then **Restart to update** shows in the tabs
-  window's header and on the About page (the sticky layout asks in a dialog). It saves the notes, quits, swaps the new
-  app in and opens it. A copy run from the disk image or a folder it cannot write offers the release page instead
+- Updates on a Mac as in TablePeek: a newer release downloads by itself, and a pill in the tabs window's header fills
+  with the download ("Downloading 42%", then "Checking update…"); the About page shows the same with the size and a
+  progress bar. Then **Restart to update** shows in both (the sticky layout asks in a dialog): it saves the notes,
+  quits, swaps the new app in and opens it, the pill filling again while it restarts. A failed download says so and
+  opens the release page; a copy run from the disk image or a folder it cannot write offers that page instead
 - Preferences > Shortcuts lists every command as a 40px table row: name, on/off switch, the keys (click to record
   new ones) and Reset
 - Default editor font family for every session; there is no font size setting, text size follows the app zoom
@@ -163,7 +165,13 @@ BlockNote handles editor interaction directly.
 - Smooth caret (Settings > Editor, on by default): the caret is drawn in the theme's accent and glides to each new
   place in 45ms as you type or move it, stays solid while it moves and blinks once it rests. A click, a scroll or a jump
   of more than three lines moves it at once, and so does every move under reduced motion. A text selection, a selected
-  block or cell, Korean and other IME composition, print and export use the native caret
+  block or cell, Korean and other IME composition, print and export use the native caret. While blocks move after an
+  edit (a list item nesting or leaving its list, a new block rising in), the caret moves with the text. It stays on a
+  table cell's text as a wide table scrolls sideways and is not drawn where the table has scrolled that text out of
+  view; at a line's soft wrap it sits where the native caret would, at the line's end after `End` or `Command + Right`
+- Toggles and checklists keep the caret in sight: closing a toggle over the caret moves it to the end of the toggle's
+  title, `Backspace` at the start of the line below a closed toggle joins that line to the title (its hidden lines
+  stay), and ticking a checklist box leaves the caret where it was, so typing goes on there
 - Launch intro (Settings > Look > Theme, on by default): as the app opens in Tabs mode, three windows fly in from
   round the window and stack into the NotePane mark, its box is drawn round them and filled, and the name is written
   out, for about three seconds, over the window's own colour: the app does not show until the intro clears. It plays

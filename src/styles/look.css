@@ -104,6 +104,22 @@ html[data-backdrop] .sticky-shell {
   background: transparent;
 }
 
+/* That stacking context also holds the window's own dialogs (Settings, the search palette,
+   export, crop, the media preview), whose z-index then only counts inside the shell, while
+   BlockNote's handles and toolbars are portalled to the body at z-index 20 to 40. While such a
+   dialog is open the shell rises above them, so a block's + and six-dot handles never show over
+   Settings. Without a background the shell is no stacking context and the dialogs' own z-index
+   already wins. */
+html[data-backdrop] .sticky-shell:has(:is(
+  .preferences-backdrop,
+  .search-palette-backdrop,
+  .export-dialog-backdrop,
+  .crop-dialog,
+  .media-preview
+)) {
+  z-index: 60;
+}
+
 /* A sticky window's editor is transparent over the note colour of its shell, so the note colour
    is the editor's own fill there. */
 html[data-backdrop] .sticky-shell.layout-sticky {

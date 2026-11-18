@@ -2304,6 +2304,23 @@ test("pops a checklist box when it is ticked, not when it is cleared", async ({ 
   expect(await readCheckPops(page)).toEqual([]);
 });
 
+// BlockNote draws a ticked item again, which took away the box that had just been focused by the
+// click, so focus fell to the page and the next keys typed nothing.
+test("keeps typing where the caret was after a checklist box is ticked", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("[] First task");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Second task");
+  const items = page.locator(".bn-editor [data-content-type='checkListItem']");
+  const firstBox = items.first().getByRole("checkbox");
+
+  await firstBox.click();
+  await expect(firstBox).toBeChecked();
+  await expectEditorFocused(page);
+  await page.keyboard.type(" done");
+  await expect(items.nth(1).locator(".bn-inline-content")).toHaveText("Second task done");
+});
+
 // Records every BlockNote floating surface that starts to close: a popover's closing copy or a
 // Mantine menu fading out (both take no pointer), and the copy NotePane fades in place of a menu its
 // popover took away. Installed before the closing action, so a short fade is never missed. A Mantine
@@ -2542,6 +2559,69 @@ test("snaps the smooth caret without a glide when reduced motion is requested", 
   expect((await readSmoothCaret(page)).transitionDuration).toBe("0s");
 });
 
+// Where a line wraps, one caret position is both the end of a line and the start of the next. The
+// browser draws the caret at the end of the line after Cmd+Right, and an Up or Down arrow keeps it
+// on the line its column reaches; the drawn caret is where the native one would be.
+test("draws the smooth caret at the end of a wrapped line after Cmd+Right and the arrows", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  const words = Array.from({ length: 60 }, (_, index) => `word${index}`).join(" ");
+  await page.keyboard.insertText(words);
+  await page.keyboard.press(modifierShortcut("ArrowUp"));
+  await waitForEditorSelection(page);
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+ArrowRight" : "End");
+  await waitForEditorSelection(page);
+  const atWrap = () => page.evaluate(() => {
+    const rects = window.getSelection().getRangeAt(0).getClientRects();
+    return rects.length === 2 && rects[0].top < rects[1].top;
+  });
+  await expect.poll(atWrap).toBe(true);
+  await expectSmoothCaretAtSelection(page);
+
+  // Down keeps the column at the right edge; the line it lands on may end before a space, so it
+  // goes on until a line ends at a wrap.
+  let landedOnWrap = false;
+  for (let line = 0; line < 4 && !landedOnWrap; line += 1) {
+    await page.keyboard.press("ArrowDown");
+    await waitForEditorSelection(page);
+    landedOnWrap = await atWrap();
+  }
+  expect(landedOnWrap).toBe(true);
+  await expectSmoothCaretAtSelection(page);
+});
+
+// A wide table scrolls inside its own scroller, whose scroll events do not reach the editor
+// surface. The drawn caret moves with the cell's text, and is not drawn once the scroller has
+// taken that text out of view, where the native caret would be clipped too.
+test("keeps the smooth caret on a table cell's text as the table scrolls sideways", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  const columns = Array.from({ length: 12 }, (_, index) => index);
+  await pastePlainText(page, [
+    `| ${columns.map((index) => `Column ${index}`).join(" | ")} |`,
+    `|${" --- |".repeat(columns.length)}`,
+    `| ${columns.map((index) => `value number ${index}`).join(" | ")} |`,
+  ].join("\n"));
+  const wrapper = page.locator(".bn-editor .tableWrapper");
+  await expect.poll(() => wrapper.evaluate((element) => element.scrollWidth > element.clientWidth + 400))
+    .toBe(true);
+
+  const cell = page.getByRole("cell", { name: "value number 1", exact: true });
+  await cell.hover();
+  await page.mouse.wheel(-2000, 0);
+  await expect.poll(() => wrapper.evaluate((element) => element.scrollLeft)).toBe(0);
+  await cell.click();
+  await waitForEditorSelection(page);
+  await expectSmoothCaretAtSelection(page);
+  await page.mouse.wheel(40, 0);
+  await expect.poll(() => wrapper.evaluate((element) => element.scrollLeft)).toBe(40);
+  await expectSmoothCaretAtSelection(page);
+
+  await page.mouse.wheel(2000, 0);
+  await expect.poll(() => cell.evaluate((element) =>
+    element.getBoundingClientRect().right < element.closest(".tableWrapper").getBoundingClientRect().left))
+    .toBe(true);
+  await expect.poll(async () => (await readSmoothCaret(page)).shown).toBe(false);
+});
+
 // A desktop bridge stub that keeps the editor preferences in sessionStorage, so they outlive a
 // reload as the store's do.
 function stubPreferenceKeepingBridge() {
@@ -2643,4 +2723,33 @@ test("continues a list typed as text and lets Escape take the marker back", asyn
 
   const texts = await page.locator(".bn-editor [data-content-type='paragraph']").allTextContents();
   expect(texts.filter(Boolean).slice(-5)).toEqual(["a) first", "b) second", "2) two", "(x) plain", "(y) "]);
+});
+
+// Nesting and unnesting slide a block's margin after the transaction; the drawn caret follows the
+// text to where it settles rather than staying where the text was.
+test("keeps the smooth caret on an empty list item as it nests and leaves the list", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  const caretOffsetFromText = () => page.evaluate(() => {
+    const caret = document.querySelector(".sticky-editor-surface .smooth-caret");
+    const head = window.getSelection().focusNode;
+    const block = (head instanceof Element ? head : head?.parentElement)?.closest(".bn-block-content");
+    const text = block?.querySelector(".bn-inline-content");
+    if (!caret || caret.hidden || !text) {
+      return null;
+    }
+    const drawn = caret.getBoundingClientRect();
+    return Math.round(Math.abs(drawn.left + drawn.width / 2 - text.getBoundingClientRect().left));
+  });
+
+  await page.keyboard.type("- Parent");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await expect(page.locator(".bn-editor [data-content-type='bulletListItem']")).toHaveCount(2);
+  await expect.poll(caretOffsetFromText).toBeLessThanOrEqual(2);
+
+  // Enter on the empty nested item lifts it out; again, and the list ends in a paragraph.
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".bn-editor [data-content-type='bulletListItem']")).toHaveCount(1);
+  await expect.poll(caretOffsetFromText).toBeLessThanOrEqual(2);
 });
