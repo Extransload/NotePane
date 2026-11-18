@@ -348,8 +348,9 @@ test("keeps the editor focused after Enter in the caption field, so Cmd+Z undoes
 
 test("leaves the view where an image file was dropped, far from the caret", async ({ page }) => {
   await clickLastEmptyParagraph(page);
+  // One input per line: typing each key of 50 lines spent most of the test's time budget.
   for (let index = 0; index < 50; index += 1) {
-    await page.keyboard.type(`Line ${index}`);
+    await page.keyboard.insertText(`Line ${index}`);
     await page.keyboard.press("Enter");
   }
   await page.locator(".bn-editor").getByText("Line 0", { exact: true }).click();

@@ -8,24 +8,29 @@ import {
   useState,
 } from "react";
 
-// Whether `element` is running a CSS animation of its own. Transitions do not count: only an
+// The names of the CSS animations `element` itself is running. Transitions do not count: only an
 // animation ends with the `animationend` the exit waits for.
-function hasRunningAnimation(element) {
+function getRunningAnimationNames(element) {
   if (!element?.isConnected || typeof element.getAnimations !== "function") {
-    return false;
+    return new Set();
   }
-  return element
-    .getAnimations()
-    .some((animation) => "animationName" in animation && animation.playState === "running");
+  return new Set(
+    element
+      .getAnimations()
+      .filter((animation) => "animationName" in animation && animation.playState === "running")
+      .map((animation) => animation.animationName),
+  );
 }
 
 /**
  * Calls `onExited` once the element in `elementRef` has finished its exit animation: on its own
  * `animationend` (or `animationcancel`, when reduced motion or an export turns it off midway),
- * never on one bubbling up from a child. When no animation runs, because reduced motion or an
- * export turns it off or the element is not rendered, `onExited` is called before the browser
- * paints. `exiting` is truthy while the element animates out; a new truthy value names a new
- * element to wait for. `onExited` must keep its identity.
+ * never on one bubbling up from a child, nor on the `animationcancel` of an enter animation the
+ * exit replaced, which an overlay closed while it is still animating in reports after the exit
+ * has begun. When no animation runs, because reduced motion or an export turns it off or the
+ * element is not rendered, `onExited` is called before the browser paints. `exiting` is truthy
+ * while the element animates out; a new truthy value names a new element to wait for. `onExited`
+ * must keep its identity.
  */
 export function useExitAnimation(elementRef, exiting, onExited) {
   useLayoutEffect(() => {
@@ -33,12 +38,13 @@ export function useExitAnimation(elementRef, exiting, onExited) {
       return undefined;
     }
     const element = elementRef.current;
-    if (!hasRunningAnimation(element)) {
+    const exitAnimationNames = getRunningAnimationNames(element);
+    if (exitAnimationNames.size === 0) {
       onExited();
       return undefined;
     }
     const handleEnd = (event) => {
-      if (event.target === element) {
+      if (event.target === element && exitAnimationNames.has(event.animationName)) {
         onExited();
       }
     };
@@ -57,10 +63,12 @@ export function useExitAnimation(elementRef, exiting, onExited) {
  * the last payload, so the overlay can still render, and `rootProps` mark its root element
  * `data-state="closing"`, `inert` and `aria-hidden` until that element's exit animation ends
  * (src/styles/motion.css gives each overlay its exit and `pointer-events: none`). A payload that
- * arrives while closing starts a new `generation`: Presence mounts a fresh overlay for it, so
- * nothing the closing one held carries over (a confirmation already given, a focused field), as
- * when closing removed an overlay at once. A caller of usePresence itself keeps its element unless
- * it keys it with `generation`.
+ * arrives after a close starts a new `generation`: Presence mounts a fresh overlay for it, so
+ * nothing the closed one held carries over (a confirmation already given, a focused field), as
+ * when closing removed an overlay at once. That holds when the exit ends in the same render as the
+ * payload arrives, too: React can batch the exit's end with the reopening, and the closed overlay
+ * is still mounted then. A caller of usePresence itself keeps its element unless it keys it with
+ * `generation`.
  *
  * Spread `rootProps` on the overlay's root element; its `ref` must reach that element.
  */
@@ -72,7 +80,7 @@ export function usePresence(value) {
   const elementRef = useRef(null);
 
   if (isOpen && (retained !== value || isClosing)) {
-    if (isClosing) {
+    if (isClosing || retained === null) {
       setGeneration((current) => current + 1);
     }
     setRetained(value);

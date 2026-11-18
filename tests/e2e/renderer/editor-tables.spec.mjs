@@ -347,6 +347,21 @@ test("keeps the focused table cell border attached through scroll and column res
   await expectFocusedTableCellBorderToMatch(page, cell);
 });
 
+// Rests the pointer on a table cell, which shows that table's handles. BlockNote hides the handles
+// on any scroll and shows them again on the next pointer move, so when the hover itself has to
+// scroll to the cell, a scroll event that lands after its pointer move hides them under a pointer
+// that no longer moves. The cell is scrolled to first: the browser fires the scroll events of a
+// rendering update before its animation frame callbacks, so once the next frame callback runs,
+// the scroll has had its effect and the hover moves the pointer onto a still view.
+async function restPointerOnTableCell(cell) {
+  await cell.evaluate((element) => new Promise((resolve) => {
+    // Centred, so the add-row button under the table is in view too.
+    element.scrollIntoView({ block: "center" });
+    window.requestAnimationFrame(() => resolve());
+  }));
+  await cell.hover();
+}
+
 test("keeps the focused cell when extending table rows or columns", async ({ page }) => {
   await loadTemplatePreview(page);
   await page.getByRole("button", { name: "Use this template" }).click();
@@ -356,7 +371,7 @@ test("keeps the focused cell when extending table rows or columns", async ({ pag
   }).first();
   await focusedCell.click();
   const lastCell = page.getByRole("cell", { name: "Export PDF" }).last();
-  await lastCell.hover();
+  await restPointerOnTableCell(lastCell);
 
   const addColumnButton = page.locator(
     ".bn-extend-button-add-remove-columns",
@@ -377,7 +392,8 @@ test("keeps the focused cell when extending table rows or columns", async ({ pag
   await page.mouse.up();
   await expectFocusedTableCellBorderToMatch(page, focusedCell);
 
-  await lastCell.hover();
+  // The column drag made the table taller, so its last row may now be below the view.
+  await restPointerOnTableCell(lastCell);
   const addRowButton = page.locator(
     ".bn-extend-button-add-remove-rows",
   ).first();

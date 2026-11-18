@@ -202,6 +202,10 @@ into their own per-note typography fields at creation time; changing defaults do
 The app font family is also stored there and applies immediately to interface text in every open window. There is no
 font size setting: as in Notion, text size follows the app zoom (`appZoom`), which the main process applies as page
 zoom to every window (`setZoomFactor`) when preferences change and each time a window loads.
+A window shows a preference change at once and sends it to the main process, which stores it and broadcasts the stored
+preferences to every window before it answers. While a window still waits for an answer, any broadcast it receives is
+older than what it shows (an earlier change of its own, or another window's that its pending change replaces), so it
+passes broadcasts over then and takes the stored preferences from the answer to its last change.
 
 Sidebar session changes use note list/create/activate/delete IPC calls. Activating a session changes the note bound to
 the current window, then remounts the BlockNote editor with that note's stored document. Deleting the active session

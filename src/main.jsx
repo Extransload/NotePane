@@ -482,9 +482,19 @@ function App({ bindTestThemeSetter }) {
     return electronApi.onFindOpenRequested?.(() => void takePendingFind());
   }, []);
 
+  // This window's preference updates still on their way through the main process. The main process
+  // sends each update to every window before it answers it, so a broadcast that comes while one
+  // is on its way holds an older state than this window shows: an earlier update of its own, as
+  // after two quick zoom presses, or another window's, which the update on its way replaces. Such
+  // a broadcast would undo the newer state, so it is passed over, and the answer to the last
+  // update brings the stored one.
+  const pendingEditorPreferenceUpdatesRef = useRef(0);
+
   useEffect(() => {
     return electronApi?.onEditorPreferencesChanged?.((nextEditorPreferences) => {
-      setEditorPreferences(normalizeEditorPreferences(nextEditorPreferences));
+      if (pendingEditorPreferenceUpdatesRef.current === 0) {
+        setEditorPreferences(normalizeEditorPreferences(nextEditorPreferences));
+      }
     });
   }, []);
 
@@ -559,7 +569,19 @@ function App({ bindTestThemeSetter }) {
     const normalizedEditorPreferences =
       normalizeEditorPreferences(nextEditorPreferences);
     setEditorPreferences(normalizedEditorPreferences);
-    await electronApi?.updateEditorPreferences?.(normalizedEditorPreferences);
+    if (!electronApi?.updateEditorPreferences) {
+      return;
+    }
+    pendingEditorPreferenceUpdatesRef.current += 1;
+    try {
+      const storedEditorPreferences =
+        await electronApi.updateEditorPreferences(normalizedEditorPreferences);
+      if (pendingEditorPreferenceUpdatesRef.current === 1 && storedEditorPreferences) {
+        setEditorPreferences(normalizeEditorPreferences(storedEditorPreferences));
+      }
+    } finally {
+      pendingEditorPreferenceUpdatesRef.current -= 1;
+    }
   }, []);
 
   useReloadReveal(Boolean(note));
@@ -1285,8 +1307,8 @@ function StickyEditor({
 
   // Cmd/Ctrl+=, - and 0 zoom the whole app as Notion does; Electron applies the stored zoom to every
   // window. The gauge also shows at either end, so a press that cannot zoom further still answers.
-  // The zoom this window asked for last. A press that comes before the stored zoom's round trip
-  // through the main process steps from it, so every press takes its step.
+  // The zoom this window asked for last. A press that comes before this window's preferences show
+  // it steps from it, so every press takes its step.
   const requestedAppZoomRef = useRef(null);
   useEffect(() => {
     if (requestedAppZoomRef.current === normalizedEditorPreferences.appZoom) {
