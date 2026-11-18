@@ -149,6 +149,10 @@ BlockNote handles editor interaction directly.
   duplicate (tables without merged cells), clear contents and delete
 - A table handle's row or column goes with Delete or Backspace while its menu is open, and one Cmd+Z brings it
   back; cells selected another way, even a whole row, only have their contents cleared
+- Tab moves to the next table cell; in the last cell it adds a row and moves to its first cell, as in Notion, and
+  one Cmd+Z takes the row away
+- Pasting plain text of several lines makes a block of each line, as in Notion, and blank lines make none; text that
+  reads as Markdown (a list, a table, a heading) pastes as Markdown, and in a code block the lines stay in the block
 - Escape widens the selection a step at a time, as in Notion: the caret in a table cell selects the cell, then its
   row, then the table; the caret or text in any other block, a code block included, selects that block; and Escape on
   a selected block leaves nothing selected. The editor keeps focus until that last step, which lets go of it, so
@@ -174,7 +178,9 @@ BlockNote handles editor interaction directly.
   view; at a line's soft wrap it sits where the native caret would, at the line's end after `End` or `Command + Right`
 - Toggles and checklists keep the caret in sight: closing a toggle over the caret moves it to the end of the toggle's
   title, `Backspace` at the start of the line below a closed toggle joins that line to the title (its hidden lines
-  stay), and ticking a checklist box leaves the caret where it was, so typing goes on there
+  stay), `Delete` at the end of a closed toggle's title joins the block after the toggle, never a hidden line, and
+  does nothing when a divider, a table or nothing follows, and ticking a checklist box leaves the caret where it
+  was, so typing goes on there
 - Launch intro (Settings > Appearance, on by default): as the app opens in Tabs mode, three windows fly in from
   round the window and stack into the NotePane mark, its box is drawn round them and filled, and the name is written
   out, for about three seconds, over the window's own colour: the app does not show until the intro clears. It plays
@@ -192,8 +198,10 @@ BlockNote handles editor interaction directly.
   export, sidebar, layout, table of contents, text width, zoom, each Settings page and each theme, with their keys
 - The shortcut that opens the search palette, Settings, the find bar or the export menu closes it again
 - Find in note: `Command/Ctrl + F` highlights matches, steps with `Enter` / `Shift + Enter`, and expands collapsed toggles that hold the current match
-- Lists typed as text continue on `Enter`: a line starting "a) ", "b. ", "(c) ", "2) " or "(3) " gets the next marker;
-  `Enter` on a bare marker ends the list, and `Escape` right after `Enter` takes the new marker back
+- Lists typed as text continue on `Enter`: a line starting "a) ", "b. ", "(c) ", "2) ", "(3) ", "iv) " or "(IX) "
+  gets the next marker, Roman numerals in either case included; a lone "i) " under "h) " is a letter and one that
+  starts a list is a numeral. `Enter` on a bare marker ends the list, and `Escape` right after `Enter` takes the new
+  marker back
 - Nested list markers follow Notion: bullets •, ◦, ▪ and numbers 1., a., i., then over again; bullets, numbers and
   toggle arrows sit at the middle of their text's first line, toggle headings included
 - The table of contents rail opens over the note without moving its text
@@ -235,7 +243,8 @@ BlockNote handles editor interaction directly.
   was and the button shows Failed. Plain Text, RegExp, Mermaid, Ruby Haml, Pug, Julia, R, Haskell, Scala, Kotlin,
   WebAssembly and WGSL have no Prettify (the reasons are `CODE_LANGUAGES_WITHOUT_FORMATTER` in
   `src/editor/codeFormatting.js`). Backspace at the start of a code block, or Delete in an empty one, leaves the
-  block; Escape selects it, and Delete or Backspace then removes it
+  block; Escape selects it, and Delete or Backspace then removes it. Enter starts the new line at the indent (spaces
+  or tabs) of the caret's line, as in Notion, and Enter on two blank lines at the end leaves the block
 - Divider: a thin rule from `/divider`, or from `---` or `***` typed on an empty line; the caret moves on to
   a line below it. Backspace on the empty line below selects it and Backspace again deletes it. Markdown writes it as
   `---` and reads `---`, `***` and `___`

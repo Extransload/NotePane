@@ -59,10 +59,33 @@ export function handleNotePanePaste({ event, editor, defaultPasteHandler }) {
       editor.pasteMarkdown(normalizedPaste.markdown);
       return true;
     }
+    // Plain text of several lines, as Notion pastes it: a block a line, blank lines dropped. The
+    // first line joins the text before the caret and the last the text after it. Only text that
+    // Markdown reads as nothing but paragraphs counts: a table, a list or a heading keeps
+    // BlockNote's Markdown paste. Each line is still read as Markdown, as BlockNote reads plain
+    // text, so `**bold**` in a line stays bold.
+    if (
+      !event.clipboardData?.types.includes("text/html") &&
+      /[\r\n]/.test(plainText) &&
+      isCaretInBlockText(editor) &&
+      editor.tryParseMarkdownToBlocks(plainText).every((block) => block.type === "paragraph")
+    ) {
+      const lines = plainText.split(/\r\n?|\n/).map((line) => line.trim()).filter(Boolean);
+      editor.pasteMarkdown(lines.join("\n\n"));
+      return true;
+    }
   }
 
   return defaultPasteHandler({
     prioritizeMarkdownOverHTML: true,
     plainTextAsMarkdown: true,
   });
+}
+
+// A caret or text selection in one block's own text: not in a table cell, a block set or a node.
+function isCaretInBlockText(editor) {
+  const { $from, $to } = editor.prosemirrorView?.state.selection ?? {};
+  return Boolean($from?.parent.isTextblock) &&
+    $from.sameParent($to) &&
+    $from.node($from.depth - 1)?.type.name === "blockContainer";
 }

@@ -479,6 +479,35 @@ test("indents and dedents code lines with Tab and Shift+Tab inside the code bloc
   expect(await codeDepth()).toBe(nestedDepth);
 });
 
+// As in Notion, Enter in a code block starts the new line at the indent of the caret's line, spaces
+// or a tab. Enter on two blank lines at the end still leaves the block, indented or not.
+test("keeps the line's indent when Enter breaks a code line, and leaves the block after two blank lines", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("``` ");
+  await page.keyboard.type("if (x) {");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("y();");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("z();");
+  const code = page.locator(".bn-editor [data-content-type='codeBlock'] code");
+  const codeText = () => code.evaluate((element) => element.textContent);
+  await expect.poll(codeText).toBe("if (x) {\n  y();\n  z();");
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("\tw();");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("v();");
+  await expect.poll(codeText).toBe("if (x) {\n  y();\n  z();\n  \tw();\n  \tv();");
+
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await expect.poll(codeText).toBe("if (x) {\n  y();\n  z();\n  \tw();\n  \tv();");
+  await page.keyboard.type("after");
+  await expect(page.locator(".bn-editor [data-content-type='paragraph']").filter({ hasText: "after" }))
+    .toHaveCount(1);
+});
+
 // A table, image or divider at an edge of the note used to be left out of Command+A.
 test("selects a note that starts with an image or a divider with Command+A", async ({ page }) => {
   const imageSource =
@@ -2719,6 +2748,56 @@ test("continues a list typed as text and lets Escape take the marker back", asyn
 
   const texts = await page.locator(".bn-editor [data-content-type='paragraph']").allTextContents();
   expect(texts.filter(Boolean).slice(-5)).toEqual(["a) first", "b) second", "2) two", "(x) plain", "(y) "]);
+});
+
+test("continues Roman numeral text lists, and reads a lone i from the item above", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  const lastParagraphText = () => page.locator(".bn-editor [data-content-type='paragraph']").last()
+    .evaluate((paragraph) => paragraph.textContent);
+  // Each marker is typed after Escape has taken back the one Enter added, on a line of its own.
+  for (const [typed, next] of [
+    ["i) one", "ii) "],
+    ["iv. four", "v. "],
+    ["(ix) nine", "(x) "],
+    ["XIV) upper", "XV) "],
+    ["h) aitch", "i) "],
+  ]) {
+    await page.keyboard.type(typed);
+    await page.keyboard.press("Enter");
+    await expect.poll(lastParagraphText).toBe(next);
+    if (next !== "i) ") {
+      await page.keyboard.press("Escape");
+      await expect.poll(lastParagraphText).toBe("");
+    }
+  }
+  // "i) " under "h) " is the letter after h; a list that starts at "i) " counts in numerals.
+  await page.keyboard.type("eye");
+  await page.keyboard.press("Enter");
+  await expect.poll(lastParagraphText).toBe("j) ");
+  await page.keyboard.press("Escape");
+  await page.keyboard.type("v) vee");
+  await page.keyboard.press("Enter");
+  await expect.poll(lastParagraphText).toBe("w) ");
+});
+
+// As in Notion, plain text of several lines pastes as a block a line, with blank lines dropped;
+// in a code block the lines stay one block.
+test("pastes plain text lines as one block each, and keeps them together in a code block", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.type("Start ");
+  await pastePlainText(page, "first line\nsecond line\n\n\nthird **bold** line\n");
+  const paragraphs = page.locator(".bn-editor [data-content-type='paragraph']");
+  await expect.poll(async () => (await paragraphs.allTextContents()).filter(Boolean))
+    .toEqual(["Start first line", "second line", "third bold line"]);
+  await expect(paragraphs.filter({ hasText: "third bold line" }).locator("strong")).toHaveText("bold");
+  await page.keyboard.type("!");
+  await expect(paragraphs.filter({ hasText: "third bold line!" })).toHaveCount(1);
+
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("``` ");
+  await pastePlainText(page, "one\n\ntwo");
+  await expect.poll(() => page.locator(".bn-editor [data-content-type='codeBlock'] code")
+    .evaluate((code) => code.textContent)).toBe("one\n\ntwo");
 });
 
 // Nesting and unnesting slide a block's margin after the transaction; the drawn caret follows the

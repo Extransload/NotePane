@@ -912,6 +912,42 @@ test("joins the line below a closed toggle to its title with Backspace", async (
   await expect(page.locator(".bn-editor").getByText("Hidden line", { exact: true })).toBeVisible();
 });
 
+// Delete at the end of a closed toggle's title pulled its first hidden line up into the title. As
+// in Notion, the hidden lines stay: the block after the toggle joins the title when it holds text,
+// and with a divider (or nothing) after the toggle, Delete does nothing.
+test("Delete at the end of a closed toggle joins the block after it, never a hidden line", async ({ page }) => {
+  const toggle = await typeToggleWithChildren(page, "Closed title", ["Hidden line"]);
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.insertText("Next line");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("---");
+  await expect(page.locator(".bn-editor [data-content-type='divider']")).toHaveCount(1);
+  await toggle.locator(".bn-toggle-button").click();
+  await expect(toggle.locator(".bn-toggle-wrapper")).toHaveAttribute("data-show-children", "false");
+
+  const title = toggle.locator(".bn-inline-content").first();
+  const lineEnd = process.platform === "darwin" ? "Meta+ArrowRight" : "End";
+  await title.click();
+  await page.keyboard.press(lineEnd);
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Delete");
+  await expect(title).toHaveText("Closed titleNext line");
+  // The caret stays where the two met; at the title's end again, the divider after it stays.
+  await page.keyboard.type("|");
+  await expect(title).toHaveText("Closed title|Next line");
+  await page.keyboard.press(lineEnd);
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Delete");
+  await page.keyboard.type("|");
+  await expect(title).toHaveText("Closed title|Next line|");
+  await expect(page.locator(".bn-editor [data-content-type='divider']")).toHaveCount(1);
+  await expect(toggle.locator(".bn-toggle-wrapper")).toHaveAttribute("data-show-children", "false");
+
+  await toggle.locator(".bn-toggle-button").click();
+  await expect(page.locator(".bn-editor").getByText("Hidden line", { exact: true })).toBeVisible();
+});
+
 test("opens and closes toggles without motion when reduced motion is requested", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   const toggle = await typeToggleWithChildren(page, "Still toggle", ["Still child"]);

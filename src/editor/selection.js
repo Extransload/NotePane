@@ -5,6 +5,9 @@ import {
   size,
 } from "@floating-ui/react";
 import {
+  closeHistory,
+} from "@tiptap/pm/history";
+import {
   AllSelection,
   Selection,
   TextSelection,
@@ -13,6 +16,7 @@ import {
   Decoration,
 } from "@tiptap/pm/view";
 import {
+  addRowAfter,
   CellSelection,
   TableMap,
 } from "prosemirror-tables";
@@ -180,6 +184,9 @@ export function moveTableTextCursorToAdjacentCell(editor, direction) {
 
   const cellPositions = getCurrentTableCellPositions(state.selection);
   const currentIndex = cellPositions.indexOf(currentCellRange.cellPos);
+  if (direction > 0 && currentIndex >= 0 && currentIndex === cellPositions.length - 1) {
+    return appendTableRowFromLastCell(view);
+  }
   const nextCellPosition = cellPositions[currentIndex + direction];
   if (currentIndex < 0 || typeof nextCellPosition !== "number") {
     return false;
@@ -199,6 +206,32 @@ export function moveTableTextCursorToAdjacentCell(editor, direction) {
   );
   view.focus();
   return true;
+}
+
+// Tab in a table's last cell adds a row below it, as in Notion, and the caret goes to the row's
+// first cell, in one transaction that starts its own undo step, so one Cmd+Z takes the row away.
+function appendTableRowFromLastCell(view) {
+  const { $from } = view.state.selection;
+  let tableDepth = $from.depth;
+  while (tableDepth > 0 && $from.node(tableDepth).type.spec.tableRole !== "table") {
+    tableDepth -= 1;
+  }
+  if (tableDepth === 0) {
+    return false;
+  }
+  const tablePosition = $from.before(tableDepth);
+  const appended = addRowAfter(view.state, (tr) => {
+    const table = tr.doc.nodeAt(tablePosition);
+    const lastRowPosition = tablePosition + 1 + table.content.size - table.lastChild.nodeSize;
+    // Inside the row, then inside its first cell.
+    tr.setSelection(TextSelection.near(tr.doc.resolve(lastRowPosition + 2)));
+    // An undo step of its own, even right after typing in the last cell.
+    view.dispatch(closeHistory(tr).scrollIntoView());
+  });
+  if (appended) {
+    view.focus();
+  }
+  return appended;
 }
 
 export function getCurrentTableCellPositions(selection) {

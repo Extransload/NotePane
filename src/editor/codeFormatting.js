@@ -156,6 +156,36 @@ export function indentCodeBlockLines(editor, direction) {
   });
 }
 
+/**
+ * Enter inside a code block, as in Notion: the new line starts with the leading spaces or tabs of
+ * the line the caret was on, up to the caret. Enter at the end of the block after two blank lines
+ * leaves it, as BlockNote's own Enter does, blank lines being lines of only spaces or tabs here:
+ * they go, and the caret moves to the next block or a new paragraph. Runs before BlockNote's Enter,
+ * which would type a bare line break.
+ */
+export function breakCodeBlockLine(editor) {
+  return editor.transact((tr) => {
+    const { $from, $to, empty } = tr.selection;
+    if (!$from.parent.type.spec.code || !$from.sameParent($to)) {
+      return false;
+    }
+    const text = $from.parent.textContent;
+    const offset = $from.parentOffset;
+    const blankLinesAtEnd = empty && offset === text.length ? /\n[ \t]*\n[ \t]*$/.exec(text) : null;
+    if (blankLinesAtEnd) {
+      tr.delete($from.pos - blankLinesAtEnd[0].length, $from.pos);
+      const { block, nextBlock } = editor.getTextCursorPosition();
+      const target = nextBlock ?? editor.insertBlocks([{ type: "paragraph" }], block, "after")[0];
+      editor.setTextCursorPosition(target, "start");
+      return true;
+    }
+    const lineStart = text.lastIndexOf("\n", offset - 1) + 1;
+    const indent = /^[ \t]*/.exec(text.slice(lineStart, offset))[0];
+    tr.insertText(`\n${indent}`);
+    return true;
+  });
+}
+
 export function getCodeLanguageLabel(language) {
   return codeBlockOptions.supportedLanguages?.[language]?.name || language || "Plain Text";
 }

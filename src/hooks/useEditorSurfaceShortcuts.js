@@ -44,6 +44,7 @@ import {
 } from "../editor/targets.js";
 import {
   handleToggleBackspace,
+  handleToggleDelete,
   handleToggleEnter,
   handleToggleSpace,
   moveSelectionOutOfClosingToggle,
@@ -142,7 +143,7 @@ export function useEditorSurfaceShortcuts({
     const handleEditorKeyDownCapture = (event) => {
       if (
         isEditorShortcutTarget(event.target) &&
-        handleToggleBackspace(editor, event)
+        (handleToggleBackspace(editor, event) || handleToggleDelete(editor, event))
       ) {
         event.preventDefault();
         event.stopPropagation();

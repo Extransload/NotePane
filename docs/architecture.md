@@ -51,7 +51,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Callout icon picker: emoji data, recent icons, upload, remove | `src/editor/calloutIconPicker.jsx` |
 | Columns: the `columnList` and `column` nodes (the layout BlockNote core knows; `@blocknote/xl-multi-column` is GPL-3.0 and not used), the resize gutter, Backspace at a column's start, the slash menu's "2 columns" | `src/editor/columns.jsx` |
 | Bookmark card: the address field, the card, opening the page, the metadata request, Markdown export as a link, the six-dot menu's Turn into bookmark | `src/editor/bookmark.jsx` (fetching in `electron/bookmarkMetadata.cjs`) |
-| Text selection, table cell selection and navigation | `src/editor/selection.js` |
+| Text selection, table cell selection and navigation, Tab in a table's last cell adding a row | `src/editor/selection.js` |
 | Table row and column handle menus, the table items of the six-dot block menu | `src/editor/tableHandles.jsx` |
 | Table column widths: live resize, double-click auto-fit, fit to width | `src/editor/tableColumnSizing.js` |
 | How far a wide table grows right of the text column before it scrolls (a container query on `.sticky-editor-surface`) | table section of `src/styles/blocknote.css` |
@@ -61,7 +61,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Marquee and drag selection gestures, edge auto-scroll, and the keyboard (Enter, Tab, move, delete) and IME composition routing for a block set or the whole note | `src/editor/blockDragSelection.js` |
 | Block lookup, cut, table of contents extraction | `src/editor/blocks.js` |
 | Copy/paste normalisation, block clipboard formats for copy and cut, the document copy and cut listeners, and Markdown round-tripping | `src/editor/clipboard.js` |
-| The editor's paste handler: files, a URL over a selection, NotePane and VS Code copies, Markdown | `src/editor/paste.js` |
+| The editor's paste handler: files, a URL over a selection, NotePane and VS Code copies, Markdown, plain text of several lines as a block a line | `src/editor/paste.js` |
 | The focused table cell and cell range decorations, keeping the focused cell across add or remove row and column | `src/editor/tableFocus.js` |
 | Which element counts as an editor shortcut target | `src/editor/targets.js` |
 | Backspace right after a Markdown shortcut such as `- ` gives back exactly the typed marker | `src/editor/markdownShortcuts.js` |
@@ -71,7 +71,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Link toolbar content: the address, Copy, Edit and its form with Remove link | `src/editor/linkToolbar.jsx` |
 | Image download, crop geometry, upload | `src/editor/images.js` |
 | Pasting and dropping files: where the file block goes, its upload, one undo step for both | `src/editor/fileInsertion.js` |
-| Code block language detection, prettifying, and Tab / Shift+Tab line indent; which formatter each language uses and why the others have none | `src/editor/codeFormatting.js` |
+| Code block language detection, prettifying, Tab / Shift+Tab line indent and Enter keeping the line's indent; which formatter each language uses and why the others have none | `src/editor/codeFormatting.js` |
 | The code block formatters that are not Prettier plugins, most of them WebAssembly, each loaded on first use. Their `.wasm` is inlined into its lazy chunk as a data: URL (`build.assetsInlineLimit` in `vite.config.js`) because the packaged renderer's file:// page cannot fetch a file beside it, and the CSP's `script-src` allows `'wasm-unsafe-eval'` to compile it | `src/editor/codeFormatEngines.js` |
 | Code block languages: the language menu's list and search, the language a new code block starts in | `src/editor/codeLanguages.js` |
 | Code block tool bar: showing on hover, the language menu, Prettify and Copy | `src/ui/CodeBlockTools.jsx`, `src/ui/CodeLanguageMenu.jsx` |
@@ -80,7 +80,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Palette commands: matching a query to commands, `>` for commands only (`matchCommands`, `parseCommandQuery`), and the list of commands with their actions and keys (`usePaletteCommands`, which makes New folder now that the sidebar has no button for it) | `src/model/commands.js`, `src/hooks/usePaletteCommands.js` |
 | A shortcut that opened the palette, the find bar or the export menu closing it again (`useChromeShortcuts`), and Settings (`handlePreferencesShortcut` in `src/main.jsx`) | `src/hooks/useKeyboardCommands.js` |
 | Nested list markers (•, ◦, ▪ and 1., a., i., cycling): `data-list-depth` decorations, and the rules that draw them and centre bullets and toggle arrows on the first line | `src/editor/listMarkers.js`, list section of `src/styles/blocknote.css` |
-| Lists typed as text ("a) ", "(b) ", "2) "): the next marker on Enter, the list ending on a bare marker, Escape taking a new marker back (`dismissTextListContinuation`, called by the surface's Escape handler) | `src/editor/textLists.js` |
+| Lists typed as text ("a) ", "(b) ", "2) ", "iv) "): the next marker on Enter, Roman numerals and the item above telling a letter "i" from a numeral, the list ending on a bare marker, Escape taking a new marker back (`dismissTextListContinuation`, called by the surface's Escape handler) | `src/editor/textLists.js` |
 | Tag rules: trimmed, without "#", lower-cased, spaces as "-", 1 to 32 characters, at most 20 a note (a twin in `electron/store.cjs`) | `src/model/tags.js` |
 | The tag chips above a note's first block: open the palette on a tag, add with suggestions, remove | `src/ui/NoteTags.jsx`, tag section of `src/styles/editor-surface.css` |
 | Folders in the tabs sidebar: grouping and visible order, folder names (store twin and IPC `folders:*`, `notes:set-folder`, `notes:set-tags` in `electron/store.cjs` / `electron/main.cjs`) | `src/model/folders.js` |
@@ -114,7 +114,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Debounced title and colour writes, for the open note and for each recoloured session tab | `src/hooks/useNoteAppearance.js` |
 | Flushing pending saves on unmount or when main asks | `src/hooks/usePendingSaveFlush.js` |
 | Keys handled on the editor surface | `src/hooks/useEditorSurfaceShortcuts.js` |
-| Toggle keys (`> ` and Space, Enter, Backspace on a toggle title), the caret moving to a toggle's title when its chevron closes it over the caret, Backspace joining the line below a closed toggle to its title | `src/editor/toggleKeyboard.js` |
+| Toggle keys (`> ` and Space, Enter, Backspace on a toggle title), the caret moving to a toggle's title when its chevron closes it over the caret, Backspace joining the line below a closed toggle to its title, Delete at a closed toggle's title end joining the block after it | `src/editor/toggleKeyboard.js` |
 | Window, session and tab-mode keyboard commands | `src/hooks/useKeyboardCommands.js` |
 | Session tab rename, duplicate, open as sticky, move to Trash, and closing the current tab | `src/hooks/useSessionTabActions.js` |
 | The session tab menu (with its one-click tab colours), the media menu and the export format menu, placed at their anchor and clamped to the window | `src/ui/menus.jsx` |

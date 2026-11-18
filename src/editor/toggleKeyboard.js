@@ -168,29 +168,66 @@ function closedToggleAbove(editor, blockId) {
 }
 
 // Backspace at the start of the line below a closed toggle joins that line to the toggle's title, the
-// line above it on screen, as in Notion; the hidden lines stay. Lines nested in it take its place.
-// List items and headings first turn into a paragraph, as BlockNote's Backspace does.
+// line above it on screen, as in Notion; the hidden lines stay. List items and headings first turn
+// into a paragraph, as BlockNote's Backspace does.
 function joinToClosedToggleAbove(editor, block) {
-  const view = editor.prosemirrorView;
   const toggle = closedToggleAbove(editor, block.id);
-  if (!view || !toggle) {
+  return Boolean(toggle) && joinBlockIntoTitle(editor, toggle.id, block.id);
+}
+
+/**
+ * Delete at the end of a closed toggle's title. ProseMirror would join the toggle's first hidden
+ * line to the title. As in Notion, the hidden lines stay where they are: the block after the toggle
+ * at its own level, the next line on screen, joins the title when it holds text, and with no such
+ * block (the toggle ends its list, or a table, an image or a divider comes next) Delete does
+ * nothing. A closed toggle without lines, and an open one, are left to BlockNote.
+ */
+export function handleToggleDelete(editor, event) {
+  const selection = editor?.prosemirrorView?.state.selection;
+  if (
+    event.isComposing ||
+    event.keyCode === 229 ||
+    event.key !== "Delete" ||
+    event.shiftKey ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.altKey ||
+    !selection?.empty ||
+    selection.$from.parentOffset !== selection.$from.parent.content.size
+  ) {
     return false;
   }
-  const { state } = view;
-  const { $from } = state.selection;
-  const container = $from.node($from.depth - 1);
-  const target = findBlockContainer(state.doc, toggle.id);
-  if (container?.type.name !== "blockContainer" || !target) {
+  const { block } = editor.getTextCursorPosition();
+  const toggle = editor.getBlock(block.id) ?? block;
+  if (!isToggleBlock(toggle) || !toggle.children?.length || isToggleShown(editor, toggle.id)) {
     return false;
   }
-  const containerStart = $from.before($from.depth - 1);
+  const next = editor.getNextBlock(toggle.id);
+  if (next && editor.schema.blockSchema[next.type]?.content === "inline") {
+    joinBlockIntoTitle(editor, toggle.id, next.id);
+  }
+  return true;
+}
+
+// Moves the text of `blockId` to the end of the title of `toggleId` and the caret to where they
+// meet. Lines nested in the block take its place.
+function joinBlockIntoTitle(editor, toggleId, blockId) {
+  const view = editor.prosemirrorView;
+  const state = view?.state;
+  const target = state && findBlockContainer(state.doc, toggleId);
+  const joined = state && findBlockContainer(state.doc, blockId);
+  if (!target || !joined) {
+    return false;
+  }
+  const { node: container, pos: containerStart } = joined;
   const containerEnd = containerStart + container.nodeSize;
   const nested = container.lastChild.type.name === "blockGroup" ? container.lastChild : null;
   const titleEnd = target.pos + target.node.firstChild.nodeSize;
+  // The joined block comes after the title, so removing it first leaves titleEnd where it is.
   const tr = nested
     ? state.tr.replaceWith(containerStart, containerEnd, nested.content)
     : state.tr.delete(containerStart, containerEnd);
-  tr.insert(titleEnd, $from.parent.content);
+  tr.insert(titleEnd, container.firstChild.content);
   tr.setSelection(TextSelection.create(tr.doc, titleEnd));
   view.dispatch(tr.scrollIntoView());
   return true;

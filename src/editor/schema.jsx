@@ -23,7 +23,7 @@ import { createCalloutBlockSpec } from "./callout.jsx";
 import { DividerMarkdownExport } from "./divider.jsx";
 import { createMathBlockSpec, inlineMathSpec } from "./math.jsx";
 import { columnBlockSpec, columnListBlockSpec } from "./columns.jsx";
-import { indentCodeBlockLines } from "./codeFormatting.js";
+import { breakCodeBlockLine, indentCodeBlockLines } from "./codeFormatting.js";
 import { CodeLanguageMemory } from "./codeLanguages.js";
 import {
   codeBlockOptions,
@@ -207,8 +207,10 @@ export const createNonDestructiveImageBlockSpec = createBlockSpec(
 // Code blocks highlighted with the active theme's code theme. Every editor built from this schema
 // (the note editor and the version history preview) follows theme changes while it is mounted.
 // BlockNote's own Tab replaces a selection with two spaces and it leaves Shift+Tab to unnest the
-// block, so both keys are NotePane's line indent instead. A new code block starts in the language
-// picked last, so the block's own default language is empty (src/editor/codeLanguages.js).
+// block, so both keys are NotePane's line indent instead, and Enter keeps the line's indent
+// (it runs before BlockNote's Enter, which types a bare line break). A new code block starts in
+// the language picked last, so the block's own default language is empty
+// (src/editor/codeLanguages.js).
 function createNotePaneCodeBlockSpec() {
   const notePaneOptions = { defaultLanguage: "", indentLineWithTab: false };
   const codeBlockSpec = createCodeBlockSpec({ ...codeBlockOptions, ...notePaneOptions });
@@ -218,9 +220,11 @@ function createNotePaneCodeBlockSpec() {
   }))();
   const indentLines = createExtension({
     key: "notepane-code-indent",
+    runsBefore: ["code-block-keyboard-shortcuts"],
     keyboardShortcuts: {
       Tab: ({ editor }) => indentCodeBlockLines(editor, 1),
       "Shift-Tab": ({ editor }) => indentCodeBlockLines(editor, -1),
+      Enter: ({ editor }) => breakCodeBlockLine(editor),
     },
   });
   return {

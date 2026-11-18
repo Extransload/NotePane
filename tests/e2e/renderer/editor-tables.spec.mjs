@@ -173,6 +173,36 @@ test("moves one table cell when Tab completes a Korean IME composition", async (
   })).toBe("Drafting, comparing, and organizing sessions");
 });
 
+// As in Notion, Tab in a table's last cell adds a row and moves the caret to its first cell; one
+// Cmd+Z takes the row away. Shift+Tab there still goes back a cell.
+test("adds a row with Tab in the last cell, and one Cmd+Z removes it", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, "| A | B |\n| --- | --- |\n| a1 | b1 |");
+  const rows = page.locator(".bn-editor table tr");
+  await expect(rows).toHaveCount(2);
+  await page.getByRole("cell", { name: "b1", exact: true }).click();
+  await waitForEditorSelection(page);
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(rows).toHaveCount(2);
+
+  await page.keyboard.press("Tab");
+  await expect(rows).toHaveCount(3);
+  const caretCell = () => page.evaluate(() => {
+    const node = window.getSelection()?.focusNode;
+    const cell = (node instanceof Element ? node : node?.parentElement)?.closest("td, th");
+    return cell ? [cell.parentElement.rowIndex, cell.cellIndex] : null;
+  });
+  await expect.poll(caretCell).toEqual([2, 0]);
+  await expectEditorFocused(page);
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect(rows).toHaveCount(2);
+
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("a2");
+  await expect(rows.nth(2).locator("td, th").first()).toHaveText("a2");
+});
+
 test("merges and splits selected table cells with Command+Shift+M", async ({ page }) => {
   await loadTemplatePreview(page);
   await page.getByRole("button", { name: "Use this template" }).click();
