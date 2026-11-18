@@ -95,29 +95,38 @@
   background: color-mix(in srgb, var(--sticky-text-color) 8%, transparent);
 }
 
+/* Size and text from Settings › Appearance › Search palette (useLookStyles sets the --look-palette-*
+   variables); without them the palette keeps its original 560px and 13px. Rows are measured in
+   em, so they grow with the text. */
+html[data-palette-position="center"] .search-palette-backdrop {
+  align-items: center;
+  padding-top: 0;
+}
+
 .search-palette {
+  --palette-text-size: var(--look-palette-text-size, 13px);
   display: flex;
   flex-direction: column;
-  width: min(560px, calc(100vw - 32px));
-  max-height: min(70vh, 520px);
+  width: min(var(--look-palette-width, 560px), calc(100vw - 32px));
+  max-height: var(--look-palette-max-height, min(70vh, 520px));
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--sticky-border-color) 48%, transparent);
   border-radius: 12px;
   background: var(--sticky-panel-bg);
   box-shadow: var(--sticky-portal-menu-shadow);
   color: var(--sticky-panel-text);
-  font: 500 13px/1.35 var(--notepane-ui-font);
+  font: 500 var(--palette-text-size)/1.35 var(--notepane-ui-font);
 }
 
 .search-palette-input {
   flex: 0 0 auto;
-  height: 44px;
-  padding: 0 16px;
+  height: calc(var(--palette-text-size) * 3.4);
+  padding: 0 calc(var(--palette-text-size) * 1.2);
   border: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--sticky-border-color) 36%, transparent);
   background: transparent;
   color: inherit;
-  font: 500 15px/1 var(--notepane-ui-font);
+  font: 500 calc(var(--palette-text-size) + 2px)/1 var(--notepane-ui-font);
   outline: none;
 }
 
@@ -194,7 +203,7 @@
   align-items: center;
   column-gap: 10px;
   row-gap: 3px;
-  padding: 8px 10px;
+  padding: 0.62em 0.77em;
   border-radius: 8px;
   cursor: pointer;
 }
@@ -210,7 +219,7 @@
   grid-template-columns: 13px minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 10px;
-  padding: 7px 10px;
+  padding: 0.54em 0.77em;
   border-radius: 8px;
   cursor: pointer;
 }
@@ -237,7 +246,7 @@
 
 .search-command-shortcut {
   color: var(--sticky-panel-muted);
-  font: 500 11px/1 var(--notepane-ui-font);
+  font: 500 calc(var(--palette-text-size) - 2px)/1 var(--notepane-ui-font);
 }
 
 .search-result-dot {
@@ -263,7 +272,7 @@
   align-items: baseline;
   gap: 8px;
   color: var(--sticky-panel-muted);
-  font-size: 11px;
+  font-size: calc(var(--palette-text-size) - 2px);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -312,8 +321,8 @@
 .search-result-snippet {
   grid-column: 2 / 4;
   overflow: hidden;
-  opacity: 0.72;
-  font-size: 12px;
+  color: var(--sticky-panel-muted);
+  font-size: calc(var(--palette-text-size) - 1px);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -325,6 +334,24 @@
 }
 
 .search-palette-empty {
-  padding: 18px 16px;
+  padding: 1.4em 1.2em;
   opacity: 0.65;
+}
+
+/* The folder's name is the part that gives way, with an ellipsis: text-overflow needs a block of
+   its own, not the folder's flex row. */
+.search-result-folder-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-palette-empty p {
+  margin: 0;
+}
+
+.search-palette-empty-hint {
+  margin-top: 4px;
+  font-size: calc(var(--palette-text-size) - 1px);
 }

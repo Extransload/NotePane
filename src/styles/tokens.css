@@ -83,6 +83,54 @@ body {
   background: var(--sticky-scrollbar-track);
 }
 
+/* A scrolling list fades out at an edge with more beyond it, so a row cut by the edge reads as
+   more to come rather than clipped. The fade follows the list's own scroll position, with no
+   script; a list too short to scroll has no scroll timeline, so it keeps its edges sharp. */
+@property --scroll-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --scroll-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes scrollFadeEdges {
+  0% {
+    --scroll-fade-top: 0px;
+    --scroll-fade-bottom: 20px;
+  }
+
+  4%,
+  96% {
+    --scroll-fade-top: 20px;
+    --scroll-fade-bottom: 20px;
+  }
+
+  100% {
+    --scroll-fade-top: 20px;
+    --scroll-fade-bottom: 0px;
+  }
+}
+
+/* Scrolling a row into view (the palette's keyboard selection, a focused tab) stops it clear of
+   the fade. */
+.scroll-fade {
+  scroll-padding-block: 20px;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    currentColor var(--scroll-fade-top),
+    currentColor calc(100% - var(--scroll-fade-bottom)),
+    transparent
+  );
+  animation: scrollFadeEdges linear both;
+  animation-timeline: scroll(self);
+}
+
 .sticky-shell {
   display: flex;
   position: relative;

@@ -4,6 +4,7 @@ import {
 } from "lucide-react";
 import {
   useCallback,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -18,12 +19,19 @@ import {
 } from "../model/keyboardShortcuts.js";
 import {
   BUILTIN_BACKGROUNDS,
+  CODE_FONT_PRESETS,
   DEFAULT_LOOK,
+  HEADING_FONT_PRESETS,
   LOOK_ACCENTS,
   FLOATING_BLUR_RANGE,
+  PALETTE_HEIGHT_RANGE,
+  PALETTE_TEXT_SIZE_RANGE,
+  PALETTE_WIDTH_RANGE,
   SURFACE_MATERIALS,
   applySurfaceStyle,
+  getLookFontOptions,
   getSurfaceStyle,
+  normalizeFontChoice,
 } from "../model/look.js";
 import {
   normalizeEditorFontFamily,
@@ -51,15 +59,19 @@ import {
   ThemePicker,
 } from "./ThemePicker.jsx";
 
-// The Look pages of Settings: Appearance, Editor, Background and Tabs. Each page draws only its
-// groups; the window draws the page title. `look` arrives normalized, and every change hands a
-// whole new look to `onLookChange`, leaving the old object untouched.
+// The Look pages of Settings: Appearance, Fonts, Editor, Background and Tabs. Each page draws
+// only its groups; the window draws the page title. `look` arrives normalized, and every change
+// hands a whole new look to `onLookChange`, leaving the old object untouched.
 
 const formatPx = (value) => `${value}px`;
 const formatPercent = (value) => `${value}%`;
 const formatDegrees = (value) => `${value}°`;
 const formatLineHeight = (value) => value.toFixed(2);
 const formatEm = (value) => `${value.toFixed(2)}em`;
+const PALETTE_POSITION_OPTIONS = [
+  { value: "top", label: "Top" },
+  { value: "center", label: "Center" },
+];
 
 const DEFAULT_PICTURE = BUILTIN_BACKGROUNDS[0]?.id ?? DEFAULT_LOOK.background.picture;
 const MAX_USER_PICTURES = 12;
@@ -105,22 +117,20 @@ const CORNER_OPTIONS = [
   { value: "round", label: "Round" },
 ];
 
-// Settings > Appearance: the theme, then the accent, corners and font of the app around the
-// notes, then the launch intro.
+// Settings > Appearance: the theme, then the accent and corners of the app around the notes,
+// then the search palette and the launch intro.
 export function AppearanceLookPage({
   look,
   onLookChange,
   appThemeId,
   themes,
   onAppThemeChange,
-  appFontFamily,
-  appFontOptions,
-  onAppFontFamilyChange,
   launchIntro,
   onLaunchIntroChange,
 }) {
   const pageRef = useRef(null);
   const setLook = (patch) => onLookChange({ ...look, ...patch });
+  const [palette, setPalette, resetPalette] = useLookSection(look, onLookChange, "palette");
   const isCustomAccent =
     look.accentColor != null && !ACCENT_OPTIONS.some((option) => option.value === look.accentColor);
 
@@ -183,20 +193,61 @@ export function AppearanceLookPage({
             onChange={(corners) => setLook({ corners })}
           />
         </SettingRow>
+      </SettingsGroup>
+      <SettingsGroup label="Search palette">
         <SettingRow
-          id="appFontFamily"
-          title="App font"
-          description="The font of the sidebar, menus and Settings."
-          className="app-font-family-setting"
+          id="paletteWidth"
+          title="Width"
+          description="How wide the search and command palette opens."
+          {...resetPalette("width")}
         >
-          <EditorFontFamilyControl
-            className="preferences-font-family-control"
-            fontFamily={appFontFamily}
-            fontOptions={appFontOptions}
-            inputAriaLabel="App font family"
-            menuButtonAriaLabel="Open app font menu"
-            optionsAriaLabel="App font family options"
-            onFontFamilyChange={onAppFontFamilyChange}
+          <Slider
+            label="Search palette width"
+            value={palette.width}
+            {...PALETTE_WIDTH_RANGE}
+            format={formatPx}
+            onChange={(width) => setPalette({ width })}
+          />
+        </SettingRow>
+        <SettingRow
+          id="paletteHeight"
+          title="Height"
+          description="How much of the window its results may fill before they scroll."
+          {...resetPalette("maxHeight")}
+        >
+          <Slider
+            label="Search palette height"
+            value={palette.maxHeight}
+            {...PALETTE_HEIGHT_RANGE}
+            format={formatPercent}
+            onChange={(maxHeight) => setPalette({ maxHeight })}
+          />
+        </SettingRow>
+        <SettingRow
+          id="paletteTextSize"
+          title="Text size"
+          description="The size of its results; the search field is a little larger."
+          {...resetPalette("textSize")}
+        >
+          <Slider
+            label="Search palette text size"
+            value={palette.textSize}
+            {...PALETTE_TEXT_SIZE_RANGE}
+            format={formatPx}
+            onChange={(textSize) => setPalette({ textSize })}
+          />
+        </SettingRow>
+        <SettingRow
+          id="palettePosition"
+          title="Position"
+          description="Where in the window it opens."
+          {...resetPalette("position")}
+        >
+          <Segmented
+            label="Search palette position"
+            value={palette.position}
+            options={PALETTE_POSITION_OPTIONS}
+            onChange={(position) => setPalette({ position })}
           />
         </SettingRow>
       </SettingsGroup>
@@ -215,57 +266,79 @@ export function AppearanceLookPage({
   );
 }
 
-const HEADING_FONT_OPTIONS = [
-  { value: "same", label: "Same as text" },
-  { value: "serif", label: "Serif" },
-  { value: "display", label: "Display" },
-  { value: "rounded", label: "Rounded" },
-];
-
 const HEADING_WEIGHT_OPTIONS = [
   { value: 600, label: "Semibold" },
   { value: 700, label: "Bold" },
   { value: 800, label: "Heavy" },
 ];
 
-const CODE_FONT_OPTIONS = [
-  { value: "system", label: "System" },
-  { value: "menlo", label: "Menlo" },
-  { value: "jetbrains", label: "JetBrains Mono" },
-  { value: "courier", label: "Courier" },
-];
+const normalizeHeadingFont = (value) =>
+  normalizeFontChoice(value, HEADING_FONT_PRESETS, DEFAULT_LOOK.fonts.headingFont);
+const normalizeCodeFont = (value) =>
+  normalizeFontChoice(value, CODE_FONT_PRESETS, DEFAULT_LOOK.fonts.codeFont);
 
-// Settings > Editor: everything about the note itself, read top to bottom as the note is: its
-// text, headings and code, then how the page is laid out, then typing.
-export function EditorLookPage({
+// Settings > Fonts: a preview, then every font in the app from the outside in: the interface,
+// the note's text, its headings and its code. Each Font row is the same searchable menu, its
+// presets first and then the installed fonts.
+export function FontsLookPage({
   look,
   onLookChange,
   editorPreferences,
   fontOptions,
   onEditorPreferencesChange,
+  appFontFamily,
+  appFontOptions,
+  onAppFontFamilyChange,
 }) {
   const normalizedEditorPreferences = normalizeEditorPreferences(editorPreferences);
   const [fonts, setFonts, resetFonts] = useLookSection(look, onLookChange, "fonts");
   const { keyboardShortcuts } = normalizedEditorPreferences;
+  const installedFamilies = useMemo(
+    () => fontOptions.filter((option) => option.source === "installed").map((option) => option.label),
+    [fontOptions],
+  );
+  const headingFontOptions = useMemo(
+    () => getLookFontOptions("heading", installedFamilies, fonts.headingFont),
+    [fonts.headingFont, installedFamilies],
+  );
+  const codeFontOptions = useMemo(
+    () => getLookFontOptions("code", installedFamilies, fonts.codeFont),
+    [fonts.codeFont, installedFamilies],
+  );
 
   const setEditorPreference = (key, value) =>
     onEditorPreferencesChange?.({ ...normalizedEditorPreferences, [key]: value });
-  const resetEditorPreference = (key) => ({
-    changed: normalizedEditorPreferences[key] !== DEFAULT_EDITOR_PREFERENCES[key],
-    onReset: () => setEditorPreference(key, DEFAULT_EDITOR_PREFERENCES[key]),
-  });
 
   return (
     <div className="look-page">
       <SettingsGroup label="Preview">
         {/* look.css types this sample from the same variables as the editor. */}
         <div className="look-font-preview" aria-label="Font preview">
+          <div className="look-font-preview-interface">Sidebar, menus and Settings</div>
           <h3>Launch checklist</h3>
           <p>
             The quick brown fox jumps over the lazy dog. 다람쥐 헌 쳇바퀴에 타고파. 0123456789
           </p>
           <pre>{'const pane = { mode: "sticky" } // => != ==='}</pre>
         </div>
+      </SettingsGroup>
+      <SettingsGroup label="Interface">
+        <SettingRow
+          id="appFontFamily"
+          title="Font"
+          description="The font of the sidebar, menus and Settings."
+          className="app-font-family-setting"
+        >
+          <EditorFontFamilyControl
+            className="preferences-font-family-control"
+            fontFamily={appFontFamily}
+            fontOptions={appFontOptions}
+            inputAriaLabel="App font family"
+            menuButtonAriaLabel="Open app font menu"
+            optionsAriaLabel="App font family options"
+            onFontFamilyChange={onAppFontFamilyChange}
+          />
+        </SettingRow>
       </SettingsGroup>
       <SettingsGroup
         label="Text"
@@ -333,12 +406,16 @@ export function EditorLookPage({
         </SettingRow>
       </SettingsGroup>
       <SettingsGroup label="Headings">
-        <SettingRow id="headingFont" title="Font" {...resetFonts("headingFont")}>
-          <Segmented
-            label="Heading font"
-            value={fonts.headingFont}
-            options={HEADING_FONT_OPTIONS}
-            onChange={(headingFont) => setFonts({ headingFont })}
+        <SettingRow id="headingFont" title="Font" className="heading-font-setting" {...resetFonts("headingFont")}>
+          <EditorFontFamilyControl
+            className="preferences-font-family-control"
+            fontFamily={fonts.headingFont}
+            fontOptions={headingFontOptions}
+            inputAriaLabel="Heading font family"
+            menuButtonAriaLabel="Open heading font menu"
+            optionsAriaLabel="Heading font family options"
+            normalizeValue={normalizeHeadingFont}
+            onFontFamilyChange={(headingFont) => setFonts({ headingFont })}
           />
         </SettingRow>
         <SettingRow id="headingWeight" title="Weight" {...resetFonts("headingWeight")}>
@@ -351,12 +428,16 @@ export function EditorLookPage({
         </SettingRow>
       </SettingsGroup>
       <SettingsGroup label="Code">
-        <SettingRow id="codeFont" title="Font" {...resetFonts("codeFont")}>
-          <Segmented
-            label="Code font"
-            value={fonts.codeFont}
-            options={CODE_FONT_OPTIONS}
-            onChange={(codeFont) => setFonts({ codeFont })}
+        <SettingRow id="codeFont" title="Font" className="code-font-setting" {...resetFonts("codeFont")}>
+          <EditorFontFamilyControl
+            className="preferences-font-family-control"
+            fontFamily={fonts.codeFont}
+            fontOptions={codeFontOptions}
+            inputAriaLabel="Code font family"
+            menuButtonAriaLabel="Open code font menu"
+            optionsAriaLabel="Code font family options"
+            normalizeValue={normalizeCodeFont}
+            onFontFamilyChange={(codeFont) => setFonts({ codeFont })}
           />
         </SettingRow>
         <SettingRow id="codeSize" title="Size" {...resetFonts("codeSize")}>
@@ -383,6 +464,30 @@ export function EditorLookPage({
           />
         </SettingRow>
       </SettingsGroup>
+    </div>
+  );
+}
+
+// Settings > Editor: how the note's page is laid out, then typing. Its fonts are on Fonts.
+export function EditorLookPage({
+  look,
+  onLookChange,
+  editorPreferences,
+  onEditorPreferencesChange,
+}) {
+  const normalizedEditorPreferences = normalizeEditorPreferences(editorPreferences);
+  const [fonts, setFonts, resetFonts] = useLookSection(look, onLookChange, "fonts");
+  const { keyboardShortcuts } = normalizedEditorPreferences;
+
+  const setEditorPreference = (key, value) =>
+    onEditorPreferencesChange?.({ ...normalizedEditorPreferences, [key]: value });
+  const resetEditorPreference = (key) => ({
+    changed: normalizedEditorPreferences[key] !== DEFAULT_EDITOR_PREFERENCES[key],
+    onReset: () => setEditorPreference(key, DEFAULT_EDITOR_PREFERENCES[key]),
+  });
+
+  return (
+    <div className="look-page">
       <SettingsGroup label="Layout">
         <SettingRow
           id="textWidth"

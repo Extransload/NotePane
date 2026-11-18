@@ -438,10 +438,14 @@ test("changes editor typography globally from preferences", async ({ page }) => 
   await importBackupButton.click();
   await expect(page.locator(".sticky-toast-error"))
     .toHaveText("Data restore is available in the desktop app.");
-  // The app font sits with the rest of the app's look on the Appearance page.
-  await preferencesPanel.getByRole("tab", { name: "Appearance" }).click();
+  // Every font, the app's own included, sits on the Fonts page.
+  await preferencesPanel.getByRole("tab", { name: "Fonts" }).click();
+  await expect(preferencesPanel.getByRole("tab", { name: "Fonts" }))
+    .toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#preferences-fonts .preferences-section-title"))
+    .toHaveText("Fonts");
   const appFontRow = preferencesPanel.locator(".app-font-family-setting");
-  await expect(appFontRow.getByText("App font", { exact: true })).toBeVisible();
+  await expect(appFontRow.getByText("Font", { exact: true })).toBeVisible();
   await expect(appFontRow.getByLabel("App font family")).toHaveValue("Inter");
   await appFontRow.getByLabel("App font family").fill("avenir");
   await expect(page.getByRole("listbox", { name: "App font family options" }))
@@ -450,13 +454,7 @@ test("changes editor typography globally from preferences", async ({ page }) => 
     maxWidth: 238,
   });
   await page.getByRole("option", { name: "Avenir" }).click();
-  // The note's font sits with its text on the Editor page.
-  await expect(page.locator("#preferences-fonts")).toHaveCount(0);
-  await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
-  await expect(preferencesPanel.getByRole("tab", { name: "Editor" }))
-    .toHaveAttribute("aria-selected", "true");
-  await expect(page.locator("#preferences-editor .preferences-section-title"))
-    .toHaveText("Editor");
+  // The note's font sits below it, with the rest of its text.
   const fontFamilyRow = preferencesPanel.locator(".editor-font-family-setting");
   await expect(fontFamilyRow.getByText("Font", { exact: true })).toBeVisible();
   await expect(fontFamilyRow.getByLabel("Editor font family")).toHaveValue("System");
@@ -546,9 +544,10 @@ test("supports light/dark mode and readable sidebar tab background customization
     .toHaveAttribute("aria-selected", "true");
   await expect(preferencesPanel.getByRole("radiogroup", { name: "App theme" })).toBeVisible();
   await expect(preferencesPanel.getByRole("list", { name: "Keyboard shortcuts" })).toHaveCount(0);
-  await expect(preferencesPanel.getByLabel("Editor font family")).toHaveCount(0);
-  await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
+  await preferencesPanel.getByRole("tab", { name: "Fonts" }).click();
   await expect(preferencesPanel.getByLabel("Editor font family")).toBeVisible();
+  await preferencesPanel.getByRole("tab", { name: "Editor" }).click();
+  await expect(preferencesPanel.getByLabel("Editor font family")).toHaveCount(0);
   await expect(preferencesPanel.getByRole("switch", { name: "Show table of contents" }))
     .toBeVisible();
   await expect(preferencesPanel.getByRole("radiogroup", { name: "App theme" })).toHaveCount(0);
@@ -571,9 +570,9 @@ test("supports light/dark mode and readable sidebar tab background customization
   await page.locator(".session-tab-row").first().click({ button: "right" });
   const sessionMenu = page.getByRole("menu", { name: /Session options/ });
   await expect(sessionMenu).toBeVisible();
-  await expect(sessionMenu.getByRole("menuitem", { name: "Color..." })).toBeVisible();
+  await expect(sessionMenu.getByRole("menuitem", { name: "Color…" })).toBeVisible();
   await expect(sessionMenu.getByRole("menuitem", { name: "Reset color" })).toHaveCount(0);
-  await sessionMenu.getByRole("menuitem", { name: "Color..." }).click();
+  await sessionMenu.getByRole("menuitem", { name: "Color…" }).click();
 
   const sessionColorPanel = page.getByRole("dialog", { name: "Session color panel" });
   await expect(sessionColorPanel).toBeVisible();
@@ -697,7 +696,7 @@ test("supports light/dark mode and readable sidebar tab background customization
   expect(tabStates.activeBorderColor).not.toBe("rgba(0, 0, 0, 0)");
 
   await page.locator(".session-tab-row").first().click({ button: "right" });
-  await page.getByRole("menuitem", { name: "Color..." }).click();
+  await page.getByRole("menuitem", { name: "Color…" }).click();
   await expect(page.getByRole("slider", { name: "Session tab color" })).toBeVisible();
 
   await page.getByLabel("HSL session tab color value").fill("hsl(0deg 100% 50%)");
@@ -1498,7 +1497,7 @@ test("writes the colour of every session tab recoloured within the save debounce
   await expect(page.locator(".session-tab-row")).toHaveCount(2);
   const recolourTab = async (index, hex, rgb) => {
     await page.locator(".session-tab-row").nth(index).click({ button: "right" });
-    await page.getByRole("menuitem", { name: "Color..." }).click();
+    await page.getByRole("menuitem", { name: "Color…" }).click();
     await page.getByLabel("HEX session tab color value").fill(hex);
     await expect.poll(() => getTabCssValue(page, index, "backgroundColor")).toBe(rgb);
   };

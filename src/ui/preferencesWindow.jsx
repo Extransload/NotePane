@@ -9,6 +9,7 @@ import {
   Search,
   SlidersHorizontal,
   Sun,
+  Type,
   Trash2,
   Upload,
   X,
@@ -50,6 +51,7 @@ import {
   AppearanceLookPage,
   BackgroundLookPage,
   EditorLookPage,
+  FontsLookPage,
   TabsLookPage,
 } from "./lookPreferences.jsx";
 import {
@@ -76,6 +78,7 @@ export const PREFERENCE_PAGE_GROUPS = [
     pages: [
       { id: "about", label: "About", Icon: Info },
       { id: "theme", label: "Appearance", Icon: Sun },
+      { id: "fonts", label: "Fonts", Icon: Type },
       { id: "background", label: "Background", Icon: ImageIcon },
       { id: "tabs", label: "Tabs", Icon: AppWindow },
       { id: "editor", label: "Editor", Icon: FileText },
@@ -98,11 +101,10 @@ export const PREFERENCE_PAGES = PREFERENCE_PAGE_GROUPS.flatMap(({ label, pages }
 const DEFAULT_PREFERENCE_PAGE_ID = "theme";
 
 // Pages that were merged into others keep opening where their settings went: the app theme left
-// General for Appearance, Surfaces became the Glass group of Background, and Fonts joined Editor.
+// General for Appearance and Surfaces became the Glass group of Background.
 const RENAMED_PREFERENCE_PAGES = {
   general: "theme",
   surfaces: "background",
-  fonts: "editor",
 };
 
 export function normalizePreferencePageId(pageId) {
@@ -129,18 +131,22 @@ export const SETTINGS_INDEX = [
   { page: "theme", id: "appTheme", title: "App theme", description: "The colors of every window, light or dark.", keywords: "theme colour color dark light mode palette scheme" },
   { page: "theme", id: "accentColor", title: "Accent color", description: "Colors buttons, switches and selections.", keywords: "accent colour color highlight tint blue purple green orange pink" },
   { page: "theme", id: "corners", title: "Corners", description: "How round windows, menus and buttons are.", keywords: "radius rounded round sharp square shape" },
-  { page: "theme", id: "appFontFamily", title: "App font", description: "The font of the sidebar, menus and Settings.", keywords: "font fonts family typeface interface ui chrome" },
+  { page: "theme", id: "paletteWidth", title: "Search palette width", description: "How wide the search and command palette opens.", keywords: "command palette search cmd+p quick open size bigger wider width" },
+  { page: "theme", id: "paletteHeight", title: "Search palette height", description: "How much of the window its results may fill before they scroll.", keywords: "command palette search cmd+p quick open size bigger taller height results" },
+  { page: "theme", id: "paletteTextSize", title: "Search palette text size", description: "The size of its results; the search field is a little larger.", keywords: "command palette search cmd+p quick open size bigger font text larger" },
+  { page: "theme", id: "palettePosition", title: "Search palette position", description: "Where in the window it opens.", keywords: "command palette search cmd+p quick open position top center middle" },
   { page: "theme", id: "launchIntro", title: "Show intro on launch", description: "The NotePane logo plays as the app opens.", keywords: "intro splash launch start opening animation logo" },
-  { page: "editor", id: "editorFontFamily", title: "Editor font", description: "The font notes are written in.", keywords: "font fonts family typeface text" },
-  { page: "editor", id: "editorSize", title: "Text size", description: "How large note text is.", keywords: "font fonts size text bigger smaller scale" },
-  { page: "editor", id: "lineHeight", title: "Line height", description: "Space between the lines of a paragraph.", keywords: "leading line spacing fonts" },
-  { page: "editor", id: "letterSpacing", title: "Letter spacing", description: "Space between letters.", keywords: "tracking kerning fonts" },
-  { page: "editor", id: "blockSpacing", title: "Paragraph spacing", description: "Extra space between paragraphs, headings and lists.", keywords: "block spacing space between blocks paragraph gap fonts" },
-  { page: "editor", id: "headingFont", title: "Heading font", description: "The font of headings.", keywords: "headings title serif display rounded fonts" },
-  { page: "editor", id: "headingWeight", title: "Heading weight", description: "How bold headings are.", keywords: "headings bold weight fonts" },
-  { page: "editor", id: "codeFont", title: "Code font", description: "The font of code blocks and inline code.", keywords: "monospace mono menlo jetbrains courier code fonts" },
-  { page: "editor", id: "codeSize", title: "Code size", description: "How large code is.", keywords: "code font fonts size" },
-  { page: "editor", id: "codeLigatures", title: "Code ligatures", description: "Shows => and != as single symbols.", keywords: "ligature code font fonts" },
+  { page: "fonts", id: "appFontFamily", title: "Interface font", description: "The font of the sidebar, menus and Settings.", keywords: "app font fonts family typeface interface ui chrome" },
+  { page: "fonts", id: "editorFontFamily", title: "Text font", description: "The font notes are written in.", keywords: "editor font fonts family typeface text" },
+  { page: "fonts", id: "editorSize", title: "Text size", description: "How large note text is.", keywords: "font fonts size text bigger smaller scale" },
+  { page: "fonts", id: "lineHeight", title: "Line height", description: "Space between the lines of a paragraph.", keywords: "leading line spacing fonts" },
+  { page: "fonts", id: "letterSpacing", title: "Letter spacing", description: "Space between letters.", keywords: "tracking kerning fonts" },
+  { page: "fonts", id: "blockSpacing", title: "Paragraph spacing", description: "Extra space between paragraphs, headings and lists.", keywords: "block spacing space between blocks paragraph gap fonts" },
+  { page: "fonts", id: "headingFont", title: "Heading font", description: "The font of headings.", keywords: "headings title serif display rounded font family typeface fonts" },
+  { page: "fonts", id: "headingWeight", title: "Heading weight", description: "How bold headings are.", keywords: "headings bold weight fonts" },
+  { page: "fonts", id: "codeFont", title: "Code font", description: "The font of code blocks and inline code.", keywords: "monospace mono menlo jetbrains courier code font family typeface fonts" },
+  { page: "fonts", id: "codeSize", title: "Code size", description: "How large code is.", keywords: "code font fonts size" },
+  { page: "fonts", id: "codeLigatures", title: "Code ligatures", description: "Shows => and != as single symbols.", keywords: "ligature code font fonts" },
   { page: "editor", id: "textWidth", title: "Text width", description: "How long a line of text gets in a wide window.", keywords: "width column measure reading layout line length fonts" },
   { page: "editor", id: "tableOfContents", title: "Table of contents", description: "Lists the note's headings on the right in the tabs layout.", keywords: "toc outline headings rail navigation layout" },
   { page: "editor", id: "smoothCaret", title: "Smooth caret", description: "The cursor glides as you type.", keywords: "caret cursor smooth animation glide blink typing" },
@@ -520,8 +526,20 @@ export function PreferencesWindow({
             look={look}
             onLookChange={updateLook}
             editorPreferences={editorPreferences}
+            onEditorPreferencesChange={onEditorPreferencesChange}
+          />
+        );
+      case "fonts":
+        return (
+          <FontsLookPage
+            look={look}
+            onLookChange={updateLook}
+            editorPreferences={editorPreferences}
             fontOptions={fontOptions}
             onEditorPreferencesChange={onEditorPreferencesChange}
+            appFontFamily={normalizedEditorPreferences.appFontFamily}
+            appFontOptions={appFontOptions}
+            onAppFontFamilyChange={updateAppFontFamily}
           />
         );
       case "background":
@@ -565,9 +583,6 @@ export function PreferencesWindow({
             appThemeId={appThemeId}
             themes={PICKER_THEMES}
             onAppThemeChange={onAppThemeChange}
-            appFontFamily={normalizedEditorPreferences.appFontFamily}
-            appFontOptions={appFontOptions}
-            onAppFontFamilyChange={updateAppFontFamily}
             launchIntro={normalizedEditorPreferences.launchIntro}
             onLaunchIntroChange={updateLaunchIntro}
           />

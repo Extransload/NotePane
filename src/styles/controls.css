@@ -34,9 +34,13 @@
   cursor: pointer;
 }
 
+/* A veil of the menu's text colour, as the search palette marks its selection: it shows on the
+   panel whatever is behind it, where the control hover colour all but vanishes on a light frosted
+   menu. The item the arrow keys reach takes it too. */
 .notepane-context-menu button:hover,
+.notepane-context-menu [role="menuitem"]:focus-visible,
 .export-format-menu button:hover {
-  background: var(--sticky-control-hover-bg);
+  background: color-mix(in srgb, var(--sticky-panel-text) 8%, transparent);
 }
 
 .notepane-context-menu {

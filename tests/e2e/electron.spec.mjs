@@ -88,7 +88,7 @@ test("Electron app opens a sticky window and persists editor content", async () 
       .toHaveCount(0);
 
     await page.locator(".session-tab-row").first().click({ button: "right" });
-    await page.getByRole("menuitem", { name: "Color..." }).click();
+    await page.getByRole("menuitem", { name: "Color…" }).click();
     const sessionColorPanel = page.getByRole("dialog", { name: "Session color panel" });
     await expect(sessionColorPanel).toBeVisible();
     await page.getByLabel("RGB session tab color value").fill("rgb(255 255 255)");
@@ -2652,7 +2652,7 @@ test("Electron titles every window with the note it shows", async () => {
 
     // Recolouring the other tab saves that note's appearance, which leaves the title alone.
     await page.locator(".session-tab-row").first().click({ button: "right" });
-    await page.getByRole("menuitem", { name: "Color..." }).click();
+    await page.getByRole("menuitem", { name: "Color…" }).click();
     const sessionColorPanel = page.getByRole("dialog", { name: "Session color panel" });
     await page.getByLabel("RGB session tab color value").fill("rgb(255 255 255)");
     await sessionColorPanel.getByRole("button", { name: "Close preferences" }).click();

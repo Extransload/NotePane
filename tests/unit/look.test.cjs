@@ -27,7 +27,7 @@ const EDGE_INPUTS = [
       letterSpacing: -1,
       blockSpacing: "7",
       textWidth: 731,
-      headingFont: "comic",
+      headingFont: 'Comic"; } body {',
       headingWeight: "800",
       codeFont: "jetbrains",
       codeSize: Number.NaN,
@@ -92,6 +92,15 @@ const EDGE_INPUTS = [
     },
   },
   { unknownKey: true, fonts: { unknownFont: 1 }, tabs: { radius: "3.4" } },
+  { palette: { width: 1100, maxHeight: 31, textSize: "15.4", position: "bottom" } },
+  { palette: { width: 731, maxHeight: 77, textSize: 11, position: "center" } },
+  { palette: "large" },
+  { fonts: { headingFont: "  Avenir Next  ", codeFont: "Andale Mono" } },
+  { fonts: { headingFont: "serif", codeFont: "courier" } },
+  { fonts: { headingFont: "Evil'; color: red", codeFont: "Mono}" } },
+  { fonts: { headingFont: "a\\b", codeFont: "Line\nbreak" } },
+  { fonts: { headingFont: "x".repeat(121), codeFont: "   " } },
+  { fonts: { headingFont: "x".repeat(120), codeFont: 42 } },
 ];
 
 test("the store's normalizeLook agrees with the renderer's on edge inputs", async () => {
@@ -99,6 +108,53 @@ test("the store's normalizeLook agrees with the renderer's on edge inputs", asyn
   for (const input of EDGE_INPUTS) {
     assert.deepEqual(normalizeStoredLook(input), normalizeLook(input), JSON.stringify(input));
   }
+});
+
+test("heading and code fonts take a preset id or a safe family name", async () => {
+  const { normalizeLook } = await loadLook();
+  const fontsOf = (fonts) => normalizeLook({ fonts }).fonts;
+  assert.deepEqual(
+    fontsOf({ headingFont: "rounded", codeFont: "jetbrains" }),
+    { ...fontsOf({}), headingFont: "rounded", codeFont: "jetbrains" },
+  );
+  const named = fontsOf({ headingFont: "  Avenir Next ", codeFont: "Andale Mono" });
+  assert.equal(named.headingFont, "Avenir Next");
+  assert.equal(named.codeFont, "Andale Mono");
+  for (const unsafe of ['A"B', "A'B", "A;B", "A{B", "A}B", "A\\B", "A\nB", "", "x".repeat(121), 7, null]) {
+    const fonts = fontsOf({ headingFont: unsafe, codeFont: unsafe });
+    assert.equal(fonts.headingFont, "same", JSON.stringify(unsafe));
+    assert.equal(fonts.codeFont, "system", JSON.stringify(unsafe));
+  }
+  assert.equal(fontsOf({ headingFont: "x".repeat(120) }).headingFont, "x".repeat(120));
+});
+
+test("a named heading or code font draws first, with the role's fallback after it", async () => {
+  // src/constants.js reads window.blocknoteSticky at import time.
+  globalThis.window ??= {};
+  const { getLookStyles } = await import("../../src/hooks/useLookStyles.js");
+  const named = getLookStyles({ fonts: { headingFont: "Avenir Next", codeFont: "Andale Mono" } });
+  assert.equal(named.properties["--look-heading-font"], '"Avenir Next"');
+  assert.equal(named.properties["--look-code-font"], '"Andale Mono", ui-monospace, monospace');
+  assert.equal(named.attributes["data-look-code-size"], "");
+  const presets = getLookStyles({ fonts: { headingFont: "serif", codeFont: "menlo" } });
+  assert.equal(presets.properties["--look-heading-font"], '"New York", ui-serif, Georgia, serif');
+  assert.equal(presets.properties["--look-code-font"], "Menlo, monospace");
+  const defaults = getLookStyles({});
+  assert.equal(defaults.properties["--look-heading-font"], undefined);
+  assert.equal(defaults.attributes["data-look-code-size"], undefined);
+});
+
+test("normalizeLook keeps the search palette's size inside its ranges", async () => {
+  const { DEFAULT_LOOK, normalizeLook } = await loadLook();
+  assert.deepEqual(DEFAULT_LOOK.palette, { width: 720, maxHeight: 72, textSize: 14, position: "top" });
+  assert.deepEqual(
+    normalizeLook({ palette: { width: 1100, maxHeight: 31, textSize: 15.4, position: "bottom" } }).palette,
+    { width: 1040, maxHeight: 40, textSize: 15, position: "top" },
+  );
+  assert.deepEqual(
+    normalizeLook({ palette: { width: 731, maxHeight: 77, textSize: 19, position: "center" } }).palette,
+    { width: 740, maxHeight: 78, textSize: 18, position: "center" },
+  );
 });
 
 test("normalizeLook fills every field from an empty object", async () => {

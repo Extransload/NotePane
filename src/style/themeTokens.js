@@ -200,6 +200,30 @@ function libraryRoleTokens(theme) {
   };
 }
 
+// The palette colour each action icon's tone takes.
+const ICON_TONE_COLOURS = {
+  copy: "blue",
+  delete: "red",
+  export: "success",
+  palette: "purple",
+  pin: "orange",
+  "pin-active": "red",
+  restore: "green",
+  settings: "purple",
+  sidebar: "blue",
+  sticky: "yellow",
+  tabs: "blue",
+  trash: "red",
+};
+
+/** A theme's `--icon-tone-*` tokens, its overrides of them included. */
+export function getIconToneTokens(theme) {
+  return Object.fromEntries(Object.entries(ICON_TONE_COLOURS).map(([name, colour]) => {
+    const token = `--icon-tone-${name}`;
+    return [token, theme.overrides?.[token] ?? theme.palette[colour]];
+  }));
+}
+
 /**
  * Derives every colour custom property from a theme's palette. Hover, border, shadow, menu,
  * table control, scrollbar and find-highlight values are computed; `theme.overrides` replaces
@@ -273,18 +297,7 @@ export function buildThemeTokens(theme) {
     "--sticky-scrollbar-track": `color-mix(in srgb, var(--sticky-editor-bg) ${s("scrollbarTrack")}%, transparent)`,
     "--sticky-scrollbar-thumb": `color-mix(in srgb, var(--sticky-text-color) ${s("scrollbarThumb")}%, transparent)`,
     "--sticky-scrollbar-thumb-hover": `color-mix(in srgb, var(--sticky-text-color) ${s("scrollbarThumbHover")}%, transparent)`,
-    "--icon-tone-copy": palette.blue,
-    "--icon-tone-delete": palette.red,
-    "--icon-tone-export": palette.success,
-    "--icon-tone-palette": palette.purple,
-    "--icon-tone-pin": palette.orange,
-    "--icon-tone-pin-active": palette.red,
-    "--icon-tone-restore": palette.green,
-    "--icon-tone-settings": palette.purple,
-    "--icon-tone-sidebar": palette.blue,
-    "--icon-tone-sticky": palette.yellow,
-    "--icon-tone-tabs": palette.blue,
-    "--icon-tone-trash": palette.red,
+    ...getIconToneTokens(theme),
     "--default-tab-text-color": palette.text,
     "--icon-chrome-color": palette.muted,
     "--icon-chrome-active-color": palette.text,

@@ -258,6 +258,7 @@ import {
   isEditableFormTarget,
   isPointInsideElement,
   isVisibleElement,
+  moveFocusWithin,
 } from "./utils/dom.js";
 import { useAppliedTheme } from "./hooks/useAppliedTheme.js";
 import { useLookStyles } from "./hooks/useLookStyles.js";
@@ -315,6 +316,9 @@ import {
   NoteTags,
 } from "./ui/NoteTags.jsx";
 import "./styles.css";
+
+// The tabs sidebar's keyboard stops: each tab and each folder header not being renamed.
+const SESSION_LIST_FOCUS_SELECTOR = ".session-tab-button, button.session-folder-header";
 
 function App({ bindTestThemeSetter }) {
   const [pendingFind, setPendingFind] = useState(null);
@@ -2694,14 +2698,18 @@ function StickyEditor({
                 <SidebarToggleIcon expanded={!isSidebarCompact} />
               </button>
             </div>
-            <div className="session-sidebar-content" data-testid="session-sidebar-scroll">
+            <div className="session-sidebar-content scroll-fade" data-testid="session-sidebar-scroll">
               <div
                 className="session-tabs"
                 role="tablist"
                 aria-label="Note sessions"
+                aria-orientation="vertical"
                 // Busy while a session moves to Trash. Moving the open note shows the next one,
                 // which remounts this editor, so the flag clears only once that note is showing.
                 aria-busy={removingSessionIds.size > 0 ? "true" : undefined}
+                // Up and Down move focus through the tabs and folder headers, Home and End to the
+                // ends; Enter or Space opens the focused tab.
+                onKeyDown={(event) => moveFocusWithin(event, SESSION_LIST_FOCUS_SELECTOR)}
                 onDragOverCapture={handleFolderDragOverCapture}
                 onDropCapture={(event) => void handleFolderDropCapture(event)}
                 onDragOver={handleSessionTabsDragOver}

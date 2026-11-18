@@ -107,6 +107,14 @@ export const DEFAULT_LOOK = Object.freeze({
     borderColor: null,
     blur: 0,
   }),
+  // The search and command palette (Command/Ctrl+P): its width in px, its height at most as a
+  // share of the window, the size of its text in px (the query is 2px larger) and where it opens.
+  palette: Object.freeze({
+    width: 720,
+    maxHeight: 72,
+    textSize: 14,
+    position: "top",
+  }),
 });
 
 // Settings > Look > Background sets the window's areas at once, as Tern's Material and Opacity
@@ -159,6 +167,83 @@ function isAssetUrl(value) {
   return typeof value === "string" && ASSET_URL_PATTERN.test(value);
 }
 
+// The heading and code fonts are a preset id, or the name of any installed font family. A name
+// goes into a CSS value as `"<name>"`, so one that could break out of it falls back.
+export const HEADING_FONT_PRESETS = Object.freeze(["same", "serif", "display", "rounded"]);
+export const CODE_FONT_PRESETS = Object.freeze(["system", "menlo", "jetbrains", "courier"]);
+const MAX_FONT_FAMILY_LENGTH = 120;
+const UNSAFE_FONT_FAMILY_PATTERN = /["'`;{}\\<>\u0000-\u001f\u007f]/;
+
+export function normalizeFontChoice(value, presets, fallback) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const name = value.trim();
+  if (presets.includes(name)) {
+    return name;
+  }
+  return name && name.length <= MAX_FONT_FAMILY_LENGTH && !UNSAFE_FONT_FAMILY_PATTERN.test(name)
+    ? name
+    : fallback;
+}
+
+// The stack each named preset draws in; "same" and "system" set no variable at all.
+export const HEADING_FONT_STACKS = Object.freeze({
+  serif: '"New York", ui-serif, Georgia, serif',
+  display: '"SF Pro Display", Inter, sans-serif',
+  rounded: 'ui-rounded, "SF Pro Rounded", sans-serif',
+});
+export const CODE_FONT_STACKS = Object.freeze({
+  menlo: "Menlo, monospace",
+  jetbrains: '"JetBrains Mono", ui-monospace, monospace',
+  courier: '"Courier New", monospace',
+});
+
+const FONT_ROLES = {
+  heading: {
+    presets: [
+      { value: "same", label: "Same as text", css: "var(--editor-font-family, sans-serif)" },
+      { value: "serif", label: "Serif", css: HEADING_FONT_STACKS.serif },
+      { value: "display", label: "Display", css: HEADING_FONT_STACKS.display },
+      { value: "rounded", label: "Rounded", css: HEADING_FONT_STACKS.rounded },
+    ],
+    fallback: "sans-serif",
+  },
+  code: {
+    presets: [
+      { value: "system", label: "System monospace", css: "ui-monospace, SFMono-Regular, Menlo, monospace" },
+      { value: "menlo", label: "Menlo", css: CODE_FONT_STACKS.menlo },
+      { value: "jetbrains", label: "JetBrains Mono", css: CODE_FONT_STACKS.jetbrains },
+      { value: "courier", label: "Courier", css: CODE_FONT_STACKS.courier },
+    ],
+    fallback: "ui-monospace, monospace",
+  },
+};
+// Names that are monospace more often than not; code lists them first.
+const MONOSPACE_NAME_PATTERN = /mono|code|courier|consol|menlo|monaco|hack|inconsolata|iosevka|terminal|fixed/i;
+
+/**
+ * The options of the heading or code font menu: the role's presets, then the installed
+ * families (for code, monospace-looking names first), each previewed in its own face. A chosen
+ * family that is no longer installed stays listed so the menu can show it.
+ */
+export function getLookFontOptions(role, installedFamilies = [], selected = "") {
+  const { presets, fallback } = FONT_ROLES[role];
+  const families = [...new Set(installedFamilies)];
+  if (selected && !presets.some((preset) => preset.value === selected) && !families.includes(selected)) {
+    families.push(selected);
+  }
+  if (role === "code") {
+    families.sort((a, b) => Number(MONOSPACE_NAME_PATTERN.test(b)) - Number(MONOSPACE_NAME_PATTERN.test(a)));
+  }
+  return [
+    ...presets,
+    ...families
+      .filter((family) => normalizeFontChoice(family, [], "") === family)
+      .map((family) => ({ value: family, label: family, css: `"${family}", ${fallback}`, source: "installed" })),
+  ];
+}
+
 function normalizeFonts(value) {
   const source = asObject(value);
   const fallback = DEFAULT_LOOK.fonts;
@@ -168,17 +253,9 @@ function normalizeFonts(value) {
     letterSpacing: normalizeNumber(source.letterSpacing, fallback.letterSpacing, -0.03, 0.08, 0.01),
     blockSpacing: normalizeNumber(source.blockSpacing, fallback.blockSpacing, 0, 24, 1),
     textWidth: normalizeNumber(source.textWidth, fallback.textWidth, 560, 1100, 20),
-    headingFont: normalizeChoice(
-      source.headingFont,
-      ["same", "serif", "display", "rounded"],
-      fallback.headingFont,
-    ),
+    headingFont: normalizeFontChoice(source.headingFont, HEADING_FONT_PRESETS, fallback.headingFont),
     headingWeight: normalizeChoice(Number(source.headingWeight), [600, 700, 800], fallback.headingWeight),
-    codeFont: normalizeChoice(
-      source.codeFont,
-      ["system", "menlo", "jetbrains", "courier"],
-      fallback.codeFont,
-    ),
+    codeFont: normalizeFontChoice(source.codeFont, CODE_FONT_PRESETS, fallback.codeFont),
     codeSize: normalizeNumber(source.codeSize, fallback.codeSize, 11, 20, 1),
     codeLigatures: normalizeBoolean(source.codeLigatures, fallback.codeLigatures),
   };
@@ -248,6 +325,24 @@ function normalizeTabs(value) {
   };
 }
 
+export const PALETTE_POSITIONS = ["top", "center"];
+export const PALETTE_WIDTH_RANGE = Object.freeze({ min: 520, max: 1040, step: 20 });
+export const PALETTE_HEIGHT_RANGE = Object.freeze({ min: 40, max: 90, step: 2 });
+export const PALETTE_TEXT_SIZE_RANGE = Object.freeze({ min: 12, max: 18, step: 1 });
+
+function normalizePalette(value) {
+  const source = asObject(value);
+  const fallback = DEFAULT_LOOK.palette;
+  const number = (key, range) =>
+    normalizeNumber(source[key], fallback[key], range.min, range.max, range.step);
+  return {
+    width: number("width", PALETTE_WIDTH_RANGE),
+    maxHeight: number("maxHeight", PALETTE_HEIGHT_RANGE),
+    textSize: number("textSize", PALETTE_TEXT_SIZE_RANGE),
+    position: normalizeChoice(source.position, PALETTE_POSITIONS, fallback.position),
+  };
+}
+
 // A complete look with every field validated: numbers clamped and snapped to their step, enums
 // and colours checked, unknown keys dropped. Anything invalid takes its DEFAULT_LOOK value.
 export function normalizeLook(value) {
@@ -263,6 +358,7 @@ export function normalizeLook(value) {
     ),
     readableText: normalizeBoolean(source.readableText, DEFAULT_LOOK.readableText),
     tabs: normalizeTabs(source.tabs),
+    palette: normalizePalette(source.palette),
   };
 }
 

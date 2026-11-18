@@ -969,6 +969,7 @@ test("every token a stylesheet or script reads is defined", async () => {
         barColor: "#123456", activeFill: "#123456", activeText: "#ffffff", inactiveFill: "#123456",
         inactiveText: "#ffffff", fillOpacity: 50, border: "subtle", borderColor: "#123456", blur: 8,
       },
+      palette: { width: 900, maxHeight: 80, textSize: 16, position: "center" },
     }).properties);
   });
   const setByStyleFunctions = new Set([

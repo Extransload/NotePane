@@ -539,9 +539,19 @@
   letter-spacing: var(--look-letter-spacing, normal);
 }
 
+/* The interface line: the app font, at the size of the sidebar and menus. */
+.look-font-preview-interface {
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--sticky-border-color);
+  color: var(--sticky-panel-muted);
+  font: 500 13px/1.4 var(--notepane-ui-font);
+  letter-spacing: normal;
+}
+
 .look-font-preview h3 {
   margin: 0 0 6px;
-  font-family: var(--look-heading-font, inherit);
+  font-family: var(--look-heading-font), var(--editor-font-family, sans-serif);
   font-size: 1.6em;
   font-weight: var(--look-heading-weight, 700);
   line-height: 1.25;

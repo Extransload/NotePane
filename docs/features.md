@@ -33,11 +33,15 @@
   changes, and text on it stays readable
 - No light/dark toggle and no light/dark shortcut; `Command/Ctrl + Shift + L` is unbound
 - Settings window via sidebar footer button, native app menu, or `Command/Ctrl + ,`: a floating window like Tern's,
-  with a search field and pages grouped under App (Editor), Look (Theme, Fonts, Background, Tabs), Data
-  (Trash, Backup) and System (Shortcuts, About). Search (`Command/Ctrl + F` while open) finds any setting and opens
+  with a search field and pages grouped under App (About, Appearance, Fonts, Background, Tabs, Editor, Keyboard)
+  and Data (Trash, Backup). Search (`Command/Ctrl + F` while open) finds any setting and opens
   its page; holding the eye button hides the window to show the app behind it
-- Look: accent colour and corner shape; editor font, size, line height, letter spacing, block spacing, text width,
-  heading font and weight, code font, size and ligatures; a background (colour, gradient or picture, with fit,
+- Settings › Fonts holds every font, each Font row the same searchable menu (presets first, then the installed
+  fonts, each shown in its own face): Interface (the app font), Text (font, size, line height, letter spacing,
+  paragraph spacing), Headings (Same as text, Serif, Display, Rounded or any installed font; weight) and Code
+  (System monospace, Menlo, JetBrains Mono, Courier or any installed font, monospace names first; size, ligatures),
+  under a preview. Settings › Editor keeps text width, table of contents and smooth caret
+- Look: accent colour and corner shape; a background (colour, gradient or picture, with fit,
   position, blur, brightness, saturation and tint) and, on the same page as Tern sets its window, the window over it:
   Material (Solid, Frosted or Clear), one Opacity for every area (menus and Settings stay at least 80%), a blur of
   their own for Menus and popups (24px by default, 0 for clear: the note under an open menu, the search palette or
@@ -67,7 +71,8 @@
   Duplicate (a new session with the same content, colour and "<title> copy" as its name), Open as sticky (desktop
   tabs layout: the note opens in its own sticky window while the app stays in tabs; its tab then brings that window
   forward, and switching the window to tabs puts the note back), a row of one-click tab colours (No color and the
-  six pastels), Color... for the full colour panel, and Move to Trash with its confirmation
+  six pastels), Color… for the full colour panel, and Move to Trash with its confirmation. The arrow keys reach a
+  menu the pointer opened (Up and Down, Home and End), and closing it gives focus back to where it was
 - Session tabs are plain (an outline) until given a colour; the colour panel offers the six pastels, "No color" to
   clear it, and a background/accent wheel with automatic contrast text
 - Tab color wheel
@@ -122,7 +127,9 @@
   delete (notes move out), move a tab from its
   menu, by dropping it on a folder header, or by dragging it over another group's tabs (above the first tab, or onto
   an ungrouped tab, takes it out of its folder), new note in a folder; tab numbers and `Command/Ctrl + 1..9` follow
-  the visible order
+  the visible order; a folder name cut short shows in full in a tooltip
+- Up and Down move the keyboard through the tabs and folder headers, Home and End to the ends, and the focus ring goes
+  round the whole tab; renaming a tab keeps its number and title in place
 - Switching sessions swaps the note in place: nothing in the sidebar or the editor fades in again
 - Tags on notes: chips above the first block, added with suggestions; a tag opens the search palette filtered to it.
   The palette (`Command/Ctrl + P`) filters by `#tag` and `folder:Name`, with folder and tag chips. A sticky window
@@ -192,7 +199,12 @@ BlockNote handles editor interaction directly.
 - `Command/Ctrl + X` cuts/removes the current block when no text is selected
 - Search notes: `Command/Ctrl + P` searches titles and bodies of every note outside Trash and opens the chosen note at its first match.
   The palette is as tall as its results, up to 70% of the window, and scrolls past that with the keyboard selection
-  kept in view; each result shows its match count ("7 matches") and when the note was last edited ("5 min. ago")
+  kept in view, its edges fading where more lies beyond (as the tabs sidebar's do); each result shows its match count
+  ("7 matches") and when the note was last edited ("5 min. ago"), and a title cut short shows in full in a tooltip.
+  Tab moves between the query and the filter chips without leaving the palette, and Escape closes it from either
+- Settings › Appearance › Search palette: Width (520–1040px, 720 by default), Height (40–90% of the window, 72),
+  Text size (12–18px, 14; the query is 2px larger and rows grow with it) and Position (Top or Center), each with
+  its reset
 - Commands in the same palette: typed words list the matching commands above the notes, and `>` lists only commands:
   new note and folder, rename, duplicate, move to a folder or out of it, open as sticky, Trash, find, version history,
   export, sidebar, layout, table of contents, text width, zoom, each Settings page and each theme, with their keys

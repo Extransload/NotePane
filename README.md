@@ -67,7 +67,8 @@ NotePane does both, and switches between them with one shortcut.
   Neon Noir. Click a card and every window takes it at once.
 - **A background behind the app.** A photo, a colour or a gradient, with the window made Solid, Frosted or Clear
   glass over it, and text kept readable.
-- **Typography and tabs.** Editor and heading fonts, size, line height, text width; tab style, height and colours.
+- **Typography and tabs.** One Fonts page for the interface, text, heading and code fonts, any installed font
+  included; size, line height, text width; tab style, height and colours.
 - **A settings window like Tern's.** One floating window with search across every setting, and an eye button to
   peek at the app behind it.
 

@@ -2121,6 +2121,12 @@ const DEFAULT_LOOK = Object.freeze({
     borderColor: null,
     blur: 0,
   }),
+  palette: Object.freeze({
+    width: 720,
+    maxHeight: 72,
+    textSize: 14,
+    position: "top",
+  }),
 });
 
 const asLookObject = (value) =>
@@ -2150,6 +2156,26 @@ function isLookAssetUrl(value) {
   return typeof value === "string" && LOOK_ASSET_URL_PATTERN.test(value);
 }
 
+// Mirrors normalizeFontChoice in src/model/look.js: a preset id, or a font family name that
+// cannot break out of a CSS value.
+const LOOK_HEADING_FONT_PRESETS = ["same", "serif", "display", "rounded"];
+const LOOK_CODE_FONT_PRESETS = ["system", "menlo", "jetbrains", "courier"];
+const LOOK_MAX_FONT_FAMILY_LENGTH = 120;
+const LOOK_UNSAFE_FONT_FAMILY_PATTERN = /["'`;{}\\<>\u0000-\u001f\u007f]/;
+
+function normalizeLookFontChoice(value, presets, fallback) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+  const name = value.trim();
+  if (presets.includes(name)) {
+    return name;
+  }
+  return name && name.length <= LOOK_MAX_FONT_FAMILY_LENGTH && !LOOK_UNSAFE_FONT_FAMILY_PATTERN.test(name)
+    ? name
+    : fallback;
+}
+
 function normalizeLook(value) {
   const source = asLookObject(value);
   const fonts = asLookObject(source.fonts);
@@ -2159,6 +2185,8 @@ function normalizeLook(value) {
   const defaultFonts = DEFAULT_LOOK.fonts;
   const defaultBackground = DEFAULT_LOOK.background;
   const defaultTabs = DEFAULT_LOOK.tabs;
+  const palette = asLookObject(source.palette);
+  const defaultPalette = DEFAULT_LOOK.palette;
   const pictures = [
     ...new Set(Array.isArray(background.pictures) ? background.pictures.filter(isLookAssetUrl) : []),
   ].slice(0, LOOK_MAX_BACKGROUND_PICTURES);
@@ -2171,17 +2199,9 @@ function normalizeLook(value) {
       letterSpacing: normalizeLookNumber(fonts.letterSpacing, defaultFonts.letterSpacing, -0.03, 0.08, 0.01),
       blockSpacing: normalizeLookNumber(fonts.blockSpacing, defaultFonts.blockSpacing, 0, 24, 1),
       textWidth: normalizeLookNumber(fonts.textWidth, defaultFonts.textWidth, 560, 1100, 20),
-      headingFont: normalizeLookChoice(
-        fonts.headingFont,
-        ["same", "serif", "display", "rounded"],
-        defaultFonts.headingFont,
-      ),
+      headingFont: normalizeLookFontChoice(fonts.headingFont, LOOK_HEADING_FONT_PRESETS, defaultFonts.headingFont),
       headingWeight: normalizeLookChoice(Number(fonts.headingWeight), [600, 700, 800], defaultFonts.headingWeight),
-      codeFont: normalizeLookChoice(
-        fonts.codeFont,
-        ["system", "menlo", "jetbrains", "courier"],
-        defaultFonts.codeFont,
-      ),
+      codeFont: normalizeLookFontChoice(fonts.codeFont, LOOK_CODE_FONT_PRESETS, defaultFonts.codeFont),
       codeSize: normalizeLookNumber(fonts.codeSize, defaultFonts.codeSize, 11, 20, 1),
       codeLigatures: normalizeLookBoolean(fonts.codeLigatures, defaultFonts.codeLigatures),
     },
@@ -2236,6 +2256,12 @@ function normalizeLook(value) {
       border: normalizeLookChoice(tabs.border, ["auto", "none", "subtle", "strong"], defaultTabs.border),
       borderColor: normalizeHexColor(tabs.borderColor, null),
       blur: normalizeLookNumber(tabs.blur, defaultTabs.blur, 0, 24, 2),
+    },
+    palette: {
+      width: normalizeLookNumber(palette.width, defaultPalette.width, 520, 1040, 20),
+      maxHeight: normalizeLookNumber(palette.maxHeight, defaultPalette.maxHeight, 40, 90, 2),
+      textSize: normalizeLookNumber(palette.textSize, defaultPalette.textSize, 12, 18, 1),
+      position: normalizeLookChoice(palette.position, ["top", "center"], defaultPalette.position),
     },
   };
 }

@@ -493,11 +493,15 @@ export async function expectAdaptiveTooltipPlacement(page, label, expectedPlacem
   });
 }
 
-// The sidebar slides between its full width and the compact rail; measure it once it rests.
+// The sidebar slides between its full width and the compact rail; measure it once it rests. Only
+// time-based animations count: the tab list's scroll fade (`.scroll-fade`) runs on its scroll
+// position, so its `finished` waits for a scroll to the end and would never come.
 export async function waitForSidebarToSettle(page) {
   await page.getByTestId("session-sidebar").evaluate((sidebar) =>
     Promise.all(
-      sidebar.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => {})),
+      sidebar.getAnimations({ subtree: true })
+        .filter((animation) => animation.timeline instanceof DocumentTimeline)
+        .map((animation) => animation.finished.catch(() => {})),
     ),
   );
 }

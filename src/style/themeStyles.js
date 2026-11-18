@@ -23,6 +23,7 @@ import {
   readableOpacity,
 } from "./colorMath.js";
 import {
+  getIconToneTokens,
   resolveLinkColor,
 } from "./themeTokens.js";
 import {
@@ -31,6 +32,8 @@ import {
 
 // Inactive session tabs show the tab text at this opacity, or more where it would not read.
 const INACTIVE_TAB_TEXT_OPACITY = 0.72;
+// The contrast an icon, as any control, needs on what it sits on.
+const ICON_CONTRAST = 3;
 
 export function resolveThemeAccentColor(theme, fallbackColor) {
   const normalizedTheme = normalizeTheme(theme);
@@ -270,6 +273,18 @@ export function getStickyShellStyle(noteTheme, accentColor, theme) {
     getContrastRatio(resolveLinkColor(theme), effectiveBackground) >= READABLE_CONTRAST
       ? {}
       : { "--notepane-link": readableOn(palette.blue, [effectiveBackground], textColor) };
+  // The title bar's action icons keep their tones where these show on the bar at 3:1, as a
+  // control needs. Elsewhere, as with a dark theme's light tones on a pastel note, each is mixed
+  // toward the ink that reads on the bar until it does.
+  const headerInk = pickReadableText(headerEffectiveBackground, inks);
+  const iconToneStyle = Object.fromEntries(
+    Object.entries(getIconToneTokens(theme))
+      .filter(([, tone]) => getContrastRatio(tone, headerEffectiveBackground) < ICON_CONTRAST)
+      .map(([token, tone]) => [
+        token,
+        readableOn(tone, [headerEffectiveBackground], headerInk, ICON_CONTRAST),
+      ]),
+  );
   // The accent marks the note; the table of contents also writes its current entry in it, on its
   // panel over the note. As text it is fitted like the link, on both the note and the panel:
   // mixed toward the first ink that reads on both until it does.
@@ -283,6 +298,7 @@ export function getStickyShellStyle(noteTheme, accentColor, theme) {
 
   return {
     ...linkStyle,
+    ...iconToneStyle,
     "--sticky-note-accent-color": accentMarkColor,
     "--sticky-note-accent-text": accentTextColor,
     "--sticky-effective-bg": effectiveBackground,

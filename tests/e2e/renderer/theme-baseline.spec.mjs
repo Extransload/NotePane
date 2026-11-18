@@ -187,12 +187,15 @@ const BASELINE_TARGETS = [
   },
 ];
 
-// Entrance animations and the theme transition must have finished before a value is read.
+// Entrance animations and the theme transition must have finished before a value is read. Only
+// time-based animations count: a list's scroll fade (`.scroll-fade`) runs on its scroll position,
+// so its `finished` waits for a scroll to the end and would never come.
 async function settleAnimations(page) {
   await page.evaluate(() =>
     Promise.all(
       document
         .getAnimations()
+        .filter((animation) => animation.timeline instanceof DocumentTimeline)
         .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
         .map((animation) => animation.finished.catch(() => {})),
     ),

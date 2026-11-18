@@ -66,9 +66,11 @@ html:is([data-look-corners="sharp"], [data-look-corners="round"]) .bn-popover-co
   max-width: var(--look-text-width, 820px);
 }
 
-/* The heading elements carry the browser's bold, which is 700. */
+/* The heading elements carry the browser's bold, which is 700. Without a heading font the
+   declaration is invalid and the heading inherits the text font; with one, the text font follows
+   it as the fallback. */
 .bn-editor [data-content-type="heading"] :is(h1, h2, h3, h4, h5, h6) {
-  font-family: var(--look-heading-font, inherit);
+  font-family: var(--look-heading-font), var(--editor-font-family, sans-serif);
   font-weight: var(--look-heading-weight, 700);
 }
 
@@ -167,7 +169,8 @@ body.is-exporting .sticky-shell::after {
 /* Each area is its fill (its own colour or the theme's) at the chosen opacity over the
    backdrop, frosted by a blur. The sidebar and title bar hold menus placed with position: fixed,
    and a backdrop-filter on them would become those menus' containing block, so they frost a
-   ::before layer instead. */
+   ::before layer instead. The layer reaches under the area's 1px border too, or the border
+   would be a seam of sharp picture between the frosted areas. */
 html[data-backdrop] .session-sidebar {
   background: transparent;
 }
@@ -175,7 +178,7 @@ html[data-backdrop] .session-sidebar {
 html[data-backdrop] .session-sidebar::before {
   position: absolute;
   z-index: -1;
-  inset: 0;
+  inset: 0 -1px 0 0;
   content: "";
   background: color-mix(
     in srgb,
@@ -197,7 +200,7 @@ html[data-backdrop] .sticky-shell .sticky-header {
 html[data-backdrop] .sticky-header::before {
   position: absolute;
   z-index: -1;
-  inset: 0;
+  inset: 0 0 -1px;
   content: "";
   background: color-mix(
     in srgb,
@@ -444,4 +447,12 @@ html[data-look-readable] .sticky-editor-surface {
   text-shadow:
     0 0 1px color-mix(in srgb, var(--sticky-effective-bg) 90%, transparent),
     0 0 8px color-mix(in srgb, var(--sticky-effective-bg) 85%, transparent);
+}
+
+/* A tab drawn on a fill of its own (a tab colour, or a fill from Settings) is no longer text over
+   the picture; the halo would only smudge it. */
+html[data-look-readable] .session-tab-row:not(.is-plain),
+html[data-look-readable][data-tab-active-fill] .session-tab-row.is-plain.active,
+html[data-look-readable][data-tab-inactive-fill] .session-tab-row.is-plain:not(.active) {
+  text-shadow: none;
 }

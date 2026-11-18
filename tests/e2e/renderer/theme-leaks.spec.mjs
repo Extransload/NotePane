@@ -62,6 +62,7 @@ const NAMED_COLOURS = ["gray", "brown", "red", "orange", "yellow", "green", "blu
 const PREFERENCES_SECTIONS = [
   "About",
   "Appearance",
+  "Fonts",
   "Background",
   "Tabs",
   "Editor",
@@ -388,13 +389,15 @@ function isVisibleColour(value) {
 
 // Finite entrance animations, hover transitions and the theme transition must have finished
 // before a value is read. A second pass after two frames catches transitions started by a
-// render that the first one triggered.
+// render that the first one triggered. Only time-based animations count: a list's scroll fade
+// (`.scroll-fade`) runs on its scroll position, so its `finished` would never come.
 async function settleAnimations(page) {
   await page.evaluate(async () => {
     const settle = () =>
       Promise.all(
         document
           .getAnimations()
+          .filter((animation) => animation.timeline instanceof DocumentTimeline)
           .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
           .map((animation) => animation.finished.catch(() => {})),
       );
@@ -607,7 +610,7 @@ const SCREEN_GROUPS = [
       const tabMenu = page.locator(".session-tab-context-menu");
       await expect(tabMenu).toBeVisible();
       await scan("session tab menu", { include: [".session-tab-context-menu"] });
-      await tabMenu.getByRole("menuitem", { name: "Color..." }).click();
+      await tabMenu.getByRole("menuitem", { name: "Color…" }).click();
       await expect(page.locator(".color-panel")).toBeVisible();
       // Focused, so the wheel's focus ring is part of the scan.
       const wheel = page.locator(".color-panel .color-wheel");

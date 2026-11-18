@@ -36,7 +36,7 @@ export function SessionFolderHeader({
     folder.collapsed ? "is-collapsed" : "",
     isDropTarget ? "is-drop-target" : "",
     isRenaming ? "is-renaming" : "",
-    isCompact ? "has-tooltip" : "",
+    "has-tooltip",
   ]
     .filter(Boolean)
     .join(" ");
@@ -78,6 +78,8 @@ export function SessionFolderHeader({
     );
   }
 
+  // The compact rail shows only the icon, so its tooltip always names the folder; the full
+  // sidebar shows the name, and the tooltip only while the name is cut short.
   return (
     <button
       type="button"
@@ -85,7 +87,8 @@ export function SessionFolderHeader({
       data-folder-id={folder.id}
       aria-expanded={!folder.collapsed}
       aria-label={`Folder ${folder.name}`}
-      data-tooltip={isCompact ? folder.name : undefined}
+      data-tooltip={folder.name}
+      data-tooltip-overflow={isCompact ? undefined : ".session-folder-name"}
       onMouseDown={preventFocusLoss}
       onClick={onToggle}
       onContextMenu={onContextMenu}

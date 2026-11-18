@@ -216,9 +216,13 @@ export function normalizeAutomaticTitleText(value) {
   }
 
   const normalizedText = value.replace(/\s+/g, " ").trim();
-  return normalizedText
-    ? normalizedText.slice(0, AUTO_TITLE_MAX_LENGTH)
-    : DEFAULT_TITLE;
+  if (!normalizedText) {
+    return DEFAULT_TITLE;
+  }
+  // A first line longer than a title ends in "…", so the cut reads as a cut.
+  return normalizedText.length > AUTO_TITLE_MAX_LENGTH
+    ? `${normalizedText.slice(0, AUTO_TITLE_MAX_LENGTH - 1).trimEnd()}…`
+    : normalizedText;
 }
 
 export function extractFirstBlockTitleText(blocks) {

@@ -145,6 +145,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Its own width, not what is left right of the centre line, so a narrow window keeps it on
+     one line while it fits. */
+  width: max-content;
+  max-width: calc(100% - 24px);
   min-height: 32px;
   padding: 4px 5px 4px 10px;
   border: 1px solid color-mix(in srgb, var(--sticky-border-color) 42%, transparent);

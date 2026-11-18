@@ -4,7 +4,9 @@ import {
   useRef,
 } from "react";
 import {
+  CODE_FONT_STACKS,
   DEFAULT_LOOK,
+  HEADING_FONT_STACKS,
   LOOK_AREAS,
   normalizeLook,
   resolveBackgroundPictureUrl,
@@ -17,17 +19,12 @@ import {
 
 const CORNER_SCALES = { sharp: 0.4, default: 1, round: 1.6 };
 
-const HEADING_FONTS = {
-  serif: '"New York", ui-serif, Georgia, serif',
-  display: '"SF Pro Display", Inter, sans-serif',
-  rounded: 'ui-rounded, "SF Pro Rounded", sans-serif',
-};
-
-const CODE_FONTS = {
-  menlo: "Menlo, monospace",
-  jetbrains: '"JetBrains Mono", ui-monospace, monospace',
-  courier: '"Courier New", monospace',
-};
+// A preset's own stack, or an installed family by name with the role's fallback after it. A
+// heading's fallback is the text font, which look.css appends (--editor-font-family lives on the
+// shell, not on <html> where this variable is set).
+function getFontStack(choice, presets, fallback) {
+  return presets[choice] ?? `"${choice}"${fallback}`;
+}
 
 const BACKGROUND_SIZES = { cover: "cover", contain: "contain", tile: "auto" };
 
@@ -48,7 +45,7 @@ const READABLE_BELOW_OPACITY = 90;
  * decides whether a sticky window shows the backdrop (background.behindStickies).
  */
 export function getLookStyles(look, { scheme = "light", layoutMode = "tabs" } = {}) {
-  const { accentColor, corners, fonts, background, surfaces, readableText, tabs } = normalizeLook(look);
+  const { accentColor, corners, fonts, background, surfaces, readableText, tabs, palette } = normalizeLook(look);
   const defaults = DEFAULT_LOOK;
   const attributes = {
     "data-look-corners": corners,
@@ -74,9 +71,9 @@ export function getLookStyles(look, { scheme = "light", layoutMode = "tabs" } = 
   setFont("letterSpacing", "--look-letter-spacing", `${fonts.letterSpacing}em`);
   setFont("blockSpacing", "--look-block-spacing", `${fonts.blockSpacing}px`);
   setFont("textWidth", "--look-text-width", `${fonts.textWidth}px`);
-  setFont("headingFont", "--look-heading-font", HEADING_FONTS[fonts.headingFont]);
+  setFont("headingFont", "--look-heading-font", getFontStack(fonts.headingFont, HEADING_FONT_STACKS, ""));
   setFont("headingWeight", "--look-heading-weight", String(fonts.headingWeight));
-  setFont("codeFont", "--look-code-font", CODE_FONTS[fonts.codeFont]);
+  setFont("codeFont", "--look-code-font", getFontStack(fonts.codeFont, CODE_FONT_STACKS, ", ui-monospace, monospace"));
   setFont("codeLigatures", "--look-code-ligatures", "none");
   // A code block's size today comes from the browser's monospace default, which no fallback
   // value can name, so the size rule only exists while this attribute is set. A named code font
@@ -141,6 +138,14 @@ export function getLookStyles(look, { scheme = "light", layoutMode = "tabs" } = 
     properties["--look-tab-strength"] = `${tabs.colorStrength}%`;
   }
   Object.assign(properties, getTabColorProperties(tabs, attributes));
+  // The search palette's size always comes from the look, whose defaults are larger than the
+  // stylesheet's fallbacks; a centred palette is marked for search.css.
+  properties["--look-palette-width"] = `${palette.width}px`;
+  properties["--look-palette-max-height"] = `${palette.maxHeight}vh`;
+  properties["--look-palette-text-size"] = `${palette.textSize}px`;
+  if (palette.position !== "top") {
+    attributes["data-palette-position"] = palette.position;
+  }
 
   return { attributes, properties };
 }

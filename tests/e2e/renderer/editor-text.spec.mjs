@@ -1473,10 +1473,13 @@ test("keeps BlockNote color and delete menus usable inside the app window", asyn
   // BlockNote moves the handle on pointer moves. One move can land while the deleted block's menu
   // is still closing and be dropped, and the note can still be settling where the deleted block
   // was, so measure the table and move within it on every try, as a hand does, until the handle is
-  // beside it; a click before then opens the menu of the block above.
+  // beside it; a click before then opens the menu of the block above. The clicks on the deleted
+  // heading above scroll the note by how much of it showed, which can leave the table above the
+  // view, where a pointer move cannot reach it, so each try first brings it into view.
   let nudge = 0;
   await expect.poll(async () => {
     nudge = (nudge + 1) % 2;
+    await table.scrollIntoViewIfNeeded();
     const tableBox = await table.boundingBox();
     await page.mouse.move(tableBox.x + 20 + nudge * 8, tableBox.y + 20);
     const handleBox = await openBlockMenuButton.boundingBox();

@@ -51,7 +51,7 @@ function ResultPath({ note, folderById }) {
       {folder && (
         <span className="search-result-folder">
           <Folder size={12} strokeWidth={1.9} aria-hidden="true" />
-          {folder.name}
+          <span className="search-result-folder-name">{folder.name}</span>
         </span>
       )}
       {tags.length > 0 && (
@@ -68,9 +68,11 @@ function FilterChip({ pressed, icon, label, ariaLabel, onToggle }) {
   return (
     <button
       type="button"
-      className="search-filter-chip"
+      className="search-filter-chip has-tooltip"
       aria-label={ariaLabel}
       aria-pressed={pressed}
+      data-tooltip={label}
+      data-tooltip-overflow=".search-filter-chip-label"
       // The query field keeps focus, so typing carries on after a chip is toggled.
       onMouseDown={(event) => event.preventDefault()}
       onClick={onToggle}
@@ -211,12 +213,30 @@ export function SearchPalette({
       if (itemCount > 0) {
         chooseIndex(activeIndex);
       }
+    }
+  };
+
+  // The palette is modal: Tab cycles through its query field and filter chips without leaving it,
+  // and Escape closes it from any of them.
+  const handleDialogKeyDown = (event) => {
+    if (event.nativeEvent.isComposing || event.keyCode === 229) {
       return;
     }
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
       onClose();
+      return;
+    }
+    if (event.key !== "Tab") {
+      return;
+    }
+    const focusable = [...event.currentTarget.querySelectorAll("input, button")];
+    const index = focusable.indexOf(document.activeElement);
+    const nextIndex = index + (event.shiftKey ? -1 : 1);
+    if (index < 0 || nextIndex < 0 || nextIndex >= focusable.length) {
+      event.preventDefault();
+      focusable.at(event.shiftKey ? -1 : 0)?.focus();
     }
   };
 
@@ -242,7 +262,13 @@ export function SearchPalette({
         }
       }}
     >
-      <div className="search-palette" role="dialog" aria-modal="true" aria-label="Search notes">
+      <div
+        className="search-palette"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search notes"
+        onKeyDown={handleDialogKeyDown}
+      >
         <input
           ref={inputRef}
           className="search-palette-input"
@@ -265,12 +291,15 @@ export function SearchPalette({
         )}
         {itemCount === 0 ? (
           <div className="search-palette-empty">
-            {commandsOnly ? "No matching commands" : "No matching notes"}
+            <p>{commandsOnly ? "No matching commands" : "No matching notes"}</p>
+            <p className="search-palette-empty-hint">
+              {commandsOnly ? "Try fewer words." : "Try fewer words, or type > for commands."}
+            </p>
           </div>
         ) : (
           <ul
             id="search-palette-results"
-            className="search-palette-results"
+            className="search-palette-results scroll-fade"
             role="listbox"
             aria-label={matchedCommands.length > 0 ? "Commands and notes" : "Matching notes"}
           >
@@ -315,7 +344,11 @@ export function SearchPalette({
                   aria-hidden="true"
                   style={{ background: noteMarkColor(result) ?? undefined }}
                 />
-                <span className="search-result-title">
+                <span
+                  className="search-result-title has-tooltip"
+                  data-tooltip={result.title}
+                  data-tooltip-overflow=""
+                >
                   <HighlightedText text={result.title} ranges={result.titleRanges} />
                 </span>
                 <span className="search-result-meta">

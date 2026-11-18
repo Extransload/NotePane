@@ -22,25 +22,47 @@ export function AdaptiveTooltipPortal() {
   const targetRef = useRef(null);
   const isPointerDownRef = useRef(false);
 
+  // A tooltip waits TOOLTIP_DELAY_MS under a resting pointer, as Notion's do, then shows at once
+  // for the next target while one showed less than TOOLTIP_WARM_MS ago.
+  const showTimerRef = useRef(0);
+  const pendingTargetRef = useRef(null);
+  const lastShownAtRef = useRef(-Infinity);
+
   const showTooltip = useCallback((target) => {
     if (isPointerDownRef.current) {
       return;
     }
 
     const text = target?.getAttribute?.("data-tooltip")?.trim();
-    if (!text) {
+    if (!text || !isTooltipNeeded(target)) {
       return;
     }
 
-    targetRef.current = target;
-    setTooltip({ target, text });
+    window.clearTimeout(showTimerRef.current);
+    const show = () => {
+      pendingTargetRef.current = null;
+      targetRef.current = target;
+      lastShownAtRef.current = performance.now();
+      setTooltip({ target, text });
+    };
+    if (targetRef.current || performance.now() - lastShownAtRef.current < TOOLTIP_WARM_MS) {
+      show();
+      return;
+    }
+    pendingTargetRef.current = target;
+    showTimerRef.current = window.setTimeout(show, TOOLTIP_DELAY_MS);
   }, []);
 
   const hideTooltip = useCallback((target) => {
-    if (target && targetRef.current !== target) {
+    if (target && targetRef.current !== target && pendingTargetRef.current !== target) {
       return;
     }
 
+    window.clearTimeout(showTimerRef.current);
+    pendingTargetRef.current = null;
+    if (targetRef.current) {
+      lastShownAtRef.current = performance.now();
+    }
     targetRef.current = null;
     setTooltip(null);
   }, []);
@@ -225,6 +247,20 @@ export function getTooltipTarget(target) {
 
   return target.closest(".has-tooltip[data-tooltip]");
 }
+
+// A target with `data-tooltip-overflow` shows its tooltip only while its label is cut short: the
+// attribute names the label element with a selector, or is empty when the target is the label.
+function isTooltipNeeded(target) {
+  const labelSelector = target.getAttribute("data-tooltip-overflow");
+  if (labelSelector === null) {
+    return true;
+  }
+  const label = labelSelector ? target.querySelector(labelSelector) : target;
+  return Boolean(label) && label.scrollWidth > label.clientWidth;
+}
+
+export const TOOLTIP_DELAY_MS = 500;
+export const TOOLTIP_WARM_MS = 800;
 
 export const ADAPTIVE_TOOLTIP_MARGIN = 8;
 

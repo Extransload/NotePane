@@ -3,6 +3,7 @@ import {
 } from "@floating-ui/react";
 import {
   useCallback,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -23,6 +24,9 @@ import {
   FloatingDropdownMenu,
 } from "./FloatingDropdownMenu.jsx";
 
+// The searchable font menu every Font row in Settings uses. The text and interface fonts keep
+// their own values ("inter", "local:Name"); the heading and code fonts pass `normalizeValue` and
+// options whose values are already theirs (a preset id or a family name).
 export function EditorFontFamilyControl({
   className = "",
   fontFamily,
@@ -30,13 +34,18 @@ export function EditorFontFamilyControl({
   inputAriaLabel = "Editor font family",
   menuButtonAriaLabel = "Open font family menu",
   optionsAriaLabel = "Font family options",
+  normalizeValue = normalizeEditorFontFamily,
   onFontFamilyChange,
 }) {
-  const normalizedFontFamily = normalizeEditorFontFamily(fontFamily);
-  const selectedFontOption = getEditorFontFamilyOption(
-    normalizedFontFamily,
-    fontOptions,
+  const optionsId = useId();
+  const normalizedFontFamily = normalizeValue(fontFamily);
+  const findOption = useCallback(
+    (value) =>
+      fontOptions.find((option) => option.value === value) ??
+      getEditorFontFamilyOption(value, fontOptions),
+    [fontOptions],
   );
+  const selectedFontOption = findOption(normalizedFontFamily);
   const [isFontMenuOpen, setIsFontMenuOpen] = useState(false);
   const [fontQuery, setFontQuery] = useState("");
   const fontMenuAnchorRef = useRef(null);
@@ -52,13 +61,13 @@ export function EditorFontFamilyControl({
 
   const applyFontFamily = useCallback(
     (nextFontFamily) => {
-      const normalizedValue = normalizeEditorFontFamily(nextFontFamily);
-      const option = getEditorFontFamilyOption(normalizedValue, fontOptions);
+      const normalizedValue = normalizeValue(nextFontFamily);
+      const option = findOption(normalizedValue);
       onFontFamilyChange(normalizedValue);
       setFontQuery(option.label === selectedFontOption.label ? "" : option.label);
       closeFontMenu();
     },
-    [closeFontMenu, fontOptions, onFontFamilyChange, selectedFontOption.label],
+    [closeFontMenu, findOption, normalizeValue, onFontFamilyChange, selectedFontOption.label],
   );
 
   return (
@@ -74,7 +83,7 @@ export function EditorFontFamilyControl({
           role="combobox"
           aria-expanded={isFontMenuOpen ? "true" : "false"}
           aria-haspopup="listbox"
-          aria-controls="editor-font-family-options"
+          aria-controls={optionsId}
           spellCheck={false}
           placeholder={selectedFontOption.label}
           value={isFontMenuOpen ? fontQuery : selectedFontOption.label}
@@ -129,7 +138,7 @@ export function EditorFontFamilyControl({
           ⌄
         </button>
         <FloatingDropdownMenu
-          id="editor-font-family-options"
+          id={optionsId}
           anchorRef={fontMenuAnchorRef}
           ariaLabel={optionsAriaLabel}
           className="editor-font-family-menu"

@@ -77,9 +77,10 @@ test("a background picture shows through frosted glass, and text stays readable"
 });
 
 test("heading font, tab style and accent apply to the app at once", async ({ page }) => {
-  await openLookPage(page, "Editor");
-  await settings(page).getByRole("radiogroup", { name: "Font" }).first().waitFor();
-  await settings(page).locator("[data-setting-id='headingFont']").getByRole("radio", { name: "Serif" }).click();
+  await openLookPage(page, "Fonts");
+  await settings(page).getByLabel("Heading font family").click();
+  await page.getByRole("listbox", { name: "Heading font family options" })
+    .getByRole("option", { name: "Serif" }).click();
   await expect.poll(() =>
     page.locator(".bn-editor h1").first().evaluate((element) => getComputedStyle(element).fontFamily),
   ).toContain("Georgia");
@@ -91,6 +92,82 @@ test("heading font, tab style and accent apply to the app at once", async ({ pag
   await openLookPage(page, "Appearance");
   await settings(page).locator("[data-setting-id='accentColor']").getByRole("button", { name: /green/i }).click();
   await expect.poll(() => rootVariable(page, "--notepane-control-accent")).toBe("#2f9e44");
+});
+
+// A desktop bridge whose installed fonts the Fonts page lists, over a note with a heading and a
+// code block.
+function stubInstalledFontsBridge() {
+  const note = {
+    id: "fonts-note",
+    title: "Fonts",
+    titleManuallyEdited: true,
+    blocksJSON: JSON.stringify([
+      { type: "heading", props: { level: 1 }, content: "Fonts heading", children: [] },
+      { type: "codeBlock", props: { language: "javascript" }, content: "const answer = 42;", children: [] },
+    ]),
+    markdown: "",
+    theme: {},
+    seedDemoContent: false,
+    editorFontFamily: "system",
+    trashedAt: null,
+    sortOrder: 1,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  window.blocknoteSticky = {
+    getCurrentNoteId: async () => note.id,
+    getNote: async () => note,
+    listNotes: async () => [note],
+    listTrash: async () => [],
+    getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
+    getLayoutMode: async () => "tabs",
+    getEditorPreferences: async () => ({}),
+    listFonts: async () => ["Avenir Next", "Andale Mono"],
+    saveContent: async () => undefined,
+    updateAppearance: async () => undefined,
+  };
+}
+
+test("every Font row is the same menu, and an installed font reaches headings and code", async ({ page }) => {
+  await page.addInitScript(stubInstalledFontsBridge);
+  await page.reload();
+  await expect(page.locator(".bn-editor h1")).toHaveText("Fonts heading");
+  await page.keyboard.press(modifierShortcut(","));
+  await openLookPage(page, "Fonts");
+
+  const fontRows = settings(page).locator(".settings-row").filter({ has: page.locator(".preferences-font-family-control") });
+  await expect(fontRows).toHaveCount(4);
+  for (const id of ["appFontFamily", "editorFontFamily", "headingFont", "codeFont"]) {
+    const row = settings(page).locator(`[data-setting-id='${id}']`);
+    await expect(row.getByText("Font", { exact: true })).toBeVisible();
+    await expect(row.getByRole("combobox")).toBeVisible();
+  }
+  const controlWidths = await fontRows.evaluateAll((rows) =>
+    rows.map((row) => Math.round(row.querySelector(".preferences-font-family-control").getBoundingClientRect().width)));
+  expect(new Set(controlWidths).size).toBe(1);
+
+  // Presets first, then the installed fonts; code lists monospace-looking names first.
+  const headingInput = settings(page).getByLabel("Heading font family");
+  await expect(headingInput).toHaveValue("Same as text");
+  await headingInput.click();
+  const headingOptions = page.getByRole("listbox", { name: "Heading font family options" }).getByRole("option");
+  await expect(headingOptions).toHaveText([/Same as text/, /Serif/, /Display/, /Rounded/, /Avenir Next/, /Andale Mono/]);
+  await headingOptions.filter({ hasText: "Avenir Next" }).click();
+  await expect.poll(() =>
+    page.locator(".bn-editor h1").evaluate((element) => getComputedStyle(element).fontFamily),
+  ).toMatch(/^"Avenir Next"/);
+
+  const codeInput = settings(page).getByLabel("Code font family");
+  await expect(codeInput).toHaveValue("System monospace");
+  await codeInput.click();
+  const codeOptions = page.getByRole("listbox", { name: "Code font family options" }).getByRole("option");
+  await expect(codeOptions).toHaveText([/System monospace/, /Menlo/, /JetBrains Mono/, /Courier/, /Andale Mono/, /Avenir Next/]);
+  await codeOptions.filter({ hasText: "Andale Mono" }).click();
+  await expect.poll(() =>
+    page.locator(".bn-editor [data-content-type='codeBlock'] code").evaluate((element) => getComputedStyle(element).fontFamily),
+  ).toMatch(/^"Andale Mono", ui-monospace, monospace/);
+  // A named code font brings the code size with it.
+  expect(await rootAttribute(page, "data-look-code-size")).toBe("");
 });
 
 // Over a background the window is its own stacking context; the block handles BlockNote portals to

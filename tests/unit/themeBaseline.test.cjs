@@ -239,8 +239,18 @@ test("NotePane sticky and tab output equals the baseline", async () => {
     const {
       "--notepane-link": link,
       "--sticky-note-accent-text": accentText,
-      ...style
+      ...shellStyle
     } = themeStyles.getStickyShellStyle(entry.noteTheme, entry.accentColor, theme);
+    // The title bar's icon tones are fitted only where the theme's own would not show on it at 3:1.
+    const style = Object.fromEntries(
+      Object.entries(shellStyle).filter(([name]) => !name.startsWith("--icon-tone-")),
+    );
+    for (const [name, tone] of Object.entries(shellStyle)) {
+      if (name.startsWith("--icon-tone-")) {
+        const header = style["--sticky-note-header-bg"];
+        assert.ok(cm.getContrastRatio(tone, header) >= 3, `${label} ${name} on ${header}`);
+      }
+    }
     const actual = normalise(style);
     const background = entry.style["--sticky-effective-bg"];
 

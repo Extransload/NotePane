@@ -492,12 +492,56 @@ test("starts blank and shows the template after closing every tab", async ({ pag
 });
 
 test("renames a session by double-clicking its tab", async ({ page }) => {
+  // The field takes the title's place and font, so the title does not jump as renaming starts.
+  const title = page.locator(".session-name").first();
+  const titleLook = await title.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { left: element.getBoundingClientRect().left, size: style.fontSize, weight: style.fontWeight };
+  });
   await page.getByRole("tab").first().dblclick();
-  await page.getByLabel("Session name").fill("Renamed session");
+  const nameField = page.getByLabel("Session name");
+  const fieldLook = await nameField.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { left: element.getBoundingClientRect().left, size: style.fontSize, weight: style.fontWeight };
+  });
+  expect(Math.abs(fieldLook.left - titleLook.left)).toBeLessThanOrEqual(1);
+  expect({ size: fieldLook.size, weight: fieldLook.weight }).toEqual({ size: titleLook.size, weight: titleLook.weight });
+
+  await nameField.fill("Renamed session");
   await page.keyboard.press("Enter");
 
   await expect(page.getByRole("tab", { name: /Renamed session/ })).toBeVisible();
   await expect(page.getByLabel("Session name")).toHaveCount(0);
+});
+
+test("arrow keys move through the tabs, and into a tab menu the pointer opened", async ({ page }) => {
+  await createBlankSession(page);
+  await expect(page.getByRole("tab")).toHaveCount(2);
+  const firstTab = page.getByRole("tab").first();
+  const secondTab = page.getByRole("tab").nth(1);
+  await firstTab.focus();
+  await page.keyboard.press("ArrowDown");
+  await expect(secondTab).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(firstTab).toBeFocused();
+  await page.keyboard.press("End");
+  await expect(secondTab).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(firstTab).toBeFocused();
+
+  // Opened by the pointer, the menu takes the first arrow key; closing it gives focus back.
+  await firstTab.click({ button: "right" });
+  const menu = page.getByRole("menu", { name: /Session options/ });
+  await expect(menu).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.getByRole("menuitem", { name: "Rename" })).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(menu.getByRole("menuitem", { name: "Move to Trash" })).toBeFocused();
+  await page.keyboard.press("Home");
+  await expect(menu.getByRole("menuitem", { name: "Rename" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(firstTab).toBeFocused();
 });
 
 test("keeps a long session title tooltip inside the window", async ({ page }) => {
@@ -996,7 +1040,7 @@ test("opens the session tab menu at the pointer, clamped inside the window", asy
   await expect(menu.getByRole("menuitem")).toHaveText([
     "Rename",
     "Duplicate",
-    "Color...",
+    "Color…",
     "New folder…",
     "Move to Trash",
   ]);
@@ -1132,6 +1176,24 @@ test("creates a folder under New session and renames it in place", async ({ page
   await page.getByTestId("sticky-editor-surface").click();
   await expect(page.getByRole("button", { name: "Folder Projects", exact: true })).toBeVisible();
   await expect(page.locator(".session-folder")).toHaveCount(1);
+});
+
+test("a folder name cut short shows in full in a tooltip", async ({ page }) => {
+  const tooltip = page.getByRole("tooltip");
+  const longName = "Projects and research archive";
+  const longHeader = await createFolder(page, longName);
+  await longHeader.hover();
+  await expect(tooltip).toHaveText(longName);
+
+  // A name with room to show needs none: two frames after the pointer reaches it, still none.
+  const shortHeader = await createFolder(page, "Work");
+  await page.getByTestId("sticky-editor-surface").hover();
+  await expect(tooltip).toHaveCount(0);
+  await shortHeader.hover();
+  await page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
+  await expect(tooltip).toHaveCount(0);
 });
 
 test("moves a tab into a folder from its tab menu and back out", async ({ page }) => {
@@ -1417,4 +1479,28 @@ test("hidden tab numbers and shortcuts free their space for the title", async ({
   const deleteBox = await deleteButton.boundingBox();
   expect(deleteBox.x + deleteBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
   expect(deleteBox.x).toBeGreaterThan(rowBox.x + rowBox.width / 2);
+});
+
+test("a first line longer than a title ends the tab's name in an ellipsis", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await page.keyboard.insertText("A very long first line that goes on well past the forty-eight characters");
+  const name = page.locator(".session-tab-row.active .session-name");
+  await expect(name).toHaveText(/…$/);
+  expect((await name.textContent()).length).toBeLessThanOrEqual(48);
+});
+
+test("a tab's tooltip waits under a resting pointer, then follows it to the next tab at once", async ({ page }) => {
+  await createBlankSession(page);
+  const tooltip = page.getByRole("tooltip");
+  const twoFrames = () => page.evaluate(() => new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve));
+  }));
+  await page.getByRole("tab").first().hover();
+  await twoFrames();
+  await expect(tooltip).toHaveCount(0);
+  await expect(tooltip).toBeVisible();
+
+  await page.getByRole("tab").nth(1).hover();
+  await twoFrames();
+  await expect(tooltip).toHaveCount(1);
 });

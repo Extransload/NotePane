@@ -776,6 +776,7 @@ test("turns the sidebar compact in a narrow window without losing the wide-windo
 const PREFERENCE_PAGE_NAMES = [
   "About",
   "Appearance",
+  "Fonts",
   "Background",
   "Tabs",
   "Editor",
@@ -851,7 +852,7 @@ test("finds a setting from the Preferences search and opens its page", async ({ 
   await search.fill("line height");
   const results = preferences.getByRole("listbox", { name: "Settings search results" });
   await expect(results.getByRole("option").first()).toContainText("Line height");
-  await expect(results.getByRole("option").first()).toContainText("App › Editor");
+  await expect(results.getByRole("option").first()).toContainText("App › Fonts");
   await expect(preferences.getByRole("heading", { level: 2 })).toHaveText("Search");
 
   // Escape in a filled field clears it and leaves the window open.
@@ -865,7 +866,7 @@ test("finds a setting from the Preferences search and opens its page", async ({ 
 
   await search.fill("line height");
   await page.keyboard.press("Enter");
-  await expect(preferences.getByRole("tab", { name: "Editor" }))
+  await expect(preferences.getByRole("tab", { name: "Fonts" }))
     .toHaveAttribute("aria-selected", "true");
   await expect(search).toHaveValue("");
   const row = preferences.locator("[data-setting-id='lineHeight']");

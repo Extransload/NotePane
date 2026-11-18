@@ -50,6 +50,9 @@ import {
   toneMatch,
 } from "../style/toneMatch.js";
 import {
+  moveFocusAmongItems,
+} from "../utils/dom.js";
+import {
   getFloatingDropdownMenuStyle,
 } from "./FloatingDropdownMenu.jsx";
 
@@ -121,34 +124,69 @@ const MENU_ICON_PROPS = {
   "aria-hidden": "true",
 };
 
-// Arrow keys move between the items of an open menu, wrapping at both ends.
+const MENU_ITEM_SELECTOR = "[role='menuitem']:not(:disabled)";
+
+// Arrow keys move between the items of an open menu, wrapping at both ends; Home and End go to
+// the first and last.
 function moveMenuFocus(event) {
-  if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
-    return;
-  }
-  const items = [...event.currentTarget.querySelectorAll("[role='menuitem']:not(:disabled)")];
-  if (items.length === 0) {
-    return;
-  }
-  event.preventDefault();
-  const offset = event.key === "ArrowDown" ? 1 : -1;
-  const index = items.indexOf(document.activeElement);
-  const nextIndex = index < 0
-    ? (offset > 0 ? 0 : items.length - 1)
-    : (index + offset + items.length) % items.length;
-  items[nextIndex].focus();
+  moveFocusAmongItems(event, [...event.currentTarget.querySelectorAll(MENU_ITEM_SELECTOR)]);
+}
+
+/**
+ * A menu opened by the pointer leaves focus where it was, so the menu's own key handling cannot
+ * hear the keyboard yet. While it is open, the first Down or Up arrow from outside it moves focus
+ * to its first or last item; once it closes, focus goes back to where the keyboard took it from.
+ */
+function useKeyboardEntry(menuRef, isClosing) {
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (!menu || isClosing) {
+      return undefined;
+    }
+    let returnFocusTo = null;
+    const handleKeyDown = (event) => {
+      if (
+        (event.key !== "ArrowDown" && event.key !== "ArrowUp") ||
+        event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
+        menu.contains(document.activeElement)
+      ) {
+        return;
+      }
+      const items = [...menu.querySelectorAll(MENU_ITEM_SELECTOR)];
+      if (items.length === 0) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      returnFocusTo = document.activeElement;
+      items.at(event.key === "ArrowDown" ? 0 : -1).focus();
+    };
+    document.addEventListener("keydown", handleKeyDown, true);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+      const focused = document.activeElement;
+      if (
+        returnFocusTo?.isConnected &&
+        (!focused || focused === document.body || menu.contains(focused))
+      ) {
+        returnFocusTo.focus({ preventScroll: true });
+      }
+    };
+  }, [isClosing, menuRef]);
 }
 
 /**
  * A menu opened at the pointer: placed below and right of it, flipped and clamped inside the
- * window (useAnchoredMenuStyle), with arrow keys moving between its items. `className` names the
- * menu for the stylesheet and for the window's outside-click handling.
+ * window (useAnchoredMenuStyle), with arrow keys moving between its items (useKeyboardEntry
+ * brings them in from outside). `className` names the menu for the stylesheet and for the
+ * window's outside-click handling.
  */
 function ContextMenu({ x, y, label, className, children }) {
   const menuRef = useRef(null);
-  const { rootProps } = usePresenceContext();
+  const { rootProps, isClosing } = usePresenceContext();
   const rootRef = useMergedRefs(menuRef, rootProps.ref);
   const position = useAnchoredMenuStyle(menuRef, { left: x, top: y });
+  useKeyboardEntry(menuRef, isClosing);
 
   return (
     <div
@@ -243,7 +281,7 @@ export function SessionTabContextMenu({
         }
         onSelect={onOpenColor}
       >
-        Color...
+        Color…
       </MenuItem>
       <MenuSeparator />
       <div className="context-menu-heading" role="presentation">Folder</div>

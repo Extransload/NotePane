@@ -423,7 +423,8 @@ test("scrolls a long search result list and keeps the keyboard selection in view
   await page.keyboard.press(modifierShortcut("P"));
   await expect(palette(page).getByRole("option")).toHaveCount(24);
 
-  const maxHeight = await page.evaluate(() => Math.min(window.innerHeight * 0.7, 520));
+  // At most the look's default height, 72% of the window (Settings › Appearance › Search palette).
+  const maxHeight = await page.evaluate(() => window.innerHeight * 0.72);
   const box = await palette(page).boundingBox();
   expect(box.height).toBeLessThanOrEqual(maxHeight + 1);
 
@@ -575,4 +576,61 @@ test("runs commands from the search palette", async ({ page }) => {
   await input.fill(">new folder");
   await input.press("Enter");
   await expect(page.getByLabel("Folder name")).toBeFocused();
+});
+
+test("Tab stays inside the search palette, and Escape closes it from a filter chip", async ({ page }) => {
+  const paletteDialog = page.getByRole("dialog", { name: "Search notes" });
+  const input = paletteDialog.getByRole("textbox", { name: "Search notes" });
+  await page.keyboard.press(modifierShortcut("P"));
+  await input.fill(">new folder");
+  await input.press("Enter");
+  await page.getByLabel("Folder name").fill("Work");
+  await page.getByLabel("Folder name").press("Enter");
+
+  await page.keyboard.press(modifierShortcut("P"));
+  await expect(input).toBeFocused();
+  const allFolders = paletteDialog.getByRole("button", { name: "All folders" });
+  const workChip = paletteDialog.getByRole("button", { name: "Work" });
+  await page.keyboard.press("Tab");
+  await expect(allFolders).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(workChip).toBeFocused();
+  // Past the last chip, Tab comes back to the query field, and Shift+Tab goes round the other way.
+  await page.keyboard.press("Tab");
+  await expect(input).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(workChip).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(paletteDialog).toHaveCount(0);
+});
+
+test("Settings sizes the search palette: its width and the size of its titles", async ({ page }) => {
+  const paletteDialog = page.getByRole("dialog", { name: "Search notes" });
+  const readPalette = async () => {
+    await page.keyboard.press(modifierShortcut("P"));
+    await expect(paletteDialog.getByRole("option").first()).toBeVisible();
+    const look = {
+      // Its layout width: the palette scales in as it opens.
+      width: await paletteDialog.evaluate((element) => element.offsetWidth),
+      titleSize: await paletteDialog.locator(".search-result-title").first()
+        .evaluate((element) => getComputedStyle(element).fontSize),
+    };
+    await page.keyboard.press("Escape");
+    await expect(paletteDialog).toHaveCount(0);
+    return look;
+  };
+  expect(await readPalette()).toEqual({ width: 720, titleSize: "14px" });
+
+  await page.keyboard.press(modifierShortcut(","));
+  const settings = page.getByRole("dialog", { name: "Preferences window" });
+  await settings.getByRole("tab", { name: "Appearance" }).click();
+  await settings.getByRole("slider", { name: "Search palette width" }).focus();
+  await page.keyboard.press("End");
+  await settings.getByRole("slider", { name: "Search palette text size" }).focus();
+  await page.keyboard.press("End");
+  await settings.getByRole("button", { name: "Close preferences" }).click();
+  await expect(settings).toHaveCount(0);
+
+  expect(await readPalette()).toEqual({ width: 1040, titleSize: "18px" });
 });
