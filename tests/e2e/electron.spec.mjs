@@ -3184,7 +3184,8 @@ async function isMenuItemEnabled(electronApp, label) {
   return electronApp.evaluate(({ Menu }, targetLabel) => {
     const findMenuItem = (menu) => {
       for (const item of menu.items) {
-        if (item.label === targetLabel) {
+        // On Windows a label carries its shortcut after a tab ("Preferences\tCtrl+,").
+        if (item.label.split("\t")[0] === targetLabel) {
           return item;
         }
         const nested = item.submenu ? findMenuItem(item.submenu) : null;
