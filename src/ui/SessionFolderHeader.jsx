@@ -1,7 +1,6 @@
 import {
   ChevronDown,
   Folder,
-  FolderPlus,
 } from "lucide-react";
 import {
   preventFocusLoss,
@@ -94,22 +93,6 @@ export function SessionFolderHeader({
       {icons}
       <span className="session-folder-name">{folder.name}</span>
       <span className="session-folder-count" aria-hidden="true">{count}</span>
-    </button>
-  );
-}
-
-// The row under New session that creates a folder and opens its name for typing.
-export function NewFolderButton({ onCreate }) {
-  return (
-    <button
-      type="button"
-      className="session-add-folder-button"
-      aria-label="New folder"
-      onMouseDown={preventFocusLoss}
-      onClick={onCreate}
-    >
-      <FolderPlus className="session-add-folder-icon" {...FOLDER_ICON_PROPS} />
-      <span>New folder</span>
     </button>
   );
 }

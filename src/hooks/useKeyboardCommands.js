@@ -19,7 +19,12 @@ import {
  */
 export function useChromeShortcuts({
   adjustAppZoom,
+  closeFindInNote,
   closeOverlay,
+  closeSearchPalette,
+  isExportFormatMenuOpen,
+  isFindInNoteOpen,
+  isSearchPaletteOpen,
   normalizedLayoutMode,
   exportNote,
   focusEditor,
@@ -68,6 +73,25 @@ export function useChromeShortcuts({
       if (matchesEnabledKeyboardShortcut(event, "resetZoom")) {
         event.preventDefault();
         resetAppZoom();
+        return;
+      }
+      // The shortcut that opened the search palette, the find bar or the export menu closes it
+      // again, from the field inside it too.
+      const closeToggled = (close) => {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      };
+      if (isSearchPaletteOpen && matchesEnabledKeyboardShortcut(event, "searchNotes")) {
+        closeToggled(closeSearchPalette);
+        return;
+      }
+      if (isFindInNoteOpen && matchesEnabledKeyboardShortcut(event, "findInNote")) {
+        closeToggled(closeFindInNote);
+        return;
+      }
+      if (isExportFormatMenuOpen && matchesEnabledKeyboardShortcut(event, "exportPdf")) {
+        closeToggled(() => closeOverlay("exportFormatMenu"));
         return;
       }
 
@@ -159,9 +183,14 @@ export function useChromeShortcuts({
     normalizedLayoutMode,
     matchesEnabledKeyboardShortcut,
     adjustAppZoom,
+    closeFindInNote,
     closeOverlay,
+    closeSearchPalette,
     exportNote,
     focusEditor,
+    isExportFormatMenuOpen,
+    isFindInNoteOpen,
+    isSearchPaletteOpen,
     requestNewSession,
     toggleTableOfContents,
     onEditorWidthChange,

@@ -124,6 +124,8 @@ import {
 } from "./editor/tableFocus.js";
 import { MarkdownShortcutUndo } from "./editor/markdownShortcuts.js";
 import { EditorMotion } from "./editor/editorMotion.js";
+import { ListMarkers } from "./editor/listMarkers.js";
+import { TextLists } from "./editor/textLists.js";
 import {
   EMPTY_BLOCKS,
   NOTE_PANE_TEMPLATE_BLOCKS,
@@ -147,6 +149,7 @@ import {
   NotePaneSlashMenuController,
 } from "./editor/slashMenu.jsx";
 import {
+  formatKeyboardShortcutLabel,
   formatShortcutTooltip,
   getSessionShortcutLabel,
   isKeyboardShortcutEnabled,
@@ -232,7 +235,6 @@ import {
   SessionTabContextMenu,
 } from "./ui/menus.jsx";
 import {
-  NewFolderButton,
   SessionFolderHeader,
 } from "./ui/SessionFolderHeader.jsx";
 import {
@@ -240,6 +242,7 @@ import {
   groupSessionNotes,
 } from "./model/folders.js";
 import { useSessionFolders } from "./hooks/useSessionFolders.js";
+import { usePaletteCommands } from "./hooks/usePaletteCommands.js";
 import {
   AppZoomGauge,
   LayoutTransitionOverlay,
@@ -701,6 +704,8 @@ function StickyEditor({
       FileDrop,
       MarkdownShortcutUndo,
       EditorMotion,
+      ListMarkers,
+      TextLists,
       SelectionDismissed,
     ],
     initialContent: initialEditorContent,
@@ -1614,6 +1619,11 @@ function StickyEditor({
       }
 
       event.preventDefault();
+      // The shortcut that opened Settings closes it again.
+      if (isPreferencesWindowOpen) {
+        closeOverlay("preferencesWindow");
+        return;
+      }
       openPreferences();
     };
 
@@ -1621,7 +1631,13 @@ function StickyEditor({
     return () => {
       document.removeEventListener("keydown", handlePreferencesShortcut, true);
     };
-  }, [canOpenPreferences, matchesEnabledKeyboardShortcut, openPreferences]);
+  }, [
+    canOpenPreferences,
+    closeOverlay,
+    isPreferencesWindowOpen,
+    matchesEnabledKeyboardShortcut,
+    openPreferences,
+  ]);
 
   // Resolves to the id of the note the window landed on, or null when the
   // switch failed.
@@ -1653,7 +1669,12 @@ function StickyEditor({
 
   useChromeShortcuts({
     adjustAppZoom,
+    closeFindInNote: findInNote.closeFind,
     closeOverlay,
+    closeSearchPalette: notePalette.closePalette,
+    isExportFormatMenuOpen: Boolean(exportFormatMenu),
+    isFindInNoteOpen: findInNote.isOpen,
+    isSearchPaletteOpen: notePalette.query !== null,
     openFindInNote,
     openOverlay,
     openSearchPalette: notePalette.openPalette,
@@ -2252,6 +2273,32 @@ function StickyEditor({
     openOverlay,
   });
 
+  const paletteCommands = usePaletteCommands({
+    activeThemeId: activeTheme.id,
+    adjustAppZoom,
+    createFolderAndRename,
+    duplicateSessionNote,
+    exportNote,
+    folders,
+    isTabsLayout: normalizedLayoutMode === "tabs",
+    note,
+    onAppThemeChanged,
+    onEditorWidthChange,
+    onMoveNoteToFolder,
+    openOverlay,
+    openFindInNote,
+    openPreferencesPage,
+    openSessionAsSticky,
+    openVersionHistory,
+    requestDeleteSessionNote,
+    requestNewSession,
+    requestSessionRename,
+    resetAppZoom,
+    setIsSidebarOpen,
+    toggleLayoutMode,
+    toggleTableOfContents,
+  });
+
   const folderMenuFolder = useMemo(
     () => folders.find((folder) => folder.id === folderMenu?.folderId) ?? null,
     [folderMenu, folders],
@@ -2685,7 +2732,6 @@ function StickyEditor({
                 />
                 <span>New session</span>
               </button>
-              <NewFolderButton onCreate={() => void createFolderAndRename()} />
             </div>
             <div
               className="session-sidebar-footer"
@@ -2803,7 +2849,6 @@ function StickyEditor({
                   current={findInNote.current}
                   total={findInNote.total}
                   focusRequest={findInNote.focusRequest}
-                  isFindShortcut={(event) => matchesEnabledKeyboardShortcut(event, "findInNote")}
                   onQueryChange={findInNote.updateQuery}
                   onStep={findInNote.step}
                   onClose={findInNote.closeFind}
@@ -3175,11 +3220,17 @@ function StickyEditor({
           <SearchPalette
             query={palette.query}
             results={palette.results}
+            commands={paletteCommands}
             activeTheme={activeTheme}
             folders={palette.folders}
             tags={palette.tags}
+            formatShortcut={(commandId) => formatKeyboardShortcutLabel(getEnabledShortcut(commandId))}
             onQueryChange={palette.setQuery}
             onChoose={(result) => void palette.chooseResult(result)}
+            onRunCommand={(command) => {
+              palette.closePalette();
+              command.run();
+            }}
             onClose={palette.closePalette}
           />
         )}

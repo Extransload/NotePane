@@ -163,6 +163,7 @@ export const SETTINGS_INDEX = [
   { page: "background", id: "surfaceMaterial", title: "Material", description: "Solid, frosted or clear glass over the background.", keywords: "material glass frosted clear solid surfaces transparent see-through window" },
   { page: "background", id: "surfaceOpacity", title: "Opacity", description: "How much the window hides the background.", keywords: "opacity transparency transparent see-through glass surfaces window" },
   { page: "background", id: "floatingMaterial", title: "Menus and popups", description: "Frosted, clear or solid menus, palette and Settings.", keywords: "menus popups popover floating blur frosted glass palette dropdown overlap readable" },
+  { page: "background", id: "floatingBlur", title: "Menu blur", description: "How strongly frosted menus and popups blur what is under them.", keywords: "menus popups blur strength amount frosted glass radius" },
   { page: "background", id: "surfaceBorder", title: "Border", description: "The line round the sidebar, title bar and menus.", keywords: "border outline hairline edge line surfaces" },
   { page: "background", id: "readableText", title: "Keep text readable", description: "A soft halo behind text over a background.", keywords: "readable contrast legibility halo text shadow" },
   { page: "tabs", id: "tabStyle", title: "Tab style", description: "How tabs without their own colour are drawn.", keywords: "tabs plain outline filled style" },

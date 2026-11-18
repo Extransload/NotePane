@@ -17,6 +17,7 @@ import {
   BUILTIN_BACKGROUNDS,
   DEFAULT_LOOK,
   LOOK_ACCENTS,
+  FLOATING_BLUR_RANGE,
   SURFACE_MATERIALS,
   applySurfaceStyle,
   getSurfaceStyle,
@@ -658,6 +659,24 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
             onChange={(floating) => setSurfaceStyle({ floating })}
           />
         </SettingRow>
+        {surfaceStyle.floating === "frosted" && (
+          <SettingRow
+            id="floatingBlur"
+            title="Menu blur"
+            description="How strongly menus and popups blur what is under them."
+            {...resetSurfaceStyle("floatingBlur")}
+          >
+            <Slider
+              label="Menu blur"
+              value={surfaceStyle.floatingBlur}
+              min={FLOATING_BLUR_RANGE.min}
+              max={FLOATING_BLUR_RANGE.max}
+              step={FLOATING_BLUR_RANGE.step}
+              format={formatPx}
+              onChange={(floatingBlur) => setSurfaceStyle({ floatingBlur })}
+            />
+          </SettingRow>
+        )}
         <SettingRow
           id="surfaceBorder"
           title="Border"

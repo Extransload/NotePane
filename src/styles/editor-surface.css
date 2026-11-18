@@ -188,28 +188,40 @@
   padding-right: 0;
 }
 
-.editor-table-of-contents {
+/* The slot holds the closed rail's place in the note: the text flows round it, and its size never
+   changes. The rail inside opens over the text, leftwards and down from the slot's corner. */
+.editor-toc-slot {
   position: sticky;
   z-index: 24;
   top: 56px;
   float: right;
   width: 44px;
+  height: min(var(--toc-rail-height, 0px), 84vh, 680px);
+  margin: 14px 10px 12px 18px;
+  -webkit-app-region: no-drag;
+}
+
+.editor-table-of-contents {
+  position: absolute;
+  z-index: 24;
+  top: 0;
+  right: 0;
+  width: 44px;
   max-width: 44px;
   max-height: min(84vh, 680px);
-  margin: 14px 10px 12px 18px;
   overflow: hidden;
   border: 0;
   border-radius: 4px;
   background: transparent;
   box-shadow: none;
   color: var(--sticky-panel-text);
-  -webkit-app-region: no-drag;
 }
 
 .editor-table-of-contents:hover,
 .editor-table-of-contents:focus-within {
   width: clamp(320px, 34vw, 440px);
-  max-width: calc(100% - 24px);
+  /* The editor surface is a size container, so this is the surface's width, not the slot's. */
+  max-width: calc(100cqw - 24px);
   border: 1px solid color-mix(in srgb, var(--sticky-border-color) 58%, transparent);
   background: color-mix(in srgb, var(--sticky-panel-bg) 82%, transparent);
   box-shadow: 0 10px 24px color-mix(in srgb, var(--sticky-text-color) 11%, transparent);

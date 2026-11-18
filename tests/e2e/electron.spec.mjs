@@ -49,9 +49,7 @@ test("Electron About page shows the app version and leaves update checks to the 
       chromiumVersion: process.versions.chrome,
     }));
 
-    await page.bringToFront();
-    await page.keyboard.press(modifierShortcut(","));
-    const preferences = page.getByRole("dialog", { name: "Preferences window" });
+    const preferences = await openSettings(page);
     await preferences.getByRole("tab", { name: "About" }).click();
     const about = preferences.getByRole("tabpanel", { name: "About" });
     await expect(about.getByTestId("about-version")).toHaveText(`Version ${version}`);
@@ -340,9 +338,12 @@ test("Cmd/Ctrl+= zooms every window, and the zoom persists", async () => {
   ]);
   const readZooms = (electronApp) => electronApp.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows().map((window) => Math.round(window.webContents.getZoomFactor() * 100)));
-  // How much larger the page draws than its window, as a person sees the zoom.
-  const readPageZoom = (page) => page.evaluate(() =>
-    Math.round((window.outerWidth / window.innerWidth) * 100));
+  // How much larger the page draws, as a person sees the zoom: its CSS pixel against the display's.
+  // (outerWidth / innerWidth also counts the window frame, which Windows draws.)
+  const readPageZoom = async (electronApp, page) => {
+    const scaleFactor = await electronApp.evaluate(({ screen }) => screen.getPrimaryDisplay().scaleFactor);
+    return Math.round((await page.evaluate(() => window.devicePixelRatio)) / scaleFactor * 100);
+  };
   const readStoredZoom = () => JSON.parse(fs.readFileSync(
     path.join(userDataDirectory, "notes.json"), "utf8",
   )).editorPreferences.appZoom;
@@ -365,7 +366,7 @@ test("Cmd/Ctrl+= zooms every window, and the zoom persists", async () => {
     await expect(tabsPage.getByRole("meter", { name: "Zoom" }))
       .toHaveAttribute("aria-valuetext", "110%");
     await expect.poll(() => readZooms(electronApp)).toEqual([110]);
-    await expect.poll(() => readPageZoom(tabsPage)).toBe(110);
+    await expect.poll(() => readPageZoom(electronApp, tabsPage)).toBe(110);
     await expect.poll(readStoredZoom).toBe(1.1);
 
     // Windows opened afterwards start at the zoom, and their buttons stay centred on the larger
@@ -381,7 +382,7 @@ test("Cmd/Ctrl+= zooms every window, and the zoom persists", async () => {
     await expect.poll(() => readZooms(electronApp)).toEqual([100, 100]);
     await secondPage.keyboard.press(modifierShortcut("-"));
     await expect.poll(() => readZooms(electronApp)).toEqual([90, 90]);
-    await expect.poll(() => readPageZoom(secondPage)).toBe(90);
+    await expect.poll(() => readPageZoom(electronApp, secondPage)).toBe(90);
     await expectWindowButtonsAt(electronApp, 9);
   } finally {
     await electronApp.close();
@@ -978,17 +979,24 @@ test("Electron exits a second instance that shares the same user data", async ()
     const page = await firstApp.firstWindow();
     await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
 
-    // The second process may exit before Playwright attaches to it.
+    // The second process may exit before Playwright attaches to it, or while it attaches, when
+    // Playwright's handle has no process left to read; either way it has exited.
+    const exitCodeOf = (app) => {
+      try {
+        return app.process().exitCode;
+      } catch {
+        return 0;
+      }
+    };
     secondApp = await launchApp(userDataDirectory).catch(() => null);
     if (secondApp) {
-      await expect.poll(() => secondApp.process().exitCode, { timeout: 10_000 })
-        .not.toBeNull();
+      await expect.poll(() => exitCodeOf(secondApp), { timeout: 10_000 }).not.toBeNull();
     }
 
     await expect(page.getByTestId("sticky-editor-surface")).toContainText("first body");
   } finally {
-    if (secondApp && secondApp.process().exitCode === null) {
-      await secondApp.close();
+    if (secondApp) {
+      await secondApp.close().catch(() => {});
     }
     await firstApp.close();
   }
@@ -1873,7 +1881,9 @@ test("Electron trash hides notes from tabs and sticky windows until restored", a
       });
     }).toBe(1);
 
-    await page.evaluate(async () => {
+    // On Windows the toggle opens a new window for the note; elsewhere the tabs window stays.
+    const stickyPage = await getStickyPageByNoteId(electronApp, "first-note");
+    await stickyPage.evaluate(async () => {
       await window.blocknoteSticky.restoreNote("second-note");
     });
     await expect.poll(() => getStoredTrashState(userDataDirectory)).toEqual({
@@ -2679,11 +2689,11 @@ test("Electron opens version history from a minimum-size sticky window", async (
   const electronApp = await launchApp(userDataDirectory);
 
   try {
-    // With one note, the tabs window becomes Alpha's sticky window.
-    const page = await electronApp.firstWindow();
-    await expect(page.getByTestId("sticky-editor-surface")).toContainText("alpha body");
+    // With one note, the tabs window becomes Alpha's sticky window (on Windows, a new window).
+    const tabsPage = await electronApp.firstWindow();
+    await expect(tabsPage.getByTestId("sticky-editor-surface")).toContainText("alpha body");
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
-    await expect(page.getByTestId("sticky-shell")).toHaveAttribute("data-layout-mode", "sticky");
+    const page = await getStickyPageByNoteId(electronApp, "alpha");
     await electronApp.browserWindow(page).then((window) =>
       window.evaluate((browserWindow) => browserWindow.setBounds({ width: 320, height: 260 })));
     await expect.poll(() => page.evaluate(() => [window.innerWidth, window.innerHeight]))
@@ -2731,14 +2741,12 @@ test("Electron moves a sticky window when dragging its header", async () => {
   const electronApp = await launchApp(userDataDirectory);
 
   try {
-    const page = await electronApp.firstWindow();
-    await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+    const tabsPage = await electronApp.firstWindow();
+    await expect(tabsPage.getByTestId("sticky-editor-surface")).toBeVisible();
+    const noteId = await getPageNoteId(tabsPage);
 
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
-    await expect(page.getByTestId("sticky-shell")).toHaveAttribute(
-      "data-layout-mode",
-      "sticky",
-    );
+    const page = await getStickyPageByNoteId(electronApp, noteId);
 
     const header = page.getByTestId("sticky-header");
     await expect(header).toBeVisible();
@@ -2987,22 +2995,27 @@ function getStoredTrashState(userDataDirectory) {
   };
 }
 
+// The window for `noteId` that shows the sticky layout. On Windows a layout change opens new
+// windows before it destroys the old ones, so the tabs window loaded for the same note can still
+// be open, about to close; it shows the tabs layout and is passed over.
 async function getStickyPageByNoteId(electronApp, noteId) {
+  let match = null;
   await expect.poll(async () => {
-    const pages = getOpenPages(electronApp);
-    const noteIds = await Promise.all(
-      pages.map((page) => getPageNoteId(page)),
-    );
-    return noteIds.includes(noteId);
-  }).toBe(true);
-
-  for (const page of getOpenPages(electronApp)) {
-    if (await getPageNoteId(page) === noteId) {
-      return page;
+    match = null;
+    for (const page of getOpenPages(electronApp)) {
+      if (await getPageNoteId(page) !== noteId) {
+        continue;
+      }
+      const layoutMode = await page.evaluate(() =>
+        document.querySelector("[data-testid='sticky-shell']")?.dataset.layoutMode ?? null,
+      ).catch(() => null);
+      if (layoutMode === "sticky") {
+        match = page;
+      }
     }
-  }
-
-  throw new Error(`Sticky page not found: ${noteId}`);
+    return Boolean(match);
+  }, { message: `a sticky window for ${noteId}` }).toBe(true);
+  return match;
 }
 
 // Finds a page by the note its window shows now. A tabs window that becomes a sticky window keeps
@@ -3149,9 +3162,10 @@ async function clickMenuItem(electronApp, label) {
     }
     item.click();
 
+    // On Windows a label carries its shortcut after a tab ("Preferences\tCtrl+,").
     function findMenuItem(menuOrSubmenu, labelToFind) {
       for (const item of menuOrSubmenu.items) {
-        if (item.label === labelToFind) {
+        if (item.label.split("\t")[0] === labelToFind) {
           return item;
         }
         if (item.submenu) {
@@ -3197,13 +3211,25 @@ function modifierShortcut(key) {
   return `${process.platform === "darwin" ? "Meta" : "Control"}+${key}`;
 }
 
+// Opens Settings with its shortcut. A press that lands before the window's shortcut listener is in
+// opens nothing; pressing again only while Settings is shut keeps a press from closing it, as the
+// shortcut toggles.
+async function openSettings(page) {
+  await page.bringToFront();
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  await expect(async () => {
+    if (await preferences.count() === 0) {
+      await page.keyboard.press(modifierShortcut(","));
+    }
+    await expect(preferences).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  return preferences;
+}
+
 // Chooses a theme as a user does: Preferences through its shortcut in a tabs window (a sticky
 // window does not open it), the theme's card on the Theme page, then Close.
 async function chooseAppTheme(page, themeId) {
-  await page.bringToFront();
-  await page.keyboard.press(modifierShortcut(","));
-  const preferences = page.getByRole("dialog", { name: "Preferences window" });
-  await expect(preferences).toBeVisible();
+  const preferences = await openSettings(page);
   await preferences.getByTestId(`theme-card-${themeId}`).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme-id", themeId);
   await preferences.getByRole("button", { name: "Close preferences" }).click();

@@ -203,6 +203,43 @@
   background: color-mix(in srgb, var(--sticky-text-color) 8%, transparent);
 }
 
+/* A command row (src/model/commands.js): one line, its key at the right edge. The last command
+   is set apart from the notes under it by a hairline. */
+.search-command {
+  display: grid;
+  grid-template-columns: 13px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.search-command.is-selected {
+  background: color-mix(in srgb, var(--sticky-text-color) 8%, transparent);
+}
+
+.search-command:has(+ .search-result) {
+  margin-bottom: 6px;
+  box-shadow: 0 6px 0 -5px color-mix(in srgb, var(--sticky-border-color) 70%, transparent);
+}
+
+.search-command-icon {
+  color: var(--sticky-panel-muted);
+}
+
+.search-command-title {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-command-shortcut {
+  color: var(--sticky-panel-muted);
+  font: 500 11px/1 var(--notepane-ui-font);
+}
+
 .search-result-dot {
   width: 8px;
   height: 8px;

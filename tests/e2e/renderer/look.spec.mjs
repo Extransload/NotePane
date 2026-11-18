@@ -44,13 +44,21 @@ test("a background picture shows through frosted glass, and text stays readable"
   // Menus and popups keep their own material: still frosted over a clear window, until set.
   expect(await rootVariable(page, "--look-menus-filter")).toBe("blur(24px) saturate(150%)");
   const floating = settings(page).locator("[data-setting-id='floatingMaterial']");
+  // The blur slider shows only for Frosted.
+  await expect(settings(page).locator("[data-setting-id='floatingBlur']")).toBeVisible();
   await floating.getByRole("radio", { name: "Clear" }).click();
   await expect.poll(() => rootVariable(page, "--look-settings-filter")).toBe("none");
   await expect.poll(() => settings(page).evaluate((element) => getComputedStyle(element).backdropFilter))
     .toBe("none");
+  await expect(settings(page).locator("[data-setting-id='floatingBlur']")).toHaveCount(0);
   await floating.getByRole("radio", { name: "Frosted" }).click();
   await expect.poll(() => settings(page).evaluate((element) => getComputedStyle(element).backdropFilter))
-    .toBe("blur(30px) saturate(1.5)");
+    .toBe("blur(24px) saturate(1.5)");
+  // Menu blur sets how strongly the panel blurs what is under it.
+  await settings(page).getByRole("button", { name: "Increase Menu blur" }).click();
+  await expect.poll(() => settings(page).evaluate((element) => getComputedStyle(element).backdropFilter))
+    .toBe("blur(26px) saturate(1.5)");
+  expect(await rootVariable(page, "--look-menus-filter")).toBe("blur(26px) saturate(150%)");
   // The sidebar's own fill gives way to the layer drawn from these variables.
   await expect.poll(() => page.getByTestId("session-sidebar")
     .evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");

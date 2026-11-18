@@ -54,7 +54,8 @@ NotePane does both, and switches between them with one shortcut.
 **Organise**
 - **Folders and tags.** Group tabs into folders you collapse, rename and drop tabs onto, and tag notes from the
   chips above their first line.
-- **Search everything.** `⌘P` searches every note, filtered by `#tag` and `folder:Name` with one-click chips.
+- **Search and commands.** `⌘P` searches every note, filtered by `#tag` and `folder:Name` with one-click chips,
+  and runs commands: a new folder, a theme, a Settings page, export and more. Type `>` for commands only.
 - **Version history and Trash.** Every save keeps a version to go back to; a closed note waits in Trash.
 
 **Export**
@@ -110,7 +111,8 @@ Press `⌘⇧T` to move between them.
   <img src="docs/images/search.png" alt="The search palette filtered to the launch tag, with folder and tag chips" width="820">
 </div>
 
-`⌘P` opens the search palette. Type words, `#tag` or `folder:Name`, or press the chips.
+`⌘P` opens the search palette. Type words, `#tag` or `folder:Name`, or press the chips; matching commands show
+above the notes, and `>` lists only commands.
 
 <div align="center">
   <img src="docs/images/background.png" alt="NotePane over a snowy mountain photo, the sidebar and editor in frosted glass" width="820">
@@ -221,7 +223,7 @@ their first line until you rename one by double-clicking its tab.
 | --- | --- |
 | `⌘T` / `⌘N` | New session |
 | `⌘1` … `⌘9` | Jump to a session |
-| `⌘P` | Search every note |
+| `⌘P` | Search notes and run commands (`>` for commands only) |
 | `⌘F` | Find in the open note |
 | `⌘⇧T` | Switch between Tab sessions mode and Sticky windows mode |
 | `/` | Open the block palette |

@@ -12,7 +12,6 @@ export function FindBar({
   current,
   total,
   focusRequest,
-  isFindShortcut,
   onQueryChange,
   onStep,
   onClose,
@@ -39,10 +38,6 @@ export function FindBar({
       event.stopPropagation();
       onClose();
       return;
-    }
-    if (isFindShortcut(event.nativeEvent)) {
-      event.preventDefault();
-      event.currentTarget.select();
     }
   };
 

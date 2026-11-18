@@ -41,7 +41,8 @@
   position, blur, brightness, saturation and tint) and, on the same page as Tern sets its window, the window over it:
   Material (Solid, Frosted or Clear), one Opacity for every area (menus and Settings stay at least 80%), a material
   of their own for Menus and popups (Frosted by default, so the note under an open menu, the search palette or
-  Settings blurs instead of showing through sharp), Border, and
+  Settings blurs instead of showing through sharp, with a Menu blur slider for how strongly; the dim behind
+  Settings and the palette fades by its colour, so the blur holds from the first frame), Border, and
   Keep text readable (a soft halo behind text while the background shows through, on by default); tab style,
   height, radius, numbers, shortcuts, new tab colour and colour strength
 - Preferences > About: the NotePane wordmark, "Version x.y.z", a short description of the app and, in the desktop
@@ -112,7 +113,8 @@
   matter; Copy as Markdown)
 - PDF export hides app chrome and sticky background
 - PDF export renders with NotePane Light colours unless the current theme is chosen in the Export window
-- Folders in the tabs sidebar: New folder, collapse and expand, rename, delete (notes move out), move a tab from its
+- Folders in the tabs sidebar: New folder (from the command palette or a tab's menu), collapse and expand, rename,
+  delete (notes move out), move a tab from its
   menu, by dropping it on a folder header, or by dragging it over another group's tabs (above the first tab, or onto
   an ungrouped tab, takes it out of its folder), new note in a folder; tab numbers and `Command/Ctrl + 1..9` follow
   the visible order
@@ -174,7 +176,16 @@ BlockNote handles editor interaction directly.
 - Search notes: `Command/Ctrl + P` searches titles and bodies of every note outside Trash and opens the chosen note at its first match.
   The palette is as tall as its results, up to 70% of the window, and scrolls past that with the keyboard selection
   kept in view; each result shows its match count ("7 matches") and when the note was last edited ("5 min. ago")
+- Commands in the same palette: typed words list the matching commands above the notes, and `>` lists only commands:
+  new note and folder, rename, duplicate, move to a folder or out of it, open as sticky, Trash, find, version history,
+  export, sidebar, layout, table of contents, text width, zoom, each Settings page and each theme, with their keys
+- The shortcut that opens the search palette, Settings, the find bar or the export menu closes it again
 - Find in note: `Command/Ctrl + F` highlights matches, steps with `Enter` / `Shift + Enter`, and expands collapsed toggles that hold the current match
+- Lists typed as text continue on `Enter`: a line starting "a) ", "b. ", "(c) ", "2) " or "(3) " gets the next marker;
+  `Enter` on a bare marker ends the list, and `Escape` right after `Enter` takes the new marker back
+- Nested list markers follow Notion: bullets •, ◦, ▪ and numbers 1., a., i., then over again; bullets, numbers and
+  toggle arrows sit at the middle of their text's first line, toggle headings included
+- The table of contents rail opens over the note without moving its text
 - Editor typography control with searchable font family dropdown and installed macOS font discovery where supported
 
 ## Blocks

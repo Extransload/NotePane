@@ -569,51 +569,6 @@
   display: none;
 }
 
-/* The row under New session that creates a folder: quieter than New session, no border. */
-.session-add-folder-button {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-  width: calc(100% - 16px);
-  height: 28px;
-  margin: -6px 8px 10px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--sticky-muted-color);
-  font: 500 12px/1 var(--notepane-ui-font);
-  cursor: pointer;
-  transition:
-    background var(--notepane-motion-hover-duration) var(--notepane-motion-ease-out),
-    color var(--notepane-motion-hover-duration) var(--notepane-motion-ease-out);
-  -webkit-app-region: no-drag;
-}
-
-.session-add-folder-button:hover {
-  background: var(--sticky-control-hover-bg);
-  color: var(--sticky-text-color);
-}
-
-.session-add-folder-button:focus-visible {
-  outline: 2px solid var(--notepane-focus-outline);
-  outline-offset: -2px;
-}
-
-.session-add-folder-icon {
-  flex: 0 0 auto;
-}
-
-.session-sidebar.is-compact .session-add-folder-button {
-  justify-content: center;
-  padding: 0;
-}
-
-.session-sidebar.is-compact .session-add-folder-button span {
-  display: none;
-}
-
 /* A folder: its header, then its tabs indented under it. The same gap as between tabs keeps the
    rhythm of the list. */
 .session-folder,
@@ -734,8 +689,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .session-folder-chevron,
-  .session-folder-header,
-  .session-add-folder-button {
+  .session-folder-header {
     transition: none;
   }
 

@@ -143,7 +143,9 @@ test("normalizeLook clamps, snaps and validates", async () => {
 test("applySurfaceStyle sets the window from one material and menus from their own", async () => {
   const { applySurfaceStyle, getSurfaceStyle, normalizeLook, DEFAULT_LOOK } = await loadLook();
   // The default look reads as frosted at the sidebar's opacity, with frosted menus.
-  assert.deepEqual(getSurfaceStyle(DEFAULT_LOOK), { material: "frosted", opacity: 72, border: "hairline", floating: "frosted" });
+  assert.deepEqual(getSurfaceStyle(DEFAULT_LOOK), {
+    material: "frosted", opacity: 72, border: "hairline", floating: "frosted", floatingBlur: 24,
+  });
 
   const look = normalizeLook({ surfaces: { sidebar: { fill: "#aabbcc", border: "strong" } } });
   const clear = applySurfaceStyle(look, { material: "clear", opacity: 30, border: "none" });
@@ -151,11 +153,21 @@ test("applySurfaceStyle sets the window from one material and menus from their o
   // A clear window keeps its frosted menus, at least 80% opaque, and the editor draws no border.
   assert.deepEqual(clear.surfaces.menus, { fill: null, opacity: 80, blur: 24, border: "none" });
   assert.equal(clear.surfaces.editor.border, "none");
-  assert.deepEqual(getSurfaceStyle(clear), { material: "clear", opacity: 30, border: "none", floating: "frosted" });
+  assert.deepEqual(getSurfaceStyle(clear), {
+    material: "clear", opacity: 30, border: "none", floating: "frosted", floatingBlur: 24,
+  });
 
-  const clearMenus = applySurfaceStyle(clear, { floating: "clear" });
+  // Menu blur sets menus and Settings alike, snapped to its 2px step and kept in 4..40.
+  const softMenus = applySurfaceStyle(clear, { floatingBlur: 9 });
+  assert.deepEqual([softMenus.surfaces.menus.blur, softMenus.surfaces.settings.blur], [10, 10]);
+  assert.equal(softMenus.surfaces.sidebar.blur, 0);
+  assert.equal(getSurfaceStyle(applySurfaceStyle(clear, { floatingBlur: 1 })).floatingBlur, 4);
+
+  // Clear menus blur nothing and keep no blur, so Frosted again starts from the default.
+  const clearMenus = applySurfaceStyle(softMenus, { floating: "clear" });
   assert.equal(clearMenus.surfaces.settings.blur, 0);
-  assert.deepEqual(getSurfaceStyle(clearMenus), { material: "clear", opacity: 30, border: "none", floating: "clear" });
+  assert.equal(getSurfaceStyle(clearMenus).floating, "clear");
+  assert.equal(applySurfaceStyle(clearMenus, { floating: "frosted" }).surfaces.menus.blur, 24);
 
   const frosted = applySurfaceStyle(clearMenus, { material: "frosted" });
   assert.equal(getSurfaceStyle(frosted).material, "frosted");
@@ -166,7 +178,9 @@ test("applySurfaceStyle sets the window from one material and menus from their o
   // opacity. Solid menus are fully opaque whatever the window is.
   const solid = applySurfaceStyle(frosted, { material: "solid", floating: "solid" });
   assert.ok(Object.values(solid.surfaces).every((surface) => surface.opacity === 100 && surface.blur === 0));
-  assert.deepEqual(getSurfaceStyle(solid), { material: "solid", opacity: 72, border: "none", floating: "solid" });
+  assert.deepEqual(getSurfaceStyle(solid), {
+    material: "solid", opacity: 72, border: "none", floating: "solid", floatingBlur: 24,
+  });
   const frostedMenusOnSolid = applySurfaceStyle(solid, { floating: "frosted" });
   assert.equal(getSurfaceStyle(frostedMenusOnSolid).material, "solid");
   assert.deepEqual(frostedMenusOnSolid.surfaces.menus, { fill: null, opacity: 80, blur: 24, border: "none" });

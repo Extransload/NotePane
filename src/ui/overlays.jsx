@@ -313,8 +313,19 @@ export function LayoutTransitionOverlay({ transition }) {
   );
 }
 
+/**
+ * The table of contents: a rail of short bars at the editor's right edge that opens into the
+ * headings list on hover or focus. The slot keeps the rail's size in the note's layout (the text
+ * flows round it), and the panel opens over the text from it, so opening it never reflows the
+ * note under the pointer. The slot's height is the closed rail's: a bar of 2px per heading, 8px
+ * apart, inside 7px of padding (src/styles/editor-surface.css).
+ */
 export function TableOfContentsRail({ entries, activeEntryIds, onSelectEntry }) {
   return (
+    <div
+      className="editor-toc-slot"
+      style={{ "--toc-rail-height": `${14 + entries.length * 2 + Math.max(entries.length - 1, 0) * 8}px` }}
+    >
     <nav
       className="editor-table-of-contents"
       data-testid="editor-toc"
@@ -347,5 +358,6 @@ export function TableOfContentsRail({ entries, activeEntryIds, onSelectEntry }) 
         ))}
       </div>
     </nav>
+    </div>
   );
 }

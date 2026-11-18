@@ -523,3 +523,56 @@ test("a tag chip on a note opens the palette filtered to its tag", async ({ page
   await expect(palette(page).getByRole("option")).toHaveCount(1);
   await expect(palette(page).getByRole("option").first()).toContainText("First stored note");
 });
+
+// The shortcut that opens a panel closes it again, from the field inside it too.
+test("the same shortcut closes the search palette, find bar, Settings and export menu", async ({ page }) => {
+  await typeParagraphs(page, ["needle"]);
+  const paletteDialog = page.getByRole("dialog", { name: "Search notes" });
+  const settingsWindow = page.getByRole("dialog", { name: "Preferences window" });
+  const exportMenu = page.getByRole("menu", { name: "Export format" });
+
+  for (const [shortcut, panel] of [
+    ["P", paletteDialog],
+    ["F", findBar(page)],
+    [",", settingsWindow],
+    ["Shift+E", exportMenu],
+  ]) {
+    await page.keyboard.press(modifierShortcut(shortcut));
+    await expect(panel).toBeVisible();
+    await page.keyboard.press(modifierShortcut(shortcut));
+    await expect(panel).toHaveCount(0);
+    await page.keyboard.press(modifierShortcut(shortcut));
+    await expect(panel).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(panel).toHaveCount(0);
+  }
+});
+
+// Cmd+P runs commands too: typed words list matching commands above the notes, ">" lists only
+// commands, and Enter runs the selected one with its shortcut shown beside it.
+test("runs commands from the search palette", async ({ page }) => {
+  await typeParagraphs(page, ["A note about themes"]);
+  const paletteDialog = page.getByRole("dialog", { name: "Search notes" });
+  const input = paletteDialog.getByRole("textbox", { name: "Search notes" });
+
+  await page.keyboard.press(modifierShortcut("P"));
+  await input.fill(">");
+  await expect(paletteDialog.locator(".search-result")).toHaveCount(0);
+  await expect(paletteDialog.getByRole("option", { name: /^New note/ })).toBeVisible();
+  await expect(paletteDialog.getByRole("option", { name: /^Find in note/ }).locator("kbd")).not.toBeEmpty();
+
+  // Words match commands and notes alike; the commands come first.
+  await input.fill("theme nord");
+  const options = paletteDialog.getByRole("option");
+  await expect(options.first()).toHaveText(/Theme: Nord/);
+  await input.press("Enter");
+  await expect(paletteDialog).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.themeId)).toBe("nord");
+
+  await page.keyboard.press(modifierShortcut("P"));
+  await input.fill(">no such command");
+  await expect(paletteDialog).toContainText("No matching commands");
+  await input.fill(">new folder");
+  await input.press("Enter");
+  await expect(page.getByLabel("Folder name")).toBeFocused();
+});

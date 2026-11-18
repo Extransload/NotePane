@@ -1438,13 +1438,14 @@ test("keeps BlockNote color and delete menus usable inside the app window", asyn
     .toHaveCount(0);
 
   const table = page.getByRole("table");
-  const tableBox = await table.boundingBox();
   // BlockNote moves the handle on pointer moves. One move can land while the deleted block's menu
-  // is still closing and be dropped, so keep moving within the table, as a hand does, until the
-  // handle is beside it; a click before then opens the menu of the block above.
+  // is still closing and be dropped, and the note can still be settling where the deleted block
+  // was, so measure the table and move within it on every try, as a hand does, until the handle is
+  // beside it; a click before then opens the menu of the block above.
   let nudge = 0;
   await expect.poll(async () => {
     nudge = (nudge + 1) % 2;
+    const tableBox = await table.boundingBox();
     await page.mouse.move(tableBox.x + 20 + nudge * 8, tableBox.y + 20);
     const handleBox = await openBlockMenuButton.boundingBox();
     const middle = handleBox ? handleBox.y + handleBox.height / 2 : -1;
@@ -2608,4 +2609,35 @@ test("turns the smooth caret off from Settings > Editor and keeps it off after a
   await page.keyboard.press(modifierShortcut(","));
   await preferences.getByRole("tab", { name: "Editor" }).click();
   await expect(smoothCaretSwitch).toHaveAttribute("aria-checked", "false");
+});
+
+// Lists typed as text ("a) ", "(b) ", "2) ") continue on Enter; Enter on a bare marker ends the
+// list, and Escape right after Enter takes the new marker back.
+test("continues a list typed as text and lets Escape take the marker back", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  const lastParagraphText = () => page.locator(".bn-editor [data-content-type='paragraph']").last()
+    .evaluate((paragraph) => paragraph.textContent);
+
+  await page.keyboard.type("a) first");
+  await page.keyboard.press("Enter");
+  await expect.poll(lastParagraphText).toBe("b) ");
+  await page.keyboard.type("second");
+  await page.keyboard.press("Enter");
+  await expect.poll(lastParagraphText).toBe("c) ");
+  // Enter on the bare marker ends the list.
+  await page.keyboard.press("Enter");
+  await expect.poll(lastParagraphText).toBe("");
+
+  await page.keyboard.type("2) two");
+  await page.keyboard.press("Enter");
+  await expect.poll(lastParagraphText).toBe("3) ");
+  // Escape right after Enter takes the marker back and leaves the line plain.
+  await page.keyboard.press("Escape");
+  await expect.poll(lastParagraphText).toBe("");
+  await page.keyboard.type("(x) plain");
+  await page.keyboard.press("Enter");
+  await expect.poll(lastParagraphText).toBe("(y) ");
+
+  const texts = await page.locator(".bn-editor [data-content-type='paragraph']").allTextContents();
+  expect(texts.filter(Boolean).slice(-5)).toEqual(["a) first", "b) second", "2) two", "(x) plain", "(y) "]);
 });

@@ -1079,7 +1079,11 @@ test("colours a tab in one click from its menu and clears it again", async ({ pa
 
 // Folders group the tabs. The browser preview keeps them in memory, like its sessions.
 async function createFolder(page, name) {
-  await page.getByRole("button", { name: "New folder", exact: true }).click();
+  // Folders are made from the command palette (Cmd+P), not a sidebar button.
+  await page.keyboard.press(modifierShortcut("P"));
+  const palette = page.getByRole("dialog", { name: "Search notes" });
+  await palette.getByRole("textbox", { name: "Search notes" }).fill(">new folder");
+  await palette.getByRole("option", { name: /^New folder/ }).click();
   const nameInput = page.getByLabel("Folder name");
   await expect(nameInput).toBeFocused();
   await expect(nameInput).toHaveValue("New folder");

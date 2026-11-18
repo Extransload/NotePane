@@ -14,6 +14,9 @@ import {
   searchNotes,
 } from "../model/search.js";
 import {
+  parseCommandQuery,
+} from "../model/commands.js";
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -60,7 +63,8 @@ export function useNoteSearchPalette({
   }, [parsedQuery.tags, query, sourceNotes]);
 
   const results = useMemo(() => {
-    if (query === null) {
+    // ">" lists commands only (src/model/commands.js).
+    if (query === null || parseCommandQuery(query).commandsOnly) {
       return [];
     }
     // The current note may have edits still waiting on the save debounce, so

@@ -103,10 +103,13 @@ export const DEFAULT_LOOK = Object.freeze({
 // and popups (and the Settings window) float over the note's text, so they take a material of
 // their own: Frosted keeps the text under an open menu from showing through sharp.
 export const SURFACE_MATERIALS = ["solid", "frosted", "clear"];
-// Frosted's blur for each area; the editor, which holds the text, the least.
-const FROSTED_BLUR = { sidebar: 24, header: 20, editor: 12, menus: 24, settings: 30 };
+// Frosted's blur for each of the window's areas; the editor, which holds the text, the least.
+const FROSTED_BLUR = { sidebar: 24, header: 20, editor: 12 };
 const WINDOW_AREAS = ["sidebar", "header", "editor"];
 const FLOATING_AREAS = ["menus", "settings"];
+// Frosted menus and popups take one blur of their own, set in Settings.
+export const FLOATING_BLUR_RANGE = Object.freeze({ min: 4, max: 40, step: 2 });
+export const DEFAULT_FLOATING_BLUR = DEFAULT_LOOK.surfaces.menus.blur;
 // Menus and Settings carry small text over whatever lies under them, so they stay at least this
 // opaque.
 const FLOATING_MIN_OPACITY = 80;
@@ -248,26 +251,38 @@ function readMaterial(surface) {
 }
 
 // The surfaces as Settings shows them: the window's material, opacity and border, read from the
-// sidebar, and the material of menus and popups, read from the menus.
+// sidebar, and the material and blur of menus and popups, read from the menus. A blur that is
+// not in use (Solid or Clear menus) reads as the default, which Frosted starts from.
 export function getSurfaceStyle(look) {
   const { surfaces } = normalizeLook(look);
-  const { sidebar } = surfaces;
+  const { sidebar, menus } = surfaces;
+  const floating = readMaterial(menus);
   return {
     material: WINDOW_AREAS.every((area) => surfaces[area].opacity === 100) ? "solid" : readMaterial(sidebar),
     opacity: sidebar.opacity === 100 ? DEFAULT_SURFACE_OPACITY : sidebar.opacity,
     border: sidebar.border,
-    floating: readMaterial(surfaces.menus),
+    floating,
+    floatingBlur: floating === "frosted"
+      ? Math.max(menus.blur, FLOATING_BLUR_RANGE.min)
+      : DEFAULT_FLOATING_BLUR,
   };
 }
 
 // The look with the window's areas set from one material, opacity and border, and menus and
-// Settings from the floating material, at the window's opacity but at least 80%. An area's own
-// fill goes, as Settings no longer sets areas one by one.
-export function applySurfaceStyle(look, { material, opacity, border, floating }) {
+// Settings from the floating material and blur, at the window's opacity but at least 80%. An
+// area's own fill goes, as Settings no longer sets areas one by one.
+export function applySurfaceStyle(look, { material, opacity, border, floating, floatingBlur }) {
   const normalized = normalizeLook(look);
   const current = getSurfaceStyle(normalized);
   const chosenMaterial = SURFACE_MATERIALS.includes(material) ? material : current.material;
   const chosenFloating = SURFACE_MATERIALS.includes(floating) ? floating : current.floating;
+  const chosenFloatingBlur = normalizeNumber(
+    floatingBlur,
+    current.floatingBlur,
+    FLOATING_BLUR_RANGE.min,
+    FLOATING_BLUR_RANGE.max,
+    FLOATING_BLUR_RANGE.step,
+  );
   const chosenOpacity = normalizeNumber(opacity, current.opacity, 0, 100, 1);
   const chosenBorder = normalizeChoice(border, ["none", "hairline", "strong"], current.border);
   const surfaceFor = (area) => {
@@ -280,7 +295,7 @@ export function applySurfaceStyle(look, { material, opacity, border, floating })
         : floats
           ? Math.max(chosenOpacity, FLOATING_MIN_OPACITY)
           : chosenOpacity,
-      blur: areaMaterial === "frosted" ? FROSTED_BLUR[area] : 0,
+      blur: areaMaterial !== "frosted" ? 0 : floats ? chosenFloatingBlur : FROSTED_BLUR[area],
       // The editor has no edge of its own to draw a border on.
       border: area === "editor" ? "none" : chosenBorder,
     };

@@ -74,6 +74,15 @@ test("shows table of contents in tab mode only when enabled from preferences", a
     name: /Jump to NotePane, heading level 1/,
   });
   await expect(activeHeading).toHaveAttribute("aria-current", "location");
+  // Opening the rail at the top of the note lays it over the text: the note does not move.
+  const firstBlockTop = () => page.locator(".bn-editor .bn-block-outer").first()
+    .evaluate((block) => block.getBoundingClientRect().top);
+  const topBeforeHover = await firstBlockTop();
+  await tableOfContents.hover();
+  await expect(tableOfContents.getByText("Contents")).toBeVisible();
+  expect(await firstBlockTop()).toBe(topBeforeHover);
+  await page.mouse.move(10, 300);
+  await expect(tableOfContents.getByText("Contents")).toBeHidden();
   await page.evaluate(() => {
     const surface = document.querySelector(".sticky-editor-surface");
     const heading = [...document.querySelectorAll(".sticky-editor-surface .bn-block-outer")]
@@ -398,6 +407,53 @@ test("renders editor bullets and checkboxes at a more visible size", async ({ pa
     .toBeGreaterThanOrEqual(14);
 });
 
+// As in Notion: bullets go •, ◦, ▪ and numbers 1., a., i. with nesting, then start over; each
+// marker sits on its text's first line, and a toggle arrow at the middle of a heading's line.
+test("nests list markers as Notion does and centres them on the first line", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await pastePlainText(page, [
+    "- One", "  - Two", "    - Three", "      - Four",
+    "1. First", "   1. Second", "   2. Third", "      1. Fourth",
+  ].join("\n"));
+  await expect(page.locator(".bn-editor").getByText("Fourth", { exact: true })).toBeVisible();
+
+  const markers = await page.evaluate(() => {
+    const read = (type) => [...document.querySelectorAll(`.bn-editor [data-content-type='${type}']`)]
+      .map((item) => ({
+        depth: item.dataset.listDepth,
+        content: getComputedStyle(item, "::before").content,
+        markerLine: Number.parseFloat(getComputedStyle(item, "::before").lineHeight),
+        textLine: Number.parseFloat(getComputedStyle(item.querySelector(".bn-inline-content")).lineHeight),
+      }));
+    return { bullets: read("bulletListItem"), numbers: read("numberedListItem") };
+  });
+  expect(markers.bullets.map(({ depth, content }) => [depth, content])).toEqual([
+    ["0", '"•"'], ["1", '"◦"'], ["2", '"▪︎"'], ["0", '"•"'],
+  ]);
+  for (const bullet of markers.bullets) {
+    expect(Math.abs(bullet.markerLine - bullet.textLine)).toBeLessThan(0.5);
+  }
+  expect(markers.numbers.map(({ depth }) => depth)).toEqual(["0", "1", "1", "2"]);
+  expect(markers.numbers[1].content).toContain("lower-alpha");
+  expect(markers.numbers[3].content).toContain("lower-roman");
+
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/toggle heading 1");
+  await page.getByRole("option", { name: /Toggle Heading 1/ }).first().click();
+  await page.keyboard.type("Toggle heading");
+  const offset = await page.locator(".bn-editor [data-content-type='heading'][data-is-toggleable='true']")
+    .evaluate((heading) => {
+      const button = heading.querySelector(".bn-toggle-button").getBoundingClientRect();
+      const text = heading.querySelector(".bn-inline-content");
+      const line = Number.parseFloat(getComputedStyle(text).lineHeight);
+      const top = text.getBoundingClientRect().top;
+      return (button.top + button.height / 2) - (top + line / 2);
+    });
+  expect(Math.abs(offset)).toBeLessThan(1);
+});
+
 test("keeps breathing room above and below the editor document", async ({ page }) => {
   await clickLastEmptyParagraph(page);
   for (let index = 0; index < 34; index += 1) {
@@ -501,6 +557,9 @@ test("keeps preferences closed in the sticky layout", async ({ page }) => {
 // state with new arrays chained synchronous renders until fast typing hit React's nested
 // update limit, which threw inside the editor transaction and could drop the keystroke's work.
 test("keeps fast typing inside React's nested update limit", async ({ page }) => {
+  // Sixty lines typed key by key, the point of the test, take most of a CI runner's 30 seconds
+  // next to three other workers.
+  test.slow();
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await clickLastEmptyParagraph(page);
@@ -584,7 +643,8 @@ test("keeps a closing menu or dialog inert and hidden until its exit animation e
   const preferencesClosing = await watchForClosing(page, ".preferences-backdrop", ".preferences-window");
   await preferences.getByRole("button", { name: "Close preferences" }).click();
   expect(await preferencesClosing()).toEqual({
-    animationName: "notepaneFadeOut",
+    // The dim fades by colour, so the frosted window inside keeps its blur as it leaves.
+    animationName: "notepaneScrimOut",
     ariaHidden: "true",
     inert: true,
     innerAnimationName: "notepaneDialogOut",

@@ -77,10 +77,14 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Code block tool bar: showing on hover, the language menu, Prettify and Copy | `src/ui/CodeBlockTools.jsx`, `src/ui/CodeLanguageMenu.jsx` |
 | Note search matching, snippets and plain-text extraction; the palette query's `#tag` and `folder:` filters (`parseSearchQuery`, `formatSearchQuery`, `filterSearchEntries`) | `src/model/search.js` |
 | The note search palette: its results with their folder and tags, match count and last-edited labels, keyboard selection, the folder and tag filter chips, opening it on a query (`openPaletteWithQuery`) | `src/ui/SearchPalette.jsx`, `src/hooks/useNoteSearchPalette.js`, `formatRelativeEditTime` in `src/model/notes.js` |
+| Palette commands: matching a query to commands, `>` for commands only (`matchCommands`, `parseCommandQuery`), and the list of commands with their actions and keys (`usePaletteCommands`, which makes New folder now that the sidebar has no button for it) | `src/model/commands.js`, `src/hooks/usePaletteCommands.js` |
+| A shortcut that opened the palette, the find bar or the export menu closing it again (`useChromeShortcuts`), and Settings (`handlePreferencesShortcut` in `src/main.jsx`) | `src/hooks/useKeyboardCommands.js` |
+| Nested list markers (•, ◦, ▪ and 1., a., i., cycling): `data-list-depth` decorations, and the rules that draw them and centre bullets and toggle arrows on the first line | `src/editor/listMarkers.js`, list section of `src/styles/blocknote.css` |
+| Lists typed as text ("a) ", "(b) ", "2) "): the next marker on Enter, the list ending on a bare marker, Escape taking a new marker back (`dismissTextListContinuation`, called by the surface's Escape handler) | `src/editor/textLists.js` |
 | Tag rules: trimmed, without "#", lower-cased, spaces as "-", 1 to 32 characters, at most 20 a note (a twin in `electron/store.cjs`) | `src/model/tags.js` |
 | The tag chips above a note's first block: open the palette on a tag, add with suggestions, remove | `src/ui/NoteTags.jsx`, tag section of `src/styles/editor-surface.css` |
 | Folders in the tabs sidebar: grouping and visible order, folder names (store twin and IPC `folders:*`, `notes:set-folder`, `notes:set-tags` in `electron/store.cjs` / `electron/main.cjs`) | `src/model/folders.js` |
-| Folder headers, the New folder row, inline rename, the folder menu and dropping a tab on a header | `src/ui/SessionFolderHeader.jsx`, `src/hooks/useSessionFolders.js` |
+| Folder headers, inline rename, the folder menu and dropping a tab on a header | `src/ui/SessionFolderHeader.jsx`, `src/hooks/useSessionFolders.js` |
 | Find in note decorations and navigation | `src/editor/findInNote.js`, `src/hooks/useFindInNote.js` |
 | Note titles, ordering, trash previews | `src/model/notes.js` |
 | Preference and font normalisation and defaults | `src/model/preferences.js` |
@@ -95,8 +99,8 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Code block syntax colours per theme, re-highlighting on a theme change | `src/editor/codeHighlighter.js` |
 | The theme picker in Preferences | `src/ui/ThemePicker.jsx` |
 | The Settings window (Tern-style floating window): grouped page sidebar (App, Look, Data, System), search over every setting (`SETTINGS_INDEX`), the hold-to-peek eye button, and the cards each page is made of | `src/ui/preferencesWindow.jsx`, `src/ui/PreferencesCard.jsx`, `src/ui/preferencesSections.jsx`, `src/ui/trashPreferences.jsx` |
-| The four Look pages (Theme, Fonts, Background, Tabs) and the controls they share; Background also holds the Window group (Material, Opacity, Menus and popups, Border, Keep text readable) that the old Surfaces page became | `src/ui/lookPreferences.jsx`, `src/ui/settingsControls.jsx` |
-| The look settings (`editorPreferences.look`): defaults, ranges, the surface style (`getSurfaceStyle`, `applySurfaceStyle`): the window's areas from one material, menus and Settings from the floating material, both read back from the stored `surfaces`; `readableText`, built-in background pictures; the store keeps a twin normaliser and keeps background pictures through asset clean-up | `src/model/look.js`, `electron/store.cjs` |
+| The four Look pages (Theme, Fonts, Background, Tabs) and the controls they share; Background also holds the Window group (Material, Opacity, Menus and popups, Menu blur, Border, Keep text readable) that the old Surfaces page became | `src/ui/lookPreferences.jsx`, `src/ui/settingsControls.jsx` |
+| The look settings (`editorPreferences.look`): defaults, ranges, the surface style (`getSurfaceStyle`, `applySurfaceStyle`): the window's areas from one material, menus and Settings from the floating material and blur (`FLOATING_BLUR_RANGE`), all read back from the stored `surfaces`; `readableText`, built-in background pictures; the store keeps a twin normaliser and keeps background pictures through asset clean-up | `src/model/look.js`, `electron/store.cjs` |
 | Applying the look: attributes and `--look-*` variables on `<html>` (`useLookStyles`, its pure half `getLookStyles`) and the rules that read them, `data-look-readable` for the text halo over a see-through window; the default look changes nothing on screen | `src/hooks/useLookStyles.js`, `src/styles/look.css` |
 | Picking a background picture: `look:pick-background` stores the file as an asset (at most 32 MB) | `electron/main.cjs`, `electron/preload.cjs` |
 | Preferences > About: version, description, Electron/Chromium versions, the manual update check (`app:info`, `app:check-for-updates`), and the Mac self-updater's download and Restart to update | `src/ui/aboutPreferences.jsx` |
@@ -117,7 +121,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | A session switch remounts `StickyEditor`; the fades its sidebar labels and folders show as they appear jump to their end before the first paint | `src/hooks/useMountWithoutFades.js` |
 | Whether the tabs sidebar is open: the user's choice, and the compact sidebar of a narrow window | `src/hooks/useSidebarVisibility.js` |
 | Export toast and zoom gauge timing | `src/hooks/useStickyToasts.js` |
-| Zoom gauge, export toast and other overlays | `src/ui/overlays.jsx` |
+| Zoom gauge, export toast and other overlays; the table of contents rail, whose slot keeps the closed rail's size in the note's flow while the panel opens over the text | `src/ui/overlays.jsx`, table of contents section of `src/styles/editor-surface.css` |
 | Which panels, menus and confirmations are open, which ones close each other, and the order Escape closes them in | `src/hooks/useOverlayState.js` |
 
 `src/main.jsx` keeps only `App` (theme, layout and preference state, IPC subscriptions, and the session list from

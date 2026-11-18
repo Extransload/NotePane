@@ -127,9 +127,25 @@ div:has(> .bn-link-toolbar) {
   animation: notepaneMenuFadeIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
 }
 
+/* The dim behind Settings and the search palette fades by its colour, never its opacity: an
+   ancestor below full opacity is a backdrop root, so a frosted panel inside would blur nothing
+   until the fade ended, and the text under it would show sharp, then snap to a blur. The panel
+   fades itself, and its own opacity keeps its blur. */
+@keyframes notepaneScrimIn {
+  from {
+    background-color: transparent;
+  }
+}
+
+@keyframes notepaneScrimOut {
+  to {
+    background-color: transparent;
+  }
+}
+
 .preferences-backdrop,
 .search-palette-backdrop {
-  animation: notepaneMenuFadeIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
+  animation: notepaneScrimIn var(--notepane-motion-panel-duration) var(--notepane-motion-ease-out);
 }
 
 .preferences-window,
@@ -328,17 +344,20 @@ body.is-exporting .color-panel {
 }
 
 /* A dialog's backdrop is the element that waits; the dialog inside shrinks back over the same
-   time, so both are gone together. */
+   time, so both are gone together. Settings and the search palette hold frosted panels, so their
+   backdrops fade by colour (see notepaneScrimIn). */
 :is(
-  .preferences-backdrop,
   .trash-confirm-backdrop,
-  .search-palette-backdrop,
   .version-history-backdrop,
   .crop-dialog,
   .media-preview,
   .export-dialog-backdrop
 )[data-state="closing"] {
   animation: notepaneFadeOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
+}
+
+:is(.preferences-backdrop, .search-palette-backdrop)[data-state="closing"] {
+  animation: notepaneScrimOut var(--notepane-motion-dialog-exit-duration) var(--notepane-motion-ease-in) forwards;
 }
 
 [data-state="closing"] :is(

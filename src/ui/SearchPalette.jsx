@@ -5,6 +5,7 @@ import {
   useState,
 } from "react";
 import {
+  CornerDownLeft,
   Folder,
   Hash,
 } from "lucide-react";
@@ -14,6 +15,10 @@ import {
 import {
   formatRelativeEditTime,
 } from "../model/notes.js";
+import {
+  matchCommands,
+  parseCommandQuery,
+} from "../model/commands.js";
 import {
   formatSearchQuery,
   normalizeSearchText,
@@ -139,11 +144,14 @@ function HighlightedText({ text, ranges }) {
 export function SearchPalette({
   query,
   results,
+  commands = [],
   folders = [],
   tags = [],
   activeTheme,
+  formatShortcut = () => null,
   onQueryChange,
   onChoose,
+  onRunCommand,
   onClose,
 }) {
   const inputRef = useRef(null);
@@ -154,6 +162,10 @@ export function SearchPalette({
     () => new Map(folders.map((folder) => [folder.id, folder])),
     [folders],
   );
+  const { commandsOnly } = parseCommandQuery(query);
+  const matchedCommands = useMemo(() => matchCommands(commands, query), [commands, query]);
+  // One list for the keyboard: the matching commands first, then the notes.
+  const itemCount = matchedCommands.length + results.length;
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -165,13 +177,24 @@ export function SearchPalette({
 
   // Results can shrink while the palette is open, for example when the stored
   // notes arrive, so the selection is clamped to the current list.
-  const activeIndex = Math.max(0, Math.min(selectedIndex, results.length - 1));
+  const activeIndex = Math.max(0, Math.min(selectedIndex, itemCount - 1));
 
   const moveSelection = (delta) => {
-    if (results.length === 0) {
+    if (itemCount === 0) {
       return;
     }
-    setSelectedIndex((activeIndex + delta + results.length) % results.length);
+    setSelectedIndex((activeIndex + delta + itemCount) % itemCount);
+  };
+
+  const chooseIndex = (index) => {
+    if (index < matchedCommands.length) {
+      onRunCommand(matchedCommands[index]);
+      return;
+    }
+    const result = results[index - matchedCommands.length];
+    if (result) {
+      onChoose(result);
+    }
   };
 
   const handleKeyDown = (event) => {
@@ -185,9 +208,8 @@ export function SearchPalette({
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      const result = results[activeIndex];
-      if (result) {
-        onChoose(result);
+      if (itemCount > 0) {
+        chooseIndex(activeIndex);
       }
       return;
     }
@@ -198,15 +220,17 @@ export function SearchPalette({
     }
   };
 
-  const activeResult = results[activeIndex];
-  const activeResultId = activeResult?.note.id;
+  const itemId = (index) => (index < matchedCommands.length
+    ? `search-command-${matchedCommands[index].id}`
+    : `search-result-${results[index - matchedCommands.length]?.note.id}`);
+  const activeItemId = itemCount > 0 ? itemId(activeIndex) : null;
 
   // The list scrolls once it reaches the palette's height; the keyboard selection stays in view.
   useEffect(() => {
-    if (activeResultId) {
-      document.getElementById(`search-result-${activeResultId}`)?.scrollIntoView({ block: "nearest" });
+    if (activeItemId) {
+      document.getElementById(activeItemId)?.scrollIntoView({ block: "nearest" });
     }
-  }, [activeResultId]);
+  }, [activeItemId]);
 
   return (
     <div
@@ -223,15 +247,15 @@ export function SearchPalette({
           ref={inputRef}
           className="search-palette-input"
           aria-label="Search notes"
-          placeholder="Search notes"
+          placeholder="Search notes, or type > for commands"
           spellCheck={false}
           value={query}
           aria-controls="search-palette-results"
-          aria-activedescendant={activeResult ? `search-result-${activeResult.note.id}` : undefined}
+          aria-activedescendant={activeItemId ?? undefined}
           onChange={(event) => onQueryChange(event.target.value)}
           onKeyDown={handleKeyDown}
         />
-        {(folders.length > 0 || tags.length > 0) && (
+        {!commandsOnly && (folders.length > 0 || tags.length > 0) && (
           <SearchFilterChips
             query={query}
             folders={folders}
@@ -239,16 +263,41 @@ export function SearchPalette({
             onQueryChange={onQueryChange}
           />
         )}
-        {results.length === 0 ? (
-          <div className="search-palette-empty">No matching notes</div>
+        {itemCount === 0 ? (
+          <div className="search-palette-empty">
+            {commandsOnly ? "No matching commands" : "No matching notes"}
+          </div>
         ) : (
           <ul
             id="search-palette-results"
             className="search-palette-results"
             role="listbox"
-            aria-label="Matching notes"
+            aria-label={matchedCommands.length > 0 ? "Commands and notes" : "Matching notes"}
           >
-            {results.map((result, index) => (
+            {matchedCommands.map((command, index) => {
+              const shortcut = command.shortcut ? formatShortcut(command.shortcut) : null;
+              return (
+                <li
+                  key={command.id}
+                  id={`search-command-${command.id}`}
+                  role="option"
+                  aria-selected={index === activeIndex}
+                  className={index === activeIndex ? "search-command is-selected" : "search-command"}
+                  onMouseEnter={() => setSelectedIndex(index)}
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    onRunCommand(command);
+                  }}
+                >
+                  <CornerDownLeft className="search-command-icon" size={13} strokeWidth={2} aria-hidden="true" />
+                  <span className="search-command-title">{command.title}</span>
+                  {shortcut && <kbd className="search-command-shortcut">{shortcut}</kbd>}
+                </li>
+              );
+            })}
+            {results.map((result, resultIndex) => {
+              const index = matchedCommands.length + resultIndex;
+              return (
               <li
                 key={result.note.id}
                 id={`search-result-${result.note.id}`}
@@ -294,7 +343,8 @@ export function SearchPalette({
                   </span>
                 )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>

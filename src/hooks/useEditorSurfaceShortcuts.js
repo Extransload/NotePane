@@ -25,6 +25,9 @@ import {
   selectCurrentTableCellContent,
 } from "../editor/selection.js";
 import {
+  dismissTextListContinuation,
+} from "../editor/textLists.js";
+import {
   autoFitActiveTableColumn,
   finishActiveTableColumnResize,
   previewActiveTableColumnResize,
@@ -382,6 +385,12 @@ export function useEditorSurfaceShortcuts({
         event.preventDefault();
         event.stopPropagation();
       };
+
+      // Right after Enter continued a typed list ("b) "), Escape takes the marker back first.
+      if (dismissTextListContinuation(view)) {
+        claimEscape();
+        return;
+      }
 
       if (selection.$anchorCell && selection.$headCell) {
         claimEscape();

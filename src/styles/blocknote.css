@@ -458,9 +458,43 @@
   opacity: 0.9;
 }
 
+/* A bullet is drawn larger than the text but on a line as tall as the text's, so it sits at the
+   middle of the first line's lowercase letters, as the numbers do. */
 .bn-editor .bn-block-content[data-content-type="bulletListItem"]::before {
   font-size: 1.12em;
-  line-height: 1;
+  line-height: calc(var(--look-line-height, 1.5) / 1.12);
+}
+
+/* Nested markers follow Notion: bullets •, ◦, ▪ and numbers 1., a., i., then over again.
+   data-list-depth (src/editor/listMarkers.js) is the depth among enclosing items of the same kind,
+   modulo 3. BlockNote's own rules stop at the third level and spell out each level with long
+   selectors, so these win with !important. The number comes from BlockNote's data-index. */
+.bn-editor .bn-block-content[data-content-type="bulletListItem"][data-list-depth="0"]::before {
+  content: "•" !important;
+}
+
+.bn-editor .bn-block-content[data-content-type="bulletListItem"][data-list-depth="1"]::before {
+  content: "◦" !important;
+}
+
+.bn-editor .bn-block-content[data-content-type="bulletListItem"][data-list-depth="2"]::before {
+  content: "▪\FE0E" !important;
+}
+
+.bn-editor .bn-block-content[data-content-type="numberedListItem"][data-list-depth]::before {
+  counter-reset: notepane-list-index attr(data-index type(<integer>), 1);
+}
+
+.bn-editor .bn-block-content[data-content-type="numberedListItem"][data-list-depth="0"]::before {
+  content: counter(notepane-list-index, decimal) "." !important;
+}
+
+.bn-editor .bn-block-content[data-content-type="numberedListItem"][data-list-depth="1"]::before {
+  content: counter(notepane-list-index, lower-alpha) "." !important;
+}
+
+.bn-editor .bn-block-content[data-content-type="numberedListItem"][data-list-depth="2"]::before {
+  content: counter(notepane-list-index, lower-roman) "." !important;
 }
 
 .bn-editor
@@ -479,6 +513,8 @@
   margin-block: 0;
 }
 
+/* The toggle arrow sits in a box as tall as the first line of its text, centred in it: the box
+   takes the text's font, so 1lh is that line in a toggle list and in a toggle heading alike. */
 .bn-editor
   .bn-block-content[data-content-type="toggleListItem"]
   .bn-toggle-wrapper,
@@ -486,6 +522,13 @@
   .bn-block-content[data-content-type="heading"][data-is-toggleable="true"]
   .bn-toggle-wrapper {
   align-items: flex-start;
+}
+
+.bn-editor .bn-toggle-wrapper > .bn-toggle-button {
+  height: 1lh;
+  align-items: center;
+  padding-block: 0;
+  font: inherit;
 }
 
 .mantine-InputPlaceholder-placeholder {
