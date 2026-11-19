@@ -1339,13 +1339,29 @@ function StickyEditor({
     });
   }, [normalizedEditorPreferences, showTableOfContents, updateGlobalEditorPreferences]);
 
+  // In the desktop app the step is taken in the main process, from the stored zoom, one press
+  // after another: a step worked out here could start from a zoom this window has not caught up
+  // with yet, and two presses would then ask for the same zoom. The gauge shows the zoom expected
+  // at once, then the one stored.
   const adjustAppZoom = useCallback(
     (direction) => {
-      setAppZoom(
-        stepAppZoom(requestedAppZoomRef.current ?? normalizedEditorPreferences.appZoom, direction),
-      );
+      const expectedAppZoom =
+        stepAppZoom(requestedAppZoomRef.current ?? normalizedEditorPreferences.appZoom, direction);
+      if (!electronApi?.stepAppZoom) {
+        setAppZoom(expectedAppZoom);
+        return;
+      }
+      requestedAppZoomRef.current = expectedAppZoom;
+      showZoomGauge(expectedAppZoom);
+      void electronApi.stepAppZoom(direction).then((storedEditorPreferences) => {
+        const storedAppZoom = storedEditorPreferences?.appZoom;
+        if (typeof storedAppZoom === "number" && requestedAppZoomRef.current === expectedAppZoom) {
+          requestedAppZoomRef.current = null;
+          showZoomGauge(storedAppZoom);
+        }
+      });
     },
-    [normalizedEditorPreferences.appZoom, setAppZoom],
+    [normalizedEditorPreferences.appZoom, setAppZoom, showZoomGauge],
   );
 
   const resetAppZoom = useCallback(() => {

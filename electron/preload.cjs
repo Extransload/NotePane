@@ -53,6 +53,7 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
   getEditorPreferences: () => ipcRenderer.invoke("editor-preferences:get"),
   updateEditorPreferences: (payload) =>
     ipcRenderer.invoke("editor-preferences:update", payload),
+  stepAppZoom: (direction) => ipcRenderer.invoke("app-zoom:step", direction),
   saveContent: (payload) => ipcRenderer.invoke("notes:save-content", payload),
   listNoteVersions: (noteId) => ipcRenderer.invoke("notes:versions:list", noteId),
   createNoteVersion: (payload) => ipcRenderer.invoke("notes:versions:create", payload),

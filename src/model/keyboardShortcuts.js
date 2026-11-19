@@ -439,9 +439,12 @@ export function getReservedKeyboardShortcutReason(shortcut) {
   return FIXED_EDITOR_SHORTCUTS.get(formatKeyboardShortcutValue(parsedShortcut)) ?? null;
 }
 
+// A shortcut recorder holding the keys. Settings closing goes inert at once, but the browser
+// moves focus off a recorder inside it only at its next frame, so a key pressed in between (⌘,
+// right after the close button) still lands on it; a recorder in an inert panel holds no keys.
 export function isShortcutRecorderTarget(target) {
   return target instanceof Element && Boolean(
-    target.closest(".shortcut-recorder-button"),
+    target.closest(".shortcut-recorder-button") && !target.closest("[inert]"),
   );
 }
 

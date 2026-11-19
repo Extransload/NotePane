@@ -750,6 +750,18 @@ test("renderer and store normalizeAppZoom agree", async () => {
   }
 });
 
+// Zoom presses step in the main process now; it must land where the renderer's gauge expects.
+test("renderer and store stepAppZoom agree", async () => {
+  globalThis.window ??= {};
+  const { stepAppZoom: stepRendererAppZoom } = await import("../../src/model/preferences.js");
+  const { stepAppZoom: stepStoreAppZoom } = require("../../electron/store.cjs");
+  for (const zoom of [0.5, 0.6, 0.67, 0.9, 1, 1.05, 1.75, 2, 9, "x"]) {
+    for (const direction of [-1, 1]) {
+      assert.equal(stepStoreAppZoom(zoom, direction), stepRendererAppZoom(zoom, direction), JSON.stringify({ zoom, direction }));
+    }
+  }
+});
+
 test("moves stored editor font-size shortcuts to the zoom commands", () => {
   const directory = createTemporaryDirectory();
   fs.mkdirSync(directory, { recursive: true });

@@ -211,6 +211,9 @@ A window shows a preference change at once and sends it to the main process, whi
 preferences to every window before it answers. While a window still waits for an answer, any broadcast it receives is
 older than what it shows (an earlier change of its own, or another window's that its pending change replaces), so it
 passes broadcasts over then and takes the stored preferences from the answer to its last change.
+Zoom presses (Cmd/Ctrl+= and -) do not send a zoom: they ask the main process for one step (`app-zoom:step`), taken
+from the stored zoom, so quick presses each take their own step in order however late a window hears back; the
+gauge shows the expected zoom at once and the stored one when the answer comes.
 
 Sidebar session changes use note list/create/activate/delete IPC calls. Activating a session changes the note bound to
 the current window, then remounts the BlockNote editor with that note's stored document. Deleting the active session

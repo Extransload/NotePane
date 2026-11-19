@@ -1961,6 +1961,13 @@ function normalizeAppZoom(value, fallback = DEFAULT_APP_ZOOM) {
     Math.abs(level - resolvedValue) < Math.abs(nearest - resolvedValue) ? level : nearest);
 }
 
+// The zoom one step in `direction` (1 or -1), held at the smallest and largest steps. Mirrors
+// `stepAppZoom` in src/model/preferences.js.
+function stepAppZoom(zoom, direction) {
+  const index = APP_ZOOM_LEVELS.indexOf(normalizeAppZoom(zoom));
+  return APP_ZOOM_LEVELS[Math.min(Math.max(index + direction, 0), APP_ZOOM_LEVELS.length - 1)];
+}
+
 function normalizeEditorFontFamily(value, fallback = DEFAULT_EDITOR_FONT_FAMILY) {
   const normalizedValue = normalizeEditorFontFamilyValue(value);
   if (isAllowedEditorFontFamily(normalizedValue)) {
@@ -2287,6 +2294,7 @@ module.exports = {
   DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
   normalizeAppTheme,
   normalizeAppZoom,
+  stepAppZoom,
   normalizeBlocksJSON,
   normalizeEditorPreferences,
   normalizeLook,

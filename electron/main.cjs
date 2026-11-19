@@ -27,6 +27,7 @@ const {
   StickyStore,
   DEFAULT_KEYBOARD_SHORTCUTS,
   normalizeBlocksJSON,
+  stepAppZoom,
 } = require("./store.cjs");
 const { fitBoundsToWorkAreas } = require("./windowBounds.cjs");
 const {
@@ -1365,6 +1366,21 @@ function installIpcHandlers() {
     if (editorPreferences.autoDownloadUpdates) {
       void selfUpdater?.downloadOffered();
     }
+    return editorPreferences;
+  });
+
+  // Cmd/Ctrl+= and -: one zoom step from the stored zoom, so presses that come faster than the
+  // windows hear back each take their own step, in order.
+  ipcMain.handle("app-zoom:step", (_event, direction) => {
+    const current = store.getEditorPreferences();
+    if (direction !== 1 && direction !== -1) {
+      return current;
+    }
+    const editorPreferences = store.updateEditorPreferences({
+      ...current,
+      appZoom: stepAppZoom(current.appZoom, direction),
+    });
+    broadcastEditorPreferences(editorPreferences);
     return editorPreferences;
   });
 
