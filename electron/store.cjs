@@ -471,8 +471,11 @@ class StickyStore {
   }
 
   updateTabsWindowBounds(bounds) {
-    this.state.tabsWindow = normalizeTabsWindow({ ...this.state.tabsWindow, bounds });
-    this.save();
+    const tabsWindow = normalizeTabsWindow({ ...this.state.tabsWindow, bounds });
+    if (!isSameBounds(tabsWindow.bounds, this.state.tabsWindow?.bounds)) {
+      this.state.tabsWindow = tabsWindow;
+      this.save();
+    }
     return this.getTabsWindow();
   }
 
@@ -826,16 +829,42 @@ class StickyStore {
     return note;
   }
 
+  // Bounds that did not change are not written again: every window that closes saves its bounds,
+  // and each write is a flushed file write that holds up the main process.
   updateBounds(noteId, bounds) {
     const note = this.getNote(noteId);
     if (!note || !bounds) {
       return null;
     }
 
-    note.bounds = normalizeBounds(bounds, note.bounds);
-    note.updatedAt = Date.now();
-    this.save();
+    if (this.setNoteBounds(note, bounds)) {
+      this.save();
+    }
     return note;
+  }
+
+  // Several notes' bounds in one write, as when the sticky layout places every note at once.
+  updateBoundsOfNotes(boundsByNoteId) {
+    let changed = false;
+    for (const [noteId, bounds] of boundsByNoteId) {
+      const note = this.getNote(noteId);
+      if (note && bounds && this.setNoteBounds(note, bounds)) {
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.save();
+    }
+  }
+
+  setNoteBounds(note, bounds) {
+    const nextBounds = normalizeBounds(bounds, note.bounds);
+    if (isSameBounds(nextBounds, note.bounds)) {
+      return false;
+    }
+    note.bounds = nextBounds;
+    note.updatedAt = Date.now();
+    return true;
   }
 
   setAlwaysOnTop(noteId, alwaysOnTop) {
@@ -1618,6 +1647,14 @@ function normalizeTabsWindow(value) {
       ? normalizeBounds(source.bounds, { width: 960, height: 720 })
       : null,
   };
+}
+
+function isSameBounds(first, second) {
+  return Boolean(first && second) &&
+    first.x === second.x &&
+    first.y === second.y &&
+    first.width === second.width &&
+    first.height === second.height;
 }
 
 function normalizeEditorPreferences(

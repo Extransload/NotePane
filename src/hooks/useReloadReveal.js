@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { isEditorMotionAllowed } from "../editor/editorMotion.js";
+import { afterEditorDrawn } from "./useWindowPaintReport.js";
 
 // What the shell looked like when the page went away, for public/boot.js to paint from the next
 // page's first frame. Session storage outlives a reload of the same window and starts empty in a
@@ -70,41 +71,21 @@ export function useReloadReveal(isNoteLoaded) {
   }, []);
 
   useEffect(() => {
-    const app = document.getElementById("root");
-    if (!isNoteLoaded || !app || document.documentElement.dataset.boot !== "reload") {
+    if (!isNoteLoaded || document.documentElement.dataset.boot !== "reload") {
       return undefined;
     }
-    let frame = 0;
-    const editorShown = () => Boolean(app.querySelector(".bn-editor .bn-block-group"));
-    const observer = new MutationObserver(() => {
-      if (editorShown()) {
-        observer.disconnect();
-        revealAfterNextFrame();
-      }
-    });
     const timer = window.setTimeout(reveal, REVEAL_FALLBACK_MS);
+    const stopWaiting = afterEditorDrawn(reveal);
 
     function stop() {
-      observer.disconnect();
+      stopWaiting();
       window.clearTimeout(timer);
-      cancelAnimationFrame(frame);
     }
     function reveal() {
       stop();
       revealApp();
     }
-    // Two frames on, so what the editor fills in around it, such as the tab titles, is drawn too.
-    function revealAfterNextFrame() {
-      frame = requestAnimationFrame(() => {
-        frame = requestAnimationFrame(reveal);
-      });
-    }
 
-    if (editorShown()) {
-      revealAfterNextFrame();
-    } else {
-      observer.observe(app, { childList: true, subtree: true });
-    }
     return stop;
   }, [isNoteLoaded]);
 }

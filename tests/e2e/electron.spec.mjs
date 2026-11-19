@@ -453,6 +453,65 @@ test("Electron plays the launch intro once per launch, unless it is turned off",
   }
 });
 
+// A layout switch keeps the windows it opens hidden until they have drawn their note, so none shows
+// blank or half drawn, and no loading cover is left once it ends.
+test("Electron layout switch shows each new window only after it has drawn its note", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-layout-switch-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", createdAt: 2, updatedAt: 2 },
+    { id: "third-note", title: "Third note", createdAt: 3, updatedAt: 3 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const tabsPage = await electronApp.firstWindow();
+    await expect(tabsPage.getByTestId("sticky-editor-surface")).toBeVisible();
+    // Every window the switches open, in order: created, drawn in a layout, shown.
+    await electronApp.evaluate(({ app, BrowserWindow, ipcMain }) => {
+      const log = [];
+      globalThis.__layoutSwitchLog = log;
+      ipcMain.on("window:painted", (event, layoutMode) => {
+        log.push({ id: BrowserWindow.fromWebContents(event.sender)?.id, kind: "painted", layoutMode });
+      });
+      app.on("browser-window-created", (_event, window) => {
+        log.push({ id: window.id, kind: "created" });
+        window.on("show", () => log.push({ id: window.id, kind: "show" }));
+      });
+    });
+    // Windows not yet shown, or shown before they had drawn their note in `layoutMode`. One shown
+    // too early stays on the list.
+    const readWindowsNotShownAfterDrawn = (layoutMode) => electronApp.evaluate((_electron, mode) => {
+      const log = globalThis.__layoutSwitchLog;
+      const created = log.filter((event) => event.kind === "created").map((event) => event.id);
+      return created.filter((id) => {
+        const shown = log.findIndex((event) => event.id === id && event.kind === "show");
+        const drawn = log.findIndex((event) => event.id === id && event.kind === "painted" && event.layoutMode === mode);
+        return shown < 0 || drawn < 0 || shown < drawn;
+      });
+    }, layoutMode);
+    const readLayoutModes = () => readOpenPages(electronApp, (page) =>
+      page.getByTestId("sticky-shell").getAttribute("data-layout-mode"));
+    const readOpenCovers = () => readOpenPages(electronApp, (page) =>
+      page.getByTestId("layout-transition-overlay").count());
+
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(readLayoutModes).toEqual(["sticky", "sticky", "sticky"]);
+    await expect.poll(() => readWindowsNotShownAfterDrawn("sticky")).toEqual([]);
+    await expect.poll(readOpenCovers).toEqual([0, 0, 0]);
+
+    await electronApp.evaluate(() => {
+      globalThis.__layoutSwitchLog.length = 0;
+    });
+    await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
+    await expect.poll(readLayoutModes).toEqual(["tabs"]);
+    await expect.poll(() => readWindowsNotShownAfterDrawn("tabs")).toEqual([]);
+    await expect.poll(readOpenCovers).toEqual([0]);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Preferences opens in the tabs window and never in the sticky layout", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-preferences-");
   writeInitialNotes(userDataDirectory, [
@@ -1594,9 +1653,12 @@ test("Electron stores pasted images as asset files and keeps exports self-contai
     expect(fs.readFileSync(path.join(userDataDirectory, "notes.json"), "utf8")).not.toContain(";base64,");
 
     const image = page.locator(".bn-editor img.bn-visual-media").first();
-    const imageTools = page.locator(".notepane-formatting-toolbar:visible");
+    const mediaMenu = page.getByRole("menu", { name: /^Options for / });
     await image.click();
-    await imageTools.locator(".notepane-file-download-button").click();
+    await page.locator(".media-block-tools[data-shown='true']")
+      .getByRole("button", { name: "More actions" })
+      .click();
+    await mediaMenu.getByRole("menuitem", { name: "Save As..." }).click();
     await expect.poll(() => fs.readdirSync(exportDirectory).filter((name) => name.endsWith(".png")))
       .toHaveLength(1);
     const downloadedName = fs.readdirSync(exportDirectory).find((name) => name.endsWith(".png"));
@@ -1614,8 +1676,8 @@ test("Electron stores pasted images as asset files and keeps exports self-contai
     expect(markdown).toContain(`data:image/png;base64,${TINY_PNG_BASE64}`);
     expect(markdown).not.toContain("notepane-asset:");
 
-    await image.click();
-    await imageTools.getByRole("button", { name: "Crop image" }).click();
+    await image.click({ button: "right" });
+    await mediaMenu.getByRole("menuitem", { name: "Crop..." }).click();
     await page.getByRole("dialog", { name: "Crop image" })
       .getByRole("button", { name: "Apply crop" })
       .click();
@@ -1650,9 +1712,9 @@ test("Electron copies an asset image to the system clipboard as image data", asy
     });
 
     await electronApp.evaluate(({ clipboard }) => clipboard.clear());
-    await page.locator(".bn-editor img.bn-visual-media").first().click();
-    await page.locator(".notepane-formatting-toolbar:visible")
-      .getByRole("button", { name: "Copy image", exact: true })
+    await page.locator(".bn-editor img.bn-visual-media").first().click({ button: "right" });
+    await page.getByRole("menu", { name: /^Options for / })
+      .getByRole("menuitem", { name: "Copy Image" })
       .click();
 
     await expect(page.getByRole("status").filter({ hasText: "Image copied" })).toBeVisible();

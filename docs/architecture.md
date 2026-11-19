@@ -74,7 +74,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Code block language detection, prettifying, Tab / Shift+Tab line indent and Enter keeping the line's indent; which formatter each language uses and why the others have none | `src/editor/codeFormatting.js` |
 | The code block formatters that are not Prettier plugins, most of them WebAssembly, each loaded on first use. Their `.wasm` is inlined into its lazy chunk as a data: URL (`build.assetsInlineLimit` in `vite.config.js`) because the packaged renderer's file:// page cannot fetch a file beside it, and the CSP's `script-src` allows `'wasm-unsafe-eval'` to compile it | `src/editor/codeFormatEngines.js` |
 | Code block languages: the language menu's list and search, the language a new code block starts in | `src/editor/codeLanguages.js` |
-| Code block tool bar: showing on hover, the language menu, Prettify and Copy | `src/ui/CodeBlockTools.jsx`, `src/ui/CodeLanguageMenu.jsx` |
+| Code block tool bar: showing on hover, the language menu, Prettify and Copy | `src/ui/CodeBlockTools.jsx`, `src/ui/CodeLanguageMenu.jsx`; placing it and finding its blocks: `src/hooks/useBlockTools.js` |
 | Note search matching, snippets and plain-text extraction; the palette query's `#tag` and `folder:` filters (`parseSearchQuery`, `formatSearchQuery`, `filterSearchEntries`) | `src/model/search.js` |
 | The note search palette: its results with their folder and tags, match count and last-edited labels, keyboard selection, the folder and tag filter chips, opening it on a query (`openPaletteWithQuery`) | `src/ui/SearchPalette.jsx`, `src/hooks/useNoteSearchPalette.js`, `formatRelativeEditTime` in `src/model/notes.js` |
 | Palette commands: matching a query to commands, `>` for commands only (`matchCommands`, `parseCommandQuery`), and the list of commands with their actions and keys (`usePaletteCommands`, which makes New folder now that the sidebar has no button for it) | `src/model/commands.js`, `src/hooks/usePaletteCommands.js` |
@@ -95,6 +95,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Applying a theme to the document, the first-paint theme, the export theme | `src/style/applyTheme.js` |
 | Applying the selected theme in a window, code theme included | `src/hooks/useAppliedTheme.js` |
 | A reload's first frames: the shell's last paint under the app, then the app's fade-in | `public/boot.js`, `index.html`, `src/hooks/useReloadReveal.js` |
+| A layout switch's choreography: each window tells main when it has drawn its note in a layout (`window:painted`); the windows a switch opens stay hidden until then, and windows fade in and out (see Window model) | `src/hooks/useWindowPaintReport.js`, `electron/main.cjs` (`applyLayoutMode`), `src/ui/overlays.jsx` (`LayoutTransitionOverlay`) |
 | The launch intro: the app icon split into one layer per part (tile, three windows, three dots) flying into the mark, its box drawn by a turning half-plane sweep and filled, the name written out letter by letter, over an opaque veil in the window's colour; only transform and opacity animate, so the compositor runs it while the app mounts, and the motion starts once the app is first idle (at most 0.5 s). Once per launch in the tabs window: preload asks `app:take-launch-intro` synchronously (`sendSync`, `electron/main.cjs` answers yes once, never in a test run unless `BLOCKNOTE_STICKY_LAUNCH_INTRO=1`), so `App` renders it in its first frame, outside the per-note `StickyEditor`; skipped under reduced motion; the `launchIntro` editor preference | `src/ui/LaunchIntro.jsx`, `src/hooks/useLaunchIntro.js`, `src/styles/intro.css` |
 | Code block syntax colours per theme, re-highlighting on a theme change | `src/editor/codeHighlighter.js` |
 | The theme picker in Preferences | `src/ui/ThemePicker.jsx` |
@@ -118,8 +119,9 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Toggle keys (`> ` and Space, Enter, Backspace on a toggle title), the caret moving to a toggle's title when its chevron closes it over the caret, Backspace joining the line below a closed toggle to its title, Delete at a closed toggle's title end joining the block after it | `src/editor/toggleKeyboard.js` |
 | Window, session and tab-mode keyboard commands | `src/hooks/useKeyboardCommands.js` |
 | Session tab rename, duplicate, open as sticky, move to Trash, and closing the current tab | `src/hooks/useSessionTabActions.js` |
-| The session tab menu (with its one-click tab colours), the media menu and the export format menu, placed at their anchor and clamped to the window | `src/ui/menus.jsx` |
-| Right-clicking an image, video, audio or file block, and what its menu does | `src/hooks/useMediaContextMenu.js` |
+| The session tab menu (with its one-click tab colours), the media menu (its Caption and Rename... fields) and the export format menu, placed at their anchor and clamped to the window | `src/ui/menus.jsx` |
+| Right-clicking an image, video, audio or file block or clicking its ⋯ button, and what its menu does (caption, rename, replace, preview toggle, crop, save, copy, alignment, delete) | `src/hooks/useMediaContextMenu.js` |
+| The ⋯ "More actions" button on a hovered or selected media block, placed on the picture's top-right corner | `src/ui/MediaBlockTools.jsx`, `src/hooks/useBlockTools.js` |
 | An image or video shown large from its menu | `src/ui/MediaPreview.jsx` |
 | Session tab drag and drop: reordering, and a tab joining the group of the tabs it is dragged over (`previewNoteFolder` in `useSessionList` shows it there, the drop stores it with `notes:set-folder`, a cancelled drag puts it back); dragend is heard on the dragged row itself, since a tab that changes group is drawn again elsewhere | `src/hooks/useSessionTabDrag.js` |
 | A session switch remounts `StickyEditor`; the fades its sidebar labels and folders show as they appear jump to their end before the first paint | `src/hooks/useMountWithoutFades.js` |
@@ -233,6 +235,26 @@ The app supports two layout modes.
 - Tab session mode keeps every session in one primary tabs window
 - Sticky mode opens every session as its own compact sticky-note window when entering the mode
 - Sticky mode arranges note windows in a small grid using the current primary display work area
+- Switching layouts never shows a blank or half-drawn window. Every open window shows its loading cover
+  (`LayoutTransitionOverlay`, faded in, `layout-mode:transition`) and keeps its look under it: main sends
+  `layout-mode:changed` only to a window that may change now, and the renderer clears the cover with it. The windows
+  the switch opens are created hidden (`revealOnPaint`) and shown only once their renderer reports `window:painted`
+  for the new layout (`src/hooks/useWindowPaintReport.js`, two frames after the editor is in the page; 4.5 s at most):
+  - Tabs to sticky: the other notes' sticky windows open hidden at their grid places (stored in one write). Once
+    drawn, they show at opacity 0 and fade in (160 ms, 40 ms apart) as the tabs window fades out; out of sight the
+    tabs window takes its grid place, gets `layout-mode:changed`, draws the sticky layout and fades back in. It is the
+    same window, so Settings open in it closes
+  - Sticky to tabs: the sticky windows' edits are flushed, the tabs window opens hidden and, once drawn, fades in
+    with focus as the sticky windows fade out, let clicks through, flush again and are destroyed (`close()` would
+    first ask each page whether it may unload, holding up the main process up to 100 ms per window). One whose edits
+    were not written shows again and closes the usual way, which asks
+  - Windows: the replacement windows (see `recreateWindowsForLayoutMode`) open hidden the same way, and the old ones
+    fade out and are destroyed once the new ones show
+  - Under reduced motion windows show and go at once, still only once drawn. Test windows stay see-through
+    (`hiddenTestWindows`) and skip the fades
+  - A window at opacity 0 may count as hidden on macOS and stop drawing, so a window that changes or answers a
+    flush out of sight runs with background throttling off
+  - Switches run one at a time (`updateLayoutMode` queues `applyLayoutMode`)
 - Closing an individual sticky window records it as manually closed and does not immediately recreate it
 - Show All NotePanes clears manually closed sticky windows and opens every note window again
 - `Command/Ctrl + T` creates a new sidebar session tab; `Command/Ctrl + N` remains available for new note/session

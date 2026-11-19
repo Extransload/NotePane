@@ -200,6 +200,9 @@ import {
   CropDialog,
 } from "./ui/CropDialog.jsx";
 import {
+  MediaBlockTools,
+} from "./ui/MediaBlockTools.jsx";
+import {
   MediaPreview,
 } from "./ui/MediaPreview.jsx";
 import {
@@ -288,6 +291,7 @@ import { useOverlayState } from "./hooks/useOverlayState.js";
 import { EditorErrorBoundary } from "./ui/EditorErrorBoundary.jsx";
 import { usePendingSaveFlush } from "./hooks/usePendingSaveFlush.js";
 import { useReloadReveal } from "./hooks/useReloadReveal.js";
+import { useWindowPaintReport } from "./hooks/useWindowPaintReport.js";
 import { useSessionList } from "./hooks/useSessionList.js";
 import { useSessionTabActions } from "./hooks/useSessionTabActions.js";
 import { useSessionTabDrag } from "./hooks/useSessionTabDrag.js";
@@ -451,11 +455,14 @@ function App({ bindTestThemeSetter }) {
     });
   }, []);
 
+  // Main sends the new layout once this window may change: a tabs window turning sticky does it out
+  // of sight, so its loading cover goes with the old layout.
   useEffect(() => {
     return electronApi?.onLayoutModeChanged?.((nextLayoutMode) => {
       setLayoutMode(normalizeLayoutMode(nextLayoutMode));
+      clearLayoutTransition();
     });
-  }, []);
+  }, [clearLayoutTransition]);
 
   useEffect(() => {
     return electronApi?.onLayoutModeTransition?.((payload) => {
@@ -553,14 +560,12 @@ function App({ bindTestThemeSetter }) {
       });
     }
 
-    setLayoutMode(nextLayoutMode);
+    // The layout changes when main says so (onLayoutModeChanged), not here: this window keeps its
+    // look under the loading cover while the other layout's windows open hidden.
     try {
       const resolvedLayoutMode = await electronApi?.updateLayoutMode?.(nextLayoutMode);
-      if (resolvedLayoutMode) {
-        setLayoutMode(normalizeLayoutMode(resolvedLayoutMode));
-      }
+      setLayoutMode(normalizeLayoutMode(resolvedLayoutMode ?? nextLayoutMode));
     } catch (error) {
-      setLayoutMode(previousLayoutMode);
       console.error("Layout mode update failed", error);
     } finally {
       if (isChangingMode) {
@@ -589,6 +594,7 @@ function App({ bindTestThemeSetter }) {
   }, []);
 
   useReloadReveal(Boolean(note));
+  useWindowPaintReport(normalizeLayoutMode(layoutMode), Boolean(note));
   // Here rather than in StickyEditor, which remounts for each note: the intro covers the app from
   // its first frame, the loading screen too, and stays one intro however the note changes. Its key
   // keeps it mounted as the loading screen gives way to the editor.
@@ -1033,7 +1039,8 @@ function StickyEditor({
         target.closest(".editor-floating-menu") ||
         target.closest(".session-tab-context-menu") ||
         target.closest(".export-format-menu") ||
-        target.closest(".export-icon-button")
+        target.closest(".export-icon-button") ||
+        target.closest(".media-block-tools")
       ) {
         return;
       }
@@ -1804,7 +1811,7 @@ function StickyEditor({
       }
 
       if (
-        target.closest(".image-tools, .bn-formatting-toolbar, .crop-dialog")
+        target.closest(".image-tools, .bn-formatting-toolbar, .crop-dialog, .media-block-tools")
       ) {
         return;
       }
@@ -1901,7 +1908,7 @@ function StickyEditor({
     });
   }, [activeImageBlockId, editor]);
 
-  const getMediaActions = useMediaContextMenu({
+  const { getMediaActions, openMediaMenuAtButton } = useMediaContextMenu({
     editor,
     openOverlay,
     closeOverlay,
@@ -2983,14 +2990,10 @@ function StickyEditor({
               <RecentColorFormattingToolbarController
                 recentColors={recentEditorColors}
                 onColorUsed={onEditorColorUsed}
-                onCropImage={openCropDialog}
-                onDownloadImage={downloadActiveImage}
-                onCopyImage={canCopyImageToClipboard() ? copyActiveImage : undefined}
-                activeImageBlockId={activeImageBlockId}
                 portalElement={document.body}
-                // The export menu stands for the whole note, and the media menu repeats the
-                // toolbar's actions: the toolbar of a selection would sit under either, so it is
-                // hidden until the menu closes.
+                // The export menu stands for the whole note, and the media menu for its block:
+                // the toolbar of a selection would sit under either, so it is hidden until the
+                // menu closes.
                 hidden={isTableCellSelectionDismissed || Boolean(exportFormatMenu) || Boolean(mediaMenu)}
               />
               <BlockMenuHighlightController />
@@ -3012,6 +3015,13 @@ function StickyEditor({
               targetElement={element}
             />
           ))}
+          <MediaBlockTools
+            editor={editor}
+            activeImageBlockId={activeImageBlockId}
+            menuBlockId={mediaMenu?.anchor ? mediaMenu.blockId : null}
+            onOpenMenu={openMediaMenuAtButton}
+            onCloseMenu={() => closeOverlay("mediaMenu")}
+          />
         </section>
       </div>
       <Presence when={isVersionHistoryOpen}>
@@ -3111,7 +3121,13 @@ function StickyEditor({
       </Presence>
       <Presence when={mediaMenu && mediaMenuBlock ? { menu: mediaMenu, block: mediaMenuBlock } : null}>
         {({ menu, block }) => (
-          <MediaContextMenu x={menu.x} y={menu.y} {...getMediaActions(block)} />
+          <MediaContextMenu
+            x={menu.x}
+            y={menu.y}
+            anchor={menu.anchor}
+            focusOnOpen={menu.focusOnOpen}
+            {...getMediaActions(block)}
+          />
         )}
       </Presence>
       <Presence when={mediaPreviewBlock}>

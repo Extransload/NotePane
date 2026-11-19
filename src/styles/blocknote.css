@@ -642,6 +642,69 @@
   color: var(--notepane-code-tool-error);
 }
 
+/* The ⋯ button of a media block (src/ui/MediaBlockTools.jsx), on the picture's top-right corner
+   as in Notion: shown while the pointer is on the block or on itself, while the block is selected
+   or its menu is open, and while it holds keyboard focus. */
+.media-block-tools {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  padding: 2px;
+  border: 1px solid var(--notepane-code-tool-border);
+  border-radius: 7px;
+  background: var(--notepane-code-tool-bg);
+  box-shadow: var(--notepane-shadow-code-tool);
+  opacity: 0;
+  transform: translateX(-100%);
+  backdrop-filter: blur(8px);
+  transition: opacity 130ms ease, border-color 130ms ease;
+  -webkit-app-region: no-drag;
+  /* Hidden, it lets clicks through to the picture and the text under it. */
+  pointer-events: none;
+}
+
+.media-block-tools[data-shown="true"],
+.media-block-tools:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.media-block-tools:hover,
+.media-block-tools:focus-within {
+  border-color: var(--notepane-code-tool-hover-border);
+}
+
+.media-block-more-button {
+  display: grid;
+  width: 24px;
+  height: 22px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--notepane-code-tool-text);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.media-block-more-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.media-block-more-button:hover,
+.media-block-more-button:focus-visible,
+.media-block-more-button[aria-expanded="true"] {
+  outline: none;
+  background: var(--notepane-code-tool-hover-bg);
+  color: var(--notepane-code-tool-hover-text);
+}
+
+.media-block-more-button:focus-visible {
+  box-shadow: 0 0 0 2px var(--notepane-code-tool-focus-ring);
+}
+
 .code-block-tool-button svg {
   width: 14px;
   height: 14px;
@@ -1324,17 +1387,6 @@ body:has(.bn-table-handle-menu) .bn-formatting-toolbar {
 .bn-formatting-toolbar.notepane-formatting-toolbar.is-table-context {
   translate: 8px 0;
   pointer-events: auto;
-}
-
-.bn-formatting-toolbar.notepane-formatting-toolbar.is-file-context {
-  width: 150px;
-}
-
-.bn-formatting-toolbar.notepane-formatting-toolbar.is-file-context
-  .notepane-formatting-contextual-actions {
-  grid-template-columns: repeat(4, 30px);
-  padding-top: 0;
-  border-top: 0;
 }
 
 div:has(> .bn-formatting-toolbar.notepane-formatting-toolbar.is-table-context) {

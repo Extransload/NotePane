@@ -12,16 +12,79 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
 });
 
-test("shows image download and crop actions in one toolbar", async ({ page }) => {
+const MEDIA_MENU = { name: /^Options for / };
+
+// The ⋯ button on a media block: there is one per block, outside the block's own DOM.
+async function moreActionsButton(media) {
+  const blockId = await media.evaluate((element) => (
+    element.closest(".bn-block-outer[data-id]").dataset.id
+  ));
+  return media.page()
+    .locator(`.media-block-tools[data-block-id="${blockId}"]`)
+    .getByRole("button", { name: "More actions" });
+}
+
+// Clicks the image, opens its menu from the ⋯ button and picks one of its items.
+async function chooseMediaAction(image, name) {
+  await image.click();
+  await (await moreActionsButton(image)).click();
+  await image.page().getByRole("menu", MEDIA_MENU)
+    .getByRole("menuitem", { name, exact: true })
+    .click();
+}
+
+test("clicking an image shows its ⋯ button, which opens the same menu as a right click", async ({ page }) => {
   await loadTemplatePreview(page);
   const image = page.locator("img.bn-visual-media").first();
-  await image.click();
+  const block = page.locator(".bn-editor [data-content-type='image']").first();
+  const menu = page.getByRole("menu", MEDIA_MENU);
+  const expectAllActions = async () => {
+    for (const name of ["Open", "Preview", "Caption", "Rename...", "Replace...", "Crop...", "Save As...", "Delete"]) {
+      await expect(menu.getByRole("menuitem", { name, exact: true })).toBeVisible();
+    }
+    await expect(menu.getByRole("group", { name: "Alignment" })).toBeVisible();
+  };
 
-  const imageTools = page.locator(".notepane-formatting-toolbar:visible");
-  await expect(imageTools).toBeVisible();
-  await expect(imageTools.locator(".notepane-file-download-button")).toBeVisible();
-  await expect(imageTools.getByRole("button", { name: "Crop image" })).toBeVisible();
-  await imageTools.getByRole("button", { name: "Replace image" }).click();
+  await image.click();
+  const more = await moreActionsButton(image);
+  await expect(more.locator("xpath=..")).toHaveAttribute("data-shown", "true");
+  // The file actions live in the menu, so the formatting toolbar stays away from media.
+  await expect(page.locator(".notepane-formatting-toolbar:visible")).toHaveCount(0);
+  await more.click();
+  await expect(menu).toBeVisible();
+  await expectAllActions();
+  // The menu hangs from the button: right edges lined up, above or below it without covering it.
+  const moreBox = await more.boundingBox();
+  const menuBox = await menu.boundingBox();
+  expect(Math.abs((menuBox.x + menuBox.width) - (moreBox.x + moreBox.width))).toBeLessThan(8);
+  expect(
+    menuBox.y >= moreBox.y + moreBox.height || menuBox.y + menuBox.height <= moreBox.y,
+  ).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+
+  // From the keyboard: Enter opens the menu with its first item focused, arrows move, Escape
+  // closes it and hands focus back to the button.
+  await more.focus();
+  await page.keyboard.press("Enter");
+  await expect(menu.getByRole("menuitem", { name: "Open" })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.getByRole("menuitem", { name: "Preview", exact: true })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(more).toBeFocused();
+
+  await image.click({ button: "right" });
+  await expect(menu).toBeVisible();
+  await expectAllActions();
+  await menu.getByRole("button", { name: "Align center" }).click();
+  await expect(block).toHaveAttribute("data-text-alignment", "center");
+});
+
+test("replaces and crops an image from its menu", async ({ page }) => {
+  await loadTemplatePreview(page);
+  const image = page.locator("img.bn-visual-media").first();
+  await chooseMediaAction(image, "Replace...");
   const replacePanel = page.locator(".bn-panel:visible");
   await expect(replacePanel).toBeVisible();
   await expect(replacePanel.locator("[data-test='upload-input']")).toBeVisible();
@@ -30,9 +93,7 @@ test("shows image download and crop actions in one toolbar", async ({ page }) =>
   )?.width).toBeGreaterThanOrEqual(480);
   await page.keyboard.press("Escape");
   await expect(replacePanel).toHaveCount(0);
-  await image.click();
-  await expect(imageTools).toBeVisible();
-  await imageTools.getByRole("button", { name: "Crop image" }).click();
+  await chooseMediaAction(image, "Crop...");
   const cropDialog = page.getByRole("dialog", { name: "Crop image" });
   await expect(cropDialog).toBeVisible();
   const cropVisuals = await cropDialog.evaluate((dialog) => {
@@ -107,8 +168,7 @@ test("shows image download and crop actions in one toolbar", async ({ page }) =>
   await cropDialog.getByRole("button", { name: "Apply crop" }).click();
   await expect(cropDialog).toHaveCount(0);
 
-  await image.click();
-  await imageTools.getByRole("button", { name: "Crop image" }).click();
+  await chooseMediaAction(image, "Crop...");
   await expect(cropDialog).toBeVisible();
   await expect(cropDialog.locator(".crop-image-canvas img")).toHaveAttribute(
     "src",
@@ -129,8 +189,7 @@ test("shows image download and crop actions in one toolbar", async ({ page }) =>
 
   await cropDialog.getByRole("button", { name: "Apply crop" }).click();
   await expect(cropDialog).toHaveCount(0);
-  await image.click();
-  await imageTools.getByRole("button", { name: "Crop image" }).click();
+  await chooseMediaAction(image, "Crop...");
   await expect(cropDialog.locator(".crop-image-canvas img")).toHaveAttribute(
     "src",
     originalSource,
@@ -167,9 +226,7 @@ test("crops the clicked image when two image blocks share one source", async ({ 
   await expect(imageInBlock(blockIds[0])).toHaveAttribute("src", imageSource);
   await expect(imageInBlock(blockIds[1])).toHaveAttribute("src", imageSource);
 
-  await imageInBlock(blockIds[1]).click();
-  const imageTools = page.locator(".notepane-formatting-toolbar:visible");
-  await imageTools.getByRole("button", { name: "Crop image" }).click();
+  await chooseMediaAction(imageInBlock(blockIds[1]), "Crop...");
   const cropDialog = page.getByRole("dialog", { name: "Crop image" });
   await expect(cropDialog).toBeVisible();
   const cropImageBox = await cropDialog.locator(".crop-image-canvas img").boundingBox();
@@ -197,11 +254,9 @@ test("crops a replaced image from the new picture, and re-crops an untouched one
   await clickLastEmptyParagraph(page);
   await pasteClipboardText(page, { plainText: "", html: `<img src="${solid("red")}" alt="photo">` });
   const image = page.locator(".bn-editor img.bn-visual-media");
-  const imageTools = page.locator(".notepane-formatting-toolbar:visible");
   const cropDialog = page.getByRole("dialog", { name: "Crop image" });
   const cropOnce = async () => {
-    await image.click();
-    await imageTools.getByRole("button", { name: "Crop image" }).click();
+    await chooseMediaAction(image, "Crop...");
     await expect(cropDialog).toBeVisible();
     const source = await cropDialog.locator(".crop-image-canvas img").getAttribute("src");
     await cropDialog.getByRole("button", { name: "Apply crop" }).click();
@@ -223,8 +278,7 @@ test("crops a replaced image from the new picture, and re-crops an untouched one
   // Cropping again starts from the original, so the crop can be widened.
   expect(await cropOnce()).toBe(solid("red"));
 
-  await image.click();
-  await imageTools.getByRole("button", { name: "Replace image" }).click();
+  await chooseMediaAction(image, "Replace...");
   const filePanel = page.locator(".bn-panel:visible");
   await filePanel.getByRole("tab", { name: /Embed/i }).click();
   await filePanel.locator("input").last().fill(solid("blue"));
@@ -238,11 +292,7 @@ test("crops a replaced image from the new picture, and re-crops an untouched one
 test("copies the selected image to the clipboard as PNG data", async ({ context, page }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await loadTemplatePreview(page);
-  await page.locator("img.bn-visual-media").first().click();
-
-  await page.locator(".notepane-formatting-toolbar:visible")
-    .getByRole("button", { name: "Copy image", exact: true })
-    .click();
+  await chooseMediaAction(page.locator("img.bn-visual-media").first(), "Copy Image");
 
   await expect(page.getByRole("status").filter({ hasText: "Image copied" })).toBeVisible();
   const copiedImage = await page.evaluate(async () => {
@@ -290,10 +340,7 @@ test("removes a pasted image file with one Cmd+Z and keeps its caption a step of
   const image = page.locator(".bn-editor img.bn-visual-media");
   await expect(image).toHaveAttribute("src", /^data:image\/png/);
 
-  await image.click();
-  await page.locator(".notepane-formatting-toolbar:visible")
-    .getByRole("button", { name: "Edit caption" })
-    .click();
+  await chooseMediaAction(image, "Caption");
   await page.locator("input[name='file-caption']").fill("Pasted photo");
   await page.keyboard.press("Enter");
   await expect(page.locator(".bn-editor .bn-file-caption")).toHaveText("Pasted photo");
@@ -333,10 +380,7 @@ test("keeps the editor focused after Enter in the caption field, so Cmd+Z undoes
   await loadTemplatePreview(page);
   const caption = page.locator(".bn-editor .bn-file-caption").first();
   const originalCaption = await caption.textContent();
-  await page.locator("img.bn-visual-media").first().click();
-  await page.locator(".notepane-formatting-toolbar:visible")
-    .getByRole("button", { name: "Edit caption" })
-    .click();
+  await chooseMediaAction(page.locator("img.bn-visual-media").first(), "Caption");
   await page.locator("input[name='file-caption']").fill("New caption");
   await page.keyboard.press("Enter");
   await expect(caption).toHaveText("New caption");
@@ -396,10 +440,10 @@ test("right-clicking an image opens its menu: preview, alignment and delete", as
   await expect(menu).toBeVisible();
   // A web image can be opened, previewed and its address copied; it has no file to show in Finder.
   for (const name of ["Open", "Preview", "Save As...", "Copy Link", "Crop...", "Delete"]) {
-    await expect(menu.getByRole("menuitem", { name })).toBeVisible();
+    await expect(menu.getByRole("menuitem", { name, exact: true })).toBeVisible();
   }
   await expect(menu.getByRole("menuitem", { name: "Show in Finder" })).toHaveCount(0);
-  // The menu repeats the formatting toolbar's actions, so the toolbar steps aside.
+  // The menu holds the block's actions, so the formatting toolbar steps aside.
   await expect(page.locator(".notepane-formatting-toolbar:visible")).toHaveCount(0);
 
   await menu.getByRole("button", { name: "Align center" }).click();
@@ -407,12 +451,20 @@ test("right-clicking an image opens its menu: preview, alignment and delete", as
   await expect(image).toHaveAttribute("data-text-alignment", "center");
 
   await image.locator("img.bn-visual-media").click({ button: "right" });
-  await menu.getByRole("menuitem", { name: "Preview" }).click();
+  await menu.getByRole("menuitem", { name: "Preview", exact: true }).click();
   const preview = page.getByRole("dialog", { name: /^Preview of / });
   await expect(preview).toBeVisible();
   await expect(preview.locator("img")).toHaveAttribute("src", source);
   await page.keyboard.press("Escape");
   await expect(preview).toHaveCount(0);
+
+  // Hide preview shows the image as a file line, as BlockNote's preview toggle did.
+  await image.locator("img.bn-visual-media").click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "Hide preview" }).click();
+  await expect(image.locator("img.bn-visual-media")).toHaveCount(0);
+  await image.click({ button: "right" });
+  await menu.getByRole("menuitem", { name: "Show preview" }).click();
+  await expect(image.locator("img.bn-visual-media")).toHaveAttribute("src", source);
 
   await image.locator("img.bn-visual-media").click({ button: "right" });
   await menu.getByRole("menuitem", { name: "Delete" }).click();

@@ -785,13 +785,16 @@ const SCREEN_GROUPS = [
   },
   {
     name: "crop dialog, export menu and toasts",
-    screens: ["image toolbar", "crop dialog", "export menu", "error toast", "success toast"],
+    screens: ["image menu", "crop dialog", "export menu", "error toast", "success toast"],
     async run(page, scan) {
       await page.locator(".bn-editor img.bn-visual-media").click();
-      const imageTools = page.locator(".notepane-formatting-toolbar:visible");
-      await expect(imageTools.getByRole("button", { name: "Crop image" })).toBeVisible();
-      await scan("image toolbar", { include: [".notepane-formatting-toolbar"] });
-      await imageTools.getByRole("button", { name: "Crop image" }).click();
+      await page.locator(".media-block-tools[data-shown='true']")
+        .getByRole("button", { name: "More actions" })
+        .click();
+      const imageMenu = page.getByRole("menu", { name: /^Options for / });
+      await expect(imageMenu.getByRole("menuitem", { name: "Crop..." })).toBeVisible();
+      await scan("image menu", { include: [".media-context-menu", ".media-block-tools"] });
+      await imageMenu.getByRole("menuitem", { name: "Crop..." }).click();
       const cropDialog = page.getByRole("dialog", { name: "Crop image" });
       await expect(cropDialog).toBeVisible();
       await parkPointer(page);

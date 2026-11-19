@@ -94,7 +94,7 @@ const requiredRendererSnippets = [
   "role=\"tablist\"",
   "data-layout-mode={normalizedLayoutMode}",
   "CropDialog",
-  "onDownloadImage",
+  "openMediaMenuAtButton",
   "useBlockNoteFloatingMenuGuard",
   "BLOCKNOTE_FLOATING_MENU_SELECTOR",
 ];

@@ -119,6 +119,7 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
     ipcRenderer.on("layout-mode:transition", listener);
     return () => ipcRenderer.removeListener("layout-mode:transition", listener);
   },
+  reportWindowPainted: (layoutMode) => ipcRenderer.send("window:painted", layoutMode),
   onEditorPreferencesChanged: (callback) => {
     const listener = (_event, editorPreferences) => callback(editorPreferences);
     ipcRenderer.on("editor-preferences:changed", listener);

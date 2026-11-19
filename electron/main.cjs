@@ -16,6 +16,7 @@ const {
   net,
   protocol,
   screen,
+  systemPreferences,
 } = require("electron");
 
 // Test runs (see quietTestMode) start as an app without a Dock icon. This runs before anything
@@ -74,7 +75,14 @@ const TABS_HEADER_HEIGHT = 42;
 const STICKY_HEADER_HEIGHT = 30;
 // The native window buttons' frame is about 14px tall, at any zoom.
 const TRAFFIC_LIGHT_HEIGHT = 14;
+// A layout switch waits this long at most for a window to draw its note before it shows it anyway.
 const LAYOUT_MODE_TRANSITION_READY_TIMEOUT_MS = 4500;
+// How long a window takes to fade in or out in a layout switch, and how far apart the sticky
+// windows start fading in.
+const WINDOW_FADE_MS = 160;
+const WINDOW_FADE_STAGGER_MS = 40;
+// Two frames at 60 Hz.
+const WINDOW_SETTLE_MS = 33;
 const STICKY_PASTEL_PALETTE = [
   "#fff2b8",
   "#ffd7e8",
@@ -240,10 +248,13 @@ function createWindow(note, options = {}) {
     window.webContents.setZoomFactor(getAppZoom());
   });
 
-  window.__notepaneReadyToShow = false;
+  // A layout switch shows the windows it opens itself, once they have drawn their note
+  // (`window:painted`), so their first frame on screen is never blank or half drawn.
+  window.__notepanePaintedLayoutMode = null;
   window.once("ready-to-show", () => {
-    window.__notepaneReadyToShow = true;
-    presentWindow(window);
+    if (!options.revealOnPaint) {
+      presentWindow(window);
+    }
   });
 
   window.on("moved", () => persistWindowBounds(window));
@@ -662,43 +673,100 @@ function ensureTabsWindow(activeNoteId) {
   return createWindow(note, { primary: true });
 }
 
-function waitForWindowReadyToShow(window, timeoutMs = LAYOUT_MODE_TRANSITION_READY_TIMEOUT_MS) {
-  if (!window || window.isDestroyed() || window.__notepaneReadyToShow || window.isVisible()) {
+// Resolves once the window has drawn its note in `layoutMode` (the renderer sends `window:painted`,
+// src/hooks/useWindowPaintReport.js), or after a while anyway, so a renderer that never reports
+// cannot hold a layout switch up.
+function waitForWindowPainted(window, layoutMode, timeoutMs = LAYOUT_MODE_TRANSITION_READY_TIMEOUT_MS) {
+  if (!window || window.isDestroyed() || window.__notepanePaintedLayoutMode === layoutMode) {
     return Promise.resolve();
   }
 
+  const { webContents } = window;
   return new Promise((resolve) => {
-    let done = false;
-    let timeoutId = null;
-
     const finish = () => {
-      if (done) {
-        return;
-      }
-      done = true;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-      if (!window.isDestroyed()) {
-        window.removeListener("ready-to-show", finish);
-        window.webContents.removeListener("did-finish-load", finish);
-        window.webContents.removeListener("did-fail-load", finish);
-      }
+      clearTimeout(timer);
+      window.removeListener("notepane:painted", onPainted);
+      window.removeListener("closed", finish);
+      webContents.removeListener("did-fail-load", finish);
+      webContents.removeListener("render-process-gone", finish);
       resolve();
     };
-
-    timeoutId = setTimeout(finish, timeoutMs);
-    window.once("ready-to-show", finish);
-    window.webContents.once("did-finish-load", finish);
-    window.webContents.once("did-fail-load", finish);
+    const onPainted = (paintedLayoutMode) => {
+      if (paintedLayoutMode === layoutMode) {
+        finish();
+      }
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    window.on("notepane:painted", onPainted);
+    window.once("closed", finish);
+    webContents.once("did-fail-load", finish);
+    webContents.once("render-process-gone", finish);
   });
 }
 
-async function waitForWindowsReadyToShow(targetWindows) {
-  const uniqueWindows = [...new Set(targetWindows)]
-    .filter((window) => window && !window.isDestroyed());
+function prefersReducedMotion() {
+  return Boolean(systemPreferences.getAnimationSettings?.().prefersReducedMotion);
+}
 
-  await Promise.all(uniqueWindows.map((window) => waitForWindowReadyToShow(window)));
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Fades the window to `opacity` over WINDOW_FADE_MS, easing out; at once under reduced motion.
+// Test windows stay see-through (hiddenTestWindows).
+function fadeWindow(window, opacity) {
+  return new Promise((resolve) => {
+    if (!window || window.isDestroyed() || hiddenTestWindows) {
+      resolve();
+      return;
+    }
+    const from = window.getOpacity();
+    if (from === opacity || prefersReducedMotion()) {
+      window.setOpacity(opacity);
+      resolve();
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      if (window.isDestroyed()) {
+        clearInterval(timer);
+        resolve();
+        return;
+      }
+      const progress = Math.min(1, (Date.now() - startedAt) / WINDOW_FADE_MS);
+      window.setOpacity(from + (opacity - from) * (1 - (1 - progress) ** 3));
+      if (progress === 1) {
+        clearInterval(timer);
+        resolve();
+      }
+    }, 16);
+  });
+}
+
+// Shows windows that have drawn their notes, each fading in a little after the one before (all at
+// once under reduced motion). A window shows out of sight for two frames first: a window that was
+// hidden can have no frame for a moment after it shows (`capturePage()` comes back empty then).
+// Only `focusWindow` takes focus.
+function revealWindowsInTurn(targetWindows, { focusWindow = null } = {}) {
+  const stagger = prefersReducedMotion() ? 0 : WINDOW_FADE_STAGGER_MS;
+  return Promise.all(targetWindows.map(async (window, index) => {
+    if (stagger > 0 && index > 0) {
+      await wait(index * stagger);
+    }
+    if (window.isDestroyed()) {
+      return;
+    }
+    if (!hiddenTestWindows) {
+      window.setOpacity(0);
+    }
+    if (window === focusWindow) {
+      presentWindow(window);
+    } else {
+      revealWindow(window);
+    }
+    await wait(WINDOW_SETTLE_MS);
+    await fadeWindow(window, 1);
+  }));
 }
 
 function ensureWindowForNote(note) {
@@ -824,6 +892,7 @@ async function recreateWindowsForLayoutMode(activeNoteId, options = {}) {
   const notes = store.listNotes();
   const layoutMode = store.getLayoutMode();
   const nextWindows = [];
+  let focusWindow = null;
 
   // `frame` is immutable in Electron. Open replacements before tearing down
   // the old windows so Windows does not treat a layout transition as app exit.
@@ -837,17 +906,34 @@ async function recreateWindowsForLayoutMode(activeNoteId, options = {}) {
   }
 
   if (layoutMode === "sticky") {
-    for (const note of notes) {
-      nextWindows.push(createWindow(note));
-    }
     if (options.arrangeStickyWindows) {
-      arrangeStickyWindows(notes);
+      placeNotesOnStickyGrid(notes);
+    }
+    for (const note of notes) {
+      const window = createWindow(store.getNote(note.id) ?? note, {
+        revealOnPaint: options.revealOnPaint,
+      });
+      nextWindows.push(window);
+      if (note.id === activeNoteId) {
+        focusWindow = window;
+      }
     }
   } else {
     const primaryNote = getMainTabsNote(activeNoteId);
     if (primaryNote) {
-      nextWindows.push(createWindow(primaryNote, { primary: true }));
+      focusWindow = createWindow(primaryNote, { primary: true, revealOnPaint: options.revealOnPaint });
+      nextWindows.push(focusWindow);
     }
+  }
+
+  // A layout switch keeps the old windows, under their loading cover, until the new ones have
+  // drawn their notes, then fades one set out as the other fades in.
+  if (options.revealOnPaint) {
+    await Promise.all(nextWindows.map((window) => waitForWindowPainted(window, layoutMode)));
+    await Promise.all([
+      revealWindowsInTurn(nextWindows, { focusWindow }),
+      ...previousEntries.map((entry) => fadeWindow(entry.window, 0)),
+    ]);
   }
 
   for (const entry of previousEntries) {
@@ -859,11 +945,121 @@ async function recreateWindowsForLayoutMode(activeNoteId, options = {}) {
   return nextWindows;
 }
 
+// Tabs to sticky, outside Windows. The tabs window stays under its loading cover while every
+// other note's sticky window opens hidden in its place on the grid. Once those have drawn their
+// notes they fade in one after another as the tabs window fades out; out of sight, the tabs window
+// then turns into its own note's sticky window and fades back in.
+async function switchToStickyLayout() {
+  const notes = store.listNotes();
+  const grid = placeNotesOnStickyGrid(notes);
+  const tabsEntry = getPrimaryEntry();
+  // Saved while still marked primary, so the tabs window's bounds are kept as its own.
+  if (tabsEntry) {
+    persistWindowBounds(tabsEntry.window);
+  }
+  for (const entry of windows.values()) {
+    entry.primary = false;
+    // A note opened as a sticky window from the tabs layout is now one sticky window among the
+    // others, closed with them when the layout returns to tabs. It moves to its place at once.
+    entry.detachedSticky = false;
+    entry.window.setAlwaysOnTop(Boolean(store.getNote(entry.noteId)?.alwaysOnTop));
+    if (entry !== tabsEntry && grid.has(entry.noteId)) {
+      entry.window.setBounds(grid.get(entry.noteId), true);
+    }
+  }
+
+  const openedWindows = notes
+    .filter((note) => grid.has(note.id) && getEntriesForNote(note.id).length === 0)
+    .map((note) => createWindow(store.getNote(note.id) ?? note, { revealOnPaint: true }));
+  await Promise.all(openedWindows.map((window) => waitForWindowPainted(window, "sticky")));
+
+  await Promise.all([
+    revealWindowsInTurn(openedWindows),
+    tabsEntry && turnTabsWindowSticky(tabsEntry.window, grid.get(tabsEntry.noteId)),
+  ]);
+}
+
+async function turnTabsWindowSticky(window, bounds) {
+  await fadeWindow(window, 0);
+  if (window.isDestroyed()) {
+    return;
+  }
+  // macOS may count a see-through window as hidden and stop drawing it, and it must draw its new
+  // layout before it shows again.
+  window.webContents.setBackgroundThrottling(false);
+  window.setMinimumSize(STICKY_MIN_WIDTH, STICKY_MIN_HEIGHT);
+  applyWindowChrome(window, false);
+  if (bounds) {
+    window.setBounds(bounds);
+  }
+  window.__notepanePaintedLayoutMode = null;
+  window.webContents.send("layout-mode:changed", "sticky");
+  await waitForWindowPainted(window, "sticky");
+  if (window.isDestroyed()) {
+    return;
+  }
+  window.webContents.setBackgroundThrottling(!hiddenTestWindows);
+  await revealWindowsInTurn([window]);
+}
+
+// Sticky to tabs, outside Windows. The sticky windows keep their look under their loading cover
+// while the tabs window opens hidden; once it has drawn its note it fades in as they fade out and
+// close.
+async function switchToTabsLayout(activeNoteId) {
+  // The tabs window reads its note from the store, so the sticky windows' last edits land first.
+  // A window whose edits did not land closes without fading, so its question shows over it.
+  const stickyEntries = [...windows.values()].filter((entry) => !entry.window.isDestroyed());
+  const outcomes = await Promise.all(
+    stickyEntries.map((entry) => requestEditorFlush(entry.window.webContents, EDITOR_FLUSH_TIMEOUT_MS)),
+  );
+  const note = getMainTabsNote(activeNoteId);
+  const tabsWindow = note ? createWindow(note, { primary: true, revealOnPaint: true }) : null;
+  await waitForWindowPainted(tabsWindow, "tabs");
+
+  await Promise.all([
+    tabsWindow && revealWindowsInTurn([tabsWindow], { focusWindow: tabsWindow }),
+    ...stickyEntries.map((entry, index) =>
+      outcomes[index] === "done" ? closeWindowFadingOut(entry) : closeWindowEntry(entry)),
+  ]);
+}
+
+// Closes a window a layout switch leaves behind, fading it out first. Out of sight it lets clicks
+// through to the windows under it until it has gone. Once its edits are written it is destroyed:
+// `close()` first asks the page whether it may unload, which holds up the main process for up to
+// 100 ms per window when the page is busy.
+async function closeWindowFadingOut(entry) {
+  const { window } = entry;
+  if (window.isDestroyed()) {
+    return;
+  }
+  // macOS may count a see-through window as hidden and slow it down, and it must still answer the
+  // flush below.
+  window.webContents.setBackgroundThrottling(false);
+  await fadeWindow(window, 0);
+  if (window.isDestroyed()) {
+    return;
+  }
+  window.setIgnoreMouseEvents(true);
+  entry.closingProgrammatically = true;
+  persistWindowBounds(window);
+  const outcome = await requestEditorFlush(window.webContents, EDITOR_FLUSH_TIMEOUT_MS);
+  if (window.isDestroyed()) {
+    return;
+  }
+  if (outcome === "done") {
+    window.destroy();
+    return;
+  }
+  // Edits it could not write: it shows again and closes the usual way, which asks about them.
+  window.setIgnoreMouseEvents(hiddenTestWindows);
+  await fadeWindow(window, 1);
+  window.close();
+}
+
 function syncWindowsForLayoutMode(activeNoteId, options = {}) {
   const notes = store.listNotes();
   const noteIds = new Set(notes.map((note) => note.id));
   const layoutMode = store.getLayoutMode();
-  const targetWindows = new Set();
 
   for (const entry of [...windows.values()]) {
     if (!noteIds.has(entry.noteId)) {
@@ -878,19 +1074,16 @@ function syncWindowsForLayoutMode(activeNoteId, options = {}) {
 
   if (layoutMode === "sticky") {
     for (const entry of windows.values()) {
-      // The tabs window stays open as its note's sticky window. It saves its bounds as the tabs
-      // window's before it moves into the sticky grid, and it takes its note's pin.
+      // A tabs window here stays open as its note's sticky window. It saves its bounds as the tabs
+      // window's first, and it takes its note's pin.
       if (entry.primary) {
         persistWindowBounds(entry.window);
       }
       entry.primary = false;
-      // A note opened as a sticky window from the tabs layout is now one sticky window among the
-      // others, closed with them when the layout returns to tabs.
       entry.detachedSticky = false;
       entry.window.setAlwaysOnTop(Boolean(store.getNote(entry.noteId)?.alwaysOnTop));
       entry.window.setMinimumSize(STICKY_MIN_WIDTH, STICKY_MIN_HEIGHT);
       applyWindowChrome(entry.window, false);
-      targetWindows.add(entry.window);
     }
     for (const note of notes) {
       if (
@@ -899,22 +1092,13 @@ function syncWindowsForLayoutMode(activeNoteId, options = {}) {
       ) {
         continue;
       }
-      const window = ensureWindowForNote(note);
-      if (window) {
-        targetWindows.add(window);
-      }
+      ensureWindowForNote(note);
     }
-    if (options.arrangeStickyWindows) {
-      arrangeStickyWindows(notes);
-    }
-    return [...targetWindows];
+    return;
   }
 
   const primaryWindow = ensureTabsWindow(activeNoteId);
   const primaryId = primaryWindow?.id;
-  if (primaryWindow) {
-    targetWindows.add(primaryWindow);
-  }
 
   for (const entry of [...windows.values()]) {
     if (entry.window.id === primaryId) {
@@ -924,17 +1108,24 @@ function syncWindowsForLayoutMode(activeNoteId, options = {}) {
     }
     // Opened with Open as sticky (`notes:open-sticky`) while the app stays in the tabs layout.
     if (entry.detachedSticky) {
-      targetWindows.add(entry.window);
       continue;
     }
 
     closeWindowEntry(entry);
   }
-
-  return [...targetWindows];
 }
 
-async function updateLayoutMode(layoutMode, options = {}) {
+// One layout switch at a time: a switch opens, shows and closes windows over a few hundred
+// milliseconds, so a second one starts where the first ends.
+let layoutModeUpdates = Promise.resolve();
+
+function updateLayoutMode(layoutMode, options = {}) {
+  const update = layoutModeUpdates.then(() => applyLayoutMode(layoutMode, options));
+  layoutModeUpdates = update.catch(() => {});
+  return update;
+}
+
+async function applyLayoutMode(layoutMode, options = {}) {
   const previousLayoutMode = store.getLayoutMode();
   const willRecreateWindows =
     process.platform === "win32" &&
@@ -947,56 +1138,60 @@ async function updateLayoutMode(layoutMode, options = {}) {
     }
   }
   const nextLayoutMode = store.updateLayoutMode(layoutMode);
-  const isChangingMode = previousLayoutMode !== nextLayoutMode;
   const activeNoteId = options.activeNoteId;
 
-  if (isChangingMode) {
-    broadcastLayoutModeTransition({
-      phase: "start",
-      sourceMode: previousLayoutMode,
-      targetMode: nextLayoutMode,
-      noteCount: store.listNotes().length,
+  if (previousLayoutMode === nextLayoutMode) {
+    buildMenu();
+    syncWindowsForLayoutMode(activeNoteId, {
+      reopenClosedStickyWindows: nextLayoutMode === "sticky",
     });
+    broadcastLayoutMode(nextLayoutMode);
+    broadcastNotesChanged();
+    return nextLayoutMode;
   }
 
+  // Every open window shows its loading cover (LayoutTransitionOverlay) until the switch ends.
+  // Windows that stay take the new layout from main when they may change (`layout-mode:changed`);
+  // windows that close keep theirs.
+  const transition = {
+    sourceMode: previousLayoutMode,
+    targetMode: nextLayoutMode,
+    noteCount: store.listNotes().length,
+  };
+  broadcastLayoutModeTransition({ phase: "start", ...transition });
   try {
     if (nextLayoutMode === "sticky") {
       manuallyClosedStickyNoteIds.clear();
     }
     buildMenu();
-    const windowSyncOptions = {
-      reopenClosedStickyWindows: nextLayoutMode === "sticky",
-      arrangeStickyWindows:
-        previousLayoutMode !== "sticky" && nextLayoutMode === "sticky",
-    };
-    const targetWindows = isChangingMode && process.platform === "win32"
-      ? await recreateWindowsForLayoutMode(activeNoteId, {
-          ...windowSyncOptions,
-          flushEditors: false,
-        })
-      : syncWindowsForLayoutMode(activeNoteId, windowSyncOptions);
-    broadcastLayoutMode(nextLayoutMode);
+    if (willRecreateWindows) {
+      await recreateWindowsForLayoutMode(activeNoteId, {
+        flushEditors: false,
+        arrangeStickyWindows: nextLayoutMode === "sticky",
+        revealOnPaint: true,
+      });
+    } else if (nextLayoutMode === "sticky") {
+      await switchToStickyLayout();
+    } else {
+      await switchToTabsLayout(activeNoteId);
+    }
     broadcastNotesChanged();
-    await waitForWindowsReadyToShow(targetWindows ?? []);
     return nextLayoutMode;
   } finally {
-    if (isChangingMode) {
-      broadcastLayoutModeTransition({
-        phase: "finish",
-        sourceMode: previousLayoutMode,
-        targetMode: nextLayoutMode,
-        noteCount: store.listNotes().length,
-      });
-    }
+    broadcastLayoutModeTransition({ phase: "finish", ...transition });
   }
 }
 
-function arrangeStickyWindows(notes) {
+// Puts every open sticky note on a grid from the top left of the primary display's work area and
+// stores the places, so the windows a layout switch opens open there. Notes closed by hand get no
+// place. Returns each placed note's bounds by note id.
+function placeNotesOnStickyGrid(notes) {
+  const placed = new Map();
   const visibleNotes = notes.filter(
     (note) => !manuallyClosedStickyNoteIds.has(note.id),
   );
   if (visibleNotes.length === 0) {
-    return;
+    return placed;
   }
 
   const workArea = screen.getPrimaryDisplay().workArea;
@@ -1016,11 +1211,6 @@ function arrangeStickyWindows(notes) {
   );
 
   visibleNotes.forEach((note, index) => {
-    const entry = getEntriesForNote(note.id).find((candidate) => !candidate.primary);
-    if (!entry || entry.window.isDestroyed()) {
-      return;
-    }
-
     const row = Math.floor(index / columns);
     const column = index % columns;
     const bounds = {
@@ -1034,9 +1224,10 @@ function arrangeStickyWindows(notes) {
       height: STICKY_WINDOW_HEIGHT,
     };
 
-    entry.window.setBounds(bounds, true);
-    store.updateBounds(note.id, bounds);
+    placed.set(note.id, bounds);
   });
+  store.updateBoundsOfNotes(placed);
+  return placed;
 }
 
 function buildMenu() {
@@ -1325,6 +1516,17 @@ function installIpcHandlers() {
       !getDetachedStickyEntry(event.sender) &&
       store.getLayoutMode() === "tabs" &&
       store.getEditorPreferences().launchIntro !== false;
+  });
+
+  // The renderer has drawn its note in this layout (src/hooks/useWindowPaintReport.js); a layout
+  // switch waits for it before it shows the window (waitForWindowPainted).
+  ipcMain.on("window:painted", (event, layoutMode) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window || window.isDestroyed()) {
+      return;
+    }
+    window.__notepanePaintedLayoutMode = layoutMode;
+    window.emit("notepane:painted", layoutMode);
   });
 
   ipcMain.handle("app-theme:update", (_event, payload) => {

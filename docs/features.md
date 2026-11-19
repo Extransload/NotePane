@@ -6,6 +6,10 @@
 - Tab session mode: one primary window with sidebar note/session tabs
 - Sticky mode: each session opens as an individual sticky window
 - Switching into Sticky mode arranges sessions as compact sticky-note windows
+- Switching between Tabs and Sticky mode shows a short loading cover ("Opening sticky windows" / "Switching to
+  tabs") over the current windows until the other layout's windows have drawn their notes; then they fade in, one
+  after another, as the old ones fade out, so no window ever appears blank or half drawn (at once, without fades,
+  under reduced motion)
 - Closing an individual sticky window keeps it closed until Show All NotePanes or another Sticky-mode entry
 - Sticky mode windows have per-session pastel color, opacity, pinning, layout, and editor controls in a header settings modal
 - Sticky color/opacity carries back to the sidebar session tab color when returning to Tab session mode
@@ -284,13 +288,19 @@ BlockNote handles editor interaction directly.
 
 ## Media tools
 
-- Image blocks expose an app-level image toolbar after selection
-- Right-clicking an image, video, audio or file block opens its menu: Open (in the default app, or the browser for a
-  web address), Preview (images and videos, shown large in the window), Show in Finder (a linked local file), Save
-  As..., Copy Image (images), Copy Link or Copy File Path (web and linked files), Crop... (images), left/centre/right
-  alignment (images and videos), and Delete. The formatting toolbar steps aside while the menu is open
-- Image download uses the desktop save dialog
-- Image crop replaces the selected image block with a cropped PNG data URL
+- One menu holds every action of an image, video, audio or file block. Right-clicking the block opens it at the
+  pointer; as in Notion, a small ⋯ button ("More actions") on the block's top-right corner, shown while the pointer is
+  on the block or the block is selected, opens the same menu under the button (Enter or Space opens it from the
+  keyboard with its first item focused, the arrow keys move, Escape closes it and returns focus to the button).
+  Clicking a media block shows no formatting toolbar
+- The menu, in groups: Open (in the default app, or the browser for a web address), Preview (images and videos, shown
+  large in the window), Show in Finder (a linked local file) · Caption and Rename... (edited in place in the menu:
+  Enter keeps the text, Escape leaves it), Replace... (BlockNote's upload and embed panel), Crop... (images), Show
+  preview / Hide preview (images and videos: the picture or player, or a file line in its place) · left/centre/right
+  alignment (images and videos) · Save As..., Copy Image (images), Copy Link or Copy File Path (web and linked
+  files) · Delete. The formatting toolbar of a text selection steps aside while the menu is open
+- Save As... uses the desktop save dialog
+- Crop... replaces the image block's picture with a cropped PNG, and cropping again starts from the original
 
 ## Local storage
 

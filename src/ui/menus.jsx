@@ -1,9 +1,12 @@
 import {
+  Captions,
   Copy,
   CopyPlus,
   Crop,
   Download,
   ExternalLink,
+  Eye,
+  EyeOff,
   FileDown,
   FilePlus,
   Folder,
@@ -15,6 +18,7 @@ import {
   Link,
   PanelTopOpen,
   PencilLine,
+  Replace,
   ScanEye,
   SlidersHorizontal,
   TextAlignCenter,
@@ -27,6 +31,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useId,
   useRef,
   useState,
 } from "react";
@@ -53,6 +58,10 @@ import {
   moveFocusAmongItems,
 } from "../utils/dom.js";
 import {
+  FLOATING_EDITOR_MENU_GAP,
+  FLOATING_EDITOR_MENU_MARGIN,
+} from "../editor/floatingMenus.js";
+import {
   getFloatingDropdownMenuStyle,
 } from "./FloatingDropdownMenu.jsx";
 
@@ -61,7 +70,9 @@ import {
  * a rectangle of no size): below it, or above it when there is no room below, and clamped to the
  * viewport by the dropdown placement helper. The menu is laid out hidden first, so the helper
  * works with its real size: its layout size, as its pop-in starts scaled down and a menu placed
- * above its anchor by that smaller height would cover the anchor once it has grown.
+ * above its anchor by that smaller height would cover the anchor once it has grown. These menus
+ * do not scroll, so one taller than the room below opens above when it fits there, and else rises
+ * until its last item shows, where the helper would have shortened it.
  */
 function useAnchoredMenuStyle(menuRef, { left, top, width = 0, height = 0 }, align = "start") {
   const [style, setStyle] = useState(null);
@@ -91,6 +102,17 @@ function useAnchoredMenuStyle(menuRef, { left, top, width = 0, height = 0 }, ali
         preferredWidth: size.width,
       },
     );
+    const roomAbove = top - FLOATING_EDITOR_MENU_GAP - FLOATING_EDITOR_MENU_MARGIN;
+    const fitsBelow = parseFloat(position.top) + size.height <=
+      window.innerHeight - FLOATING_EDITOR_MENU_MARGIN;
+    if (placement === "bottom" && !fitsBelow) {
+      position.top = size.height <= roomAbove
+        ? `${top - FLOATING_EDITOR_MENU_GAP - size.height}px`
+        : `${Math.max(
+          FLOATING_EDITOR_MENU_MARGIN,
+          window.innerHeight - size.height - FLOATING_EDITOR_MENU_MARGIN,
+        )}px`;
+    }
     setStyle({ ...position, maxHeight: undefined, width: undefined });
   }, [align, height, left, menuRef, top, width]);
 
@@ -135,7 +157,9 @@ function moveMenuFocus(event) {
 /**
  * A menu opened by the pointer leaves focus where it was, so the menu's own key handling cannot
  * hear the keyboard yet. While it is open, the first Down or Up arrow from outside it moves focus
- * to its first or last item; once it closes, focus goes back to where the keyboard took it from.
+ * to its first or last item (a menu opened from the keyboard, ContextMenu's `focusOnOpen`, takes
+ * focus as it shows). Once it closes with focus inside it (or lost), focus goes back to where it
+ * was when the menu opened.
  */
 function useKeyboardEntry(menuRef, isClosing) {
   useEffect(() => {
@@ -143,7 +167,10 @@ function useKeyboardEntry(menuRef, isClosing) {
     if (!menu || isClosing) {
       return undefined;
     }
-    let returnFocusTo = null;
+    const opener = document.activeElement;
+    const returnFocusTo = opener && opener !== document.body && !menu.contains(opener)
+      ? opener
+      : null;
     const handleKeyDown = (event) => {
       if (
         (event.key !== "ArrowDown" && event.key !== "ArrowUp") ||
@@ -158,7 +185,6 @@ function useKeyboardEntry(menuRef, isClosing) {
       }
       event.preventDefault();
       event.stopPropagation();
-      returnFocusTo = document.activeElement;
       items.at(event.key === "ArrowDown" ? 0 : -1).focus();
     };
     document.addEventListener("keydown", handleKeyDown, true);
@@ -176,17 +202,24 @@ function useKeyboardEntry(menuRef, isClosing) {
 }
 
 /**
- * A menu opened at the pointer: placed below and right of it, flipped and clamped inside the
- * window (useAnchoredMenuStyle), with arrow keys moving between its items (useKeyboardEntry
- * brings them in from outside). `className` names the menu for the stylesheet and for the
- * window's outside-click handling.
+ * A menu opened at the pointer (`x`, `y`) or at a button (`anchor`, { left, top, width, height,
+ * align }): placed below it, flipped and clamped inside the window (useAnchoredMenuStyle), with
+ * arrow keys moving between its items (useKeyboardEntry brings them in from outside).
+ * `className` names the menu for the stylesheet and for the window's outside-click handling.
  */
-function ContextMenu({ x, y, label, className, children }) {
+function ContextMenu({ x, y, anchor, focusOnOpen = false, label, className, children }) {
   const menuRef = useRef(null);
   const { rootProps, isClosing } = usePresenceContext();
   const rootRef = useMergedRefs(menuRef, rootProps.ref);
-  const position = useAnchoredMenuStyle(menuRef, { left: x, top: y });
+  const position = useAnchoredMenuStyle(menuRef, anchor ?? { left: x, top: y }, anchor?.align);
   useKeyboardEntry(menuRef, isClosing);
+  // The menu is laid out hidden first, and a hidden item cannot take focus.
+  const isPlaced = position.visibility !== "hidden";
+  useEffect(() => {
+    if (focusOnOpen && isPlaced) {
+      menuRef.current?.querySelector(MENU_ITEM_SELECTOR)?.focus();
+    }
+  }, [focusOnOpen, isPlaced]);
 
   return (
     <div
@@ -372,83 +405,169 @@ const ALIGNMENTS = [
 ];
 
 /**
- * The right-click menu of an image, video, audio or file block. An action left undefined is not
- * offered: `onPreview` for media the app cannot show, `onReveal` for a file that is not linked
- * from disk, `onCopyLink` for a file kept with the note, `onCopyImage` and `onCrop` for anything
- * but an image, `onAlign` for blocks without an alignment.
+ * One line of text edited inside a menu, as the menu's only content: Enter keeps it, Escape
+ * closes the menu without a change.
+ */
+function MenuTextField({ label, name, value, onSubmit }) {
+  const inputId = useId();
+  return (
+    <div className="context-menu-field">
+      <label className="context-menu-heading" htmlFor={inputId}>{label}</label>
+      <input
+        id={inputId}
+        name={name}
+        type="text"
+        defaultValue={value}
+        autoFocus
+        spellCheck={false}
+        onFocus={(event) => event.currentTarget.select()}
+        onKeyDown={(event) => {
+          // Enter that ends an IME composition (Korean, Japanese) only commits the syllable.
+          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            onSubmit(event.currentTarget.value);
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * The menu of an image, video, audio or file block, opened by a right click at the pointer or by
+ * the block's ⋯ button at the button (`anchor`). An action left undefined is not offered:
+ * `onPreview` and `onTogglePreview` for media the app cannot show, `onReveal` for a file that is
+ * not linked from disk, `onCopyLink` for a file kept with the note, `onCopyImage` and `onCrop`
+ * for anything but an image, `onAlign` for blocks without an alignment. Caption and Rename...
+ * turn the menu into a text field for the block's caption or file name.
  */
 export function MediaContextMenu({
   x,
   y,
+  anchor,
+  focusOnOpen,
   name,
+  caption,
   copyLinkLabel,
   alignment,
+  isPreviewShown,
   onOpen,
   onPreview,
   onReveal,
+  onSetCaption,
+  onRename,
+  onReplace,
+  onCrop,
+  onTogglePreview,
+  onAlign,
   onSave,
   onCopyImage,
   onCopyLink,
-  onCrop,
-  onAlign,
   onDelete,
 }) {
+  const [field, setField] = useState(null);
+
   return (
-    <ContextMenu x={x} y={y} label={`Options for ${name}`} className="media-context-menu">
-      <div className="context-menu-heading" title={name}>{name}</div>
-      <MenuItem icon={<ExternalLink {...MENU_ICON_PROPS} />} onSelect={onOpen}>
-        Open
-      </MenuItem>
-      {onPreview && (
-        <MenuItem icon={<ScanEye {...MENU_ICON_PROPS} />} onSelect={onPreview}>
-          Preview
-        </MenuItem>
+    <ContextMenu
+      x={x}
+      y={y}
+      anchor={anchor}
+      focusOnOpen={focusOnOpen}
+      label={`Options for ${name}`}
+      className="media-context-menu"
+    >
+      {field === "caption" && (
+        <MenuTextField label="Caption" name="file-caption" value={caption} onSubmit={onSetCaption} />
       )}
-      {onReveal && (
-        <MenuItem icon={<FolderOpen {...MENU_ICON_PROPS} />} onSelect={onReveal}>
-          Show in Finder
-        </MenuItem>
+      {field === "name" && (
+        <MenuTextField label="File name" name="file-name" value={name} onSubmit={onRename} />
       )}
-      <MenuSeparator />
-      <MenuItem icon={<Download {...MENU_ICON_PROPS} />} onSelect={onSave}>
-        Save As...
-      </MenuItem>
-      {onCopyImage && (
-        <MenuItem icon={<Copy {...MENU_ICON_PROPS} />} onSelect={onCopyImage}>
-          Copy Image
-        </MenuItem>
-      )}
-      {onCopyLink && (
-        <MenuItem icon={<Link {...MENU_ICON_PROPS} />} onSelect={onCopyLink}>
-          {copyLinkLabel}
-        </MenuItem>
-      )}
-      {(onCrop || onAlign) && <MenuSeparator />}
-      {onCrop && (
-        <MenuItem icon={<Crop {...MENU_ICON_PROPS} />} onSelect={onCrop}>
-          Crop...
-        </MenuItem>
-      )}
-      {onAlign && (
-        <div className="context-menu-segments" role="group" aria-label="Alignment">
-          {ALIGNMENTS.map(([value, label, Icon]) => (
-            <button
-              key={value}
-              type="button"
-              aria-label={label}
-              aria-pressed={alignment === value}
-              onMouseDown={preventFocusLoss}
-              onClick={() => onAlign(value)}
+      {!field && (
+        <>
+          <div className="context-menu-heading" title={name}>{name}</div>
+          <MenuItem icon={<ExternalLink {...MENU_ICON_PROPS} />} onSelect={onOpen}>
+            Open
+          </MenuItem>
+          {onPreview && (
+            <MenuItem icon={<ScanEye {...MENU_ICON_PROPS} />} onSelect={onPreview}>
+              Preview
+            </MenuItem>
+          )}
+          {onReveal && (
+            <MenuItem icon={<FolderOpen {...MENU_ICON_PROPS} />} onSelect={onReveal}>
+              Show in Finder
+            </MenuItem>
+          )}
+          <MenuSeparator />
+          {onSetCaption && (
+            <MenuItem icon={<Captions {...MENU_ICON_PROPS} />} onSelect={() => setField("caption")}>
+              Caption
+            </MenuItem>
+          )}
+          {onRename && (
+            <MenuItem icon={<PencilLine {...MENU_ICON_PROPS} />} onSelect={() => setField("name")}>
+              Rename...
+            </MenuItem>
+          )}
+          {onReplace && (
+            <MenuItem icon={<Replace {...MENU_ICON_PROPS} />} onSelect={onReplace}>
+              Replace...
+            </MenuItem>
+          )}
+          {onCrop && (
+            <MenuItem icon={<Crop {...MENU_ICON_PROPS} />} onSelect={onCrop}>
+              Crop...
+            </MenuItem>
+          )}
+          {onTogglePreview && (
+            <MenuItem
+              icon={isPreviewShown
+                ? <EyeOff {...MENU_ICON_PROPS} />
+                : <Eye {...MENU_ICON_PROPS} />}
+              onSelect={onTogglePreview}
             >
-              <Icon {...MENU_ICON_PROPS} />
-            </button>
-          ))}
-        </div>
+              {isPreviewShown ? "Hide preview" : "Show preview"}
+            </MenuItem>
+          )}
+          {onAlign && (
+            <>
+              <MenuSeparator />
+              <div className="context-menu-segments" role="group" aria-label="Alignment">
+                {ALIGNMENTS.map(([value, label, Icon]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-label={label}
+                    aria-pressed={alignment === value}
+                    onMouseDown={preventFocusLoss}
+                    onClick={() => onAlign(value)}
+                  >
+                    <Icon {...MENU_ICON_PROPS} />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          <MenuSeparator />
+          <MenuItem icon={<Download {...MENU_ICON_PROPS} />} onSelect={onSave}>
+            Save As...
+          </MenuItem>
+          {onCopyImage && (
+            <MenuItem icon={<Copy {...MENU_ICON_PROPS} />} onSelect={onCopyImage}>
+              Copy Image
+            </MenuItem>
+          )}
+          {onCopyLink && (
+            <MenuItem icon={<Link {...MENU_ICON_PROPS} />} onSelect={onCopyLink}>
+              {copyLinkLabel}
+            </MenuItem>
+          )}
+          <MenuSeparator />
+          <MenuItem icon={<Trash2 {...MENU_ICON_PROPS} />} tone="danger" onSelect={onDelete}>
+            Delete
+          </MenuItem>
+        </>
       )}
-      <MenuSeparator />
-      <MenuItem icon={<Trash2 {...MENU_ICON_PROPS} />} tone="danger" onSelect={onDelete}>
-        Delete
-      </MenuItem>
     </ContextMenu>
   );
 }

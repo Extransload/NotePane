@@ -146,6 +146,29 @@
   box-shadow: var(--sticky-table-control-shadow);
 }
 
+/* Caption and Rename... in the media menu: one line of text in place of the items. */
+.context-menu-field {
+  display: grid;
+  gap: 2px;
+  padding-bottom: 4px;
+}
+
+.context-menu-field input {
+  height: 28px;
+  margin: 0 4px;
+  padding: 0 8px;
+  border: 1px solid var(--sticky-border-color);
+  border-radius: 6px;
+  background: var(--sticky-control-hover-bg);
+  color: var(--sticky-panel-text);
+  font: 500 12.5px/1 var(--notepane-ui-font);
+}
+
+.context-menu-field input:focus-visible {
+  outline: 2px solid var(--notepane-focus-outline);
+  outline-offset: -1px;
+}
+
 .export-format-menu {
   min-width: 190px;
 }
