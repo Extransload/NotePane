@@ -1,6 +1,6 @@
 {
   "name": "notepane",
-  "version": "0.5.9",
+  "version": "0.5.10",
   "private": true,
   "license": "MIT",
   "description": "A local-first desktop note pane app with tabbed sessions and sticky windows.",
