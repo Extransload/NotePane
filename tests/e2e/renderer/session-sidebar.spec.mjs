@@ -1418,11 +1418,11 @@ test("switches sessions without fading the window in again", async ({ page }) =>
   }
 });
 
-async function openTabsSettings(page) {
+async function openSidebarSettings(page) {
   await page.keyboard.press(modifierShortcut(","));
   const settings = page.getByRole("dialog", { name: "Preferences window" });
   await expect(settings).toBeVisible();
-  await settings.getByRole("tab", { name: "Tabs", exact: true }).click();
+  await settings.getByRole("tab", { name: "Sidebar", exact: true }).click();
   return settings;
 }
 
@@ -1430,7 +1430,7 @@ async function openTabsSettings(page) {
 // a border, on tabs without a colour of their own.
 test("colours the open and other tabs from Settings", async ({ page }) => {
   await createBlankSession(page);
-  const settings = await openTabsSettings(page);
+  const settings = await openSidebarSettings(page);
   await settings.locator("[data-setting-id='tabActiveFill']").getByRole("button", { name: "Green" }).click();
   await settings.locator("[data-setting-id='tabInactiveFill']").getByRole("button", { name: "Purple" }).click();
   await settings.locator("[data-setting-id='tabBorder']").getByRole("radio", { name: "None" }).click();
@@ -1466,7 +1466,7 @@ test("hidden tab numbers and shortcuts free their space for the title", async ({
   const titleWidth = () => row.locator(".session-tab-button").evaluate((button) => button.getBoundingClientRect().width);
   const widthWithBoth = await titleWidth();
 
-  const settings = await openTabsSettings(page);
+  const settings = await openSidebarSettings(page);
   await settings.getByRole("switch", { name: "Show tab numbers" }).click();
   await settings.getByRole("switch", { name: "Show tab shortcuts" }).click();
   await settings.getByRole("button", { name: "Close preferences" }).click();
@@ -1489,7 +1489,7 @@ test("hidden tab numbers keep each tab's shortcut on the title's line", async ({
   const row = page.locator(".session-tab-row").first();
   const rowHeight = (await row.boundingBox()).height;
 
-  const settings = await openTabsSettings(page);
+  const settings = await openSidebarSettings(page);
   await settings.getByRole("switch", { name: "Show tab numbers" }).click();
   await settings.getByRole("button", { name: "Close preferences" }).click();
 

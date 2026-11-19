@@ -28,17 +28,13 @@ import {
   Gauge,
 } from "./Gauge.jsx";
 import {
-  NotePaneWordmark,
-} from "./icons.jsx";
-import {
-  PreferencesCard,
-} from "./PreferencesCard.jsx";
-import {
+  SettingRow,
+  SettingsGroup,
   Switch,
 } from "./settingsControls.jsx";
 
 // The page electron/appUpdates.cjs checks for releases (its RELEASES_URL).
-export const RELEASES_URL = "https://github.com/Extransload/NotePane/releases";
+const RELEASES_URL = "https://github.com/Extransload/NotePane/releases";
 
 // What the status line says for each result of `app:check-for-updates` (electron/main.cjs).
 function describeUpdateCheck(update) {
@@ -119,11 +115,17 @@ function describeSelfUpdate(selfUpdate) {
 }
 
 /**
- * Preferences > About: the wordmark, the running version, what NotePane is, a manual update
- * check, the download of a release on offer, and whether releases download without asking. The
- * browser preview has no bridge, so it shows the package version and no update check.
+ * Settings > General: the running version and its update (a manual check, the download of a
+ * release on offer, whether releases download without asking, what changed), then what happens
+ * at startup. The browser preview has no bridge, so it shows the package version and no update
+ * check.
  */
-export function AboutPreferencesSection({ autoDownloadUpdates = false, onAutoDownloadUpdatesChange }) {
+export function GeneralPreferencesPage({
+  autoDownloadUpdates = false,
+  onAutoDownloadUpdatesChange,
+  launchIntro,
+  onLaunchIntroChange,
+}) {
   const [appInfo, setAppInfo] = useState(null);
   const [update, setUpdate] = useState({ status: "idle" });
   const { update: selfUpdate, downloadUpdate, installUpdate, openRelease } = useAppUpdate();
@@ -166,60 +168,55 @@ export function AboutPreferencesSection({ autoDownloadUpdates = false, onAutoDow
   const { text, detail, tone } = selfDescription ?? describeUpdateCheck(update);
 
   return (
-    <>
-      <section className="preferences-card about-card" aria-labelledby="about-app-name">
-        <div className="about-identity">
-          <h3 id="about-app-name" className="sr-only">NotePane</h3>
-          <NotePaneWordmark />
-          <div className="about-version" data-testid="about-version">Version {version}</div>
-        </div>
-        <p className="about-description" data-testid="about-description">
-          NotePane is a block-based note app built on BlockNote. Keep your notes as tabs in one
-          window, or spread them across the desktop as sticky notes. Every note stays on this
-          computer, and NotePane works offline.
-        </p>
-        {appInfo?.electronVersion && (
-          <div className="about-runtime" data-testid="about-runtime">
-            Electron {appInfo.electronVersion} · Chromium {appInfo.chromiumVersion}
-          </div>
-        )}
-      </section>
-      <PreferencesCard
-        title="Updates"
+    <div className="look-page">
+      <SettingsGroup
+        label="Updates"
         description="The installed app also checks at launch and every six hours."
       >
-        <div className="preference-setting-row about-update-row">
-          <div className="about-update-text">
-            <div className="preference-setting-title">Latest version</div>
-            <div
-              className={`preferences-section-description about-update-status${
-                tone === "error" ? " is-error" : tone === "active" ? " is-active" : ""
-              }`}
-              role="status"
-              data-testid="update-status"
-              data-update-status={shownStatus}
-              title={tone === "error" ? detail : undefined}
-            >
-              <span key={shownStatus} className="about-update-status-text">{text}</span>
-            </div>
-            {detail && (
-              <div className="preferences-section-description about-update-detail">{detail}</div>
-            )}
-            {!checking && isUpdateBusy(selfUpdate) && (
-              <div
-                className="about-update-progress gauge-host"
-                role="progressbar"
-                aria-label="Update progress"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={getUpdateProgress(selfUpdate) === null
-                  ? undefined
-                  : Math.floor(getUpdateProgress(selfUpdate) * 100)}
+        <SettingRow
+          id="appVersion"
+          title={<span data-testid="app-version">NotePane {version}</span>}
+          description={appInfo?.electronVersion && (
+            <span className="general-runtime" data-testid="app-runtime">
+              Electron {appInfo.electronVersion} · Chromium {appInfo.chromiumVersion}
+            </span>
+          )}
+        />
+        <SettingRow
+          id="checkForUpdates"
+          title="Latest version"
+          className="general-update-row"
+          description={
+            <>
+              <span
+                className={`general-update-status${
+                  tone === "error" ? " is-error" : tone === "active" ? " is-active" : ""
+                }`}
+                role="status"
+                data-testid="update-status"
+                data-update-status={shownStatus}
+                title={tone === "error" ? detail : undefined}
               >
-                <Gauge progress={getUpdateProgress(selfUpdate)} />
-              </div>
-            )}
-          </div>
+                <span key={shownStatus} className="general-update-status-text">{text}</span>
+              </span>
+              {detail && <span className="general-update-detail">{detail}</span>}
+              {!checking && isUpdateBusy(selfUpdate) && (
+                <span
+                  className="general-update-progress gauge-host"
+                  role="progressbar"
+                  aria-label="Update progress"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={getUpdateProgress(selfUpdate) === null
+                    ? undefined
+                    : Math.floor(getUpdateProgress(selfUpdate) * 100)}
+                >
+                  <Gauge progress={getUpdateProgress(selfUpdate)} />
+                </span>
+              )}
+            </>
+          }
+        >
           <div className="preference-backup-actions">
             {selfUpdate.status === "available" && (
               <button
@@ -262,34 +259,30 @@ export function AboutPreferencesSection({ autoDownloadUpdates = false, onAutoDow
               onClick={() => void checkForUpdates()}
             >
               <RefreshCw
-                className={`about-update-icon${checking ? " is-spinning" : ""}`}
+                className={`general-update-icon${checking ? " is-spinning" : ""}`}
                 size={13}
                 aria-hidden="true"
               />
               Check for updates
             </button>
           </div>
-        </div>
-        <div className="preference-setting-row" data-setting-id="autoDownloadUpdates">
-          <div>
-            <div className="preference-setting-title">Download updates automatically</div>
-            <div className="preferences-section-description">
-              Off asks first: a new version shows as Update to x.y.z beside the title.
-            </div>
-          </div>
+        </SettingRow>
+        <SettingRow
+          id="autoDownloadUpdates"
+          title="Download updates automatically"
+          description="Off asks before downloading a new version."
+        >
           <Switch
             label="Download updates automatically"
             checked={autoDownloadUpdates}
             onChange={(checked) => onAutoDownloadUpdatesChange?.(checked)}
           />
-        </div>
-        <div className="preference-setting-row">
-          <div>
-            <div className="preference-setting-title">What's new</div>
-            <div className="preferences-section-description">
-              What changed in each version, on GitHub.
-            </div>
-          </div>
+        </SettingRow>
+        <SettingRow
+          id="releaseNotes"
+          title="What's new"
+          description="What changed in each version, on GitHub."
+        >
           <a
             className="preference-data-button"
             href={RELEASES_URL}
@@ -300,8 +293,19 @@ export function AboutPreferencesSection({ autoDownloadUpdates = false, onAutoDow
             <ExternalLink size={13} aria-hidden="true" />
             Release notes
           </a>
-        </div>
-      </PreferencesCard>
-    </>
+        </SettingRow>
+      </SettingsGroup>
+      <SettingsGroup label="Startup">
+        <SettingRow
+          id="launchIntro"
+          title="Show intro on launch"
+          description="The NotePane logo plays as the app opens; a key or click skips it."
+          changed={launchIntro !== true}
+          onReset={() => onLaunchIntroChange(true)}
+        >
+          <Switch label="Show intro on launch" checked={launchIntro} onChange={onLaunchIntroChange} />
+        </SettingRow>
+      </SettingsGroup>
+    </div>
   );
 }

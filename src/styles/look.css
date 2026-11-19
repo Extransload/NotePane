@@ -457,7 +457,7 @@ html[data-tab-strength] .session-tab-row:not(.is-plain).active {
   background: color-mix(in srgb, var(--session-tab-active-bg) var(--look-tab-strength), transparent);
 }
 
-/* Keep text readable (look.readableText): while the background shows through, the text of the
+/* Text glow (look.readableText): while the background shows through, the text of the
    window's own areas gets a soft halo of the window colour, so it stays legible over a bright or
    busy picture. The muted labels move halfway to the text colour. */
 html[data-look-readable] .session-sidebar,

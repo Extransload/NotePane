@@ -774,12 +774,12 @@ test("turns the sidebar compact in a narrow window without losing the wide-windo
 });
 
 const PREFERENCE_PAGE_NAMES = [
-  "About",
+  "General",
   "Appearance",
-  "Fonts",
-  "Background",
-  "Tabs",
+  "Window",
+  "Sidebar",
   "Editor",
+  "Search",
   "Keyboard",
   "Trash",
   "Backup",
@@ -837,6 +837,30 @@ test("lays Preferences out as a sidebar of pages beside a scrolling page of card
   await expect(preferences.getByRole("button", { name: "Close preferences" })).toBeInViewport();
 });
 
+// Each page has its Settings: command in the palette, and the ids of pages that were merged into
+// others (an older build's About, Fonts, Background and Tabs) open the page their settings went to.
+test("opens every Settings page from the palette, and old page ids open where their settings went", async ({ page }) => {
+  const paletteDialog = page.getByRole("dialog", { name: "Search notes" });
+  const input = paletteDialog.getByRole("textbox", { name: "Search notes" });
+  const preferences = page.getByRole("dialog", { name: "Preferences window" });
+  for (const pageName of PREFERENCE_PAGE_NAMES) {
+    await page.keyboard.press(modifierShortcut("P"));
+    await input.fill(`>Settings: ${pageName}`);
+    await paletteDialog.getByRole("option", { name: new RegExp(`^Settings: ${pageName}`) }).click();
+    await expect(preferences.getByRole("tab", { name: pageName })).toHaveAttribute("aria-selected", "true");
+    await expect(preferences.getByRole("heading", { level: 2 })).toHaveText(pageName);
+    await preferences.getByRole("button", { name: "Close preferences" }).click();
+    await expect(preferences).toHaveCount(0);
+  }
+
+  const openedPages = await page.evaluate(async () => {
+    const { normalizePreferencePageId } = await import("/src/ui/preferencesWindow.jsx");
+    return ["about", "fonts", "background", "surfaces", "tabs", "general", "no-such-page"]
+      .map(normalizePreferencePageId);
+  });
+  expect(openedPages).toEqual(["general", "editor", "window", "window", "sidebar", "general", "theme"]);
+});
+
 test("finds a setting from the Preferences search and opens its page", async ({ page }) => {
   await page.keyboard.press(modifierShortcut(","));
   const preferences = page.getByRole("dialog", { name: "Preferences window" });
@@ -844,7 +868,7 @@ test("finds a setting from the Preferences search and opens its page", async ({ 
   const search = preferences.getByRole("searchbox", { name: "Search settings" });
 
   // Command-F searches settings while the window is open, not the note behind it.
-  await preferences.getByRole("tab", { name: "Tabs" }).click();
+  await preferences.getByRole("tab", { name: "Sidebar" }).click();
   await page.keyboard.press(modifierShortcut("f"));
   await expect(search).toBeFocused();
   await expect(page.getByRole("search", { name: "Find in note" })).toHaveCount(0);
@@ -852,36 +876,45 @@ test("finds a setting from the Preferences search and opens its page", async ({ 
   await search.fill("line height");
   const results = preferences.getByRole("listbox", { name: "Settings search results" });
   await expect(results.getByRole("option").first()).toContainText("Line height");
-  await expect(results.getByRole("option").first()).toContainText("App › Fonts");
+  await expect(results.getByRole("option").first()).toContainText("App › Editor");
   await expect(preferences.getByRole("heading", { level: 2 })).toHaveText("Search");
 
   // Escape in a filled field clears it and leaves the window open.
   await page.keyboard.press("Escape");
   await expect(search).toHaveValue("");
   await expect(preferences).toBeVisible();
-  await expect(preferences.getByRole("heading", { level: 2 })).toHaveText("Tabs");
+  await expect(preferences.getByRole("heading", { level: 2 })).toHaveText("Sidebar");
 
   await search.fill("zzzz-no-such-setting");
   await expect(preferences.getByText(/^No settings match/)).toBeVisible();
 
   await search.fill("line height");
   await page.keyboard.press("Enter");
-  await expect(preferences.getByRole("tab", { name: "Fonts" }))
+  await expect(preferences.getByRole("tab", { name: "Editor" }))
     .toHaveAttribute("aria-selected", "true");
   await expect(search).toHaveValue("");
   const row = preferences.locator("[data-setting-id='lineHeight']");
   await expect(row).toHaveAttribute("data-search-hit", "");
   await expect(row).toBeInViewport();
 
-  // A row this window does not render itself is found by its control.
+  // A result names the page it is on; the update check is on General.
   await search.fill("check for updates");
   const updatesResult = results.getByRole("option").first();
-  await expect(updatesResult).toContainText("App › About");
+  await expect(updatesResult).toContainText("App › General");
   await updatesResult.click();
-  await expect(preferences.getByRole("tab", { name: "About" }))
+  await expect(preferences.getByRole("tab", { name: "General" }))
     .toHaveAttribute("aria-selected", "true");
-  await expect(preferences.locator(".about-update-row[data-search-hit]"))
+  await expect(preferences.locator("[data-setting-id='checkForUpdates'][data-search-hit]"))
     .toContainText("Latest version");
+
+  // A row behind More colors opens it.
+  await search.fill("other tabs text");
+  const textResult = results.getByRole("option").first();
+  await expect(textResult).toContainText("Inactive tab text");
+  await expect(textResult).toContainText("App › Sidebar");
+  await textResult.click();
+  await expect(preferences.getByRole("button", { name: "More colors" })).toHaveAttribute("aria-expanded", "true");
+  await expect(preferences.locator("[data-setting-id='tabInactiveText']")).toHaveAttribute("data-search-hit", "");
 
   // With the field empty, Escape closes the window as before.
   await search.focus();

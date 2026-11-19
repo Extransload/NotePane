@@ -37,8 +37,8 @@ test("Electron test windows stay out of sight", async () => {
   }
 });
 
-test("Electron About page shows the app version and leaves update checks to the installed app", async () => {
-  const electronApp = await launchApp(createTemporaryDirectory("notepane-about-"));
+test("Electron Settings > General shows the app version and leaves update checks to the installed app", async () => {
+  const electronApp = await launchApp(createTemporaryDirectory("notepane-general-"));
 
   try {
     const page = await electronApp.firstWindow();
@@ -50,15 +50,15 @@ test("Electron About page shows the app version and leaves update checks to the 
     }));
 
     const preferences = await openSettings(page);
-    await preferences.getByRole("tab", { name: "About" }).click();
-    const about = preferences.getByRole("tabpanel", { name: "About" });
-    await expect(about.getByTestId("about-version")).toHaveText(`Version ${version}`);
-    await expect(about.getByTestId("about-runtime"))
+    await preferences.getByRole("tab", { name: "General" }).click();
+    const general = preferences.getByRole("tabpanel", { name: "General" });
+    await expect(general.getByTestId("app-version")).toHaveText(`NotePane ${version}`);
+    await expect(general.getByTestId("app-runtime"))
       .toHaveText(`Electron ${electronVersion} · Chromium ${chromiumVersion}`);
 
     // A test build is unpackaged, so the main process runs no update check.
-    await about.getByRole("button", { name: "Check for updates" }).click();
-    await expect(about.getByTestId("update-status")).toHaveText("Update checks run in the installed app");
+    await general.getByRole("button", { name: "Check for updates" }).click();
+    await expect(general.getByTestId("update-status")).toHaveText("Update checks run in the installed app");
   } finally {
     await electronApp.close();
   }

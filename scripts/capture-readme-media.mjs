@@ -193,7 +193,7 @@ const SCENES = {
     try {
       await page.keyboard.press(`${MOD}+,`);
       const settingsWindow = page.getByRole("dialog", { name: "Preferences window" });
-      await settingsWindow.getByRole("tab", { name: "Background" }).click();
+      await settingsWindow.getByRole("tab", { name: "Window" }).click();
       await settingsWindow.locator("[data-setting-id='floatingBlur']").scrollIntoViewIfNeeded();
       await settle(page);
       await shot(page, "settings");

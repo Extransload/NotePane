@@ -33,7 +33,7 @@ const DARK_SCHEME_DIMMING = 2 / 3;
 
 const STRONG_BORDER = "color-mix(in srgb, var(--sticky-text-color) 32%, transparent)";
 
-// The window's own areas, whose text "Keep text readable" looks after once one of them lets this
+// The window's own areas, whose text "Text glow" looks after once one of them lets this
 // much of the background through.
 const READABLE_AREAS = ["sidebar", "header", "editor"];
 const READABLE_BELOW_OPACITY = 90;

@@ -28,7 +28,7 @@ test("the default look leaves the app as it was", async ({ page }) => {
 });
 
 test("a background picture shows through frosted glass, and text stays readable", async ({ page }) => {
-  await openLookPage(page, "Background");
+  await openLookPage(page, "Window");
   await settings(page).getByRole("radio", { name: "Picture" }).click();
   await expect.poll(() => rootAttribute(page, "data-backdrop")).toBe("picture");
   expect(await rootVariable(page, "--look-backdrop-image")).toContain("dawn");
@@ -70,11 +70,11 @@ test("a background picture shows through frosted glass, and text stays readable"
     const { sidebar, header, editor } = await fills();
     return sidebar === editor && header === editor;
   }).toBe(true);
-  // Text over it gets a halo, until Keep text readable is turned off.
+  // Text over it gets a halo, until Text glow is turned off.
   expect(await rootAttribute(page, "data-look-readable")).toBe("");
   await expect.poll(() => page.getByTestId("session-sidebar")
     .evaluate((element) => getComputedStyle(element).textShadow)).not.toBe("none");
-  await settings(page).getByRole("switch", { name: "Keep text readable" }).click();
+  await settings(page).getByRole("switch", { name: "Text glow" }).click();
   await expect.poll(() => rootAttribute(page, "data-look-readable")).toBeNull();
 
   // Solid hides the background and the opacity with it.
@@ -88,7 +88,7 @@ test("a background picture shows through frosted glass, and text stays readable"
 });
 
 test("heading font, tab style and accent apply to the app at once", async ({ page }) => {
-  await openLookPage(page, "Fonts");
+  await openLookPage(page, "Editor");
   await settings(page).getByLabel("Heading font family").click();
   await page.getByRole("listbox", { name: "Heading font family options" })
     .getByRole("option", { name: "Serif" }).click();
@@ -96,7 +96,7 @@ test("heading font, tab style and accent apply to the app at once", async ({ pag
     page.locator(".bn-editor h1").first().evaluate((element) => getComputedStyle(element).fontFamily),
   ).toContain("Georgia");
 
-  await openLookPage(page, "Tabs");
+  await openLookPage(page, "Sidebar");
   await settings(page).locator("[data-setting-id='tabStyle']").getByRole("radio", { name: "Filled" }).click();
   await expect.poll(() => rootAttribute(page, "data-tab-style")).toBe("filled");
 
@@ -105,7 +105,7 @@ test("heading font, tab style and accent apply to the app at once", async ({ pag
   await expect.poll(() => rootVariable(page, "--notepane-control-accent")).toBe("#2f9e44");
 });
 
-// A desktop bridge whose installed fonts the Fonts page lists, over a note with a heading and a
+// A desktop bridge whose installed fonts the Editor page lists, over a note with a heading and a
 // code block.
 function stubInstalledFontsBridge() {
   const note = {
@@ -144,18 +144,25 @@ test("every Font row is the same menu, and an installed font reaches headings an
   await page.reload();
   await expect(page.locator(".bn-editor h1")).toHaveText("Fonts heading");
   await page.keyboard.press(modifierShortcut(","));
-  await openLookPage(page, "Fonts");
+  await openLookPage(page, "Editor");
 
   const fontRows = settings(page).locator(".settings-row").filter({ has: page.locator(".preferences-font-family-control") });
-  await expect(fontRows).toHaveCount(4);
-  for (const id of ["appFontFamily", "editorFontFamily", "headingFont", "codeFont"]) {
+  await expect(fontRows).toHaveCount(3);
+  for (const id of ["editorFontFamily", "headingFont", "codeFont"]) {
     const row = settings(page).locator(`[data-setting-id='${id}']`);
     await expect(row.getByText("Font", { exact: true })).toBeVisible();
     await expect(row.getByRole("combobox")).toBeVisible();
   }
-  const controlWidths = await fontRows.evaluateAll((rows) =>
-    rows.map((row) => Math.round(row.querySelector(".preferences-font-family-control").getBoundingClientRect().width)));
+  const controlWidth = (rows) => rows.evaluateAll((elements) =>
+    elements.map((row) => Math.round(row.querySelector(".preferences-font-family-control").getBoundingClientRect().width)));
+  const controlWidths = await controlWidth(fontRows);
   expect(new Set(controlWidths).size).toBe(1);
+  // The interface font is on Appearance, the same menu at the same width.
+  await openLookPage(page, "Appearance");
+  const appFontRow = settings(page).locator("[data-setting-id='appFontFamily']");
+  await expect(appFontRow.getByText("Font", { exact: true })).toBeVisible();
+  expect(await controlWidth(appFontRow)).toEqual([controlWidths[0]]);
+  await openLookPage(page, "Editor");
 
   // Presets first, then the installed fonts; code lists monospace-looking names first.
   const headingInput = settings(page).getByLabel("Heading font family");
@@ -184,7 +191,7 @@ test("every Font row is the same menu, and an installed font reaches headings an
 // Over a background the window is its own stacking context; the block handles BlockNote portals to
 // the body must still stay under Settings, not show through it.
 test("a block's handles stay under Settings over a background picture", async ({ page }) => {
-  await openLookPage(page, "Background");
+  await openLookPage(page, "Window");
   await settings(page).getByRole("radio", { name: "Picture" }).click();
   await expect.poll(() => rootAttribute(page, "data-backdrop")).toBe("picture");
   await settings(page).getByRole("button", { name: "Close preferences" }).click();
@@ -205,4 +212,26 @@ test("a block's handles stay under Settings over a background picture", async ({
     return element?.closest(".bn-side-menu") ? "handles" : element?.closest(".preferences-backdrop") ? "settings" : "other";
   }, { x: handlesBox.x + handlesBox.width / 2, y: handlesBox.y + handlesBox.height / 2 });
   expect(topmost).toBe("settings");
+});
+
+// The Sidebar page's Colors card shows the three fills; the text colors, opacity and blur wait
+// behind More colors, which a changed one opens by itself the next time the page shows.
+test("More colors keeps the less used tab colors folded until one is set", async ({ page }) => {
+  await openLookPage(page, "Sidebar");
+  const colors = settings(page).getByRole("region", { name: "Colors", exact: true });
+  const moreColors = colors.getByRole("button", { name: "More colors" });
+  await expect(colors.locator(".settings-row")).toHaveCount(3);
+  await expect(moreColors).toHaveAttribute("aria-expanded", "false");
+
+  await moreColors.click();
+  await expect(moreColors).toHaveAttribute("aria-expanded", "true");
+  await expect(colors.locator(".settings-row")).toHaveCount(7);
+  await settings(page).getByRole("button", { name: "Increase Tab blur" }).click();
+  await moreColors.click();
+  await expect(colors.locator(".settings-row")).toHaveCount(3);
+
+  await openLookPage(page, "Editor");
+  await openLookPage(page, "Sidebar");
+  await expect(moreColors).toHaveAttribute("aria-expanded", "true");
+  await expect(colors.locator("[data-setting-id='tabBlur']")).toBeVisible();
 });

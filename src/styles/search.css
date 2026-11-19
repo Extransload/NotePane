@@ -95,7 +95,7 @@
   background: color-mix(in srgb, var(--sticky-text-color) 8%, transparent);
 }
 
-/* Size and text from Settings › Appearance › Search palette (useLookStyles sets the --look-palette-*
+/* Size and text from Settings › Search › Search palette (useLookStyles sets the --look-palette-*
    variables); without them the palette keeps its original 560px and 13px. Rows are measured in
    em, so they grow with the text. */
 html[data-palette-position="center"] .search-palette-backdrop {

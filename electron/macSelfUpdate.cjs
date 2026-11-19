@@ -163,7 +163,7 @@ function createMacSelfUpdater({
 
   // Called for each check that finds a newer release; a release already downloaded or on its way
   // is not fetched again, and one that failed is tried again by the next check. Unless
-  // `download` is set (Settings > About > Download updates automatically), a release is only
+  // `download` is set (Settings > General > Download updates automatically), a release is only
   // offered: `available`, until downloadOffered() is asked for.
   const prepare = (updateInfo, { download: downloadNow = false } = {}) => {
     const version = updateInfo?.version;

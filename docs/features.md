@@ -33,35 +33,42 @@
   changes, and text on it stays readable
 - No light/dark toggle and no light/dark shortcut; `Command/Ctrl + Shift + L` is unbound
 - Settings window via sidebar footer button, native app menu, or `Command/Ctrl + ,`: a floating window like Tern's,
-  with a search field and pages grouped under App (About, Appearance, Fonts, Background, Tabs, Editor, Keyboard)
-  and Data (Trash, Backup). Search (`Command/Ctrl + F` while open) finds any setting and opens
-  its page; holding the eye button hides the window to show the app behind it
-- Settings › Fonts holds every font, each Font row the same searchable menu (presets first, then the installed
-  fonts, each shown in its own face): Interface (the app font), Text (font, size, line height, letter spacing,
-  paragraph spacing), Headings (Same as text, Serif, Display, Rounded or any installed font; weight) and Code
-  (System monospace, Menlo, JetBrains Mono, Courier or any installed font, monospace names first; size, ligatures),
-  under a preview. Settings › Editor keeps text width, table of contents and smooth caret
-- Look: accent colour and corner shape; a background (colour, gradient or picture, with fit,
-  position, blur, brightness, saturation and tint) and, on the same page as Tern sets its window, the window over it:
-  Material (Solid, Frosted or Clear), one Opacity for every area (menus and Settings stay at least 80%), a blur of
-  their own for Menus and popups (24px by default, 0 for clear: the note under an open menu, the search palette or
-  Settings blurs instead of showing through sharp; the dim behind Settings and the palette fades by its colour, so
-  the blur holds from the first frame, and a block's handles never show over them), Border, and
-  Keep text readable (a soft halo behind text while the background shows through, on by default); tab style,
-  height, radius, numbers, shortcuts, new tab colour and colour strength; and tab colours as in Tern, for tabs
-  without a colour of their own: the tab bar, the open tab and the other tabs (fill, and text that reads well on it
-  unless chosen), fill opacity, border (the style's, none, subtle or strong, with a colour) and a blur. Turning
-  numbers or shortcuts off gives their room to the title; the close button then shows at the tab's right end on hover
-- Preferences > About: the NotePane wordmark, "Version x.y.z", a short description of the app and, in the desktop
-  app, the Electron and Chromium versions. Its Updates card has **Check for updates**, with a status line (checking,
-  up to date, "NotePane x.y.z is available", "installs when NotePane quits" on Windows, "Update checks run in the
-  installed app" in development, test builds and the browser preview, or "Could not check for updates" with the
-  reason), and a **Release notes** link to the GitHub releases page
+  with a search field and a page for each part of the app a setting changes, grouped under App (General, Appearance,
+  Window, Sidebar, Editor, Search, Keyboard) and Data (Trash, Backup); it opens on Appearance, and the version sits
+  at the foot of the sidebar. Search (`Command/Ctrl + F` while open) finds any setting, by its old name too, and
+  opens its page with the row highlighted; holding the eye button hides the window to show the app behind it. Old
+  page ids open where their settings went (About → General, Fonts → Editor, Background → Window, Tabs → Sidebar)
+- Settings › General: Updates (the running version, with the Electron and Chromium versions in the desktop app;
+  **Check for updates**, with a status line: checking, up to date, "NotePane x.y.z is available", "installs when
+  NotePane quits" on Windows, "Update checks run in the installed app" in development, test builds and the browser
+  preview, or "Could not check for updates" with the reason; Download updates automatically; What's new with a
+  **Release notes** link to the GitHub releases page) and Startup (Show intro on launch)
+- Settings › Appearance: Theme (the theme picker), Style (accent color and corner shape) and Interface (the font of
+  the sidebar, menus and Settings)
+- Settings › Window: Background (None, Color, Gradient or Picture, with its color, gradient or picture, fit and
+  position, then blur, brightness, saturation, tint and dim in dark mode); once there is a background, Glass, the
+  window over it as Tern sets it: Material (Solid, Frosted or Clear), one Opacity for every area (menus and Settings
+  stay at least 80%), a Menu blur of their own (24px by default, 0 for clear: the note under an open menu, the search
+  palette or Settings blurs instead of showing through sharp; the dim behind Settings and the palette fades by its
+  colour, so the blur holds from the first frame, and a block's handles never show over them), Border, and Text glow
+  (a soft halo behind text while the background shows through, on by default); and Sticky notes (show the background
+  behind sticky notes)
+- Settings › Sidebar: Tabs (style, height, corners, border, and its colour unless None), Colors as in Tern for tabs
+  without a colour of their own (the tab bar, the active tab and the inactive tabs; More colors adds the text of
+  each, which reads well on its fill unless chosen, fill opacity and a blur, and is open whenever one of them is
+  set), Note colors (new tab colour, None or In order, and note color intensity) and Show (tab numbers, tab
+  shortcuts). Turning numbers or shortcuts off gives their room to the title; the close button then shows at the
+  tab's right end on hover
+- Settings › Editor: a preview, then Text (font, size, line height, letter spacing, paragraph spacing), Headings
+  (Same as text, Serif, Display, Rounded or any installed font; weight), Code (System monospace, Menlo, JetBrains
+  Mono, Courier or any installed font, monospace names first; size, ligatures), Layout (text width, table of
+  contents) and Typing (smooth caret). Each Font row, and the Interface font on Appearance, is the same searchable
+  menu (presets first, then the installed fonts, each shown in its own face)
 - Updates on a Mac as in TablePeek: a newer release is offered first, as "Update to x.y.z" in a pill in the tabs
-  window's header and as **Download** on the About page (the sticky layout asks in a dialog); nothing downloads until
-  one is clicked, unless Settings > About > **Download updates automatically** is on (off by default; turning it on
-  takes a release already on offer). The pill then fills with the download ("Downloading 42%", then "Checking
-  update…"); the About page shows the same with the size and a progress bar. Then **Restart to update** shows in both
+  window's header and as **Download** on Settings › General (the sticky layout asks in a dialog); nothing downloads
+  until one is clicked, unless Settings › General › **Download updates automatically** is on (off by default; turning
+  it on takes a release already on offer). The pill then fills with the download ("Downloading 42%", then "Checking
+  update…"); General shows the same with the size and a progress bar. Then **Restart to update** shows in both
   (the sticky layout asks again): it saves the notes, quits, swaps the new app in and opens it, the pill filling again
   while it restarts. A failed download says so and opens the release page; a copy run from the disk image or a folder
   it cannot write offers that page instead
@@ -191,7 +198,7 @@ BlockNote handles editor interaction directly.
   stay), `Delete` at the end of a closed toggle's title joins the block after the toggle, never a hidden line, and
   does nothing when a divider, a table or nothing follows, and ticking a checklist box leaves the caret where it
   was, so typing goes on there
-- Launch intro (Settings > Appearance, on by default): as the app opens in Tabs mode, three windows fly in from
+- Launch intro (Settings › General › Startup, on by default): as the app opens in Tabs mode, three windows fly in from
   round the window and stack into the NotePane mark, its box is drawn round them and filled, and the name is written
   out, for about three seconds, over the window's own colour: the app does not show until the intro clears. It plays
   once per launch, never in a sticky window, a later window or a reload, and never under reduced motion. Any key or
@@ -205,7 +212,7 @@ BlockNote handles editor interaction directly.
   kept in view, its edges fading where more lies beyond (as the tabs sidebar's do); each result shows its match count
   ("7 matches") and when the note was last edited ("5 min. ago"), and a title cut short shows in full in a tooltip.
   Tab moves between the query and the filter chips without leaving the palette, and Escape closes it from either
-- Settings › Appearance › Search palette: Width (520–1040px, 720 by default), Height (40–90% of the window, 72),
+- Settings › Search › Search palette: Width (520–1040px, 720 by default), Height (40–90% of the window, 72),
   Text size (12–18px, 14; the query is 2px larger and rows grow with it) and Position (Top or Center), each with
   its reset
 - Commands in the same palette: typed words list the matching commands above the notes, and `>` lists only commands:

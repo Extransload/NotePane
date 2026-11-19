@@ -3,13 +3,12 @@ import {
   Download,
   Eye,
   FileText,
-  Image as ImageIcon,
-  Info,
   Keyboard,
+  PanelLeft,
   Search,
+  Settings2,
   SlidersHorizontal,
   Sun,
-  Type,
   Trash2,
   Upload,
   X,
@@ -45,14 +44,14 @@ import {
   listBuiltInThemes,
 } from "../style/themes.js";
 import {
-  AboutPreferencesSection,
-} from "./aboutPreferences.jsx";
+  GeneralPreferencesPage,
+} from "./generalPreferences.jsx";
 import {
   AppearanceLookPage,
-  BackgroundLookPage,
   EditorLookPage,
-  FontsLookPage,
-  TabsLookPage,
+  SearchLookPage,
+  SidebarLookPage,
+  WindowLookPage,
 } from "./lookPreferences.jsx";
 import {
   KeyboardShortcutsSection,
@@ -68,20 +67,20 @@ import {
 
 const PICKER_THEMES = listBuiltInThemes();
 
-// The sidebar's groups, in order, as Tern lays out its Settings: About first, so an update is one
-// glance away, then how the app looks, then the note itself, then the keys. A group heading only
-// labels its pages; it is not a tab. Page ids stay as stored by older versions (`theme` is
-// Appearance, `shortcuts` is Keyboard).
+// The sidebar's groups, in order, as Tern lays out its Settings: a page for each part of the app
+// a setting changes (General, then how it looks, the window, the sidebar, the note, the search
+// palette and the keys), then the data. A group heading only labels its pages; it is not a tab.
+// Page ids stay as stored by older versions (`theme` is Appearance, `shortcuts` is Keyboard).
 export const PREFERENCE_PAGE_GROUPS = [
   {
     label: "App",
     pages: [
-      { id: "about", label: "About", Icon: Info },
+      { id: "general", label: "General", Icon: Settings2 },
       { id: "theme", label: "Appearance", Icon: Sun },
-      { id: "fonts", label: "Fonts", Icon: Type },
-      { id: "background", label: "Background", Icon: ImageIcon },
-      { id: "tabs", label: "Tabs", Icon: AppWindow },
+      { id: "window", label: "Window", Icon: AppWindow },
+      { id: "sidebar", label: "Sidebar", Icon: PanelLeft },
       { id: "editor", label: "Editor", Icon: FileText },
+      { id: "search", label: "Search", Icon: Search },
       { id: "shortcuts", label: "Keyboard", Icon: Keyboard },
     ],
   },
@@ -100,11 +99,15 @@ export const PREFERENCE_PAGES = PREFERENCE_PAGE_GROUPS.flatMap(({ label, pages }
 
 const DEFAULT_PREFERENCE_PAGE_ID = "theme";
 
-// Pages that were merged into others keep opening where their settings went: the app theme left
-// General for Appearance and Surfaces became the Glass group of Background.
+// Pages that were merged into others keep opening where their settings went: About became
+// General, Fonts joined Editor, Background (and Surfaces before it) became Window, and Tabs
+// became Sidebar.
 const RENAMED_PREFERENCE_PAGES = {
-  general: "theme",
-  surfaces: "background",
+  about: "general",
+  fonts: "editor",
+  background: "window",
+  surfaces: "window",
+  tabs: "sidebar",
 };
 
 export function normalizePreferencePageId(pageId) {
@@ -120,73 +123,74 @@ function getPreferencePage(pageId) {
 
 /**
  * Every setting the search field can find. `id` is the row's `data-setting-id`; rows this window
- * does not render itself (Trash, Keyboard, About) are found by `selector` instead. A row that
- * only shows for some choices (a picture's size while the background is a color) opens its page
- * without a highlight. Keywords keep the names settings had before, so old words still find them.
+ * does not render itself (Trash, Keyboard) are found by `selector` instead. A row that only shows
+ * for some choices (a picture's size while the background is a color) opens its page without a
+ * highlight; the Sidebar page opens More colors for a row behind it. Keywords keep the names
+ * settings and pages had before, so old words still find them.
  */
 export const SETTINGS_INDEX = [
-  { page: "about", id: "aboutVersion", selector: ".about-card", title: "Version", description: "Which NotePane you are running.", keywords: "about version electron chromium" },
-  { page: "about", id: "checkForUpdates", selector: ".about-update-row", title: "Check for updates", description: "Looks for a newer NotePane.", keywords: "updates upgrade new version download latest" },
-  { page: "about", id: "autoDownloadUpdates", title: "Download updates automatically", description: "Off asks before downloading a new version.", keywords: "updates download automatic auto ask prompt background" },
-  { page: "about", id: "releaseNotes", selector: '.preferences-card a[href$="/releases"]', title: "What's new", description: "What changed in each version.", keywords: "release notes changelog github" },
+  { page: "general", id: "appVersion", title: "NotePane version", description: "Which NotePane you are running.", keywords: "about version electron chromium" },
+  { page: "general", id: "checkForUpdates", title: "Check for updates", description: "Looks for a newer NotePane.", keywords: "about updates upgrade new version download latest" },
+  { page: "general", id: "autoDownloadUpdates", title: "Download updates automatically", description: "Off asks before downloading a new version.", keywords: "about updates download automatic auto ask prompt background" },
+  { page: "general", id: "releaseNotes", title: "What's new", description: "What changed in each version.", keywords: "about release notes changelog github" },
+  { page: "general", id: "launchIntro", title: "Show intro on launch", description: "The NotePane logo plays as the app opens.", keywords: "appearance intro splash launch startup start opening animation logo" },
   { page: "theme", id: "appTheme", title: "App theme", description: "The colors of every window, light or dark.", keywords: "theme colour color dark light mode palette scheme" },
   { page: "theme", id: "accentColor", title: "Accent color", description: "Colors buttons, switches and selections.", keywords: "accent colour color highlight tint blue purple green orange pink" },
   { page: "theme", id: "corners", title: "Corners", description: "How round windows, menus and buttons are.", keywords: "radius rounded round sharp square shape" },
-  { page: "theme", id: "paletteWidth", title: "Search palette width", description: "How wide the search and command palette opens.", keywords: "command palette search cmd+p quick open size bigger wider width" },
-  { page: "theme", id: "paletteHeight", title: "Search palette height", description: "How much of the window its results may fill before they scroll.", keywords: "command palette search cmd+p quick open size bigger taller height results" },
-  { page: "theme", id: "paletteTextSize", title: "Search palette text size", description: "The size of its results; the search field is a little larger.", keywords: "command palette search cmd+p quick open size bigger font text larger" },
-  { page: "theme", id: "palettePosition", title: "Search palette position", description: "Where in the window it opens.", keywords: "command palette search cmd+p quick open position top center middle" },
-  { page: "theme", id: "launchIntro", title: "Show intro on launch", description: "The NotePane logo plays as the app opens.", keywords: "intro splash launch start opening animation logo" },
-  { page: "fonts", id: "appFontFamily", title: "Interface font", description: "The font of the sidebar, menus and Settings.", keywords: "app font fonts family typeface interface ui chrome" },
-  { page: "fonts", id: "editorFontFamily", title: "Text font", description: "The font notes are written in.", keywords: "editor font fonts family typeface text" },
-  { page: "fonts", id: "editorSize", title: "Text size", description: "How large note text is.", keywords: "font fonts size text bigger smaller scale" },
-  { page: "fonts", id: "lineHeight", title: "Line height", description: "Space between the lines of a paragraph.", keywords: "leading line spacing fonts" },
-  { page: "fonts", id: "letterSpacing", title: "Letter spacing", description: "Space between letters.", keywords: "tracking kerning fonts" },
-  { page: "fonts", id: "blockSpacing", title: "Paragraph spacing", description: "Extra space between paragraphs, headings and lists.", keywords: "block spacing space between blocks paragraph gap fonts" },
-  { page: "fonts", id: "headingFont", title: "Heading font", description: "The font of headings.", keywords: "headings title serif display rounded font family typeface fonts" },
-  { page: "fonts", id: "headingWeight", title: "Heading weight", description: "How bold headings are.", keywords: "headings bold weight fonts" },
-  { page: "fonts", id: "codeFont", title: "Code font", description: "The font of code blocks and inline code.", keywords: "monospace mono menlo jetbrains courier code font family typeface fonts" },
-  { page: "fonts", id: "codeSize", title: "Code size", description: "How large code is.", keywords: "code font fonts size" },
-  { page: "fonts", id: "codeLigatures", title: "Code ligatures", description: "Shows => and != as single symbols.", keywords: "ligature code font fonts" },
+  { page: "theme", id: "appFontFamily", title: "Interface font", description: "The sidebar, menus and Settings.", keywords: "app font fonts family typeface interface ui chrome" },
+  { page: "window", id: "backgroundType", title: "Background", description: "What shows behind your notes and the sidebar.", keywords: "background type wallpaper backdrop picture image colour color gradient none" },
+  { page: "window", id: "backgroundColor", title: "Background color", description: "The flat color behind the window.", keywords: "background colour color solid" },
+  { page: "window", id: "backgroundGradient", title: "Gradient start color", description: "The color the gradient starts from.", keywords: "gradient from start colour color background" },
+  { page: "window", id: "backgroundGradientTo", title: "Gradient end color", description: "The color the gradient ends on.", keywords: "gradient to end colour color background" },
+  { page: "window", id: "backgroundGradientAngle", title: "Gradient angle", description: "Which way the gradient runs.", keywords: "gradient angle direction rotate degrees background" },
+  { page: "window", id: "backgroundPicture", title: "Picture", description: "A built-in picture or one of your own.", keywords: "background picture image photo wallpaper upload add" },
+  { page: "window", id: "backgroundFit", title: "Picture size", description: "Fill the window, fit the whole picture, or tile it.", keywords: "background fit cover contain tile repeat fill picture size scale" },
+  { page: "window", id: "backgroundPosition", title: "Picture position", description: "Which edge or corner the picture lines up with.", keywords: "background align anchor focus picture position" },
+  { page: "window", id: "backgroundBlur", title: "Background blur", description: "Softens the picture or gradient.", keywords: "blur soften background picture adjust" },
+  { page: "window", id: "backgroundBrightness", title: "Background brightness", description: "Lightens or darkens the background.", keywords: "brightness light dark exposure adjust background" },
+  { page: "window", id: "backgroundSaturation", title: "Background saturation", description: "How much color the background keeps.", keywords: "saturation colour color grayscale vivid adjust background" },
+  { page: "window", id: "backgroundTint", title: "Tint", description: "How strongly the tint color washes over the background.", keywords: "tint amount strength overlay colour color wash adjust background" },
+  { page: "window", id: "backgroundTintColor", title: "Tint color", description: "The color washed over the background.", keywords: "tint overlay colour color wash adjust background" },
+  { page: "window", id: "backgroundDimInDark", title: "Dim in dark mode", description: "Darkens the background while the theme is dark.", keywords: "dim dark mode night background" },
+  { page: "window", id: "surfaceMaterial", title: "Material", description: "Solid, frosted or clear glass over the background.", keywords: "material glass frosted clear solid surfaces transparent see-through window background" },
+  { page: "window", id: "surfaceOpacity", title: "Opacity", description: "How much the window covers the background.", keywords: "opacity transparency transparent see-through glass surfaces window background" },
+  { page: "window", id: "floatingBlur", title: "Menu blur", description: "How much menus, the palette and Settings blur what is behind them.", keywords: "menus popups popover floating blur strength frosted glass clear palette dropdown overlap background" },
+  { page: "window", id: "surfaceBorder", title: "Border", description: "The line around the sidebar, title bar and menus.", keywords: "border outline hairline thin edge line surfaces glass background" },
+  { page: "window", id: "readableText", title: "Text glow", description: "A soft glow behind text over a background.", keywords: "keep text readable contrast legibility halo glow shadow glass background" },
+  { page: "window", id: "backgroundBehindStickies", title: "Show background behind sticky notes", description: "Sticky note windows show the background too.", keywords: "behind sticky notes windows background where" },
+  { page: "sidebar", id: "tabStyle", title: "Tab style", description: "How tabs without a color of their own are drawn.", keywords: "tabs plain outline filled style" },
+  { page: "sidebar", id: "tabHeight", title: "Tab height", description: "How tall each tab is.", keywords: "tabs height compact regular tall size" },
+  { page: "sidebar", id: "tabRadius", title: "Tab corners", description: "How round each tab is.", keywords: "tabs radius corners rounded corner radius" },
+  { page: "sidebar", id: "tabBorder", title: "Tab border", description: "The line around each tab.", keywords: "tabs border outline line stroke" },
+  { page: "sidebar", id: "tabBorderColor", title: "Tab border color", description: "The color of the line around each tab.", keywords: "tabs border outline colour color" },
+  { page: "sidebar", id: "tabBarColor", title: "Tab bar", description: "The sidebar behind the tabs.", keywords: "tabs bar sidebar background colour color" },
+  { page: "sidebar", id: "tabActiveFill", title: "Active tab", description: "The tab of the note you are in.", keywords: "tabs open tab current selected fill background colour color" },
+  { page: "sidebar", id: "tabActiveText", title: "Active tab text", description: "Text color of the active tab.", keywords: "tabs open tab text current foreground colour color more colors" },
+  { page: "sidebar", id: "tabInactiveFill", title: "Inactive tabs", description: "The tabs of your other notes.", keywords: "tabs other tabs fill background colour color" },
+  { page: "sidebar", id: "tabInactiveText", title: "Inactive tab text", description: "Text color of the inactive tabs.", keywords: "tabs other tabs text foreground colour color more colors" },
+  { page: "sidebar", id: "tabFillOpacity", title: "Tab opacity", description: "How solid the tab colors are.", keywords: "tabs opacity transparency alpha fill more colors" },
+  { page: "sidebar", id: "tabBlur", title: "Tab blur", description: "How much the tabs blur a background behind them.", keywords: "tabs blur frosted glass more colors" },
+  { page: "sidebar", id: "tabNewColor", title: "New tab color", description: "Gives each new tab the next color.", keywords: "tabs note colors colour color new cycle pastel" },
+  { page: "sidebar", id: "tabColorStrength", title: "Note color intensity", description: "How strongly a tab shows its note's color.", keywords: "tabs colored tabs color strength colour intensity" },
+  { page: "sidebar", id: "tabShowNumbers", title: "Tab numbers", description: "The number before each title.", keywords: "tabs show tab numbers index hide" },
+  { page: "sidebar", id: "tabShowShortcuts", title: "Tab shortcuts", description: "The key beside each tab that opens it.", keywords: "tabs show tab shortcuts keys hints hide" },
+  { page: "editor", id: "editorFontFamily", title: "Text font", description: "The font notes are written in.", keywords: "editor font fonts family typeface text" },
+  { page: "editor", id: "editorSize", title: "Text size", description: "How large note text is.", keywords: "font fonts size text bigger smaller scale" },
+  { page: "editor", id: "lineHeight", title: "Line height", description: "Space between the lines of a paragraph.", keywords: "leading line spacing fonts" },
+  { page: "editor", id: "letterSpacing", title: "Letter spacing", description: "Space between letters.", keywords: "tracking kerning fonts" },
+  { page: "editor", id: "blockSpacing", title: "Paragraph spacing", description: "Extra space between paragraphs, headings and lists.", keywords: "block spacing space between blocks paragraph gap fonts" },
+  { page: "editor", id: "headingFont", title: "Heading font", description: "The font of headings.", keywords: "headings title serif display rounded font family typeface fonts" },
+  { page: "editor", id: "headingWeight", title: "Heading weight", description: "How bold headings are.", keywords: "headings bold weight fonts" },
+  { page: "editor", id: "codeFont", title: "Code font", description: "The font of code blocks and inline code.", keywords: "monospace mono menlo jetbrains courier code font family typeface fonts" },
+  { page: "editor", id: "codeSize", title: "Code size", description: "How large code is.", keywords: "code font fonts size" },
+  { page: "editor", id: "codeLigatures", title: "Code ligatures", description: "Shows => and != as single symbols.", keywords: "ligature code font fonts" },
   { page: "editor", id: "textWidth", title: "Text width", description: "How long a line of text gets in a wide window.", keywords: "width column measure reading layout line length fonts" },
   { page: "editor", id: "tableOfContents", title: "Table of contents", description: "Lists the note's headings on the right in the tabs layout.", keywords: "toc outline headings rail navigation layout" },
   { page: "editor", id: "smoothCaret", title: "Smooth caret", description: "The cursor glides as you type.", keywords: "caret cursor smooth animation glide blink typing" },
-  { page: "background", id: "backgroundType", title: "Background", description: "What shows behind your notes and the sidebar.", keywords: "wallpaper backdrop picture image colour color gradient none" },
-  { page: "background", id: "backgroundColor", title: "Background color", description: "The flat color behind the window.", keywords: "background colour color solid" },
-  { page: "background", id: "backgroundGradient", title: "Gradient start color", description: "The color the gradient starts from.", keywords: "gradient from start colour color background" },
-  { page: "background", id: "backgroundGradientTo", title: "Gradient end color", description: "The color the gradient ends on.", keywords: "gradient to end colour color background" },
-  { page: "background", id: "backgroundGradientAngle", title: "Gradient angle", description: "Which way the gradient runs.", keywords: "gradient angle direction rotate degrees background" },
-  { page: "background", id: "backgroundPicture", title: "Picture", description: "A built-in picture or one of your own.", keywords: "picture image photo wallpaper upload add" },
-  { page: "background", id: "backgroundFit", title: "Picture size", description: "Fill the window, fit the whole picture, or tile it.", keywords: "fit cover contain tile repeat fill picture size scale" },
-  { page: "background", id: "backgroundPosition", title: "Picture position", description: "Which edge or corner the picture lines up with.", keywords: "align anchor focus picture position" },
-  { page: "background", id: "backgroundBlur", title: "Background blur", description: "Softens the picture or gradient.", keywords: "blur soften background picture adjust" },
-  { page: "background", id: "backgroundBrightness", title: "Background brightness", description: "Lightens or darkens the background.", keywords: "brightness light dark exposure adjust" },
-  { page: "background", id: "backgroundSaturation", title: "Background saturation", description: "More or less color in the background.", keywords: "saturation colour color grayscale vivid adjust" },
-  { page: "background", id: "backgroundTint", title: "Tint", description: "How strongly a color washes over the background.", keywords: "tint amount strength overlay colour color wash adjust" },
-  { page: "background", id: "backgroundTintColor", title: "Tint color", description: "The color washed over the background.", keywords: "tint overlay colour color wash adjust" },
-  { page: "background", id: "backgroundDimInDark", title: "Dim in dark mode", description: "Darkens the background while the theme is dark.", keywords: "dim dark mode night background" },
-  { page: "background", id: "backgroundBehindStickies", title: "Show behind sticky notes", description: "Sticky note windows show the background too.", keywords: "behind sticky notes windows background where" },
-  { page: "background", id: "surfaceMaterial", title: "Material", description: "Solid, frosted or clear glass over the background.", keywords: "material glass frosted clear solid surfaces transparent see-through window" },
-  { page: "background", id: "surfaceOpacity", title: "Opacity", description: "How much the window covers the background.", keywords: "opacity transparency transparent see-through glass surfaces window" },
-  { page: "background", id: "floatingBlur", title: "Menu blur", description: "How much menus, the palette and Settings blur what is behind them.", keywords: "menus popups popover floating blur strength frosted glass clear palette dropdown overlap" },
-  { page: "background", id: "surfaceBorder", title: "Border", description: "The line around the sidebar, title bar and menus.", keywords: "border outline hairline thin edge line surfaces glass" },
-  { page: "background", id: "readableText", title: "Keep text readable", description: "A soft glow behind text over a background.", keywords: "readable contrast legibility halo glow text shadow glass" },
-  { page: "tabs", id: "tabStyle", title: "Tab style", description: "How tabs without a color of their own are drawn.", keywords: "tabs plain outline filled style" },
-  { page: "tabs", id: "tabHeight", title: "Tab height", description: "Compact, regular or tall tabs.", keywords: "tabs height compact tall size" },
-  { page: "tabs", id: "tabRadius", title: "Tab corners", description: "How round each tab is.", keywords: "tabs radius corners rounded corner radius" },
-  { page: "tabs", id: "tabBorder", title: "Tab border", description: "The line around each tab.", keywords: "tabs border outline line stroke" },
-  { page: "tabs", id: "tabBorderColor", title: "Tab border color", description: "The color of the line around each tab.", keywords: "tabs border outline colour color" },
-  { page: "tabs", id: "tabBarColor", title: "Tab bar", description: "The sidebar behind the tabs.", keywords: "tabs bar sidebar background colour color" },
-  { page: "tabs", id: "tabActiveFill", title: "Open tab", description: "The tab of the note you are in.", keywords: "tabs active current selected fill background colour color" },
-  { page: "tabs", id: "tabActiveText", title: "Open tab text", description: "Text color of the open tab.", keywords: "tabs active current text foreground colour color" },
-  { page: "tabs", id: "tabInactiveFill", title: "Other tabs", description: "Fill of the tabs you are not in.", keywords: "tabs inactive other fill background colour color" },
-  { page: "tabs", id: "tabInactiveText", title: "Other tabs text", description: "Text color of the other tabs.", keywords: "tabs inactive other text foreground colour color" },
-  { page: "tabs", id: "tabFillOpacity", title: "Tab opacity", description: "How solid the tab colors are.", keywords: "tabs opacity transparency alpha fill" },
-  { page: "tabs", id: "tabBlur", title: "Tab blur", description: "How much the tabs blur a background behind them.", keywords: "tabs blur frosted glass" },
-  { page: "tabs", id: "tabNewColor", title: "New tab color", description: "Give each new tab the next pastel.", keywords: "tabs colour color new cycle pastel" },
-  { page: "tabs", id: "tabColorStrength", title: "Color strength", description: "How strongly a colored tab is filled.", keywords: "tabs colour color strength intensity" },
-  { page: "tabs", id: "tabShowNumbers", title: "Show tab numbers", description: "Off gives the title the room.", keywords: "tabs numbers index show hide" },
-  { page: "tabs", id: "tabShowShortcuts", title: "Show tab shortcuts", description: "The ⌘1 to ⌘9 key beside each tab.", keywords: "tabs shortcuts keys hints show hide" },
+  { page: "search", id: "paletteWidth", title: "Search palette width", description: "How wide the palette opens.", keywords: "appearance command palette search cmd+p quick open size bigger wider width" },
+  { page: "search", id: "paletteHeight", title: "Search palette height", description: "How much of the window the results fill before they scroll.", keywords: "appearance command palette search cmd+p quick open size bigger taller height results" },
+  { page: "search", id: "paletteTextSize", title: "Search palette text size", description: "How large the results are.", keywords: "appearance command palette search cmd+p quick open size bigger font text larger" },
+  { page: "search", id: "palettePosition", title: "Search palette position", description: "Where in the window the palette opens.", keywords: "appearance command palette search cmd+p quick open position top center middle" },
   { page: "trash", id: "trashDeletedNotes", selector: ".preferences-trash-section", title: "Deleted notes", description: "Restore deleted notes or delete them for good.", keywords: "trash deleted restore purge bin recycle" },
   { page: "backup", id: "exportBackup", title: "Export a backup", description: "Saves every note and setting to a .notepane file.", keywords: "backup export save data file workspace" },
   { page: "backup", id: "importBackup", title: "Import a backup", description: "Replaces your notes with a .notepane file.", keywords: "backup import restore data file workspace" },
@@ -248,8 +252,9 @@ function findSettingElement(container, entry) {
 /**
  * The Settings window, laid out like Tern's: a sidebar (brand, search, pages under group
  * headings, version) beside the active page, whose title sits above cards that scroll on their
- * own. Look pages (Appearance, Background, Tabs, Editor) come from src/ui/lookPreferences.jsx;
- * About, Keyboard and Trash are PreferencesCard sections.
+ * own. General comes from src/ui/generalPreferences.jsx and the Look pages (Appearance, Window,
+ * Sidebar, Editor, Search) from src/ui/lookPreferences.jsx; Keyboard and Trash are
+ * PreferencesCard sections.
  */
 export function PreferencesWindow({
   initialPage = DEFAULT_PREFERENCE_PAGE_ID,
@@ -531,38 +536,49 @@ export function PreferencesWindow({
   const renderActivePreferencePage = () => {
     const look = normalizedEditorPreferences.look;
     switch (activePage) {
+      case "general":
+        return (
+          <GeneralPreferencesPage
+            autoDownloadUpdates={normalizedEditorPreferences.autoDownloadUpdates}
+            onAutoDownloadUpdatesChange={updateAutoDownloadUpdates}
+            launchIntro={normalizedEditorPreferences.launchIntro}
+            onLaunchIntroChange={updateLaunchIntro}
+          />
+        );
+      case "window":
+        return (
+          <WindowLookPage
+            look={look}
+            onLookChange={updateLook}
+            onPickBackground={onPickBackground}
+          />
+        );
+      case "sidebar":
+        return (
+          <SidebarLookPage
+            look={look}
+            onLookChange={updateLook}
+            revealSettingId={pendingSearchHit?.id}
+          />
+        );
       case "editor":
         return (
           <EditorLookPage
             look={look}
             onLookChange={updateLook}
             editorPreferences={editorPreferences}
+            fontOptions={fontOptions}
             onEditorPreferencesChange={onEditorPreferencesChange}
           />
         );
-      case "fonts":
+      case "search":
         return (
-          <FontsLookPage
+          <SearchLookPage
             look={look}
             onLookChange={updateLook}
             editorPreferences={editorPreferences}
-            fontOptions={fontOptions}
-            onEditorPreferencesChange={onEditorPreferencesChange}
-            appFontFamily={normalizedEditorPreferences.appFontFamily}
-            appFontOptions={appFontOptions}
-            onAppFontFamilyChange={updateAppFontFamily}
           />
         );
-      case "background":
-        return (
-          <BackgroundLookPage
-            look={look}
-            onLookChange={updateLook}
-            onPickBackground={onPickBackground}
-          />
-        );
-      case "tabs":
-        return <TabsLookPage look={look} onLookChange={updateLook} />;
       case "trash":
         return (
           <TrashPreferencesSection
@@ -584,13 +600,6 @@ export function PreferencesWindow({
             onKeyboardShortcutEnabledChange={updateKeyboardShortcutEnabled}
           />
         );
-      case "about":
-        return (
-          <AboutPreferencesSection
-            autoDownloadUpdates={normalizedEditorPreferences.autoDownloadUpdates}
-            onAutoDownloadUpdatesChange={updateAutoDownloadUpdates}
-          />
-        );
       default:
         return (
           <AppearanceLookPage
@@ -599,8 +608,9 @@ export function PreferencesWindow({
             appThemeId={appThemeId}
             themes={PICKER_THEMES}
             onAppThemeChange={onAppThemeChange}
-            launchIntro={normalizedEditorPreferences.launchIntro}
-            onLaunchIntroChange={updateLaunchIntro}
+            appFontFamily={normalizedEditorPreferences.appFontFamily}
+            appFontOptions={appFontOptions}
+            onAppFontFamilyChange={updateAppFontFamily}
           />
         );
     }

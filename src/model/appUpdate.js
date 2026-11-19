@@ -1,5 +1,5 @@
 // What the Mac self-updater's state (electron/macSelfUpdate.cjs, through useAppUpdate) means on
-// screen: shared by the update pill in the tabs header and Settings > About, so both say the same.
+// screen: shared by the update pill in the tabs header and Settings > General, so both say the same.
 
 // How far the update has got, 0 to 1, or null while the length is unknown (a download whose size
 // the server did not give, a restart). Checking the download counts as done downloading.

@@ -60,12 +60,12 @@ const ALLOWLIST = [
 
 const NAMED_COLOURS = ["gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink"];
 const PREFERENCES_SECTIONS = [
-  "About",
+  "General",
   "Appearance",
-  "Fonts",
-  "Background",
-  "Tabs",
+  "Window",
+  "Sidebar",
   "Editor",
+  "Search",
   "Keyboard",
   "Trash",
   "Backup",

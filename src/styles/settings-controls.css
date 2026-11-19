@@ -521,7 +521,46 @@
   transform: translateY(1px);
 }
 
-/* Fonts preview: a sample note typed from the same variables as the editor, with today's
+/* More colors (src/ui/lookPreferences.jsx): a small text button at the foot of a card that shows
+   the card's less used rows above it. */
+.settings-disclosure {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 16px;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--sticky-border-color) 60%, transparent);
+  background: transparent;
+  color: var(--notepane-control-accent);
+  font: 500 12px/1.3 var(--notepane-ui-font);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-disclosure:hover {
+  text-decoration: underline;
+}
+
+.settings-disclosure:focus-visible {
+  outline: 2px solid var(--notepane-control-accent);
+  outline-offset: -2px;
+}
+
+.settings-disclosure-icon {
+  transition: transform 160ms var(--notepane-motion-ease-out);
+}
+
+.settings-disclosure[aria-expanded="true"] .settings-disclosure-icon {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-disclosure-icon {
+    transition: none;
+  }
+}
+
+/* Editor preview: a sample note typed from the same variables as the editor, with today's
    values as fallbacks because the Look only sets a variable once it differs from the default. */
 .look-font-preview {
   padding: 16px 18px;
@@ -537,16 +576,6 @@
   );
   font-size: var(--look-editor-size, 16px);
   letter-spacing: var(--look-letter-spacing, normal);
-}
-
-/* The interface line: the app font, at the size of the sidebar and menus. */
-.look-font-preview-interface {
-  margin: 0 0 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--sticky-border-color);
-  color: var(--sticky-panel-muted);
-  font: 500 13px/1.4 var(--notepane-ui-font);
-  letter-spacing: normal;
 }
 
 .look-font-preview h3 {

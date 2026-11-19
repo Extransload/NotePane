@@ -55,6 +55,13 @@ move between cards with the arrow keys, and the theme applies at once to every
 window. There is no separate light/dark toggle and no light/dark shortcut:
 pick a light or a dark theme instead.
 
+Settings (`⌘,`) has a page for each part of the app: General (updates and the
+intro at launch), Appearance (theme, accent color, corners and the interface
+font), Window (a background and the glass over it), Sidebar (the tabs and their
+colors), Editor (the note's fonts, text width, table of contents and caret),
+Search (the size and place of the `⌘P` palette), Keyboard, Trash and Backup.
+The field at the top of its sidebar finds any setting by name.
+
 Per-session colour is set from a tab's
 right-click menu, with a colour wheel, opacity, an eyedropper where the
 browser supports it, and editable HEX/HSL/RGB/LCH values. That colour becomes

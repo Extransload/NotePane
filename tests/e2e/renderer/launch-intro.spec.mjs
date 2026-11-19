@@ -109,13 +109,13 @@ test("reduced motion skips the launch intro without asking for it", async ({ pag
   expect(await page.evaluate(() => window.launchIntroAsks)).toBe(0);
 });
 
-test("Settings > Appearance turns the launch intro off", async ({ page }) => {
+test("Settings > General turns the launch intro off", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
   await page.keyboard.press(modifierShortcut(","));
   const settings = page.getByRole("dialog", { name: "Preferences window" });
-  await settings.getByRole("tab", { name: "Appearance" }).click();
+  await settings.getByRole("tab", { name: "General" }).click();
   const introSwitch = settings.getByRole("switch", { name: "Show intro on launch" });
   await expect(introSwitch).toHaveAttribute("aria-checked", "true");
   await introSwitch.click();

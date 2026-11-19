@@ -62,7 +62,7 @@ function startAppUpdates({
   updater.autoDownload = mode === "auto";
   updater.on("error", warn);
   if (mode === "self") {
-    // Every check that finds a newer release, the About page's included, hands it on; the
+    // Every check that finds a newer release, Settings > General's included, hands it on; the
     // self-updater fetches each release once.
     updater.on("update-available", (updateInfo) => onUpdateAvailable(updateInfo));
   }

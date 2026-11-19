@@ -423,7 +423,7 @@ test("scrolls a long search result list and keeps the keyboard selection in view
   await page.keyboard.press(modifierShortcut("P"));
   await expect(palette(page).getByRole("option")).toHaveCount(24);
 
-  // At most the look's default height, 72% of the window (Settings › Appearance › Search palette).
+  // At most the look's default height, 72% of the window (Settings › Search › Search palette).
   const maxHeight = await page.evaluate(() => window.innerHeight * 0.72);
   const box = await palette(page).boundingBox();
   expect(box.height).toBeLessThanOrEqual(maxHeight + 1);
@@ -624,7 +624,7 @@ test("Settings sizes the search palette: its width and the size of its titles", 
 
   await page.keyboard.press(modifierShortcut(","));
   const settings = page.getByRole("dialog", { name: "Preferences window" });
-  await settings.getByRole("tab", { name: "Appearance" }).click();
+  await settings.getByRole("tab", { name: "Search" }).click();
   await settings.getByRole("slider", { name: "Search palette width" }).focus();
   await page.keyboard.press("End");
   await settings.getByRole("slider", { name: "Search palette text size" }).focus();

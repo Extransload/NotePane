@@ -9,7 +9,7 @@ import { Gauge } from "./Gauge.jsx";
 
 /**
  * The update in the tabs window's header, as TablePeek shows it: a newer release is offered as
- * "Update to x.y.z", and only a click downloads it (unless Settings > About downloads updates
+ * "Update to x.y.z", and only a click downloads it (unless Settings > General downloads updates
  * automatically); the accent pill fills with the download, then reads "Restart to update"; a
  * click saves the notes, quits, swaps the new app in and opens it, the pill filling again while
  * it restarts. A failed download says so and opens the release page; a copy that cannot replace

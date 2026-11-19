@@ -67,13 +67,13 @@ NotePane does both, and switches between them with one shortcut.
   Neon Noir. Click a card and every window takes it at once.
 - **A background behind the app.** A photo, a colour or a gradient, with the window made Solid, Frosted or Clear
   glass over it, and text kept readable.
-- **Typography and tabs.** One Fonts page for the interface, text, heading and code fonts, any installed font
-  included; size, line height, text width; tab style, height and colours.
+- **Typography and tabs.** An Editor page for the text, heading and code fonts, any installed font included, with
+  size, line height and text width; a Sidebar page for tab style, height and colours.
 - **A settings window like Tern's.** One floating window with search across every setting, and an eye button to
   peek at the app behind it.
 
 **Stays current.** On a Mac, NotePane asks before downloading a new release (**Update to x.y.z**), then **Restart to
-update** swaps it in; Settings > About can download releases without asking. On Windows it installs when you quit.
+update** swaps it in; Settings › General can download releases without asking. On Windows it installs when you quit.
 
 ---
 
@@ -125,11 +125,11 @@ only commands, from a new folder to a theme or a Settings page.
   <img src="docs/images/background.png" alt="NotePane over a snowy mountain photo, the sidebar and editor in frosted glass" width="820">
 </div>
 
-Settings › Background puts a picture, color or gradient behind the app, and its Glass group sets how much of it shows
+Settings › Window puts a picture, color or gradient behind the app, and its Glass group sets how much of it shows
 through the window, with a blur of their own for menus and popups.
 
 <div align="center">
-  <img src="docs/images/settings.png" alt="The Settings window open on the Background page, with Material, Opacity and the blur of menus and popups" width="820">
+  <img src="docs/images/settings.png" alt="The Settings window open on the Window page, with Material, Opacity and the blur of menus and popups" width="820">
 </div>
 
 ---
@@ -182,9 +182,9 @@ choose **More info → Run anyway**.
 ### Updates
 
 NotePane checks Releases at startup and every six hours; no note data is sent. On macOS a newer release shows as
-**Update to x.y.z** in the window's title bar and as **Download** in Settings > About; once you click it, it downloads
+**Update to x.y.z** in the window's title bar and as **Download** in Settings › General; once you click it, it downloads
 in the background, its checksum and version are checked, and **Restart to update** appears: it saves your notes,
-swaps the new app in and opens it. Settings > About > Download updates automatically skips the question. On Windows
+swaps the new app in and opens it. Settings › General › Download updates automatically skips the question. On Windows
 the update installs when you quit.
 Versions before 0.5.1 only link to the release page, so they need one update by hand.
 

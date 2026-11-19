@@ -1,4 +1,5 @@
 import {
+  ChevronDown,
   Plus,
   X,
 } from "lucide-react";
@@ -59,7 +60,7 @@ import {
   ThemePicker,
 } from "./ThemePicker.jsx";
 
-// The Look pages of Settings: Appearance, Fonts, Editor, Background and Tabs. Each page draws
+// The Look pages of Settings: Appearance, Window, Sidebar, Editor and Search. Each page draws
 // only its groups; the window draws the page title. `look` arrives normalized, and every change
 // hands a whole new look to `onLookChange`, leaving the old object untouched.
 
@@ -118,19 +119,19 @@ const CORNER_OPTIONS = [
 ];
 
 // Settings > Appearance: the theme, then the accent and corners of the app around the notes,
-// then the search palette and the launch intro.
+// then the font of the interface (the note's fonts are on Editor).
 export function AppearanceLookPage({
   look,
   onLookChange,
   appThemeId,
   themes,
   onAppThemeChange,
-  launchIntro,
-  onLaunchIntroChange,
+  appFontFamily,
+  appFontOptions,
+  onAppFontFamilyChange,
 }) {
   const pageRef = useRef(null);
   const setLook = (patch) => onLookChange({ ...look, ...patch });
-  const [palette, setPalette, resetPalette] = useLookSection(look, onLookChange, "palette");
   const isCustomAccent =
     look.accentColor != null && !ACCENT_OPTIONS.some((option) => option.value === look.accentColor);
 
@@ -171,7 +172,11 @@ export function AppearanceLookPage({
           />
         </SettingRow>
         {isCustomAccent && (
-          <SettingRow id="accentCustomColor" title="Custom accent">
+          <SettingRow
+            id="accentCustomColor"
+            title="Custom accent"
+            description="Type a hex color or pick one."
+          >
             <ColorInput
               label="Custom accent"
               value={look.accentColor}
@@ -194,11 +199,43 @@ export function AppearanceLookPage({
           />
         </SettingRow>
       </SettingsGroup>
-      <SettingsGroup label="Search palette">
+      <SettingsGroup label="Interface">
+        <SettingRow
+          id="appFontFamily"
+          title="Font"
+          description="The sidebar, menus and Settings."
+          className="app-font-family-setting"
+        >
+          <EditorFontFamilyControl
+            className="preferences-font-family-control"
+            fontFamily={appFontFamily}
+            fontOptions={appFontOptions}
+            inputAriaLabel="App font family"
+            menuButtonAriaLabel="Open app font menu"
+            optionsAriaLabel="App font family options"
+            onFontFamilyChange={onAppFontFamilyChange}
+          />
+        </SettingRow>
+      </SettingsGroup>
+    </div>
+  );
+}
+
+// Settings > Search: the size and place of the search palette.
+export function SearchLookPage({ look, onLookChange, editorPreferences }) {
+  const [palette, setPalette, resetPalette] = useLookSection(look, onLookChange, "palette");
+  const { keyboardShortcuts } = normalizeEditorPreferences(editorPreferences);
+
+  return (
+    <div className="look-page">
+      <SettingsGroup
+        label="Search palette"
+        description={`The window ${formatKeyboardShortcutLabel(keyboardShortcuts.searchNotes)} opens.`}
+      >
         <SettingRow
           id="paletteWidth"
           title="Width"
-          description="How wide the search and command palette opens."
+          description="How wide the palette opens."
           {...resetPalette("width")}
         >
           <Slider
@@ -212,7 +249,7 @@ export function AppearanceLookPage({
         <SettingRow
           id="paletteHeight"
           title="Height"
-          description="How much of the window its results may fill before they scroll."
+          description="How much of the window the results fill before they scroll."
           {...resetPalette("maxHeight")}
         >
           <Slider
@@ -226,7 +263,7 @@ export function AppearanceLookPage({
         <SettingRow
           id="paletteTextSize"
           title="Text size"
-          description="The size of its results; the search field is a little larger."
+          description="How large the results are; the search field is a little larger."
           {...resetPalette("textSize")}
         >
           <Slider
@@ -240,7 +277,7 @@ export function AppearanceLookPage({
         <SettingRow
           id="palettePosition"
           title="Position"
-          description="Where in the window it opens."
+          description="Where in the window the palette opens."
           {...resetPalette("position")}
         >
           <Segmented
@@ -249,17 +286,6 @@ export function AppearanceLookPage({
             options={PALETTE_POSITION_OPTIONS}
             onChange={(position) => setPalette({ position })}
           />
-        </SettingRow>
-      </SettingsGroup>
-      <SettingsGroup label="Launch">
-        <SettingRow
-          id="launchIntro"
-          title="Show intro on launch"
-          description="The NotePane logo plays as the app opens; any key or click skips it."
-          changed={launchIntro !== true}
-          onReset={() => onLaunchIntroChange(true)}
-        >
-          <Switch label="Show intro on launch" checked={launchIntro} onChange={onLaunchIntroChange} />
         </SettingRow>
       </SettingsGroup>
     </div>
@@ -277,18 +303,15 @@ const normalizeHeadingFont = (value) =>
 const normalizeCodeFont = (value) =>
   normalizeFontChoice(value, CODE_FONT_PRESETS, DEFAULT_LOOK.fonts.codeFont);
 
-// Settings > Fonts: a preview, then every font in the app from the outside in: the interface,
-// the note's text, its headings and its code. Each Font row is the same searchable menu, its
-// presets first and then the installed fonts.
-export function FontsLookPage({
+// Settings > Editor: a preview, then the note's text, its headings and its code, then how the
+// page is laid out and typing. Each Font row is the same searchable menu, its presets first and
+// then the installed fonts.
+export function EditorLookPage({
   look,
   onLookChange,
   editorPreferences,
   fontOptions,
   onEditorPreferencesChange,
-  appFontFamily,
-  appFontOptions,
-  onAppFontFamilyChange,
 }) {
   const normalizedEditorPreferences = normalizeEditorPreferences(editorPreferences);
   const [fonts, setFonts, resetFonts] = useLookSection(look, onLookChange, "fonts");
@@ -308,13 +331,16 @@ export function FontsLookPage({
 
   const setEditorPreference = (key, value) =>
     onEditorPreferencesChange?.({ ...normalizedEditorPreferences, [key]: value });
+  const resetEditorPreference = (key) => ({
+    changed: normalizedEditorPreferences[key] !== DEFAULT_EDITOR_PREFERENCES[key],
+    onReset: () => setEditorPreference(key, DEFAULT_EDITOR_PREFERENCES[key]),
+  });
 
   return (
     <div className="look-page">
       <SettingsGroup label="Preview">
         {/* look.css types this sample from the same variables as the editor. */}
         <div className="look-font-preview" aria-label="Font preview">
-          <div className="look-font-preview-interface">Sidebar, menus and Settings</div>
           <h3>Launch checklist</h3>
           <p>
             The quick brown fox jumps over the lazy dog. 다람쥐 헌 쳇바퀴에 타고파. 0123456789
@@ -322,31 +348,18 @@ export function FontsLookPage({
           <pre>{'const pane = { mode: "sticky" } // => != ==='}</pre>
         </div>
       </SettingsGroup>
-      <SettingsGroup label="Interface">
-        <SettingRow
-          id="appFontFamily"
-          title="Font"
-          description="The font of the sidebar, menus and Settings."
-          className="app-font-family-setting"
-        >
-          <EditorFontFamilyControl
-            className="preferences-font-family-control"
-            fontFamily={appFontFamily}
-            fontOptions={appFontOptions}
-            inputAriaLabel="App font family"
-            menuButtonAriaLabel="Open app font menu"
-            optionsAriaLabel="App font family options"
-            onFontFamilyChange={onAppFontFamilyChange}
-          />
-        </SettingRow>
-      </SettingsGroup>
       <SettingsGroup
         label="Text"
         note={`Applies to every note. ${formatKeyboardShortcutLabel(
           keyboardShortcuts.zoomIn,
         )} and ${formatKeyboardShortcutLabel(keyboardShortcuts.zoomOut)} zoom the whole app.`}
       >
-        <SettingRow id="editorFontFamily" title="Font" className="editor-font-family-setting">
+        <SettingRow
+          id="editorFontFamily"
+          title="Font"
+          description="The font notes are written in."
+          className="editor-font-family-setting"
+        >
           <EditorFontFamilyControl
             className="preferences-font-family-control"
             fontFamily={normalizedEditorPreferences.editorFontFamily}
@@ -355,7 +368,12 @@ export function FontsLookPage({
               setEditorPreference("editorFontFamily", normalizeEditorFontFamily(fontFamily))}
           />
         </SettingRow>
-        <SettingRow id="editorSize" title="Size" {...resetFonts("editorSize")}>
+        <SettingRow
+          id="editorSize"
+          title="Size"
+          description="How large note text is."
+          {...resetFonts("editorSize")}
+        >
           <Slider
             label="Text size"
             value={fonts.editorSize}
@@ -366,7 +384,12 @@ export function FontsLookPage({
             onChange={(editorSize) => setFonts({ editorSize })}
           />
         </SettingRow>
-        <SettingRow id="lineHeight" title="Line height" {...resetFonts("lineHeight")}>
+        <SettingRow
+          id="lineHeight"
+          title="Line height"
+          description="Space between the lines of a paragraph."
+          {...resetFonts("lineHeight")}
+        >
           <Slider
             label="Line height"
             value={fonts.lineHeight}
@@ -377,7 +400,12 @@ export function FontsLookPage({
             onChange={(lineHeight) => setFonts({ lineHeight })}
           />
         </SettingRow>
-        <SettingRow id="letterSpacing" title="Letter spacing" {...resetFonts("letterSpacing")}>
+        <SettingRow
+          id="letterSpacing"
+          title="Letter spacing"
+          description="Space between letters."
+          {...resetFonts("letterSpacing")}
+        >
           <Slider
             label="Letter spacing"
             value={fonts.letterSpacing}
@@ -406,7 +434,13 @@ export function FontsLookPage({
         </SettingRow>
       </SettingsGroup>
       <SettingsGroup label="Headings">
-        <SettingRow id="headingFont" title="Font" className="heading-font-setting" {...resetFonts("headingFont")}>
+        <SettingRow
+          id="headingFont"
+          title="Font"
+          description="The font of headings."
+          className="heading-font-setting"
+          {...resetFonts("headingFont")}
+        >
           <EditorFontFamilyControl
             className="preferences-font-family-control"
             fontFamily={fonts.headingFont}
@@ -418,7 +452,12 @@ export function FontsLookPage({
             onFontFamilyChange={(headingFont) => setFonts({ headingFont })}
           />
         </SettingRow>
-        <SettingRow id="headingWeight" title="Weight" {...resetFonts("headingWeight")}>
+        <SettingRow
+          id="headingWeight"
+          title="Weight"
+          description="How bold headings are."
+          {...resetFonts("headingWeight")}
+        >
           <Segmented
             label="Heading weight"
             value={fonts.headingWeight}
@@ -428,7 +467,13 @@ export function FontsLookPage({
         </SettingRow>
       </SettingsGroup>
       <SettingsGroup label="Code">
-        <SettingRow id="codeFont" title="Font" className="code-font-setting" {...resetFonts("codeFont")}>
+        <SettingRow
+          id="codeFont"
+          title="Font"
+          description="The font of code blocks and inline code."
+          className="code-font-setting"
+          {...resetFonts("codeFont")}
+        >
           <EditorFontFamilyControl
             className="preferences-font-family-control"
             fontFamily={fonts.codeFont}
@@ -440,7 +485,12 @@ export function FontsLookPage({
             onFontFamilyChange={(codeFont) => setFonts({ codeFont })}
           />
         </SettingRow>
-        <SettingRow id="codeSize" title="Size" {...resetFonts("codeSize")}>
+        <SettingRow
+          id="codeSize"
+          title="Size"
+          description="How large code is."
+          {...resetFonts("codeSize")}
+        >
           <Slider
             label="Code size"
             value={fonts.codeSize}
@@ -464,30 +514,6 @@ export function FontsLookPage({
           />
         </SettingRow>
       </SettingsGroup>
-    </div>
-  );
-}
-
-// Settings > Editor: how the note's page is laid out, then typing. Its fonts are on Fonts.
-export function EditorLookPage({
-  look,
-  onLookChange,
-  editorPreferences,
-  onEditorPreferencesChange,
-}) {
-  const normalizedEditorPreferences = normalizeEditorPreferences(editorPreferences);
-  const [fonts, setFonts, resetFonts] = useLookSection(look, onLookChange, "fonts");
-  const { keyboardShortcuts } = normalizedEditorPreferences;
-
-  const setEditorPreference = (key, value) =>
-    onEditorPreferencesChange?.({ ...normalizedEditorPreferences, [key]: value });
-  const resetEditorPreference = (key) => ({
-    changed: normalizedEditorPreferences[key] !== DEFAULT_EDITOR_PREFERENCES[key],
-    onReset: () => setEditorPreference(key, DEFAULT_EDITOR_PREFERENCES[key]),
-  });
-
-  return (
-    <div className="look-page">
       <SettingsGroup label="Layout">
         <SettingRow
           id="textWidth"
@@ -561,10 +587,10 @@ const BORDER_OPTIONS = [
   { value: "strong", label: "Strong" },
 ];
 
-// Settings > Background, in two steps: what sits behind the window (its kind, its picture or
-// colours, how it is adjusted, where it shows), then, once there is one, the glass the window
-// lays over it.
-export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
+// Settings > Window, in steps: what sits behind the window (its kind, its picture or colors and
+// how it is adjusted), then, once there is one, the glass the window lays over it and whether
+// sticky notes show it too.
+export function WindowLookPage({ look, onLookChange, onPickBackground }) {
   const [background, setBackground, resetBackground] = useLookSection(
     look,
     onLookChange,
@@ -625,11 +651,11 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
     <div className="look-page">
       <SettingsGroup
         label="Background"
-        note={hasBackground ? null : "With a background, glass settings for the window appear here."}
+        note={hasBackground ? null : "With a background, glass and sticky note settings appear here."}
       >
         <SettingRow
           id="backgroundType"
-          title="Background"
+          title="Type"
           description="What shows behind your notes and the sidebar."
           {...resetBackground("type")}
         >
@@ -641,7 +667,12 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
           />
         </SettingRow>
         {background.type === "color" && (
-          <SettingRow id="backgroundColor" title="Color" {...resetBackground("color")}>
+          <SettingRow
+            id="backgroundColor"
+            title="Color"
+            description="The flat color behind the window."
+            {...resetBackground("color")}
+          >
             <ColorInput
               label="Background color"
               value={background.color}
@@ -651,21 +682,36 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
         )}
         {background.type === "gradient" && (
           <>
-            <SettingRow id="backgroundGradient" title="Start color" {...resetBackground("from")}>
+            <SettingRow
+              id="backgroundGradient"
+              title="Start color"
+              description="The color the gradient starts from."
+              {...resetBackground("from")}
+            >
               <ColorInput
                 label="Gradient start color"
                 value={background.from}
                 onChange={(from) => setBackground({ from })}
               />
             </SettingRow>
-            <SettingRow id="backgroundGradientTo" title="End color" {...resetBackground("to")}>
+            <SettingRow
+              id="backgroundGradientTo"
+              title="End color"
+              description="The color the gradient ends on."
+              {...resetBackground("to")}
+            >
               <ColorInput
                 label="Gradient end color"
                 value={background.to}
                 onChange={(to) => setBackground({ to })}
               />
             </SettingRow>
-            <SettingRow id="backgroundGradientAngle" title="Angle" {...resetBackground("angle")}>
+            <SettingRow
+              id="backgroundGradientAngle"
+              title="Angle"
+              description="Which way the gradient runs."
+              {...resetBackground("angle")}
+            >
               <Slider
                 label="Gradient angle"
                 value={background.angle}
@@ -683,7 +729,7 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
             <SettingRow
               id="backgroundPicture"
               title="Picture"
-              description="Pictures you add stay on this computer."
+              description="A built-in picture or one of your own; yours stay on this computer."
               wide
               {...resetBackground("picture")}
             >
@@ -772,7 +818,12 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
           </>
         )}
         {canBlur && (
-          <SettingRow id="backgroundBlur" title="Blur" {...resetBackground("blur")}>
+          <SettingRow
+            id="backgroundBlur"
+            title="Blur"
+            description="Softens the picture or gradient."
+            {...resetBackground("blur")}
+          >
             <Slider
               label="Background blur"
               value={background.blur}
@@ -789,6 +840,7 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
             <SettingRow
               id="backgroundBrightness"
               title="Brightness"
+              description="Lightens or darkens the background."
               {...resetBackground("brightness")}
             >
               <Slider
@@ -804,6 +856,7 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
             <SettingRow
               id="backgroundSaturation"
               title="Saturation"
+              description="How much color the background keeps."
               {...resetBackground("saturation")}
             >
               <Slider
@@ -819,7 +872,7 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
             <SettingRow
               id="backgroundTint"
               title="Tint"
-              description="Washes the background with a color."
+              description="How strongly the tint color washes over the background."
               {...resetBackground("tintAmount")}
             >
               <Slider
@@ -833,7 +886,12 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
               />
             </SettingRow>
             {background.tintAmount > 0 && (
-              <SettingRow id="backgroundTintColor" title="Tint color" {...resetBackground("tint")}>
+              <SettingRow
+                id="backgroundTintColor"
+                title="Tint color"
+                description="The color washed over the background."
+                {...resetBackground("tint")}
+              >
                 <ColorInput
                   label="Tint color"
                   value={background.tint}
@@ -851,17 +909,6 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
                 label="Dim in dark mode"
                 checked={background.dimInDark}
                 onChange={(dimInDark) => setBackground({ dimInDark })}
-              />
-            </SettingRow>
-            <SettingRow
-              id="backgroundBehindStickies"
-              title="Show behind sticky notes"
-              {...resetBackground("behindStickies")}
-            >
-              <Switch
-                label="Show behind sticky notes"
-                checked={background.behindStickies}
-                onChange={(behindStickies) => setBackground({ behindStickies })}
               />
             </SettingRow>
           </>
@@ -906,7 +953,7 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
           <SettingRow
             id="floatingBlur"
             title="Menu blur"
-            description="How much menus, the search palette and Settings blur what is behind them."
+            description="How much menus and Settings blur what is behind them."
             {...resetSurfaceStyle("floatingBlur")}
           >
             <Slider
@@ -935,18 +982,34 @@ export function BackgroundLookPage({ look, onLookChange, onPickBackground }) {
           {!isSolid && (
             <SettingRow
               id="readableText"
-              title="Keep text readable"
+              title="Text glow"
               description="A soft glow behind text keeps it clear of the background."
               changed={look.readableText !== DEFAULT_LOOK.readableText}
               onReset={() => onLookChange({ ...look, readableText: DEFAULT_LOOK.readableText })}
             >
               <Switch
-                label="Keep text readable"
+                label="Text glow"
                 checked={look.readableText}
                 onChange={(readableText) => onLookChange({ ...look, readableText })}
               />
             </SettingRow>
           )}
+        </SettingsGroup>
+      )}
+      {hasBackground && (
+        <SettingsGroup label="Sticky notes">
+          <SettingRow
+            id="backgroundBehindStickies"
+            title="Show background"
+            description="Sticky note windows show the background too."
+            {...resetBackground("behindStickies")}
+          >
+            <Switch
+              label="Show background behind sticky notes"
+              checked={background.behindStickies}
+              onChange={(behindStickies) => setBackground({ behindStickies })}
+            />
+          </SettingRow>
         </SettingsGroup>
       )}
     </div>
@@ -989,7 +1052,7 @@ const TAB_BORDER_OPTIONS = [
   { value: "strong", label: "Strong" },
 ];
 
-// One colour row of the Tabs page: a swatch row whose first swatch keeps the theme's colour.
+// One colour row of the Sidebar page: a swatch row whose first swatch keeps the theme's colour.
 function TabColorRow({ id, title, description, noneLabel, options, value, onChange, reset }) {
   return (
     <SettingRow id={id} title={title} description={description} {...reset}>
@@ -1007,12 +1070,27 @@ function TabColorRow({ id, title, description, noneLabel, options, value, onChan
   );
 }
 
-export function TabsLookPage({ look, onLookChange }) {
+// The tab colours most people never touch, behind More colors: each look key and its row's id.
+const MORE_TAB_COLOR_ROWS = {
+  activeText: "tabActiveText",
+  inactiveText: "tabInactiveText",
+  fillOpacity: "tabFillOpacity",
+  blur: "tabBlur",
+};
+
+// Settings > Sidebar: the shape of the tabs, their colours (the fills first, the text colours,
+// opacity and blur behind More colors, open from the start once one of them is set or when a
+// search result points at one), the colours of notes that have one, and what each tab shows.
+export function SidebarLookPage({ look, onLookChange, revealSettingId }) {
   const [tabs, setTabs, resetTabs] = useLookSection(look, onLookChange, "tabs");
+  const [showMoreColors, setShowMoreColors] = useState(() =>
+    Object.entries(MORE_TAB_COLOR_ROWS).some(([key, id]) =>
+      tabs[key] !== DEFAULT_LOOK.tabs[key] || id === revealSettingId),
+  );
 
   return (
     <div className="look-page">
-      <SettingsGroup label="Shape">
+      <SettingsGroup label="Tabs">
         <SettingRow
           id="tabStyle"
           title="Style"
@@ -1026,7 +1104,12 @@ export function TabsLookPage({ look, onLookChange }) {
             onChange={(style) => setTabs({ style })}
           />
         </SettingRow>
-        <SettingRow id="tabHeight" title="Height" {...resetTabs("height")}>
+        <SettingRow
+          id="tabHeight"
+          title="Height"
+          description="How tall each tab is."
+          {...resetTabs("height")}
+        >
           <Segmented
             label="Tab height"
             value={tabs.height}
@@ -1034,7 +1117,12 @@ export function TabsLookPage({ look, onLookChange }) {
             onChange={(height) => setTabs({ height })}
           />
         </SettingRow>
-        <SettingRow id="tabRadius" title="Corners" description="How round each tab is." {...resetTabs("radius")}>
+        <SettingRow
+          id="tabRadius"
+          title="Corners"
+          description="How round each tab is."
+          {...resetTabs("radius")}
+        >
           <Slider
             label="Tab corner radius"
             value={tabs.radius}
@@ -1048,7 +1136,7 @@ export function TabsLookPage({ look, onLookChange }) {
         <SettingRow
           id="tabBorder"
           title="Border"
-          description="Auto keeps the border the style draws."
+          description="The line around each tab; Auto follows the style."
           {...resetTabs("border")}
         >
           <Segmented
@@ -1062,6 +1150,7 @@ export function TabsLookPage({ look, onLookChange }) {
           <TabColorRow
             id="tabBorderColor"
             title="Border color"
+            description="The color of the line around each tab."
             noneLabel="Theme color"
             options={TAB_FILL_OPTIONS}
             value={tabs.borderColor}
@@ -1086,7 +1175,7 @@ export function TabsLookPage({ look, onLookChange }) {
         />
         <TabColorRow
           id="tabActiveFill"
-          title="Open tab"
+          title="Active tab"
           description="The tab of the note you are in."
           noneLabel="Theme color"
           options={TAB_FILL_OPTIONS}
@@ -1095,71 +1184,87 @@ export function TabsLookPage({ look, onLookChange }) {
           reset={resetTabs("activeFill")}
         />
         <TabColorRow
-          id="tabActiveText"
-          title="Open tab text"
-          description="Automatic picks whichever reads better on the tab."
-          noneLabel="Automatic"
-          options={TAB_TEXT_OPTIONS}
-          value={tabs.activeText}
-          onChange={(activeText) => setTabs({ activeText })}
-          reset={resetTabs("activeText")}
-        />
-        <TabColorRow
           id="tabInactiveFill"
-          title="Other tabs"
+          title="Inactive tabs"
+          description="The tabs of your other notes."
           noneLabel="Theme color"
           options={TAB_FILL_OPTIONS}
           value={tabs.inactiveFill}
           onChange={(inactiveFill) => setTabs({ inactiveFill })}
           reset={resetTabs("inactiveFill")}
         />
-        <TabColorRow
-          id="tabInactiveText"
-          title="Other tabs text"
-          noneLabel="Automatic"
-          options={TAB_TEXT_OPTIONS}
-          value={tabs.inactiveText}
-          onChange={(inactiveText) => setTabs({ inactiveText })}
-          reset={resetTabs("inactiveText")}
-        />
-        <SettingRow
-          id="tabFillOpacity"
-          title="Opacity"
-          description="How solid the tab colors are."
-          {...resetTabs("fillOpacity")}
+        {showMoreColors && (
+          <>
+            <TabColorRow
+              id="tabActiveText"
+              title="Active tab text"
+              description="The text color of the active tab; Automatic picks what reads best."
+              noneLabel="Automatic"
+              options={TAB_TEXT_OPTIONS}
+              value={tabs.activeText}
+              onChange={(activeText) => setTabs({ activeText })}
+              reset={resetTabs("activeText")}
+            />
+            <TabColorRow
+              id="tabInactiveText"
+              title="Inactive tab text"
+              description="The text color of the inactive tabs."
+              noneLabel="Automatic"
+              options={TAB_TEXT_OPTIONS}
+              value={tabs.inactiveText}
+              onChange={(inactiveText) => setTabs({ inactiveText })}
+              reset={resetTabs("inactiveText")}
+            />
+            <SettingRow
+              id="tabFillOpacity"
+              title="Opacity"
+              description="How solid the tab colors are."
+              {...resetTabs("fillOpacity")}
+            >
+              <Slider
+                label="Tab fill opacity"
+                value={tabs.fillOpacity}
+                min={10}
+                max={100}
+                step={5}
+                format={formatPercent}
+                onChange={(fillOpacity) => setTabs({ fillOpacity })}
+              />
+            </SettingRow>
+            <SettingRow
+              id="tabBlur"
+              title="Blur"
+              description="How much the tabs blur a background behind them."
+              {...resetTabs("blur")}
+            >
+              <Slider
+                label="Tab blur"
+                value={tabs.blur}
+                min={0}
+                max={24}
+                step={2}
+                format={(blur) => (blur === 0 ? "None" : formatPx(blur))}
+                onChange={(blur) => setTabs({ blur })}
+              />
+            </SettingRow>
+          </>
+        )}
+        <button
+          type="button"
+          className="settings-disclosure"
+          aria-expanded={showMoreColors}
+          onMouseDown={preventFocusLoss}
+          onClick={() => setShowMoreColors((shown) => !shown)}
         >
-          <Slider
-            label="Tab fill opacity"
-            value={tabs.fillOpacity}
-            min={10}
-            max={100}
-            step={5}
-            format={formatPercent}
-            onChange={(fillOpacity) => setTabs({ fillOpacity })}
-          />
-        </SettingRow>
-        <SettingRow
-          id="tabBlur"
-          title="Blur"
-          description="How much the tabs blur a background behind them."
-          {...resetTabs("blur")}
-        >
-          <Slider
-            label="Tab blur"
-            value={tabs.blur}
-            min={0}
-            max={24}
-            step={2}
-            format={(blur) => (blur === 0 ? "None" : formatPx(blur))}
-            onChange={(blur) => setTabs({ blur })}
-          />
-        </SettingRow>
+          More colors
+          <ChevronDown className="settings-disclosure-icon" size={13} aria-hidden="true" />
+        </button>
       </SettingsGroup>
-      <SettingsGroup label="Colored tabs">
+      <SettingsGroup label="Note colors">
         <SettingRow
           id="tabNewColor"
           title="New tab color"
-          description="In order gives each new tab the next pastel; right-click a tab to pick one."
+          description="In order gives each new tab the next color."
           {...resetTabs("newTabColor")}
         >
           <Segmented
@@ -1171,12 +1276,12 @@ export function TabsLookPage({ look, onLookChange }) {
         </SettingRow>
         <SettingRow
           id="tabColorStrength"
-          title="Color strength"
-          description="How strongly a colored tab is filled."
+          title="Note color intensity"
+          description="How strongly a tab shows its note's color."
           {...resetTabs("colorStrength")}
         >
           <Slider
-            label="Tab color strength"
+            label="Note color intensity"
             value={tabs.colorStrength}
             min={20}
             max={100}
@@ -1189,8 +1294,8 @@ export function TabsLookPage({ look, onLookChange }) {
       <SettingsGroup label="Show">
         <SettingRow
           id="tabShowNumbers"
-          title="Numbers"
-          description="Off gives the title the room."
+          title="Tab numbers"
+          description="The number before each title; off gives the title more room."
           {...resetTabs("showNumbers")}
         >
           <Switch
@@ -1201,8 +1306,10 @@ export function TabsLookPage({ look, onLookChange }) {
         </SettingRow>
         <SettingRow
           id="tabShowShortcuts"
-          title="Shortcuts"
-          description="The ⌘1 to ⌘9 key beside each tab."
+          title="Tab shortcuts"
+          description={`The ${formatKeyboardShortcutLabel("Mod+1")} to ${formatKeyboardShortcutLabel(
+            "Mod+9",
+          )} key beside each tab.`}
           {...resetTabs("showShortcuts")}
         >
           <Switch

@@ -2536,7 +2536,7 @@ app.whenReady().then(() => {
   appUpdates = startAppUpdates({
     mode: updateMode,
     loadUpdater: () => require("electron-updater").autoUpdater,
-    // Settings > About > Download updates automatically; otherwise the release is offered.
+    // Settings > General > Download updates automatically; otherwise the release is offered.
     onUpdateAvailable: (updateInfo) => void selfUpdater?.prepare(updateInfo, {
       download: store.getEditorPreferences().autoDownloadUpdates === true,
     }),
