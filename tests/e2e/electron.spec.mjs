@@ -1508,6 +1508,33 @@ test("Electron note search leaves focus in the find field of the tab it opens", 
   }
 });
 
+// Opening a note puts the caret at its end and changes nothing in it, as opening a Notion page
+// does: no empty line is added under a note that ends in text, and the stored note is untouched.
+test("Electron opening a note leaves its blocks as they were", async () => {
+  const userDataDirectory = createTemporaryDirectory("notepane-electron-");
+  writeInitialNotes(userDataDirectory, [
+    { id: "first-note", title: "First note", markdown: "first body", createdAt: 1, updatedAt: 1 },
+    { id: "second-note", title: "Second note", markdown: "ends in text", createdAt: 2, updatedAt: 2 },
+  ]);
+  const electronApp = await launchApp(userDataDirectory);
+
+  try {
+    const page = await electronApp.firstWindow();
+    const editor = page.getByTestId("sticky-editor-surface");
+    await expect(editor).toContainText("first body");
+    await page.getByRole("tab", { name: "Second note" }).click();
+    await expect(editor).toContainText("ends in text");
+    // Once the caret is in the note, the open has done all it does.
+    await expect.poll(() => page.evaluate(() => document.activeElement?.closest(".bn-editor") !== null))
+      .toBe(true);
+    const blocks = () => editor.locator(".bn-block-content").evaluateAll((elements) =>
+      elements.map((element) => element.textContent));
+    expect(await blocks()).toEqual(["ends in text"]);
+  } finally {
+    await electronApp.close();
+  }
+});
+
 test("Electron note search reveals a sticky window, even one closed by hand", async () => {
   const userDataDirectory = createTemporaryDirectory("notepane-electron-");
   writeInitialNotes(userDataDirectory, [
@@ -3357,11 +3384,12 @@ async function reloadAndReadFirstPaintTheme(page) {
   return await page.evaluate(() => window.__notepaneThemeAtDomContentLoaded);
 }
 
-// One frame after its editor mounts, a window puts the caret in the last block (StickyEditor's
-// focusLastEditorBlock effect), which replaces any selection made before it. In these notes the
-// last block is empty, so its placeholder marks that the caret has landed.
+// One frame after its editor mounts, a window puts the caret at the end of the note (StickyEditor's
+// focusOpenedNote effect) unless the editor already has focus. Once the editor holds focus that
+// has happened, so a selection made afterwards stays.
 async function expectStartupCaretPlaced(page) {
-  await expect(page.locator(".bn-editor [data-is-empty-and-focused]")).toHaveCount(1);
+  await expect.poll(() => page.evaluate(() => document.activeElement?.closest(".bn-editor") !== null))
+    .toBe(true);
 }
 
 // Selects the first word of `paragraphText` so BlockNote shows the formatting toolbar, which

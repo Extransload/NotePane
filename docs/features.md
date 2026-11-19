@@ -144,7 +144,8 @@
   the visible order; a folder name cut short shows in full in a tooltip
 - Up and Down move the keyboard through the tabs and folder headers, Home and End to the ends, and the focus ring goes
   round the whole tab; renaming a tab keeps its number and title in place
-- Switching sessions swaps the note in place: nothing in the sidebar or the editor fades in again
+- Switching sessions swaps the note in place: nothing in the sidebar or the editor fades in again. Opening a note puts
+  the caret at its end and changes nothing in it, as opening a Notion page does, and a selection already made in it stays
 - Tags on notes: chips above the first block, added with suggestions; a tag opens the search palette filtered to it.
   The palette (`Command/Ctrl + P`) filters by `#tag` and `folder:Name`, with folder and tag chips. A sticky window
   shows the tag row only once its note has tags

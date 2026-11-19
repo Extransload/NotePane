@@ -83,6 +83,7 @@ import {
   findBlockById,
   findImageBlockForElement,
   focusLastEditorBlock,
+  focusOpenedNote,
   getEditorBlockElement,
   isBlankTableSurfacePointer,
   isEmptyParagraphBlock,
@@ -1414,7 +1415,7 @@ function StickyEditor({
       if (isEditableFormTarget(document.activeElement)) {
         return;
       }
-      focusLastEditorBlock(editor);
+      focusOpenedNote(editor);
     });
 
     return () => {

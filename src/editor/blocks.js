@@ -116,6 +116,25 @@ export function isEmptyParagraphBlock(block) {
   );
 }
 
+// Focus for a note that has just opened: the caret goes to the end of the last block, and the
+// note is left as it is, so opening a note never adds a block to it (Notion's page open). It
+// gives way to a selection the user has already made in the editor.
+export function focusOpenedNote(editor) {
+  if (editor.isFocused?.()) {
+    return;
+  }
+  const lastBlock = editor.document.at(-1);
+  editor.focus();
+  if (!lastBlock) {
+    return;
+  }
+  try {
+    editor.setTextCursorPosition(lastBlock, "end");
+  } catch {
+    // A block without text (an image, a divider) keeps the editor's own selection.
+  }
+}
+
 export function focusLastEditorBlock(editor) {
   const lastBlock = editor.document.at(-1);
   if (lastBlock && isEmptyParagraphBlock(lastBlock)) {
