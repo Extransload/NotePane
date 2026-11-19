@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
   // Synchronous, so the renderer knows before its first frame whether the intro covers it.
   takeLaunchIntro: () => ipcRenderer.sendSync("app:take-launch-intro"),
   getAppUpdateState: () => ipcRenderer.invoke("app-update:get-state"),
+  downloadAppUpdate: () => ipcRenderer.invoke("app-update:download"),
   installAppUpdate: () => ipcRenderer.invoke("app-update:install"),
   openUpdateRelease: (version) => ipcRenderer.invoke("app-update:open-release", version),
   onAppUpdateState: (callback) => {

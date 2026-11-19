@@ -123,8 +123,8 @@ let appUpdates = null;
 let selfUpdater = null;
 // Set by "Restart to update": the quit that follows starts the installer.
 let installUpdateOnQuit = false;
-// Versions the sticky layout has already been told about in a dialog.
-const announcedUpdateVersions = new Set();
+// The update states (status and version) the sticky layout has already been asked about.
+const announcedUpdateStates = new Set();
 const manuallyClosedStickyNoteIds = new Set();
 // Find queries waiting for a window to pick them up, keyed by window id. A
 // window that is still loading cannot receive `find:open` yet, so it pulls its
@@ -1296,8 +1296,10 @@ function installIpcHandlers() {
     }
   });
 
-  // The Mac self-updater's state, "Restart to update", and the release page for a download by hand.
+  // The Mac self-updater's state, the yes to a release on offer, "Restart to update", and the
+  // release page for a download by hand.
   ipcMain.handle("app-update:get-state", () => selfUpdater?.getState() ?? { status: "off" });
+  ipcMain.handle("app-update:download", () => void selfUpdater?.downloadOffered());
   ipcMain.handle("app-update:install", () => installAppUpdate());
   ipcMain.handle("app-update:open-release", (_event, version) => {
     if (typeof version === "string" && /^\d+\.\d+\.\d+/.test(version)) {
@@ -1357,6 +1359,10 @@ function installIpcHandlers() {
     const editorPreferences = store.updateEditorPreferences(payload);
     buildMenu();
     broadcastEditorPreferences(editorPreferences);
+    // Turning on automatic downloads also takes the release already on offer.
+    if (editorPreferences.autoDownloadUpdates) {
+      void selfUpdater?.downloadOffered();
+    }
     return editorPreferences;
   });
 
@@ -2509,7 +2515,10 @@ app.whenReady().then(() => {
   appUpdates = startAppUpdates({
     mode: updateMode,
     loadUpdater: () => require("electron-updater").autoUpdater,
-    onUpdateAvailable: (updateInfo) => void selfUpdater?.prepare(updateInfo),
+    // Settings > About > Download updates automatically; otherwise the release is offered.
+    onUpdateAvailable: (updateInfo) => void selfUpdater?.prepare(updateInfo, {
+      download: store.getEditorPreferences().autoDownloadUpdates === true,
+    }),
   });
 
   app.on("activate", () => {
@@ -2592,40 +2601,54 @@ app.on("will-quit", () => {
   }
 });
 
-// The self-updater's state reaches every window: the tabs window's "Restart to update" and
-// Settings > About. The sticky layout has no place for it, so a release that is ready, or one to
-// download by hand, is offered there once in a dialog.
+// The self-updater's state reaches every window: the tabs window's update pill and Settings >
+// About. The sticky layout has no place for it, so a release on offer, one that is ready, or one
+// to download by hand is offered there once in a dialog.
+const UPDATE_DIALOGS = {
+  available: {
+    message: (version) => `NotePane ${version} is available`,
+    detail: "Download it now? NotePane asks to restart once it is ready.",
+    button: "Download",
+    act: () => void selfUpdater?.downloadOffered(),
+  },
+  ready: {
+    message: (version) => `NotePane ${version} is ready`,
+    detail: "Restart NotePane to start using it. Your notes are saved first.",
+    button: "Restart to Update",
+    act: () => installAppUpdate(),
+  },
+  manual: {
+    message: (version) => `NotePane ${version} is available`,
+    detail: "This copy of NotePane cannot replace itself. Download the new version from its release page.",
+    button: "Download",
+    act: (version) => openReleasePage(version),
+  },
+};
+
 function handleAppUpdateState(state) {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) {
       window.webContents.send("app-update:state", state);
     }
   }
-  const offer = state.status === "ready" || state.status === "manual";
-  if (!offer || store.getLayoutMode() !== "sticky" || announcedUpdateVersions.has(state.version)) {
+  const offer = UPDATE_DIALOGS[state.status];
+  const key = `${state.status} ${state.version}`;
+  if (!offer || store.getLayoutMode() !== "sticky" || announcedUpdateStates.has(key)) {
     return;
   }
-  announcedUpdateVersions.add(state.version);
-  const ready = state.status === "ready";
+  announcedUpdateStates.add(key);
   void dialog
     .showMessageBox({
       type: "info",
-      message: `NotePane ${state.version} is ${ready ? "ready" : "available"}`,
-      detail: ready
-        ? "Restart NotePane to start using it. Your notes are saved first."
-        : "This copy of NotePane cannot replace itself. Download the new version from its release page.",
-      buttons: [ready ? "Restart to Update" : "Download", "Later"],
+      message: offer.message(state.version),
+      detail: offer.detail,
+      buttons: [offer.button, "Later"],
       defaultId: 0,
       cancelId: 1,
     })
     .then(({ response }) => {
-      if (response !== 0) {
-        return;
-      }
-      if (ready) {
-        installAppUpdate();
-      } else {
-        openReleasePage(state.version);
+      if (response === 0) {
+        offer.act(state.version);
       }
     })
     .catch(() => {});

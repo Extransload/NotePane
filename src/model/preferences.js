@@ -92,6 +92,11 @@ export function normalizeEditorPreferences(
       typeof source.launchIntro === "boolean"
         ? source.launchIntro
         : fallbackSource.launchIntro !== false,
+    // Off unless turned on: a newer release is offered and downloads only when asked.
+    autoDownloadUpdates:
+      typeof source.autoDownloadUpdates === "boolean"
+        ? source.autoDownloadUpdates
+        : fallbackSource.autoDownloadUpdates === true,
     ...normalizeKeyboardShortcutPreferences(source, fallbackSource),
     // A partial update without a look keeps the previous one.
     look: normalizeLook(source.look ?? fallbackSource.look),

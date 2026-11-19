@@ -65,6 +65,7 @@ export const DEFAULT_EDITOR_PREFERENCES = {
   showTableOfContents: false,
   smoothCaret: true,
   launchIntro: true,
+  autoDownloadUpdates: false,
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
 };

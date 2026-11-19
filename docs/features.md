@@ -57,11 +57,14 @@
   up to date, "NotePane x.y.z is available", "installs when NotePane quits" on Windows, "Update checks run in the
   installed app" in development, test builds and the browser preview, or "Could not check for updates" with the
   reason), and a **Release notes** link to the GitHub releases page
-- Updates on a Mac as in TablePeek: a newer release downloads by itself, and a pill in the tabs window's header fills
-  with the download ("Downloading 42%", then "Checking update…"); the About page shows the same with the size and a
-  progress bar. Then **Restart to update** shows in both (the sticky layout asks in a dialog): it saves the notes,
-  quits, swaps the new app in and opens it, the pill filling again while it restarts. A failed download says so and
-  opens the release page; a copy run from the disk image or a folder it cannot write offers that page instead
+- Updates on a Mac as in TablePeek: a newer release is offered first, as "Update to x.y.z" in a pill in the tabs
+  window's header and as **Download** on the About page (the sticky layout asks in a dialog); nothing downloads until
+  one is clicked, unless Settings > About > **Download updates automatically** is on (off by default; turning it on
+  takes a release already on offer). The pill then fills with the download ("Downloading 42%", then "Checking
+  update…"); the About page shows the same with the size and a progress bar. Then **Restart to update** shows in both
+  (the sticky layout asks again): it saves the notes, quits, swaps the new app in and opens it, the pill filling again
+  while it restarts. A failed download says so and opens the release page; a copy run from the disk image or a folder
+  it cannot write offers that page instead
 - Settings > Keyboard lists every command as a 40px table row: name, on/off switch, the keys (click to record
   new ones) and Reset
 - Default editor font family for every session; there is no font size setting, text size follows the app zoom

@@ -617,6 +617,7 @@ test("updates editor preferences and applies them to new notes", () => {
     showTableOfContents: false,
     smoothCaret: true,
     launchIntro: true,
+    autoDownloadUpdates: false,
     keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
     keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
   });
@@ -639,6 +640,7 @@ test("updates editor preferences and applies them to new notes", () => {
     showTableOfContents: true,
     smoothCaret: false,
     launchIntro: false,
+    autoDownloadUpdates: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
   }), {
@@ -648,6 +650,7 @@ test("updates editor preferences and applies them to new notes", () => {
     showTableOfContents: true,
     smoothCaret: false,
     launchIntro: false,
+    autoDownloadUpdates: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
     look: normalizeLook({}),
@@ -664,6 +667,7 @@ test("updates editor preferences and applies them to new notes", () => {
     showTableOfContents: true,
     smoothCaret: false,
     launchIntro: false,
+    autoDownloadUpdates: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
     look: normalizeLook({}),

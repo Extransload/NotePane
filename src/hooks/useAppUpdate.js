@@ -3,9 +3,10 @@ import { electronApi } from "../constants.js";
 
 /**
  * The Mac build's own update (electron/macSelfUpdate.cjs), as main reports it: `idle`,
- * `downloading`, `ready` (downloaded and checked, waiting for "Restart to update"),
- * `installing`, `error`, or `manual` (this copy cannot replace itself, so the release page
- * offers it). Elsewhere, and in the browser preview, the status is `off`.
+ * `available` (a newer release on offer, waiting for the user's yes), `downloading`, `ready`
+ * (downloaded and checked, waiting for "Restart to update"), `installing`, `error`, or `manual`
+ * (this copy cannot replace itself, so the release page offers it). Elsewhere, and in the
+ * browser preview, the status is `off`.
  */
 export function useAppUpdate() {
   const [update, setUpdate] = useState({ status: "off" });
@@ -30,6 +31,10 @@ export function useAppUpdate() {
     };
   }, []);
 
+  const downloadUpdate = useCallback(() => {
+    void electronApi?.downloadAppUpdate?.();
+  }, []);
+
   const installUpdate = useCallback(() => {
     void electronApi?.installAppUpdate?.();
   }, []);
@@ -40,5 +45,5 @@ export function useAppUpdate() {
     }
   }, [update.version]);
 
-  return { update, installUpdate, openRelease };
+  return { update, downloadUpdate, installUpdate, openRelease };
 }

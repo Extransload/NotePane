@@ -26,6 +26,8 @@ export function formatDownloadSize(bytes) {
 export function getUpdatePillLabel(state) {
   const progress = getUpdateProgress(state);
   switch (state?.status) {
+    case "available":
+      return `Update to ${state.version}`;
     case "downloading":
       return progress === null ? "Downloading update…" : `Downloading ${Math.floor(progress * 100)}%`;
     case "verifying":

@@ -1766,7 +1766,7 @@ function StickyEditor({
   useSmoothCaret(editor, editorSurfaceRef, normalizedEditorPreferences);
   const shellRef = useRef(null);
   useMountWithoutFades(shellRef);
-  const { update: appUpdate, installUpdate, openRelease } = useAppUpdate();
+  const { update: appUpdate, downloadUpdate, installUpdate, openRelease } = useAppUpdate();
 
   useEditorSurfaceShortcuts({
     activeImageBlockId,
@@ -2568,7 +2568,12 @@ function StickyEditor({
               )}
             </div>
             <SaveStatus status={saveStatus.status} sequence={saveStatus.sequence} />
-            <UpdatePill update={appUpdate} onInstall={installUpdate} onOpenRelease={openRelease} />
+            <UpdatePill
+              update={appUpdate}
+              onDownload={downloadUpdate}
+              onInstall={installUpdate}
+              onOpenRelease={openRelease}
+            />
           </>
         )}
         <div

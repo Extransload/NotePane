@@ -127,6 +127,7 @@ function getPreferencePage(pageId) {
 export const SETTINGS_INDEX = [
   { page: "about", id: "aboutVersion", selector: ".about-card", title: "Version", description: "Which NotePane you are running.", keywords: "about version electron chromium" },
   { page: "about", id: "checkForUpdates", selector: ".about-update-row", title: "Check for updates", description: "Looks for a newer NotePane.", keywords: "updates upgrade new version download latest" },
+  { page: "about", id: "autoDownloadUpdates", title: "Download updates automatically", description: "Off asks before downloading a new version.", keywords: "updates download automatic auto ask prompt background" },
   { page: "about", id: "releaseNotes", selector: '.preferences-card a[href$="/releases"]', title: "What's new", description: "What changed in each version.", keywords: "release notes changelog github" },
   { page: "theme", id: "appTheme", title: "App theme", description: "The colors of every window, light or dark.", keywords: "theme colour color dark light mode palette scheme" },
   { page: "theme", id: "accentColor", title: "Accent color", description: "Colors buttons, switches and selections.", keywords: "accent colour color highlight tint blue purple green orange pink" },
@@ -309,6 +310,16 @@ export function PreferencesWindow({
       onEditorPreferencesChange?.({
         ...normalizedEditorPreferences,
         launchIntro: Boolean(launchIntro),
+      });
+    },
+    [normalizedEditorPreferences, onEditorPreferencesChange],
+  );
+
+  const updateAutoDownloadUpdates = useCallback(
+    (autoDownloadUpdates) => {
+      onEditorPreferencesChange?.({
+        ...normalizedEditorPreferences,
+        autoDownloadUpdates: Boolean(autoDownloadUpdates),
       });
     },
     [normalizedEditorPreferences, onEditorPreferencesChange],
@@ -574,7 +585,12 @@ export function PreferencesWindow({
           />
         );
       case "about":
-        return <AboutPreferencesSection />;
+        return (
+          <AboutPreferencesSection
+            autoDownloadUpdates={normalizedEditorPreferences.autoDownloadUpdates}
+            onAutoDownloadUpdatesChange={updateAutoDownloadUpdates}
+          />
+        );
       default:
         return (
           <AppearanceLookPage

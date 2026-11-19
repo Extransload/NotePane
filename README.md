@@ -72,8 +72,8 @@ NotePane does both, and switches between them with one shortcut.
 - **A settings window like Tern's.** One floating window with search across every setting, and an eye button to
   peek at the app behind it.
 
-**Stays current.** On a Mac, a new release downloads by itself and **Restart to update** swaps it in. On Windows it
-installs when you quit.
+**Stays current.** On a Mac, NotePane asks before downloading a new release (**Update to x.y.z**), then **Restart to
+update** swaps it in; Settings > About can download releases without asking. On Windows it installs when you quit.
 
 ---
 
@@ -181,9 +181,11 @@ choose **More info → Run anyway**.
 
 ### Updates
 
-NotePane checks Releases at startup and every six hours; no note data is sent. On macOS a newer release downloads
-in the background, its checksum and version are checked, and **Restart to update** appears in the window's title
-bar: it saves your notes, swaps the new app in and opens it. On Windows the update installs when you quit.
+NotePane checks Releases at startup and every six hours; no note data is sent. On macOS a newer release shows as
+**Update to x.y.z** in the window's title bar and as **Download** in Settings > About; once you click it, it downloads
+in the background, its checksum and version are checked, and **Restart to update** appears: it saves your notes,
+swaps the new app in and opens it. Settings > About > Download updates automatically skips the question. On Windows
+the update installs when you quit.
 Versions before 0.5.1 only link to the release page, so they need one update by hand.
 
 ### Build a package yourself

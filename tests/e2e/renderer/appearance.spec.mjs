@@ -1665,7 +1665,8 @@ test("shows NotePane, its version and what it is on the About page", async ({ pa
 
 // A desktop bridge with one note whose update check waits until `__updateCheck.release()`, then
 // answers with `result`. `__appUpdate.emit(state)` reports the Mac self-updater's state, and
-// `__appUpdate.calls` records Restart to update and the release page.
+// `__appUpdate.calls` records Download, Restart to update, the release page and the
+// automatic-download preference.
 function stubAboutBridge({ updateMode, result }) {
   const note = {
     id: "about-note",
@@ -1700,6 +1701,10 @@ function stubAboutBridge({ updateMode, result }) {
     getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
     getLayoutMode: async () => "tabs",
     getEditorPreferences: async () => ({}),
+    updateEditorPreferences: async (preferences) => {
+      window.__appUpdate.calls.push(`autoDownloadUpdates ${preferences.autoDownloadUpdates}`);
+      return preferences;
+    },
     listFonts: async () => [],
     saveContent: async () => undefined,
     updateAppearance: async () => undefined,
@@ -1717,6 +1722,9 @@ function stubAboutBridge({ updateMode, result }) {
       return result;
     },
     getAppUpdateState: async () => updateState,
+    downloadAppUpdate: async () => {
+      window.__appUpdate.calls.push("download");
+    },
     onAppUpdateState: (listener) => {
       updateListeners.add(listener);
       return () => updateListeners.delete(listener);
@@ -1732,11 +1740,11 @@ function stubAboutBridge({ updateMode, result }) {
 
 for (const { name, updateMode, result, status, detail } of [
   {
-    name: "says a newer version downloads by itself on a Mac",
+    name: "says a newer version is there to download on a Mac",
     updateMode: "self",
     result: { status: "available", mode: "self", version: "1.5.0" },
     status: "NotePane 1.5.0 is available",
-    detail: "It downloads in the background, then Restart to update installs it.",
+    detail: "Download it, then restart to update.",
   },
   {
     name: "says a newer version installs when NotePane quits",
@@ -1792,6 +1800,32 @@ for (const { name, updateMode, result, status, detail } of [
     await expect(about.getByRole("button", { name: "Download" })).toHaveCount(0);
   });
 }
+
+// A newer release is offered, not downloaded: the header's pill and the About page each ask, and
+// only a click downloads it. About's switch turns automatic downloads on.
+test("a newer release waits for Download before it downloads", async ({ page }) => {
+  await page.addInitScript(stubAboutBridge, { updateMode: "self", result: null });
+  await page.reload();
+  await expect(page.getByTestId("sticky-editor-surface")).toBeVisible();
+  await page.evaluate(() => window.__appUpdate.emit({ status: "available", version: "1.5.0" }));
+
+  const pill = page.getByTestId("sticky-header").getByRole("button", { name: "Download NotePane 1.5.0" });
+  await expect(pill).toHaveText("Update to 1.5.0");
+  await expect(pill).toBeEnabled();
+  expect(await page.evaluate(() => window.__appUpdate.calls)).toEqual([]);
+  await pill.click();
+  await expect.poll(() => page.evaluate(() => window.__appUpdate.calls)).toEqual(["download"]);
+
+  const about = await openAboutPage(page);
+  await expect(about.getByTestId("update-status")).toHaveText("NotePane 1.5.0 is available");
+  await about.getByRole("button", { name: "Download", exact: true }).click();
+  const autoDownload = about.getByRole("switch", { name: "Download updates automatically" });
+  await expect(autoDownload).toHaveAttribute("aria-checked", "false");
+  await autoDownload.click();
+  await expect(autoDownload).toHaveAttribute("aria-checked", "true");
+  await expect.poll(() => page.evaluate(() => window.__appUpdate.calls))
+    .toEqual(["download", "download", "autoDownloadUpdates true"]);
+});
 
 // The Mac build downloads a release by itself: the header's pill and the About page fill with the
 // download, then offer Restart to update, either of which starts the install, and fill again while

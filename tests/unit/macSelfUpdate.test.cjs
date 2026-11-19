@@ -96,7 +96,7 @@ function createHarness({ zipBytes = Buffer.from("zip bytes"), listedSha512, unpa
 
 test("downloads, checks and unpacks a release, then installs it as the app quits", MAC_ONLY, async () => {
   const harness = createHarness({});
-  await harness.updater.prepare(harness.updateInfo);
+  await harness.updater.prepare(harness.updateInfo, { download: true });
   // Downloading (with its progress), then checking the download, then ready.
   const statuses = harness.states.map(({ status }) => status)
     .filter((status, index, all) => status !== all[index - 1]);
@@ -111,7 +111,7 @@ test("downloads, checks and unpacks a release, then installs it as the app quits
   ]);
 
   // A later check that finds the same release fetches nothing.
-  await harness.updater.prepare(harness.updateInfo);
+  await harness.updater.prepare(harness.updateInfo, { download: true });
   assert.equal(harness.runs.filter(([name]) => name === "fetch").length, 1);
 
   assert.equal(harness.updater.launchInstaller(), true);
@@ -126,7 +126,7 @@ test("downloads, checks and unpacks a release, then installs it as the app quits
 
 test("refuses a download that does not match the release's checksum", async () => {
   const harness = createHarness({ listedSha512: "not-the-hash" });
-  await harness.updater.prepare(harness.updateInfo);
+  await harness.updater.prepare(harness.updateInfo, { download: true });
   assert.equal(harness.updater.getState().status, "error");
   assert.match(harness.updater.getState().message, /does not match/);
   assert.equal(harness.updater.isReady(), false);
@@ -136,7 +136,7 @@ test("refuses a download that does not match the release's checksum", async () =
 
 test("refuses an unpacked app of another version", async () => {
   const harness = createHarness({ unpackedVersion: "0.5.0" });
-  await harness.updater.prepare(harness.updateInfo);
+  await harness.updater.prepare(harness.updateInfo, { download: true });
   assert.equal(harness.updater.getState().status, "error");
   assert.equal(harness.updater.isReady(), false);
 });
@@ -150,6 +150,23 @@ test("leaves a copy it cannot replace to the release page", async () => {
   await harness.updater.prepare(harness.updateInfo);
   assert.deepEqual(harness.updater.getState(), { status: "manual", version: "0.5.1" });
   assert.equal(harness.runs.length, 0);
+});
+
+// Without automatic downloads a release is offered and nothing is fetched until the user says
+// yes; a later check of the same release does not offer it again.
+test("offers a release and downloads it only when asked", MAC_ONLY, async () => {
+  const harness = createHarness({});
+  await harness.updater.prepare(harness.updateInfo);
+  await harness.updater.prepare(harness.updateInfo);
+  assert.deepEqual(harness.states, [{ status: "available", version: "0.5.1" }]);
+  assert.equal(harness.runs.length, 0);
+
+  await harness.updater.downloadOffered();
+  assert.equal(harness.updater.getState().status, "ready");
+  assert.equal(harness.runs.filter(([name]) => name === "fetch").length, 1);
+  // Nothing is left on offer.
+  await harness.updater.downloadOffered();
+  assert.equal(harness.runs.filter(([name]) => name === "fetch").length, 1);
 });
 
 // The script that swaps the bundles, run for real on folders standing in for the apps.

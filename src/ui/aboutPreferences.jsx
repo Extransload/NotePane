@@ -33,6 +33,9 @@ import {
 import {
   PreferencesCard,
 } from "./PreferencesCard.jsx";
+import {
+  Switch,
+} from "./settingsControls.jsx";
 
 // The page electron/appUpdates.cjs checks for releases (its RELEASES_URL).
 export const RELEASES_URL = "https://github.com/Extransload/NotePane/releases";
@@ -49,7 +52,7 @@ function describeUpdateCheck(update) {
         text: `NotePane ${update.version} is available`,
         detail: update.mode === "auto"
           ? "It downloads in the background and installs when NotePane quits."
-          : "It downloads in the background, then Restart to update installs it.",
+          : "Download it, then restart to update.",
       };
     case "off":
       return { text: "Update checks run in the installed app" };
@@ -61,10 +64,16 @@ function describeUpdateCheck(update) {
 }
 
 // What the Mac self-updater (useAppUpdate) has to say, when it is past a plain check: a download
-// on its way, a release ready to install, or one this copy cannot install itself.
+// on offer, on its way, ready to install, or one this copy cannot install itself.
 function describeSelfUpdate(selfUpdate) {
   const progress = getUpdateProgress(selfUpdate);
   switch (selfUpdate.status) {
+    case "available":
+      return {
+        text: `NotePane ${selfUpdate.version} is available`,
+        detail: "Download it now; NotePane asks to restart once it is ready.",
+        tone: "active",
+      };
     case "downloading":
       return {
         text: progress === null
@@ -110,13 +119,14 @@ function describeSelfUpdate(selfUpdate) {
 }
 
 /**
- * Preferences > About: the wordmark, the running version, what NotePane is, and a manual update
- * check. The browser preview has no bridge, so it shows the package version and no update check.
+ * Preferences > About: the wordmark, the running version, what NotePane is, a manual update
+ * check, the download of a release on offer, and whether releases download without asking. The
+ * browser preview has no bridge, so it shows the package version and no update check.
  */
-export function AboutPreferencesSection() {
+export function AboutPreferencesSection({ autoDownloadUpdates = false, onAutoDownloadUpdatesChange }) {
   const [appInfo, setAppInfo] = useState(null);
   const [update, setUpdate] = useState({ status: "idle" });
-  const { update: selfUpdate, installUpdate, openRelease } = useAppUpdate();
+  const { update: selfUpdate, downloadUpdate, installUpdate, openRelease } = useAppUpdate();
 
   useEffect(() => {
     if (!electronApi?.getAppInfo) {
@@ -211,6 +221,17 @@ export function AboutPreferencesSection() {
             )}
           </div>
           <div className="preference-backup-actions">
+            {selfUpdate.status === "available" && (
+              <button
+                type="button"
+                className="preference-data-button is-primary"
+                onMouseDown={preventFocusLoss}
+                onClick={downloadUpdate}
+              >
+                <Download size={13} aria-hidden="true" />
+                Download
+              </button>
+            )}
             {selfUpdate.status === "ready" && (
               <button
                 type="button"
@@ -248,6 +269,19 @@ export function AboutPreferencesSection() {
               Check for updates
             </button>
           </div>
+        </div>
+        <div className="preference-setting-row" data-setting-id="autoDownloadUpdates">
+          <div>
+            <div className="preference-setting-title">Download updates automatically</div>
+            <div className="preferences-section-description">
+              Off asks first: a new version shows as Update to x.y.z beside the title.
+            </div>
+          </div>
+          <Switch
+            label="Download updates automatically"
+            checked={autoDownloadUpdates}
+            onChange={(checked) => onAutoDownloadUpdatesChange?.(checked)}
+          />
         </div>
         <div className="preference-setting-row">
           <div>

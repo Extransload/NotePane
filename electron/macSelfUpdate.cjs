@@ -88,6 +88,8 @@ function createMacSelfUpdater({
   let state = { status: "idle" };
   let staged = null;
   let preparing = null;
+  // The release a check found while downloads wait for the user's yes.
+  let offered = null;
 
   const setState = (next) => {
     state = next;
@@ -140,18 +142,8 @@ function createMacSelfUpdater({
     return app;
   };
 
-  // Called for each check that finds a newer release; a release already downloaded or on its way
-  // is not fetched again, and one that failed is tried again by the next check.
-  const prepare = (updateInfo) => {
-    const version = updateInfo?.version;
-    if (!version || (staged?.version === version) || (preparing && state.version === version)) {
-      return preparing ?? Promise.resolve(state);
-    }
-    const file = findMacZip(updateInfo.files, arch);
-    if (!file || !canReplaceBundle(bundle, access)) {
-      setState({ status: "manual", version });
-      return Promise.resolve(state);
-    }
+  const startDownload = (version, file) => {
+    offered = null;
     setState({ status: "downloading", version, downloaded: 0, total: null });
     preparing = download(version, file)
       .then((app) => {
@@ -168,6 +160,34 @@ function createMacSelfUpdater({
       });
     return preparing;
   };
+
+  // Called for each check that finds a newer release; a release already downloaded or on its way
+  // is not fetched again, and one that failed is tried again by the next check. Unless
+  // `download` is set (Settings > About > Download updates automatically), a release is only
+  // offered: `available`, until downloadOffered() is asked for.
+  const prepare = (updateInfo, { download: downloadNow = false } = {}) => {
+    const version = updateInfo?.version;
+    if (!version || (staged?.version === version) || (preparing && state.version === version)) {
+      return preparing ?? Promise.resolve(state);
+    }
+    const file = findMacZip(updateInfo.files, arch);
+    if (!file || !canReplaceBundle(bundle, access)) {
+      setState({ status: "manual", version });
+      return Promise.resolve(state);
+    }
+    if (!downloadNow) {
+      offered = { version, file };
+      if (state.status !== "available" || state.version !== version) {
+        setState({ status: "available", version });
+      }
+      return Promise.resolve(state);
+    }
+    return startDownload(version, file);
+  };
+
+  // The user's yes to the release on offer.
+  const downloadOffered = () =>
+    offered && !preparing ? startDownload(offered.version, offered.file) : Promise.resolve(state);
 
   // Starts the script that swaps the new bundle in once this process has ended. Call it as the
   // app quits.
@@ -196,6 +216,7 @@ function createMacSelfUpdater({
       }
     },
     prepare,
+    downloadOffered,
   };
 }
 

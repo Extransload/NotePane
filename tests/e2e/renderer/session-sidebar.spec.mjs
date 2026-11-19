@@ -1479,6 +1479,9 @@ test("hidden tab numbers and shortcuts free their space for the title", async ({
   const deleteBox = await deleteButton.boundingBox();
   expect(deleteBox.x + deleteBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
   expect(deleteBox.x).toBeGreaterThan(rowBox.x + rowBox.width / 2);
+  // Over the title's end, it still takes the click (Playwright fails a click another element would get).
+  await deleteButton.click();
+  await expect(page.getByRole("dialog", { name: "Move session to trash confirmation" })).toBeVisible();
 });
 
 // Numbers off with shortcuts on: the shortcut stays on the title's line, at the tab's right end.
@@ -1501,6 +1504,10 @@ test("hidden tab numbers keep each tab's shortcut on the title's line", async ({
       atRightEnd: shortcutBox.x > titleBox.x + titleBox.width,
     };
   }).toEqual({ height: rowHeight, sameLine: true, atRightEnd: true });
+  // The delete button shows over the shortcut on hover and takes the click.
+  await row.hover();
+  await row.getByRole("button", { name: /^Delete session/ }).click();
+  await expect(page.getByRole("dialog", { name: "Move session to trash confirmation" })).toBeVisible();
 });
 
 test("a first line longer than a title ends the tab's name in an ellipsis", async ({ page }) => {
