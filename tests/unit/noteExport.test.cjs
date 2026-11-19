@@ -31,6 +31,26 @@ test("copies a Markdown file's images beside it and links them relatively", () =
   assert.deepEqual(result.files, [{ name: "1.png", buffer: PNG_BYTES }]);
 });
 
+// One-click Markdown keeps pictures inside the file, but an attached file goes beside it under
+// the name its link shows, never into the text as base64.
+test("keeps pictures inline and puts attached files beside the Markdown", () => {
+  const assets = new AssetStore(temporaryDirectory());
+  const image = assets.put(PNG_BYTES, "image/png");
+  const report = assets.put(Buffer.from("<html>report</html>"), "application/octet-stream");
+
+  const result = externalizeMarkdownAssets(`![chart](${image})\n\n[rpt-1 report.html](${report})`, {
+    assets,
+    folderName: "Plan files",
+    inlineImages: true,
+  });
+
+  assert.equal(
+    result.markdown,
+    `![chart](data:image/png;base64,${PNG_BYTES.toString("base64")})\n\n[rpt-1 report.html](Plan%20files/rpt-1%20report.html)`,
+  );
+  assert.deepEqual(result.files, [{ name: "rpt-1 report.html", buffer: Buffer.from("<html>report</html>") }]);
+});
+
 test("writes notes into folders and never overwrites a note with the same title", () => {
   const directory = temporaryDirectory();
 

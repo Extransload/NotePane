@@ -262,12 +262,16 @@ The renderer uses:
 - Export is opened from one icon: its menu exports the open note as PDF or Markdown in one click, and Options... opens
   the Export window (`src/ui/ExportDialog.jsx`, run by `src/hooks/useNoteExport.js`): the open note, its folder or every
   note; PDF (light or current theme colours, A4 or Letter), Markdown (images inside the file or in a folder beside
-  it, optional title/tags/dates front matter), HTML (one self-contained page) or an image; Copy as Markdown.
+  it; attached files always in that folder under the name their link shows, never as base64 in the text —
+  `externalizeMarkdownAssets` in `electron/noteExport.cjs`; optional title/tags/dates front matter), HTML (one
+  self-contained page) or an image; Copy as Markdown.
 - An image export renders the note's HTML page in a hidden window and captures it whole (`renderHtmlToPng` in
   `electron/noteExport.cjs`, cut at 16000 px). A folder or every note exports Markdown or HTML, one file per note in a
   folder the user picks, notes in folders written into sub-folders, same titles numbered (`export:notes`). Notes
   that are not open are converted by a detached editor (`src/editor/noteConversion.js`).
-- PDF export uses Electron `printToPDF` with print CSS that hides app chrome.
+- PDF export uses Electron `printToPDF` with print CSS that hides app chrome, in two steps: `export:print-pdf` prints
+  while the note is laid out for print and keeps the PDF, the renderer puts the window back, and `export:save-pdf`
+  then asks where to save it, so the save dialog never sits over the print layout.
 - Both export paths temporarily remove app chrome/background styling so the exported content has no NotePane shell background.
 - PDF export renders with NotePane Light's colours whatever theme is selected, its GitHub dark code blocks included, so
   exports stay printable and look the same in every theme; the selected theme returns afterwards.

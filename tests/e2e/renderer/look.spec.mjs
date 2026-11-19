@@ -59,6 +59,17 @@ test("a background picture shows through frosted glass, and text stays readable"
   // The sidebar's own fill gives way to the layer drawn from these variables.
   await expect.poll(() => page.getByTestId("session-sidebar")
     .evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+  // Over the background the window is one tint: the sidebar's and title bar's layers take the
+  // editor's fill, not the theme's other sidebar and header shades.
+  const fills = () => page.evaluate(() => ({
+    sidebar: getComputedStyle(document.querySelector(".session-sidebar"), "::before").backgroundColor,
+    header: getComputedStyle(document.querySelector(".sticky-header"), "::before").backgroundColor,
+    editor: getComputedStyle(document.querySelector(".sticky-editor-surface")).backgroundColor,
+  }));
+  await expect.poll(async () => {
+    const { sidebar, header, editor } = await fills();
+    return sidebar === editor && header === editor;
+  }).toBe(true);
   // Text over it gets a halo, until Keep text readable is turned off.
   expect(await rootAttribute(page, "data-look-readable")).toBe("");
   await expect.poll(() => page.getByTestId("session-sidebar")

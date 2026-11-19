@@ -100,8 +100,12 @@ html[data-look-code-size] .bn-editor [data-content-type="codeBlock"] pre code {
    them above its own (now transparent) background; the frosted layers of the areas sit above
    both at z-index -1. The picture layer reaches past the shell by twice its blur, so the blurred
    edge stays outside the clip. */
+/* Over a background the window is one sheet of glass, as in Tern: the sidebar and title bar take
+   the editor's fill unless given their own, or the theme's slightly different sidebar and header
+   shades would show as a seam of another tint where the areas meet. */
 html[data-backdrop] .sticky-shell {
   --look-editor-theme-fill: var(--sticky-editor-bg);
+  --look-sidebar-theme-fill: var(--look-editor-theme-fill);
   isolation: isolate;
   background: transparent;
 }
@@ -126,6 +130,7 @@ html[data-backdrop] .sticky-shell:has(:is(
    is the editor's own fill there. */
 html[data-backdrop] .sticky-shell.layout-sticky {
   --look-editor-theme-fill: var(--sticky-note-bg);
+  --look-sidebar-theme-fill: var(--sticky-note-bg);
 }
 
 html[data-backdrop] .sticky-shell::before,
@@ -182,7 +187,7 @@ html[data-backdrop] .session-sidebar::before {
   content: "";
   background: color-mix(
     in srgb,
-    var(--look-sidebar-fill, var(--sticky-sidebar-bg)) var(--look-sidebar-opacity, 100%),
+    var(--look-sidebar-fill, var(--look-sidebar-theme-fill)) var(--look-sidebar-opacity, 100%),
     transparent
   );
   backdrop-filter: var(--look-sidebar-filter, none);
@@ -204,7 +209,7 @@ html[data-backdrop] .sticky-header::before {
   content: "";
   background: color-mix(
     in srgb,
-    var(--look-header-fill, var(--sticky-header-bg)) var(--look-header-opacity, 100%),
+    var(--look-header-fill, var(--look-editor-theme-fill)) var(--look-header-opacity, 100%),
     transparent
   );
   backdrop-filter: var(--look-header-filter, none);
@@ -375,6 +380,7 @@ html[data-tab-numbers="hidden"] .session-tab-row:hover .session-shortcut {
    border and a blur of what lies behind the tabs. Each applies only while it is set. */
 html[data-tab-bar] .session-sidebar {
   --sticky-sidebar-bg: var(--look-tab-bar-bg);
+  --look-sidebar-theme-fill: var(--look-tab-bar-bg);
 }
 
 html[data-tab-active-fill] .session-tab-row.is-plain {

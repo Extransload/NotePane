@@ -68,26 +68,46 @@ function buildFrontMatter({ title, tags = [], createdAt, updatedAt }) {
   return lines.join("\n");
 }
 
+// A file name taken from a link's text ("report.html"), or null when the text is no file name.
+function fileNameFromLabel(label) {
+  const name = String(label ?? "").replace(/[/\\:*?"<>|\u0000-\u001f]/g, "-").trim();
+  return /\.[A-Za-z0-9]{1,8}$/.test(name) && name.length <= 120 ? name : null;
+}
+
 /**
  * Markdown whose asset links point at copies in `folderName` beside the file instead of being
- * written into it. Returns the rewritten text and the files to write into that folder.
+ * written into it. Returns the rewritten text and the files to write into that folder. With
+ * `inlineImages`, pictures stay inside the text as data URLs and only other files (an attached
+ * report, a PDF) go to the folder: a file has no use as a page of base64 in the text. A file
+ * keeps the name its link shows; a picture is numbered.
  */
-function externalizeMarkdownAssets(markdown, { assets, folderName }) {
+function externalizeMarkdownAssets(markdown, { assets, folderName, inlineImages = false }) {
   const files = [];
   const names = new Map();
-  const text = String(markdown ?? "").replace(ASSET_URL_IN_TEXT_PATTERN, (url) => {
+  const taken = new Set();
+  const rewrite = (url, label) => {
+    const asset = assets.read(url);
+    if (!asset) {
+      return url;
+    }
+    if (inlineImages && asset.mimeType.startsWith("image/")) {
+      return `data:${asset.mimeType};base64,${asset.buffer.toString("base64")}`;
+    }
     if (!names.has(url)) {
-      const asset = assets.read(url);
-      if (!asset) {
-        return url;
-      }
       const { extension } = parseAssetUrl(url);
-      const name = `${files.length + 1}.${MIME_BY_EXTENSION[extension] ? extension : "bin"}`;
+      const numbered = `${files.length + 1}.${MIME_BY_EXTENSION[extension] ? extension : "bin"}`;
+      const name = uniqueFileName(taken, fileNameFromLabel(label) ?? numbered);
       names.set(url, name);
       files.push({ name, buffer: asset.buffer });
     }
-    return `${encodeURI(folderName)}/${names.get(url)}`;
-  });
+    return `${encodeURI(folderName)}/${encodeURI(names.get(url))}`;
+  };
+  const assetUrl = ASSET_URL_IN_TEXT_PATTERN.source;
+  const text = String(markdown ?? "")
+    // A link or picture with its text, which names the file.
+    .replace(new RegExp(`(!?)\\[([^\\]]*)\\]\\((${assetUrl})\\)`, "g"),
+      (_match, bang, label, url) => `${bang}[${label}](${rewrite(url, bang ? null : label)})`)
+    .replace(ASSET_URL_IN_TEXT_PATTERN, (url) => rewrite(url, null));
   return { markdown: text, files };
 }
 

@@ -71,6 +71,8 @@ contextBridge.exposeInMainWorld("blocknoteSticky", {
     return () => ipcRenderer.removeListener("find:open", listener);
   },
   exportNote: (payload) => ipcRenderer.invoke("export:note", payload),
+  printPdf: (payload) => ipcRenderer.invoke("export:print-pdf", payload),
+  savePdf: () => ipcRenderer.invoke("export:save-pdf"),
   exportNotes: (payload) => ipcRenderer.invoke("export:notes", payload),
   exportBackup: () => ipcRenderer.invoke("backup:export"),
   importBackup: () => ipcRenderer.invoke("backup:import"),

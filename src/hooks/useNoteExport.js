@@ -50,20 +50,26 @@ export function useNoteExport({ editor, note, title, notes, folders, showToast, 
   const exportOpenNote = useCallback(async (format, options) => {
     const payload = { noteId: note.id, title: normalizeTitle(title), type: format };
     if (format === "pdf") {
+      // The note is laid out for print only while it prints; the save dialog then comes up over
+      // the window as it was, not over a page of dark text on a see-through window.
       payload.pageSize = options.pageSize;
       document.body.classList.add("is-exporting");
       try {
         const render = async () => {
           await nextAnimationFrame();
           await nextAnimationFrame();
-          return electronApi.exportNote(payload);
+          await electronApi.printPdf(payload);
         };
-        return options.colors === "light"
-          ? await withExportTheme(() => withCodeTheme(getExportTheme().codeTheme, render))
-          : await render();
+        if (options.colors === "light") {
+          await withExportTheme(() => withCodeTheme(getExportTheme().codeTheme, render));
+        } else {
+          await render();
+        }
       } finally {
         document.body.classList.remove("is-exporting");
       }
+      await nextAnimationFrame();
+      return electronApi.savePdf();
     }
     if (format === "md") {
       payload.markdown = await editor.blocksToMarkdownLossy(editor.document);

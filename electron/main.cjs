@@ -125,6 +125,8 @@ let selfUpdater = null;
 let installUpdateOnQuit = false;
 // The update states (status and version) the sticky layout has already been asked about.
 const announcedUpdateStates = new Set();
+// A printed PDF waiting for its save dialog, by the webContents id of the window it came from.
+const printedPdfs = new Map();
 const manuallyClosedStickyNoteIds = new Set();
 // Find queries waiting for a window to pick them up, keyed by window id. A
 // window that is still loading cannot receive `find:open` yet, so it pulls its
@@ -1729,34 +1731,31 @@ function installIpcHandlers() {
       const frontMatter = payload.frontMatter
         ? buildFrontMatter({ title: payload.title, ...payload.frontMatter })
         : "";
-      if (payload.images === "folder") {
-        const filePath = await chooseSavePath({
-          window,
-          defaultName: `${title}.md`,
-          dialogTitle: "Export note as Markdown",
-          filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
-        });
-        if (!filePath) {
-          return { canceled: true, filePath: null };
-        }
-        const folderName = `${path.basename(filePath, path.extname(filePath))} files`;
-        const { markdown, files } = externalizeMarkdownAssets(payload.markdown, { assets: store.assets, folderName });
-        writeExportEntries(path.dirname(filePath), [{
-          folder: null,
-          fileName: path.basename(filePath),
-          content: frontMatter + markdown,
-          extraFiles: files.map((file) => ({ folder: folderName, ...file })),
-        }]);
-        return { canceled: false, filePath };
-      }
-      return saveBuffer({
+      const filePath = await chooseSavePath({
         window,
-        // Assets are inlined so the exported file stays self-contained.
-        buffer: Buffer.from(frontMatter + store.assets.inlineAssetUrls(payload.markdown), "utf8"),
         defaultName: `${title}.md`,
         dialogTitle: "Export note as Markdown",
         filters: [{ name: "Markdown", extensions: ["md", "markdown"] }],
       });
+      if (!filePath) {
+        return { canceled: true, filePath: null };
+      }
+      // Pictures go inside the file unless asked into the folder; attached files always go there.
+      const folderName = `${path.basename(filePath, path.extname(filePath))} files`;
+      const { markdown, files } = externalizeMarkdownAssets(payload.markdown, {
+        assets: store.assets,
+        folderName,
+        inlineImages: payload.images !== "folder",
+      });
+      fs.writeFileSync(filePath, frontMatter + markdown);
+      if (files.length > 0) {
+        const folderPath = path.join(path.dirname(filePath), folderName);
+        fs.mkdirSync(folderPath, { recursive: true });
+        for (const file of files) {
+          fs.writeFileSync(path.join(folderPath, file.name), file.buffer);
+        }
+      }
+      return { canceled: false, filePath };
     }
 
     if (type === "html" || type === "png") {
@@ -1790,20 +1789,40 @@ function installIpcHandlers() {
       });
     }
 
-    if (type !== "pdf") {
-      throw new Error("Unsupported note export format.");
-    }
+    throw new Error("Unsupported note export format.");
+  });
 
+  // A PDF in two steps, so the window is back to normal before the save dialog shows: the
+  // renderer lays the note out for print, `export:print-pdf` prints it and keeps the PDF for that
+  // window, the renderer restores its layout, and `export:save-pdf` asks where to save it.
+  ipcMain.handle("export:print-pdf", async (event, payload) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) {
+      throw new Error("No active window found for export.");
+    }
     const pageSize = payload?.pageSize === "Letter" ? "Letter" : payload?.pageSize === "A4" ? "A4" : null;
     const buffer = await window.webContents.printToPDF({
       printBackground: true,
       ...(pageSize ? { pageSize } : { preferCSSPageSize: true }),
       margins: { marginType: "none" },
     });
+    if (!printedPdfs.has(event.sender.id)) {
+      event.sender.once("destroyed", () => printedPdfs.delete(event.sender.id));
+    }
+    printedPdfs.set(event.sender.id, { buffer, title: sanitizeFileName(payload?.title, "notepane-note") });
+  });
+
+  ipcMain.handle("export:save-pdf", async (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    const printed = printedPdfs.get(event.sender.id);
+    printedPdfs.delete(event.sender.id);
+    if (!window || !printed) {
+      throw new Error("There is no printed PDF to save.");
+    }
     return saveBuffer({
       window,
-      buffer,
-      defaultName: `${title}.pdf`,
+      buffer: printed.buffer,
+      defaultName: `${printed.title}.pdf`,
       dialogTitle: "Export note as PDF",
       filters: [{ name: "PDF", extensions: ["pdf"] }],
     });
@@ -1834,17 +1853,19 @@ function installIpcHandlers() {
         };
       }
       const frontMatter = payload?.frontMatter ? buildFrontMatter({ title: entry?.title, ...entry }) : "";
-      if (payload?.images === "folder") {
-        const imageFolder = `${fileTitle} files`;
-        const { markdown, files: images } = externalizeMarkdownAssets(entry?.content, { assets: store.assets, folderName: imageFolder });
-        return {
-          folder,
-          fileName: `${fileTitle}.md`,
-          content: frontMatter + markdown,
-          extraFiles: images.map((image) => ({ folder: imageFolder, ...image })),
-        };
-      }
-      return { folder, fileName: `${fileTitle}.md`, content: frontMatter + store.assets.inlineAssetUrls(String(entry?.content ?? "")) };
+      // Pictures go inside each file unless asked into its folder; attached files always go there.
+      const assetFolder = `${fileTitle} files`;
+      const { markdown, files: assetFiles } = externalizeMarkdownAssets(entry?.content, {
+        assets: store.assets,
+        folderName: assetFolder,
+        inlineImages: payload?.images !== "folder",
+      });
+      return {
+        folder,
+        fileName: `${fileTitle}.md`,
+        content: frontMatter + markdown,
+        extraFiles: assetFiles.map((file) => ({ folder: assetFolder, ...file })),
+      };
     });
     const written = writeExportEntries(directory, files);
     return { canceled: false, count: written.length, directory };

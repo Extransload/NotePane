@@ -193,8 +193,13 @@ function stubExportBridge() {
     listFonts: async () => [],
     saveContent: async () => note,
     updateAppearance: async () => undefined,
-    exportNote: async () => {
+    exportNote: async () => ({ canceled: false }),
+    printPdf: async () => {
       window.__exportColours = window.__readExportColours();
+    },
+    // The save dialog comes up over the window as it was, not the print layout.
+    savePdf: async () => {
+      window.__savedWhilePrintLayout = document.body.classList.contains("is-exporting");
       return { canceled: false };
     },
   };
@@ -254,6 +259,7 @@ for (const { themeId, label, ownCodeTheme, layoutMode } of [
     await page.getByRole("menu", { name: "Export format" }).getByRole("menuitem", { name: /PDF/ }).click();
     await expect(page.locator(".sticky-toast-success")).toHaveText("PDF exported");
 
+    expect(await page.evaluate(() => window.__savedWhilePrintLayout)).toBe(false);
     const exportColours = await page.evaluate(() => window.__exportColours);
     expect(exportColours).toEqual({
       exporting: true,
