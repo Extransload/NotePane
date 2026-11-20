@@ -115,7 +115,7 @@ import {
   uploadFile,
   storeDataUrlAsAsset,
 } from "./editor/images.js";
-import { computeCalloutDropPosition } from "./editor/callout.jsx";
+import { computeCalloutDropPosition, connectCalloutDefaults } from "./editor/callout.jsx";
 import { FILE_INSERTION_FAILED_EVENT, FileDrop } from "./editor/fileInsertion.js";
 import { handleNotePanePaste } from "./editor/paste.js";
 import {
@@ -125,6 +125,7 @@ import {
 } from "./editor/tableFocus.js";
 import { MarkdownShortcutUndo } from "./editor/markdownShortcuts.js";
 import { EditorMotion } from "./editor/editorMotion.js";
+import { MediaDrag } from "./editor/mediaDrag.js";
 import { ListMarkers } from "./editor/listMarkers.js";
 import { TextLists } from "./editor/textLists.js";
 import {
@@ -735,6 +736,7 @@ function StickyEditor({
       BlockDragSelection,
       FindInNote,
       FileDrop,
+      MediaDrag,
       MarkdownShortcutUndo,
       EditorMotion,
       ListMarkers,
@@ -1316,6 +1318,13 @@ function StickyEditor({
     },
     [normalizedEditorPreferences, onEditorPreferencesChanged],
   );
+
+  // A new callout starts with the icon and background colour last given to one.
+  useEffect(() => connectCalloutDefaults(
+    editor,
+    normalizedEditorPreferences.calloutDefaults,
+    (calloutDefaults) => updateGlobalEditorPreferences({ ...normalizedEditorPreferences, calloutDefaults }),
+  ), [editor, normalizedEditorPreferences, updateGlobalEditorPreferences]);
 
   // Cmd/Ctrl+=, - and 0 zoom the whole app as Notion does; Electron applies the stored zoom to every
   // window. The gauge also shows at either end, so a press that cannot zoom further still answers.

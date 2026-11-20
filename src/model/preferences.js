@@ -3,6 +3,7 @@ import {
   DEFAULT_APP_FONT_FAMILY,
   DEFAULT_APP_ZOOM,
   DEFAULT_APP_THEME,
+  DEFAULT_CALLOUT_DEFAULTS,
   DEFAULT_EDITOR_FONT_FAMILY,
   DEFAULT_EDITOR_PREFERENCES,
   DEFAULT_LAYOUT_MODE,
@@ -20,6 +21,7 @@ import {
   isHexColor,
   normalizeOpacity,
 } from "../style/colorMath.js";
+import { NAMED_COLOURS } from "../style/themeTokens.js";
 import {
   getTheme,
   isKnownThemeId,
@@ -98,9 +100,44 @@ export function normalizeEditorPreferences(
         ? source.autoDownloadUpdates
         : fallbackSource.autoDownloadUpdates === true,
     ...normalizeKeyboardShortcutPreferences(source, fallbackSource),
+    calloutDefaults: normalizeCalloutDefaults(
+      source.calloutDefaults,
+      fallbackSource.calloutDefaults,
+    ),
     // A partial update without a look keeps the previous one.
     look: normalizeLook(source.look ?? fallbackSource.look),
   };
+}
+
+const CALLOUT_ICON_ASSET_PATTERN = /^notepane-asset:\/\/local\/[0-9a-f]{64}\.[a-z0-9]{1,5}$/;
+const CALLOUT_BACKGROUND_COLORS = ["default", ...NAMED_COLOURS];
+
+// The style a new callout starts with. Mirrors normalizeCalloutDefaults in electron/store.cjs
+// (tests/unit/store.test.cjs checks that they agree). Each field falls back on its own.
+export function normalizeCalloutDefaults(value, fallback = DEFAULT_CALLOUT_DEFAULTS) {
+  const source = value && typeof value === "object" ? value : {};
+  const fallbackSource = fallback && typeof fallback === "object"
+    ? fallback
+    : DEFAULT_CALLOUT_DEFAULTS;
+  const pick = (key, isValid) =>
+    [source[key], fallbackSource[key], DEFAULT_CALLOUT_DEFAULTS[key]].find(isValid);
+  return {
+    icon: pick("icon", isCalloutDefaultIcon),
+    backgroundColor: pick("backgroundColor", (color) => CALLOUT_BACKGROUND_COLORS.includes(color)),
+  };
+}
+
+// No icon (null), a stored image, or an emoji: short text without spaces or a URL scheme. An image
+// in the browser preview is a data URL, too large to keep.
+function isCalloutDefaultIcon(icon) {
+  if (icon === null) {
+    return true;
+  }
+  return typeof icon === "string" && (
+    CALLOUT_ICON_ASSET_PATTERN.test(icon) ||
+    (icon.length > 0 && icon.length <= 32 && !/[\s\u0000-\u001f]/.test(icon) &&
+      !/^[a-z][a-z0-9+.-]*:/i.test(icon))
+  );
 }
 
 function normalizeKeyboardShortcutPreferences(source, fallbackSource) {

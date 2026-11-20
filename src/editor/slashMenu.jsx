@@ -28,6 +28,7 @@ import {
 import {
   SLASH_MENU_MAX_HEIGHT,
 } from "../constants.js";
+import { getNewCalloutProps } from "./callout.jsx";
 import { setDividerSlashMenuItem } from "./divider.jsx";
 import { createFloatingCloseOptions } from "./floatingMenus.js";
 import { getMathSlashMenuItems } from "./math.jsx";
@@ -153,7 +154,7 @@ export function NotePaneSlashMenuController({ editor, onImportMarkdown }) {
       icon: <Lightbulb size={18} />,
       key: "callout",
       onItemClick: () => {
-        insertOrUpdateBlockForSlashMenu(editor, { type: "callout" });
+        insertOrUpdateBlockForSlashMenu(editor, { type: "callout", props: getNewCalloutProps(editor) });
       },
     };
     // BlockNote formats its badges itself ("⌘-ALT-1"); they take the app's labels instead.

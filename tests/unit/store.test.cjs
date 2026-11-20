@@ -620,6 +620,7 @@ test("updates editor preferences and applies them to new notes", () => {
     autoDownloadUpdates: false,
     keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
     keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
+    calloutDefaults: { icon: "💡", backgroundColor: "default" },
   });
 
   const keyboardShortcuts = {
@@ -643,6 +644,7 @@ test("updates editor preferences and applies them to new notes", () => {
     autoDownloadUpdates: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
+    calloutDefaults: { icon: null, backgroundColor: "blue" },
   }), {
     editorFontFamily: "local:Pretendard",
     appFontFamily: "garamond",
@@ -653,6 +655,7 @@ test("updates editor preferences and applies them to new notes", () => {
     autoDownloadUpdates: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
+    calloutDefaults: { icon: null, backgroundColor: "blue" },
     look: normalizeLook({}),
   });
 
@@ -670,6 +673,7 @@ test("updates editor preferences and applies them to new notes", () => {
     autoDownloadUpdates: true,
     keyboardShortcuts,
     keyboardShortcutEnabled,
+    calloutDefaults: { icon: null, backgroundColor: "blue" },
     look: normalizeLook({}),
   });
 });
@@ -696,6 +700,63 @@ test("keeps the smooth caret on unless it is turned off, in the renderer and the
   const directory = createTemporaryDirectory();
   new StickyStore(directory).updateEditorPreferences({ smoothCaret: false });
   assert.equal(new StickyStore(directory).getEditorPreferences().smoothCaret, false);
+});
+
+test("renderer and store normalizeCalloutDefaults agree, and a partial update keeps the stored style", async () => {
+  globalThis.window ??= {};
+  const { normalizeCalloutDefaults: normalizeRendererCalloutDefaults } =
+    await import("../../src/model/preferences.js");
+  const { normalizeCalloutDefaults: normalizeStoreCalloutDefaults } = require("../../electron/store.cjs");
+  const asset = `notepane-asset://local/${"a".repeat(64)}.png`;
+  const cases = [
+    [undefined, undefined, { icon: "💡", backgroundColor: "default" }],
+    [{ icon: "⚠️", backgroundColor: "blue" }, undefined, { icon: "⚠️", backgroundColor: "blue" }],
+    [{ icon: null }, { icon: "📌", backgroundColor: "red" }, { icon: null, backgroundColor: "red" }],
+    [{ icon: asset }, undefined, { icon: asset, backgroundColor: "default" }],
+    [{ backgroundColor: "teal" }, { icon: null, backgroundColor: "green" }, { icon: null, backgroundColor: "green" }],
+    [{ icon: "" }, undefined, { icon: "💡", backgroundColor: "default" }],
+    [{ icon: "two words" }, { icon: "🔥" }, { icon: "🔥", backgroundColor: "default" }],
+    [{ icon: "https://example.com/a.png" }, undefined, { icon: "💡", backgroundColor: "default" }],
+    [{ icon: "data:image/png;base64,AAAA" }, { icon: null }, { icon: null, backgroundColor: "default" }],
+    [{ icon: "notepane-asset://local/x.png" }, undefined, { icon: "💡", backgroundColor: "default" }],
+    [{ icon: "x".repeat(33) }, undefined, { icon: "💡", backgroundColor: "default" }],
+    [{ icon: 7, backgroundColor: null }, "garbage", { icon: "💡", backgroundColor: "default" }],
+    ["garbage", { icon: "👨‍👩‍👧‍👦", backgroundColor: "pink" }, { icon: "👨‍👩‍👧‍👦", backgroundColor: "pink" }],
+  ];
+  for (const [value, fallback, expected] of cases) {
+    const label = JSON.stringify({ value, fallback });
+    assert.deepEqual(normalizeRendererCalloutDefaults(value, fallback), expected, label);
+    assert.deepEqual(normalizeStoreCalloutDefaults(value, fallback), expected, label);
+  }
+
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+  store.updateEditorPreferences({
+    ...store.getEditorPreferences(),
+    calloutDefaults: { icon: null, backgroundColor: "blue" },
+  });
+  store.updateEditorPreferences({ appZoom: 1.1 });
+  assert.deepEqual(
+    new StickyStore(directory).getEditorPreferences().calloutDefaults,
+    { icon: null, backgroundColor: "blue" },
+  );
+});
+
+test("the store keeps the image a new callout starts with through garbage collection", () => {
+  const directory = createTemporaryDirectory();
+  const store = new StickyStore(directory);
+  const icon = store.assets.put(Buffer.from("callout icon"), "image/png");
+  const orphan = store.assets.put(Buffer.from("orphan icon"), "image/png");
+  store.updateEditorPreferences({
+    ...store.getEditorPreferences(),
+    calloutDefaults: { icon, backgroundColor: "default" },
+  });
+
+  const reloaded = new StickyStore(directory);
+
+  assert.ok(fs.existsSync(reloaded.assets.filePathFor(icon)));
+  assert.equal(fs.existsSync(reloaded.assets.filePathFor(orphan)), false);
+  assert.equal(reloaded.getEditorPreferences().calloutDefaults.icon, icon);
 });
 
 test("snaps the app zoom to a zoom step and keeps it across a restart", () => {

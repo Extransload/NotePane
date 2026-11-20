@@ -274,6 +274,228 @@ test("copies a callout block with its icon", async ({ page }) => {
   await expect(callouts.last().getByRole("button", { name: "Change callout icon" })).toHaveText("⚠️");
 });
 
+// The blocks of the note from the one whose text is `firstText`, as a tree: each block's type and
+// text, a callout's icons and background colour, and its nested blocks.
+function outlineFrom(page, firstText) {
+  return editor(page).evaluate((root, first) => {
+    const read = (group) => [...group.children]
+      .filter((element) => element.classList.contains("bn-block-outer"))
+      .map((outer) => {
+        const block = outer.querySelector(":scope > .bn-block");
+        // A React block's content sits in its renderer's element.
+        const content = block?.querySelector(
+          ":scope > .bn-block-content, :scope > .react-renderer > .bn-block-content",
+        );
+        // Blocks of other kinds, such as columns, come before the ones a test writes.
+        if (!content) {
+          return { type: "other", text: "" };
+        }
+        const entry = {
+          type: content.dataset.contentType,
+          text: content.querySelector(".bn-inline-content")?.textContent ?? "",
+        };
+        if (entry.type === "callout") {
+          entry.icons = [...content.querySelectorAll(".notepane-callout-icon")].map((icon) => icon.textContent);
+          entry.background = content.dataset.backgroundColor ?? "default";
+        }
+        const children = block.querySelector(":scope > .bn-block-group");
+        if (children) {
+          entry.children = read(children);
+        }
+        return entry;
+      });
+    const blocks = read(root.querySelector(".bn-block-group"));
+    return blocks.slice(blocks.findIndex((block) => block.text === first));
+  }, firstText);
+}
+
+const warningCallout = (title, children) => ({
+  type: "callout", text: title, icons: ["⚠️"], background: "default", children,
+});
+const paragraphBlock = (text) => ({ type: "paragraph", text });
+
+async function pickSuggestedIcon(page, callout, name) {
+  const picker = await openIconPicker(page, callout);
+  await picker.getByRole("group", { name: "Suggested" }).getByRole("button", { name }).click();
+  await expect(picker).toHaveCount(0);
+}
+
+// A callout "Tip" with a ⚠️ icon and a nested "Body line", then a paragraph `after` below it; the
+// callout is copied from its block menu.
+async function copyTipCallout(page, after) {
+  const callout = await insertCallout(page);
+  await pickSuggestedIcon(page, callout, "Warning");
+  await page.keyboard.type("Tip");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Body line");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type(after);
+  await openBlockMenuFor(page, callout);
+  await page.evaluate(() => {
+    window.__copiedCallout = new DataTransfer();
+    document.querySelector(".bn-editor").dispatchEvent(
+      new ClipboardEvent("copy", { bubbles: true, cancelable: true, clipboardData: window.__copiedCallout }),
+    );
+  });
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".bn-drag-handle-menu:visible")).toHaveCount(0);
+  return callout;
+}
+
+const pasteCopiedCallout = (page) => page.evaluate(() => {
+  document.querySelector(".bn-editor").dispatchEvent(
+    new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData: window.__copiedCallout }),
+  );
+});
+
+test("pastes a copied callout between the two halves of a line, the text after the caret staying out of it", async ({ page }) => {
+  await copyTipCallout(page, "before after");
+  const original = await outlineFrom(page, "Tip");
+  await placeCaret(page, "before after", "before ".length);
+
+  await pasteCopiedCallout(page);
+
+  const pasted = [
+    warningCallout("Tip", [paragraphBlock("Body line")]),
+    paragraphBlock("before "),
+    warningCallout("Tip", [paragraphBlock("Body line")]),
+    paragraphBlock("after"),
+  ];
+  await expect.poll(() => outlineFrom(page, "Tip").then((blocks) => blocks.slice(0, 4))).toEqual(pasted);
+  await page.keyboard.press(modifierShortcut("z"));
+  await expect.poll(() => outlineFrom(page, "Tip")).toEqual(original);
+  await page.keyboard.press(modifierShortcut("Shift+z"));
+  await expect.poll(() => outlineFrom(page, "Tip").then((blocks) => blocks.slice(0, 4))).toEqual(pasted);
+});
+
+test("pastes a copied callout at the start of a line above that line", async ({ page }) => {
+  await copyTipCallout(page, "Below");
+  await placeCaret(page, "Below", 0);
+
+  await pasteCopiedCallout(page);
+
+  await expect.poll(() => outlineFrom(page, "Tip").then((blocks) => blocks.slice(0, 3))).toEqual([
+    warningCallout("Tip", [paragraphBlock("Body line")]),
+    warningCallout("Tip", [paragraphBlock("Body line")]),
+    paragraphBlock("Below"),
+  ]);
+});
+
+test("pastes a copied callout into a callout's text first in its body, without splitting off a second icon", async ({ page }) => {
+  await copyTipCallout(page, "Below");
+  await placeCaret(page, "Tip", "Ti".length);
+
+  await pasteCopiedCallout(page);
+
+  await expect.poll(() => outlineFrom(page, "Ti").then((blocks) => blocks.slice(0, 2))).toEqual([
+    warningCallout("Ti", [
+      warningCallout("Tip", [paragraphBlock("Body line")]),
+      paragraphBlock("p"),
+      paragraphBlock("Body line"),
+    ]),
+    paragraphBlock("Below"),
+  ]);
+});
+
+test("pastes a callout copied as Markdown back as a callout, its icon not repeated in its text", async ({ page }) => {
+  await copyTipCallout(page, "Last");
+  await placeCaret(page, "Last", "Last".length);
+  const markdown = await page.evaluate(() => window.__copiedCallout.getData("text/plain"));
+  expect(markdown).toBe("> ⚠️ Tip\n> \n> Body line");
+
+  await page.evaluate((text) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData("text/plain", text);
+    document.querySelector(".bn-editor").dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, cancelable: true, clipboardData }),
+    );
+  }, markdown);
+
+  await expect.poll(() => outlineFrom(page, "Tip").then((blocks) => blocks.slice(0, 3))).toEqual([
+    warningCallout("Tip", [paragraphBlock("Body line")]),
+    paragraphBlock("Last"),
+    warningCallout("Tip", [paragraphBlock("Body line")]),
+  ]);
+});
+
+// Ends the line `text` and leaves the box below its callout with Enter twice.
+async function leaveCalloutBelow(page, text) {
+  await placeCaret(page, text, text.length);
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+}
+
+async function insertCalloutHere(page) {
+  await page.keyboard.type("/callout");
+  await expect(page.getByText("Callout", { exact: true })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".bn-suggestion-menu")).toHaveCount(0);
+}
+
+test("a new callout takes the icon and background colour last given to a callout", async ({ page }) => {
+  await insertCallout(page);
+  await page.keyboard.type("First");
+  const first = editor(page).locator("[data-content-type='callout']").filter({ hasText: "First" }).first();
+  await pickSuggestedIcon(page, first, "Warning");
+  const blockMenu = await openBlockMenuFor(page, first);
+  await blockMenu.getByRole("menuitem", { name: "Colors" }).click();
+  await page.locator(".notepane-block-menu-subpanel[data-panel='colors']:visible")
+    .locator("[data-color-kind='background'][data-color-value='blue']")
+    .click();
+  await page.keyboard.press("Escape");
+  await expect(first).toHaveAttribute("data-background-color", "blue");
+  await expect(page.locator(".bn-drag-handle-menu")).toHaveCount(0);
+
+  await leaveCalloutBelow(page, "First");
+  await insertCalloutHere(page);
+  await page.keyboard.type("Second");
+  const second = editor(page).locator("[data-content-type='callout']").filter({ hasText: "Second" });
+  await expect(second.getByRole("button", { name: "Change callout icon" })).toHaveText("⚠️");
+  await expect(second).toHaveAttribute("data-background-color", "blue");
+
+  // Removing the icon is remembered too.
+  const picker = await openIconPicker(page, second);
+  await picker.getByRole("button", { name: "Remove" }).click();
+  await expect(second.getByRole("button", { name: "Change callout icon" })).toHaveCount(0);
+  await leaveCalloutBelow(page, "Second");
+  await insertCalloutHere(page);
+  await page.keyboard.type("Third");
+  const third = editor(page).locator("[data-content-type='callout']").filter({ hasText: "Third" });
+  await expect(third).toHaveAttribute("data-background-color", "blue");
+  await expect(third.getByRole("button", { name: "Change callout icon" })).toHaveCount(0);
+
+  // Turn into makes a callout in the same style.
+  await leaveCalloutBelow(page, "Third");
+  await page.keyboard.type("Turned");
+  const turned = editor(page).getByText("Turned", { exact: true });
+  const turnMenu = await openBlockMenuFor(page, turned);
+  await turnMenu.getByRole("menuitem", { name: "Turn into" }).click();
+  await page.locator(".notepane-block-menu-subpanel[data-panel='turn-into']:visible")
+    .getByRole("menuitem", { name: "Callout" })
+    .click();
+  const turnedCallout = editor(page).locator("[data-content-type='callout']").filter({ hasText: "Turned" });
+  await expect(turnedCallout).toHaveAttribute("data-background-color", "blue");
+  await expect(turnedCallout.getByRole("button", { name: "Change callout icon" })).toHaveCount(0);
+  // The block menu fades out before the next one opens.
+  await expect(page.locator(".bn-drag-handle-menu")).toHaveCount(0);
+
+  // A pasted callout keeps its own style.
+  await openBlockMenuFor(page, first);
+  await page.evaluate(() => {
+    window.__copiedCallout = new DataTransfer();
+    document.querySelector(".bn-editor").dispatchEvent(
+      new ClipboardEvent("copy", { bubbles: true, cancelable: true, clipboardData: window.__copiedCallout }),
+    );
+  });
+  await page.keyboard.press("Escape");
+  await leaveCalloutBelow(page, "Turned");
+  await pasteCopiedCallout(page);
+  const callouts = editor(page).locator("[data-content-type='callout']").filter({ hasText: "First" });
+  await expect(callouts).toHaveCount(2);
+  await expect(callouts.last().getByRole("button", { name: "Change callout icon" })).toHaveText("⚠️");
+});
+
 test("Enter on an empty line between nested blocks adds a line and keeps the rest in the box", async ({ page }) => {
   const callout = await typeCalloutBody(page, "Title", ["First", "Second"]);
   await placeCaret(page, "First", "First".length);

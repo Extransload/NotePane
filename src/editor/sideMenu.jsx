@@ -12,10 +12,10 @@ import {
   useExtension,
   useExtensionState,
 } from "@blocknote/react";
-import { ArrowRightLeft, Palette, SmilePlus, Trash2 } from "lucide-react";
+import { ArrowRightLeft, Lightbulb, Palette, SmilePlus, Trash2 } from "lucide-react";
 import { resolveBlocksForMenuBlock } from "./blocks.js";
 import { TurnIntoBookmarkItem } from "./bookmark.jsx";
-import { editCalloutIcon } from "./callout.jsx";
+import { editCalloutIcon, getNewCalloutProps, rememberCalloutStyle } from "./callout.jsx";
 import { getCodeBlockText } from "./codeFormatting.js";
 import { EditorColorPickerSections } from "./colorFormatting.jsx";
 import { TableBlockMenuItems } from "./tableHandles.jsx";
@@ -284,6 +284,12 @@ function BlockMenuSubpanel({ activePanel, recentColors, onColorUsed }) {
   const blockTypeItems = getBlockTypeSelectItems(editor.dictionary).filter(
     (item) => item.type !== "heading" || Number(item.props?.level ?? 1) <= 4,
   );
+  // Callout after Quote, as in the slash menu.
+  blockTypeItems.splice(blockTypeItems.findIndex((item) => item.type === "quote") + 1, 0, {
+    name: "Callout",
+    type: "callout",
+    icon: Lightbulb,
+  });
   const targetBlocks = resolveBlocksForMenuBlock(editor, block.id);
 
   // `update` gives null for a block it leaves as it is.
@@ -339,6 +345,9 @@ function BlockMenuSubpanel({ activePanel, recentColors, onColorUsed }) {
                   props: { [kind === "text" ? "textColor" : "backgroundColor"]: color },
                 }));
                 onColorUsed?.({ kind, color });
+                if (kind === "background" && targetBlocks.some((target) => target.type === "callout")) {
+                  rememberCalloutStyle(editor, { backgroundColor: color });
+                }
               }}
             />
           </>
@@ -455,6 +464,13 @@ function getTurnIntoUpdate(editor, block, item) {
     return null;
   }
   const update = { type: item.type, props: item.props };
+  // A new callout starts in the remembered style; a callout keeps its own.
+  if (item.type === "callout") {
+    if (block.type === "callout") {
+      return null;
+    }
+    update.props = getNewCalloutProps(editor);
+  }
   if (editor.schema.blockSchema[block.type].content === "plain") {
     update.content = getCodeBlockText(block);
   }

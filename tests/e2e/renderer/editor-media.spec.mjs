@@ -470,3 +470,114 @@ test("right-clicking an image opens its menu: preview, alignment and delete", as
   await menu.getByRole("menuitem", { name: "Delete" }).click();
   await expect(images).toHaveCount(imageCount - 1);
 });
+
+// Opens a note of `blocks` through a desktop bridge stub that serves it.
+async function openNoteWithBlocks(page, blocks) {
+  await page.addInitScript((blocksJSON) => {
+    const note = {
+      id: "media-drag-note",
+      title: "Media drag note",
+      titleManuallyEdited: false,
+      blocksJSON,
+      markdown: "",
+      theme: {},
+      seedDemoContent: false,
+      editorFontFamily: "Inter",
+      trashedAt: null,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    window.blocknoteSticky = {
+      getCurrentNoteId: async () => note.id,
+      getNote: async () => note,
+      listNotes: async () => [note],
+      listTrash: async () => [],
+      getAppTheme: async () => ({ themeId: "notepane-light", mode: "light" }),
+      getLayoutMode: async () => "tabs",
+      getEditorPreferences: async () => ({}),
+      listFonts: async () => [],
+      saveContent: async () => note,
+      updateAppearance: async () => undefined,
+      listNoteVersions: async () => [],
+    };
+  }, JSON.stringify(blocks));
+  await page.goto("/");
+  await expect(page.locator(".bn-editor [data-content-type='paragraph']").first()).toBeVisible();
+}
+
+// Small enough that the whole note fits the window, so every drag ends on screen.
+const MEDIA_DRAG_BLOCKS = [
+  { type: "paragraph", content: "Before" },
+  { type: "image", props: { url: `data:image/png;base64,${PNG_FILE_BASE64}`, previewWidth: 160, caption: "Picture" } },
+  { type: "paragraph", content: "After" },
+  { type: "video", props: { url: "/docs/media/tour.mp4", previewWidth: 320 } },
+  { type: "paragraph", content: "End" },
+];
+
+// Each top-level block as its type, then its text when it has any.
+const blockOrder = (page) => page.locator(".bn-editor [data-content-type]").evaluateAll((blocks) => (
+  blocks.map((block) => (block.textContent ? `${block.dataset.contentType}:${block.textContent}` : block.dataset.contentType))
+));
+
+// Presses at `from`, drags to `to` in small steps and releases there.
+async function dragWithMouse(page, from, to, beforeRelease) {
+  await page.mouse.move(from.x, from.y);
+  await page.mouse.down();
+  await page.mouse.move(to.x, to.y, { steps: 12 });
+  await beforeRelease?.();
+  await page.mouse.up();
+}
+
+const center = (box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
+
+test("dragging an image by its picture moves the block, with one Cmd+Z to put it back", async ({ page }) => {
+  await openNoteWithBlocks(page, MEDIA_DRAG_BLOCKS);
+  const original = ["paragraph:Before", "image:Picture", "paragraph:After", "video", "paragraph:End"];
+  await expect.poll(() => blockOrder(page)).toEqual(original);
+  const image = await page.locator(".bn-editor img.bn-visual-media").boundingBox();
+  const after = await page.locator(".bn-editor [data-content-type='paragraph']").filter({ hasText: "After" }).boundingBox();
+
+  await dragWithMouse(page, center(image), { x: image.x + image.width / 2, y: after.y + after.height * 0.8 }, async () => {
+    // The six-dot handle's drop line shows where the block goes.
+    await expect(page.locator(".prosemirror-dropcursor-block")).toBeVisible();
+  });
+
+  // The block moved: no copy of the picture was dropped as a file.
+  await expect.poll(() => blockOrder(page))
+    .toEqual(["paragraph:Before", "paragraph:After", "image:Picture", "video", "paragraph:End"]);
+  await expectEditorFocused(page);
+  await page.keyboard.press(modifierShortcut("Z"));
+  await expect.poll(() => blockOrder(page)).toEqual(original);
+});
+
+test("a press on an image that barely moves is a click: it selects the image and shows its ⋯ button", async ({ page }) => {
+  await openNoteWithBlocks(page, MEDIA_DRAG_BLOCKS);
+  const image = page.locator(".bn-editor img.bn-visual-media");
+  const start = center(await image.boundingBox());
+
+  await dragWithMouse(page, start, { x: start.x + 2, y: start.y + 1 });
+
+  await expect((await moreActionsButton(image)).locator("xpath=..")).toHaveAttribute("data-shown", "true");
+  await page.mouse.move(start.x + 400, start.y);
+  await expect((await moreActionsButton(image)).locator("xpath=..")).toHaveAttribute("data-shown", "true");
+  expect(await blockOrder(page))
+    .toEqual(["paragraph:Before", "image:Picture", "paragraph:After", "video", "paragraph:End"]);
+  // The press made the picture draggable only while it lasted.
+  await expect(page.locator(".bn-editor .bn-file-block-content-wrapper[draggable]")).toHaveCount(0);
+});
+
+test("dragging a video by its controls bar does not move it; by its picture does", async ({ page }) => {
+  await openNoteWithBlocks(page, MEDIA_DRAG_BLOCKS);
+  const video = await page.locator(".bn-editor video.bn-visual-media").boundingBox();
+  const end = await page.locator(".bn-editor [data-content-type='paragraph']").filter({ hasText: "End" }).boundingBox();
+  const belowEnd = { x: video.x + video.width / 2, y: end.y + end.height * 0.8 };
+
+  // On the timeline, just above the video's bottom edge.
+  await dragWithMouse(page, { x: video.x + video.width / 2, y: video.y + video.height - 20 }, belowEnd);
+  expect(await blockOrder(page))
+    .toEqual(["paragraph:Before", "image:Picture", "paragraph:After", "video", "paragraph:End"]);
+
+  await dragWithMouse(page, { x: video.x + video.width / 2, y: video.y + 40 }, belowEnd);
+  await expect.poll(() => blockOrder(page))
+    .toEqual(["paragraph:Before", "image:Picture", "paragraph:After", "paragraph:End", "video"]);
+});

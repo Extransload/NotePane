@@ -240,10 +240,17 @@ BlockNote handles editor interaction directly.
 - Heading
 - Toggle Heading
 - Quote
-- Callout: a box with an icon and nested blocks; Enter adds a line inside, Enter on an empty last line leaves it, and
+- Callout: a box with an icon and nested blocks, from the slash menu (`/callout`) or the block menu's Turn into;
+  Enter adds a line inside, Enter on an empty last line leaves it, and
   Backspace at the start of a line joins it to the text above inside the box. The
   icon comes from an emoji picker (filter, recent, random, categories) or an uploaded image, can be removed, and is
-  edited from the icon or the block menu's Edit icon. A block dragged onto a callout's line or padding lands in its body
+  edited from the icon or the block menu's Edit icon. A new callout starts with the icon (or no icon) and background
+  colour last given to a callout, kept in the editor preferences; the first one has 💡 and the default colour.
+  A block dragged onto a callout's line or padding lands in its body. A pasted callout keeps its own icon, colours
+  and body: on an empty line it takes the line's place, at the start of a line it goes above it, in the middle it
+  goes between the line's two halves, and in a callout's own text first in its body. Markdown export writes a quote
+  that opens with the icon; pasting such a quote (one whose first line starts with an emoji and a space) back gives a
+  callout again, without its colours
 - 2 columns: two columns of blocks side by side, from the slash menu (`/columns`), outside a column only. Dragging
   the gutter between them resizes them in one undo step, and the ratio is saved with the note. Backspace at the start
   of a column stays in it; in an empty column it removes the column, and the other column's blocks stay in place. A
@@ -294,6 +301,11 @@ BlockNote handles editor interaction directly.
   on the block or the block is selected, opens the same menu under the button (Enter or Space opens it from the
   keyboard with its first item focused, the arrow keys move, Escape closes it and returns focus to the button).
   Clicking a media block shows no formatting toolbar
+- As in Notion, pressing on an image, video or file block's picture (a video's above its controls), file name or caption,
+  or an audio block's caption, and dragging moves the block: the same drop line, drop targets (between blocks, into a
+  column, into a callout) and one Cmd+Z as a drag by the six-dot handle. A press that moves only a few pixels is a click
+  that selects the block. The video and audio controls, the image resize handles and the ⋯ button keep their own press
+  and never start a move
 - The menu, in groups: Open (in the default app, or the browser for a web address), Preview (images and videos, shown
   large in the window), Show in Finder (a linked local file) · Caption and Rename... (edited in place in the menu:
   Enter keeps the text, Escape leaves it), Replace... (BlockNote's upload and embed panel), Crop... (images), Show

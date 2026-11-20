@@ -58,6 +58,13 @@ export const DEFAULT_KEYBOARD_SHORTCUT_ENABLED = Object.fromEntries(
   KEYBOARD_SHORTCUT_TOGGLE_COMMAND_IDS.map((commandId) => [commandId, true]),
 );
 
+// The style a new callout starts with: the icon (an emoji, a stored image's URL, or null for none)
+// and background colour last given to a callout. These are the first callout's.
+export const DEFAULT_CALLOUT_DEFAULTS = {
+  icon: "💡",
+  backgroundColor: "default",
+};
+
 export const DEFAULT_EDITOR_PREFERENCES = {
   editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
   appFontFamily: DEFAULT_APP_FONT_FAMILY,
@@ -68,6 +75,7 @@ export const DEFAULT_EDITOR_PREFERENCES = {
   autoDownloadUpdates: false,
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
+  calloutDefaults: DEFAULT_CALLOUT_DEFAULTS,
 };
 
 export const LOCAL_FONT_VALUE_PREFIX = "local:";

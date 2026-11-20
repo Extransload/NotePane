@@ -7,11 +7,53 @@ import {
 } from "@blocknote/core";
 import { createReactBlockSpec } from "@blocknote/react";
 import { Plugin, Selection, TextSelection } from "@tiptap/pm/state";
+import { Fragment } from "@tiptap/pm/model";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CalloutIconGlyph, CalloutIconPicker, isImageIcon } from "./calloutIconPicker.jsx";
 import { isFileTransfer } from "./images.js";
+import { DEFAULT_CALLOUT_DEFAULTS } from "../constants.js";
 
-export const DEFAULT_CALLOUT_ICON = "💡";
+const DEFAULT_CALLOUT_ICON = DEFAULT_CALLOUT_DEFAULTS.icon;
+
+// The remembered callout style of each editor (see connectCalloutDefaults).
+const calloutDefaultsByEditor = new WeakMap();
+
+/**
+ * Gives `editor` the style its new callouts start with, `defaults` ({ icon, backgroundColor } from
+ * the editor preferences, icon null for none), and `onChange`, called with the next defaults when
+ * a callout's icon or background colour is changed. Returns the function that disconnects them.
+ */
+export function connectCalloutDefaults(editor, defaults, onChange) {
+  const connection = { defaults, onChange };
+  calloutDefaultsByEditor.set(editor, connection);
+  return () => {
+    if (calloutDefaultsByEditor.get(editor) === connection) {
+      calloutDefaultsByEditor.delete(editor);
+    }
+  };
+}
+
+// The props a new callout starts with, as in Notion: the icon and background colour last given to
+// a callout. A pasted or moved callout keeps its own.
+export function getNewCalloutProps(editor) {
+  const { icon, backgroundColor } = calloutDefaultsByEditor.get(editor)?.defaults ?? DEFAULT_CALLOUT_DEFAULTS;
+  return { icon: icon ?? "", backgroundColor };
+}
+
+// Remembers `change` ({ icon } with "" for none, or { backgroundColor }) for the next new callout.
+export function rememberCalloutStyle(editor, change) {
+  const connection = calloutDefaultsByEditor.get(editor);
+  if (!connection) {
+    return;
+  }
+  const next = { ...connection.defaults, ...change };
+  if ("icon" in change) {
+    next.icon = change.icon || null;
+  }
+  // Kept here too, so a second change before the preferences come back builds on this one.
+  connection.defaults = next;
+  connection.onChange(next);
+}
 
 const EDIT_CALLOUT_ICON_EVENT = "notepane:edit-callout-icon";
 
@@ -53,6 +95,7 @@ function Callout({ block, editor, contentRef }) {
 
   const setIcon = (nextIcon) => {
     editor.updateBlock(block.id, { props: { icon: nextIcon } });
+    rememberCalloutStyle(editor, { icon: nextIcon });
     closePicker();
     editor.focus();
   };
@@ -372,6 +415,87 @@ const calloutDropPlugin = new Plugin({
   },
 });
 
+const isCalloutBlock = (block) =>
+  block?.type.name === "blockContainer" && block.firstChild?.type.name === "callout";
+
+// The blocks of a pasted slice that starts or ends with a callout, or null.
+function getPastedBlocksAroundCallout(slice) {
+  const blocks = [];
+  slice.content.forEach((node) => {
+    if (node.type.name === "blockGroup") {
+      node.forEach((child) => blocks.push(child));
+    } else {
+      blocks.push(node);
+    }
+  });
+  if (!blocks.every((block) => block.type.name === "blockContainer")) {
+    return null;
+  }
+  return isCalloutBlock(blocks[0]) || isCalloutBlock(blocks.at(-1)) ? blocks : null;
+}
+
+// A pasted callout keeps its own title and body, as in Notion. ProseMirror opens a pasted slice as
+// far as it can, so the text after the caret would join the callout's last line or its title, or
+// the callout's title would join the text before the caret and lose its icon; a slice it cannot
+// open it nests in the block at the caret. The blocks go beside that block instead: in its place
+// when it is an empty line, above it from the start of its text, below it from the end, and between
+// its two halves from the middle. In a callout's own text they go first in its body, followed by
+// the text after the caret, as Enter there moves it.
+function pasteBlocksAroundCallout(view, slice) {
+  const blocks = getPastedBlocksAroundCallout(slice);
+  if (!blocks || !(view.state.selection instanceof TextSelection)) {
+    return false;
+  }
+  const tr = view.state.tr.deleteSelection();
+  const { $from } = tr.selection;
+  const container = $from.node($from.depth - 1);
+  if (!$from.parent.isTextblock || container?.type.name !== "blockContainer") {
+    return false;
+  }
+  const containerPos = $from.before($from.depth - 1);
+  const { parent, parentOffset } = $from;
+  const { blockContainer, blockGroup, paragraph } = tr.doc.type.schema.nodes;
+  const pasted = Fragment.from(blocks);
+  let insertAt;
+  if (parent.content.size === 0 && container.childCount === 1) {
+    insertAt = containerPos;
+    tr.replaceWith(containerPos, containerPos + container.nodeSize, pasted);
+  } else if (parentOffset === 0) {
+    insertAt = containerPos;
+    tr.insert(insertAt, pasted);
+  } else if (parent.type.name === "callout") {
+    let body = pasted;
+    if (parentOffset < parent.content.size) {
+      const textAfter = tr.doc.slice($from.pos, $from.end()).content;
+      tr.delete($from.pos, $from.end());
+      body = pasted.addToEnd(blockContainer.create(null, paragraph.create(null, textAfter)));
+    }
+    const callout = tr.doc.nodeAt(containerPos);
+    const afterLine = containerPos + 1 + callout.firstChild.nodeSize;
+    insertAt = afterLine + 1;
+    if (callout.childCount > 1) {
+      tr.insert(insertAt, body);
+    } else {
+      tr.insert(afterLine, blockGroup.create(null, body));
+    }
+  } else if (parentOffset === parent.content.size) {
+    insertAt = containerPos + container.nodeSize;
+    tr.insert(insertAt, pasted);
+  } else {
+    tr.split($from.pos, 2);
+    insertAt = $from.pos + 2;
+    tr.insert(insertAt, pasted);
+  }
+  // As ProseMirror's own paste does: the caret ends at the end of what was pasted.
+  tr.setSelection(Selection.near(tr.doc.resolve(insertAt + pasted.size), -1));
+  view.dispatch(tr.scrollIntoView().setMeta("paste", true).setMeta("uiEvent", "paste"));
+  return true;
+}
+
+const calloutPastePlugin = new Plugin({
+  props: { handlePaste: (view, _event, slice) => pasteBlocksAroundCallout(view, slice) },
+});
+
 // Markdown has no callout, so the export is a quote that opens with the icon. The nested blocks go
 // inside the quote too; BlockNote would otherwise place them after it.
 function calloutToExternalHTML(block) {
@@ -384,6 +508,96 @@ function calloutToExternalHTML(block) {
   title.append(icon && !isImageIcon(icon) ? `${icon} ` : "", content);
   quote.append(title);
   return { dom: quote, contentDOM: content, childrenDOM: quote };
+}
+
+const MARKDOWN_QUOTE_LINE = /^ {0,3}>/;
+const MARKDOWN_FENCE = /^ {0,3}(`{3,}|~{3,})/;
+
+/**
+ * Reads Markdown with callouts written by its export back into blocks: a quote whose first line
+ * opens with an emoji and a space becomes a callout with that icon, the rest of its first
+ * paragraph its text and the paragraphs after it its body. Returns null when the Markdown has no
+ * such quote, so that it is pasted as Markdown is.
+ */
+export function parseMarkdownWithCallouts(editor, markdown) {
+  const lines = String(markdown).split("\n");
+  const blocks = [];
+  let pending = [];
+  let fence = null;
+  let hasCallout = false;
+  const flushPending = () => {
+    if (pending.some((line) => line.trim())) {
+      blocks.push(...editor.tryParseMarkdownToBlocks(pending.join("\n")));
+    }
+    pending = [];
+  };
+  for (let index = 0; index < lines.length;) {
+    const line = lines[index];
+    const fenceMatch = MARKDOWN_FENCE.exec(line);
+    if (fence || fenceMatch) {
+      // Inside a code block nothing is a quote.
+      if (!fence) {
+        fence = fenceMatch[1];
+      } else if (fenceMatch && fenceMatch[1][0] === fence[0] && fenceMatch[1].length >= fence.length) {
+        fence = null;
+      }
+      pending.push(line);
+      index += 1;
+      continue;
+    }
+    if (!MARKDOWN_QUOTE_LINE.test(line)) {
+      pending.push(line);
+      index += 1;
+      continue;
+    }
+    let end = index;
+    while (end < lines.length && MARKDOWN_QUOTE_LINE.test(lines[end])) {
+      end += 1;
+    }
+    const callout = readMarkdownCallout(
+      editor,
+      lines.slice(index, end).map((quoteLine) => quoteLine.replace(/^ {0,3}> ?/, "")),
+    );
+    if (callout) {
+      flushPending();
+      blocks.push(callout);
+      hasCallout = true;
+    } else {
+      pending.push(...lines.slice(index, end));
+    }
+    index = end;
+  }
+  flushPending();
+  return hasCallout ? blocks : null;
+}
+
+function readMarkdownCallout(editor, lines) {
+  const icon = readLeadingEmoji(lines[0]);
+  if (!icon) {
+    return null;
+  }
+  const titleEnd = lines.findIndex((line) => !line.trim());
+  const titleLines = lines.slice(0, titleEnd === -1 ? lines.length : titleEnd);
+  titleLines[0] = titleLines[0].slice(icon.length).trimStart();
+  const bodyMarkdown = titleEnd === -1 ? "" : lines.slice(titleEnd + 1).join("\n");
+  const title = titleLines.join("\n").trim()
+    ? editor.tryParseMarkdownToBlocks(titleLines.join("\n"))[0]
+    : null;
+  const children = bodyMarkdown.trim()
+    ? parseMarkdownWithCallouts(editor, bodyMarkdown) ?? editor.tryParseMarkdownToBlocks(bodyMarkdown)
+    : [];
+  return { type: "callout", props: { icon }, content: title?.content ?? [], children };
+}
+
+// The emoji `text` opens with when a space or nothing follows it. Only characters shown as emoji
+// count, so "© 2024" stays text.
+function readLeadingEmoji(text) {
+  const first = new Intl.Segmenter(undefined, { granularity: "grapheme" })
+    .segment(text)[Symbol.iterator]().next().value?.segment;
+  if (!first || !/\p{Emoji_Presentation}|\uFE0F|\p{Regional_Indicator}|\u20E3/u.test(first)) {
+    return null;
+  }
+  return /^(\s|$)/.test(text.slice(first.length)) ? first : null;
 }
 
 const createReactCalloutBlockSpec = createReactBlockSpec(
@@ -400,7 +614,7 @@ const createReactCalloutBlockSpec = createReactBlockSpec(
   [
     createExtension({
       key: "notepane-callout-keys",
-      prosemirrorPlugins: [calloutDropPlugin],
+      prosemirrorPlugins: [calloutDropPlugin, calloutPastePlugin],
       keyboardShortcuts: {
         Enter: ({ editor }) => enterInsideCallout(editor) || addLineInsideCalloutBody(editor),
         Backspace: ({ editor }) => joinBodyLineBackward(editor),

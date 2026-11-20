@@ -206,6 +206,11 @@ const LEGACY_DEFAULT_TOGGLE_SIDEBAR_SHORTCUT = "Mod+B";
 const LEGACY_DEFAULT_MOVE_TAB_LEFT_SHORTCUT = "Mod+Shift+ArrowLeft";
 const LEGACY_DEFAULT_MOVE_TAB_RIGHT_SHORTCUT = "Mod+Shift+ArrowRight";
 const LEGACY_DEFAULT_TOGGLE_LAYOUT_MODE_SHORTCUT = "Mod+Shift+M";
+// The style a new callout starts with (see DEFAULT_CALLOUT_DEFAULTS in src/constants.js).
+const DEFAULT_CALLOUT_DEFAULTS = Object.freeze({
+  icon: "💡",
+  backgroundColor: "default",
+});
 const DEFAULT_EDITOR_PREFERENCES = Object.freeze({
   editorFontFamily: DEFAULT_EDITOR_FONT_FAMILY,
   appFontFamily: DEFAULT_APP_FONT_FAMILY,
@@ -216,6 +221,7 @@ const DEFAULT_EDITOR_PREFERENCES = Object.freeze({
   autoDownloadUpdates: false,
   keyboardShortcuts: DEFAULT_KEYBOARD_SHORTCUTS,
   keyboardShortcutEnabled: DEFAULT_KEYBOARD_SHORTCUT_ENABLED,
+  calloutDefaults: DEFAULT_CALLOUT_DEFAULTS,
 });
 const LOCAL_FONT_VALUE_PREFIX = "local:";
 const EDITOR_FONT_FAMILIES = new Set([
@@ -355,6 +361,11 @@ class StickyStore {
       if (url.startsWith("notepane-asset:")) {
         referenced.add(url);
       }
+    }
+    // A new callout starts with the image last given to a callout as its icon.
+    const { icon } = normalizeCalloutDefaults(this.state.editorPreferences?.calloutDefaults);
+    if (icon?.startsWith("notepane-asset:")) {
+      referenced.add(icon);
     }
     return referenced;
   }
@@ -1696,9 +1707,44 @@ function normalizeEditorPreferences(
         ? source.autoDownloadUpdates
         : fallbackSource.autoDownloadUpdates === true,
     ...normalizeKeyboardShortcutPreferences(source, fallbackSource),
+    calloutDefaults: normalizeCalloutDefaults(
+      source.calloutDefaults,
+      fallbackSource.calloutDefaults,
+    ),
     // A partial update without a look keeps the previous one.
     look: normalizeLook(source.look ?? fallbackSource.look),
   };
+}
+
+const CALLOUT_ICON_ASSET_PATTERN = /^notepane-asset:\/\/local\/[0-9a-f]{64}\.[a-z0-9]{1,5}$/;
+const CALLOUT_BACKGROUND_COLORS = [
+  "default", "gray", "brown", "red", "orange", "yellow", "green", "blue", "purple", "pink",
+];
+
+// The style a new callout starts with. Mirrors normalizeCalloutDefaults in src/model/preferences.js.
+function normalizeCalloutDefaults(value, fallback = DEFAULT_CALLOUT_DEFAULTS) {
+  const source = value && typeof value === "object" ? value : {};
+  const fallbackSource = fallback && typeof fallback === "object"
+    ? fallback
+    : DEFAULT_CALLOUT_DEFAULTS;
+  const pick = (key, isValid) =>
+    [source[key], fallbackSource[key], DEFAULT_CALLOUT_DEFAULTS[key]].find(isValid);
+  return {
+    icon: pick("icon", isCalloutDefaultIcon),
+    backgroundColor: pick("backgroundColor", (color) => CALLOUT_BACKGROUND_COLORS.includes(color)),
+  };
+}
+
+// No icon (null), a stored image, or an emoji: short text without spaces or a URL scheme.
+function isCalloutDefaultIcon(icon) {
+  if (icon === null) {
+    return true;
+  }
+  return typeof icon === "string" && (
+    CALLOUT_ICON_ASSET_PATTERN.test(icon) ||
+    (icon.length > 0 && icon.length <= 32 && !/[\s\u0000-\u001f]/.test(icon) &&
+      !/^[a-z][a-z0-9+.-]*:/i.test(icon))
+  );
 }
 
 function normalizeKeyboardShortcutPreferences(source, fallbackSource) {
@@ -2333,6 +2379,7 @@ module.exports = {
   normalizeAppZoom,
   stepAppZoom,
   normalizeBlocksJSON,
+  normalizeCalloutDefaults,
   normalizeEditorPreferences,
   normalizeLook,
   normalizeNoteTags,

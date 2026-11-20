@@ -47,7 +47,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | To change this | Look here |
 | --- | --- |
 | Block schema, template content, custom blocks | `src/editor/schema.jsx` |
-| Callout block: Enter and Backspace in its text and body, drops into its body, Markdown export as a quote | `src/editor/callout.jsx` |
+| Callout block: Enter and Backspace in its text and body, drops into its body, pasting a copied callout whole beside the line at the caret (`handlePaste`), Markdown export as a quote and reading such a quote back on paste (`parseMarkdownWithCallouts`, called from `src/editor/paste.js`), the remembered style of a new callout (`connectCalloutDefaults`, wired in `StickyEditor` to `editorPreferences.calloutDefaults`, normalised in `src/model/preferences.js` with a twin in `electron/store.cjs`, which also keeps its image asset; read by the slash menu and the block menu's Turn into, written by the icon picker and the block menu's background colour) | `src/editor/callout.jsx` |
 | Callout icon picker: emoji data, recent icons, upload, remove | `src/editor/calloutIconPicker.jsx` |
 | Columns: the `columnList` and `column` nodes (the layout BlockNote core knows; `@blocknote/xl-multi-column` is GPL-3.0 and not used), the resize gutter, Backspace at a column's start, the slash menu's "2 columns" | `src/editor/columns.jsx` |
 | Bookmark card: the address field, the card, opening the page, the metadata request, Markdown export as a link, the six-dot menu's Turn into bookmark | `src/editor/bookmark.jsx` (fetching in `electron/bookmarkMetadata.cjs`) |
@@ -71,6 +71,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Link toolbar content: the address, Copy, Edit and its form with Remove link | `src/editor/linkToolbar.jsx` |
 | Image download, crop geometry, upload | `src/editor/images.js` |
 | Pasting and dropping files: where the file block goes, its upload, one undo step for both | `src/editor/fileInsertion.js` |
+| Dragging an image, video, audio or file block by the object itself (picture, file name, caption) through BlockNote's six-dot drag (`blockDragStart`), and the parts that keep their own press: player controls, resize handles | `src/editor/mediaDrag.js` |
 | Code block language detection, prettifying, Tab / Shift+Tab line indent and Enter keeping the line's indent; which formatter each language uses and why the others have none | `src/editor/codeFormatting.js` |
 | The code block formatters that are not Prettier plugins, most of them WebAssembly, each loaded on first use. Their `.wasm` is inlined into its lazy chunk as a data: URL (`build.assetsInlineLimit` in `vite.config.js`) because the packaged renderer's file:// page cannot fetch a file beside it, and the CSP's `script-src` allows `'wasm-unsafe-eval'` to compile it | `src/editor/codeFormatEngines.js` |
 | Code block languages: the language menu's list and search, the language a new code block starts in | `src/editor/codeLanguages.js` |

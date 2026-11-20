@@ -1,5 +1,10 @@
 import { isBlockSetSelection, replaceBlockSelectionWithParagraph } from "./blockSelection.js";
-import { isStandaloneWebUrl, normalizePastedMarkdownForBlockNote } from "./clipboard.js";
+import { parseMarkdownWithCallouts } from "./callout.jsx";
+import {
+  isStandaloneWebUrl,
+  normalizePastedMarkdownForBlockNote,
+  withSelfRemovingChangeSubscriptions,
+} from "./clipboard.js";
 import { pasteFiles } from "./fileInsertion.js";
 import { isFileTransfer } from "./images.js";
 import { hasEditorRangeSelection, isSelectionInsideCodeBlock } from "./targets.js";
@@ -56,7 +61,7 @@ export function handleNotePanePaste({ event, editor, defaultPasteHandler }) {
       });
     }
     if (normalizedPaste.shouldPasteAsMarkdown) {
-      editor.pasteMarkdown(normalizedPaste.markdown);
+      pasteMarkdownWithCallouts(editor, normalizedPaste.markdown);
       return true;
     }
     // Plain text of several lines, as Notion pastes it: a block a line, blank lines dropped. The
@@ -88,4 +93,15 @@ function isCaretInBlockText(editor) {
   return Boolean($from?.parent.isTextblock) &&
     $from.sameParent($to) &&
     $from.node($from.depth - 1)?.type.name === "blockContainer";
+}
+
+// A callout copied as Markdown, a quote that opens with its icon, is pasted back as a callout.
+function pasteMarkdownWithCallouts(editor, markdown) {
+  const blocks = parseMarkdownWithCallouts(editor, markdown);
+  if (!blocks) {
+    editor.pasteMarkdown(markdown);
+    return;
+  }
+  const html = withSelfRemovingChangeSubscriptions(editor, () => editor.blocksToFullHTML(blocks));
+  editor.pasteHTML(html, true);
 }
