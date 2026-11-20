@@ -1680,7 +1680,7 @@ test("Electron stores pasted images as asset files and keeps exports self-contai
     const image = page.locator(".bn-editor img.bn-visual-media").first();
     const mediaMenu = page.getByRole("menu", { name: /^Options for / });
     await image.click();
-    await page.locator(".media-block-tools[data-shown='true']")
+    await page.locator(".media-block-tools")
       .getByRole("button", { name: "More actions" })
       .click();
     await mediaMenu.getByRole("menuitem", { name: "Save As..." }).click();

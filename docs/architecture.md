@@ -122,7 +122,7 @@ Renderer code is grouped by what it owns. Start here rather than reading `src/ma
 | Session tab rename, duplicate, open as sticky, move to Trash, and closing the current tab | `src/hooks/useSessionTabActions.js` |
 | The session tab menu (with its one-click tab colours), the media menu (its Caption and Rename... fields) and the export format menu, placed at their anchor and clamped to the window | `src/ui/menus.jsx` |
 | Right-clicking an image, video, audio or file block or clicking its ⋯ button, and what its menu does (caption, rename, replace, preview toggle, crop, save, copy, alignment, delete) | `src/hooks/useMediaContextMenu.js` |
-| The ⋯ "More actions" button on a hovered or selected media block, placed on the picture's top-right corner | `src/ui/MediaBlockTools.jsx`, `src/hooks/useBlockTools.js` |
+| The one ⋯ "More actions" button: which media block it is on (menu's block, then hovered, then selected), and its CSS anchor positioning on the picture's top-right corner | `src/ui/MediaBlockTools.jsx`, `.media-block-tools` in `src/styles/blocknote.css` |
 | An image or video shown large from its menu | `src/ui/MediaPreview.jsx` |
 | Session tab drag and drop: reordering, and a tab joining the group of the tabs it is dragged over (`previewNoteFolder` in `useSessionList` shows it there, the drop stores it with `notes:set-folder`, a cancelled drag puts it back); dragend is heard on the dragged row itself, since a tab that changes group is drawn again elsewhere | `src/hooks/useSessionTabDrag.js` |
 | A session switch remounts `StickyEditor`; the fades its sidebar labels and folders show as they appear jump to their end before the first paint | `src/hooks/useMountWithoutFades.js` |

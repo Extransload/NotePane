@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   clickLastEmptyParagraph,
+  createBlankSession,
   expectEditorFocused,
   loadTemplatePreview,
   modifierShortcut,
@@ -14,7 +15,7 @@ test.beforeEach(async ({ page }) => {
 
 const MEDIA_MENU = { name: /^Options for / };
 
-// The ⋯ button on a media block: there is one per block, outside the block's own DOM.
+// The ⋯ button of a media block: one at most, outside the block's own DOM, naming its block.
 async function moreActionsButton(media) {
   const blockId = await media.evaluate((element) => (
     element.closest(".bn-block-outer[data-id]").dataset.id
@@ -47,7 +48,7 @@ test("clicking an image shows its ⋯ button, which opens the same menu as a rig
 
   await image.click();
   const more = await moreActionsButton(image);
-  await expect(more.locator("xpath=..")).toHaveAttribute("data-shown", "true");
+  await expect(more).toBeVisible();
   // The file actions live in the menu, so the formatting toolbar stays away from media.
   await expect(page.locator(".notepane-formatting-toolbar:visible")).toHaveCount(0);
   await more.click();
@@ -557,9 +558,9 @@ test("a press on an image that barely moves is a click: it selects the image and
 
   await dragWithMouse(page, start, { x: start.x + 2, y: start.y + 1 });
 
-  await expect((await moreActionsButton(image)).locator("xpath=..")).toHaveAttribute("data-shown", "true");
+  await expect(await moreActionsButton(image)).toBeVisible();
   await page.mouse.move(start.x + 400, start.y);
-  await expect((await moreActionsButton(image)).locator("xpath=..")).toHaveAttribute("data-shown", "true");
+  await expect(await moreActionsButton(image)).toBeVisible();
   expect(await blockOrder(page))
     .toEqual(["paragraph:Before", "image:Picture", "paragraph:After", "video", "paragraph:End"]);
   // The press made the picture draggable only while it lasted.
@@ -580,4 +581,109 @@ test("dragging a video by its controls bar does not move it; by its picture does
   await dragWithMouse(page, { x: video.x + video.width / 2, y: video.y + 40 }, belowEnd);
   await expect.poll(() => blockOrder(page))
     .toEqual(["paragraph:Before", "image:Picture", "paragraph:After", "paragraph:End", "video"]);
+});
+
+// A picture of the given size and colour, as a data URL.
+const svgPicture = (width, height, color) => `data:image/svg+xml;utf8,${encodeURIComponent(
+  `<svg xmlns='http://www.w3.org/2000/svg' width='${width}' height='${height}'><rect width='${width}' height='${height}' fill='${color}'/></svg>`,
+)}`;
+
+// The one ⋯ drawn, inside the picture's top-right corner, 8px in from both edges, as in Notion.
+async function expectMoreAtCorner(page, picture) {
+  await expect.poll(() => page.evaluate(() => (
+    [...document.querySelectorAll(".media-block-tools")]
+      .filter((tools) => getComputedStyle(tools).opacity !== "0").length
+  ))).toBe(1);
+  const shown = page.locator(".media-block-tools");
+  await expect.poll(async () => {
+    const pictureBox = await picture.boundingBox();
+    const moreBox = await shown.boundingBox();
+    return [
+      Math.round(pictureBox.x + pictureBox.width - (moreBox.x + moreBox.width)),
+      Math.round(moreBox.y - pictureBox.y),
+    ];
+  }).toEqual([8, 8]);
+}
+
+test("keeps the ⋯ on its picture's corner when a picture above it loads and grows", async ({ page }) => {
+  // A short note: its editor is as tall as the window before and after, so only the pictures move.
+  await createBlankSession(page);
+  // The picture above arrives only when the test lets it, as a slow download would.
+  let releaseLatePicture;
+  const latePictureArrives = new Promise((resolve) => {
+    releaseLatePicture = resolve;
+  });
+  await page.route("**/late-picture.svg", async (route) => {
+    await latePictureArrives;
+    await route.fulfill({
+      contentType: "image/svg+xml",
+      body: "<svg xmlns='http://www.w3.org/2000/svg' width='400' height='200'><rect width='400' height='200' fill='teal'/></svg>",
+    });
+  });
+  await clickLastEmptyParagraph(page);
+  const lateSource = new URL("/late-picture.svg", page.url()).href;
+  await pasteClipboardText(page, {
+    plainText: "",
+    html: `<img src="${lateSource}" alt="late"><p>between</p><img src="${svgPicture(300, 120, "orange")}" alt="below">`,
+  });
+  const pictures = page.locator(".bn-editor img.bn-visual-media");
+  await expect(pictures).toHaveCount(2);
+  const below = pictures.nth(1);
+
+  await below.click();
+  await expectMoreAtCorner(page, below);
+  const belowTop = (await below.boundingBox()).y;
+  releaseLatePicture();
+  await expect.poll(async () => (await below.boundingBox()).y).toBeGreaterThan(belowTop + 100);
+  await expectMoreAtCorner(page, below);
+});
+
+test("puts the ⋯ of a picture made narrower on that picture's own corner", async ({ page }) => {
+  await clickLastEmptyParagraph(page);
+  await pasteClipboardText(page, {
+    plainText: "",
+    html: `<img src="${svgPicture(600, 200, "orange")}" alt="wide">`,
+  });
+  const picture = page.locator(".bn-editor img.bn-visual-media");
+  await picture.hover();
+  await expectMoreAtCorner(page, picture);
+
+  const handle = page.locator(".bn-editor .bn-resize-handle").last();
+  const handleBox = await handle.boundingBox();
+  const widthBefore = (await picture.boundingBox()).width;
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox.x - 250, handleBox.y + handleBox.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await expect.poll(async () => (await picture.boundingBox()).width).toBeLessThan(widthBefore - 150);
+  await picture.hover();
+  await expectMoreAtCorner(page, picture);
+});
+
+test("shows one ⋯, on the picture a scroll brings under a still pointer, not also on the selected one", async ({ page }) => {
+  const filler = Array.from({ length: 40 }, (_, index) => `<p>Line ${index}</p>`).join("");
+  await clickLastEmptyParagraph(page);
+  await pasteClipboardText(page, {
+    plainText: "",
+    // Lines below the second picture too, so the note can scroll it up to the pointer.
+    html: `<img src="${svgPicture(500, 200, "orange")}" alt="first">${filler}<img src="${svgPicture(500, 200, "teal")}" alt="second">${filler}`,
+  });
+  const pictures = page.locator(".bn-editor img.bn-visual-media");
+  await expect(pictures).toHaveCount(2);
+  const [first, second] = [pictures.nth(0), pictures.nth(1)];
+
+  await first.scrollIntoViewIfNeeded();
+  await first.click();
+  await expectMoreAtCorner(page, first);
+  // The note scrolls (as a wheel or a jump would) so the second picture comes under the pointer,
+  // which has not moved and so sends no pointer event.
+  const firstBox = await first.boundingBox();
+  await page.getByTestId("sticky-editor-surface").evaluate((surface, top) => {
+    const picture = surface.querySelectorAll(".bn-editor img.bn-visual-media")[1];
+    surface.scrollTop += picture.getBoundingClientRect().top - top;
+  }, firstBox.y);
+  await expectMoreAtCorner(page, second);
+
+  await page.mouse.move(firstBox.x + firstBox.width / 2 + 3, firstBox.y + firstBox.height / 2 + 3);
+  await expectMoreAtCorner(page, second);
 });

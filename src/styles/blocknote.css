@@ -642,31 +642,31 @@
   color: var(--notepane-code-tool-error);
 }
 
-/* The ⋯ button of a media block (src/ui/MediaBlockTools.jsx), on the picture's top-right corner
-   as in Notion: shown while the pointer is on the block or on itself, while the block is selected
-   or its menu is open, and while it holds keyboard focus. */
+/* The ⋯ button of a media block (src/ui/MediaBlockTools.jsx), as in Notion: inside the picture's
+   top-right corner, 8px in from both edges, placed by anchor positioning against the picture
+   (the anchor the component names), so it follows the picture through any layout change. A
+   picture narrower than the button keeps the button's left edge on the picture's left edge. A
+   block shown as a row (a file, audio, a picture without its preview) has it at the row's right
+   end, centred on the row. The button is 30px wide and 28px tall. */
 .media-block-tools {
   position: absolute;
   z-index: 4;
+  position-anchor: --notepane-media-tool;
+  top: calc(anchor(top) + 8px);
+  right: min(calc(anchor(right) + 8px), calc(anchor(left) - 30px));
   display: flex;
   padding: 2px;
   border: 1px solid var(--notepane-code-tool-border);
   border-radius: 7px;
   background: var(--notepane-code-tool-bg);
   box-shadow: var(--notepane-shadow-code-tool);
-  opacity: 0;
-  transform: translateX(-100%);
   backdrop-filter: blur(8px);
-  transition: opacity 130ms ease, border-color 130ms ease;
+  transition: border-color 130ms ease;
   -webkit-app-region: no-drag;
-  /* Hidden, it lets clicks through to the picture and the text under it. */
-  pointer-events: none;
 }
 
-.media-block-tools[data-shown="true"],
-.media-block-tools:focus-within {
-  opacity: 1;
-  pointer-events: auto;
+.media-block-tools.is-row {
+  top: calc(anchor(center) - 14px);
 }
 
 .media-block-tools:hover,

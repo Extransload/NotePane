@@ -788,7 +788,7 @@ const SCREEN_GROUPS = [
     screens: ["image menu", "crop dialog", "export menu", "error toast", "success toast"],
     async run(page, scan) {
       await page.locator(".bn-editor img.bn-visual-media").click();
-      await page.locator(".media-block-tools[data-shown='true']")
+      await page.locator(".media-block-tools")
         .getByRole("button", { name: "More actions" })
         .click();
       const imageMenu = page.getByRole("menu", { name: /^Options for / });

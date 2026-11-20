@@ -297,10 +297,12 @@ BlockNote handles editor interaction directly.
 ## Media tools
 
 - One menu holds every action of an image, video, audio or file block. Right-clicking the block opens it at the
-  pointer; as in Notion, a small ⋯ button ("More actions") on the block's top-right corner, shown while the pointer is
-  on the block or the block is selected, opens the same menu under the button (Enter or Space opens it from the
-  keyboard with its first item focused, the arrow keys move, Escape closes it and returns focus to the button).
-  Clicking a media block shows no formatting toolbar
+  pointer; as in Notion, a small ⋯ button ("More actions") opens the same menu under the button (Enter or Space opens
+  it from the keyboard with its first item focused, the arrow keys move, Escape closes it and returns focus to the
+  button). There is one ⋯ at most: on the block whose menu it opened, else the block under the pointer (also after the
+  note scrolls under a still pointer), else the selected block. It sits inside the visible picture's top-right
+  corner, 8px in, whatever the picture's size or wherever layout moves it (for a file, audio, or a picture shown as a
+  file line, at the right end of the block row). Clicking a media block shows no formatting toolbar
 - As in Notion, pressing on an image, video or file block's picture (a video's above its controls), file name or caption,
   or an audio block's caption, and dragging moves the block: the same drop line, drop targets (between blocks, into a
   column, into a callout) and one Cmd+Z as a drag by the six-dot handle. A press that moves only a few pixels is a click

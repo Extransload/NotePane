@@ -6,12 +6,11 @@ import {
 const EDITOR_SURFACE_SELECTOR = "[data-testid='sticky-editor-surface']";
 
 /**
- * The blocks of the given content types in the note, as { blockId, element, anchor }: `element`
- * is the block's content, `anchor` the part of it a tool bar sits on (`getAnchor`, else the
- * content itself). Kept in step with the editor's DOM, so a re-rendered block hands over its new
- * elements.
+ * The blocks of the given content types in the note, as { blockId, element }, `element` being
+ * the block's content. Kept in step with the editor's DOM, so a re-rendered block hands over its
+ * new element.
  */
-export function useBlockToolTargets(contentTypes, getAnchor) {
+export function useBlockToolTargets(contentTypes) {
   const [targets, setTargets] = useState([]);
 
   useLayoutEffect(() => {
@@ -28,7 +27,7 @@ export function useBlockToolTargets(contentTypes, getAnchor) {
       animationFrame = null;
       const nextTargets = [...editorSurface.querySelectorAll(selector)].flatMap((element) => {
         const blockId = element.closest(".bn-block-outer[data-id]")?.dataset.id;
-        return blockId ? [{ blockId, element, anchor: getAnchor?.(element) ?? element }] : [];
+        return blockId ? [{ blockId, element }] : [];
       });
 
       setTargets((currentTargets) => {
@@ -37,8 +36,7 @@ export function useBlockToolTargets(contentTypes, getAnchor) {
           currentTargets.every(
             (target, index) =>
               target.blockId === nextTargets[index].blockId &&
-              target.element === nextTargets[index].element &&
-              target.anchor === nextTargets[index].anchor,
+              target.element === nextTargets[index].element,
           );
         return unchanged ? currentTargets : nextTargets;
       });
@@ -60,7 +58,7 @@ export function useBlockToolTargets(contentTypes, getAnchor) {
         window.cancelAnimationFrame(animationFrame);
       }
     };
-    // The content types and the anchor finder are module constants of each caller.
+    // The content types are a module constant of each caller.
   }, []);
 
   return targets;
@@ -68,12 +66,10 @@ export function useBlockToolTargets(contentTypes, getAnchor) {
 
 /**
  * Where a tool bar sits on the top-right corner of `anchorElement`, in the editor surface's
- * scroll coordinates (the bar is translated left by its own width in CSS); null until placed. An
- * anchor narrower than `minWidth` has the bar at `minWidth` from its left edge instead, so a
- * small picture does not push the bar out over the block handles. Placed again whenever the
- * block, the surface or the note's layout changes.
+ * scroll coordinates (the bar is translated left by its own width in CSS); null until placed.
+ * Placed again whenever the block, the surface or the note's layout changes.
  */
-export function useBlockToolPosition(anchorElement, minWidth = 0) {
+export function useBlockToolPosition(anchorElement) {
   const [position, setPosition] = useState(null);
 
   useLayoutEffect(() => {
@@ -87,8 +83,7 @@ export function useBlockToolPosition(anchorElement, minWidth = 0) {
       const surfaceRect = editorSurface.getBoundingClientRect();
       const nextPosition = {
         top: anchorRect.top - surfaceRect.top + editorSurface.scrollTop + 8,
-        left: Math.max(anchorRect.right, anchorRect.left + minWidth) - surfaceRect.left +
-          editorSurface.scrollLeft - 9,
+        left: anchorRect.right - surfaceRect.left + editorSurface.scrollLeft - 9,
       };
       setPosition((currentPosition) =>
         currentPosition &&
@@ -124,7 +119,7 @@ export function useBlockToolPosition(anchorElement, minWidth = 0) {
       window.removeEventListener("resize", updatePosition);
       editorDocument?.removeEventListener("animationend", updatePosition);
     };
-  }, [anchorElement, minWidth]);
+  }, [anchorElement]);
 
   return position;
 }
