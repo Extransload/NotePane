@@ -255,7 +255,11 @@ The app supports two layout modes.
     (`hiddenTestWindows`) and skip the fades
   - A window at opacity 0 may count as hidden on macOS and stop drawing, so a window that changes or answers a
     flush out of sight runs with background throttling off
-  - Switches run one at a time (`updateLayoutMode` queues `applyLayoutMode`)
+  - Switches run one at a time (`updateLayoutMode` queues `applyLayoutMode`). A quit waits for the switch in
+    progress before its flush (`flushThenQuit`), and no switch starts once a quit has: a window opened after the
+    quit has asked every window to close is never asked, and keeps the app running
+  - Mid-switch the old and new windows are open together, so the window count can already read its final value;
+    the Electron tests wait for every window to show the new layout (`expectLayoutSwitchEnded`)
 - Closing an individual sticky window records it as manually closed and does not immediately recreate it
 - Show All NotePanes clears manually closed sticky windows and opens every note window again
 - `Command/Ctrl + T` creates a new sidebar session tab; `Command/Ctrl + N` remains available for new note/session

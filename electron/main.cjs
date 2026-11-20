@@ -124,6 +124,8 @@ const BACKGROUND_MIME_BY_EXTENSION = Object.freeze({
 let store;
 let quitting = false;
 let flushedBeforeQuit = false;
+// Set from the start of a quit (before its flush) until it is called off.
+let quitRequested = false;
 let backupOperationInProgress = false;
 // Set once the app is ready (startAppUpdates); null while update checks are off.
 let updateMode = "off";
@@ -1116,7 +1118,9 @@ function syncWindowsForLayoutMode(activeNoteId, options = {}) {
 }
 
 // One layout switch at a time: a switch opens, shows and closes windows over a few hundred
-// milliseconds, so a second one starts where the first ends.
+// milliseconds, so a second one starts where the first ends. A quit waits for the switch in
+// progress (flushThenQuit), and no switch starts once a quit has: a window opened after the quit
+// has asked every window to close is never asked, and keeps the app from quitting.
 let layoutModeUpdates = Promise.resolve();
 
 function updateLayoutMode(layoutMode, options = {}) {
@@ -1127,6 +1131,9 @@ function updateLayoutMode(layoutMode, options = {}) {
 
 async function applyLayoutMode(layoutMode, options = {}) {
   const previousLayoutMode = store.getLayoutMode();
+  if (quitRequested) {
+    return previousLayoutMode;
+  }
   const willRecreateWindows =
     process.platform === "win32" &&
     (layoutMode === "sticky" || layoutMode === "tabs") &&
@@ -2816,8 +2823,13 @@ app.on("before-quit", (event) => {
 });
 
 async function flushThenQuit() {
+  // A layout switch in progress ends first, so every window it opens is open when the quit asks
+  // the windows to close.
+  quitRequested = true;
+  await layoutModeUpdates;
   const outcomes = await flushEditorWindows();
   if (!(await confirmFlushOutcomes(outcomes, getPrimaryEntry()?.window))) {
+    quitRequested = false;
     // The quit was called off, so the update waits for the next "Restart to update".
     if (installUpdateOnQuit) {
       installUpdateOnQuit = false;

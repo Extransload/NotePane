@@ -490,13 +490,11 @@ test("Electron layout switch shows each new window only after it has drawn its n
         return shown < 0 || drawn < 0 || shown < drawn;
       });
     }, layoutMode);
-    const readLayoutModes = () => readOpenPages(electronApp, (page) =>
-      page.getByTestId("sticky-shell").getAttribute("data-layout-mode"));
     const readOpenCovers = () => readOpenPages(electronApp, (page) =>
       page.getByTestId("layout-transition-overlay").count());
 
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
-    await expect.poll(readLayoutModes).toEqual(["sticky", "sticky", "sticky"]);
+    await expectLayoutSwitchEnded(electronApp, "sticky", 3);
     await expect.poll(() => readWindowsNotShownAfterDrawn("sticky")).toEqual([]);
     await expect.poll(readOpenCovers).toEqual([0, 0, 0]);
 
@@ -504,7 +502,7 @@ test("Electron layout switch shows each new window only after it has drawn its n
       globalThis.__layoutSwitchLog.length = 0;
     });
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
-    await expect.poll(readLayoutModes).toEqual(["tabs"]);
+    await expectLayoutSwitchEnded(electronApp, "tabs", 1);
     await expect.poll(() => readWindowsNotShownAfterDrawn("tabs")).toEqual([]);
     await expect.poll(readOpenCovers).toEqual([0]);
   } finally {
@@ -1861,11 +1859,7 @@ test("Electron menu actions respect tabs/sticky modes and toggle always-on-top",
     await expect(page.getByRole("tab")).toHaveCount(2);
 
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
-    await expect.poll(async () => {
-      return await electronApp.evaluate(({ BrowserWindow }) => {
-        return BrowserWindow.getAllWindows().length;
-      });
-    }).toBe(2);
+    await expectLayoutSwitchEnded(electronApp, "sticky", 2);
     await expect.poll(async () => {
       return await electronApp.evaluate(({ BrowserWindow }) => {
         return BrowserWindow.getAllWindows().map((window) => window.getBounds());
@@ -2017,11 +2011,7 @@ test("Electron sticky header trash confirms and does not duplicate fallback wind
     const page = await electronApp.firstWindow();
     await expect(page.getByRole("tab")).toHaveCount(2);
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
-    await expect.poll(async () => {
-      return await electronApp.evaluate(({ BrowserWindow }) => {
-        return BrowserWindow.getAllWindows().length;
-      });
-    }).toBe(2);
+    await expectLayoutSwitchEnded(electronApp, "sticky", 2);
 
     const secondStickyPage = await getStickyPageByNoteId(electronApp, "second-note");
     await secondStickyPage.bringToFront();
@@ -2083,11 +2073,7 @@ test("Electron sticky close icon closes the current window with the platform sho
     const page = await electronApp.firstWindow();
     await expect(page.getByRole("tab")).toHaveCount(2);
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
-    await expect.poll(async () => {
-      return await electronApp.evaluate(({ BrowserWindow }) => {
-        return BrowserWindow.getAllWindows().length;
-      });
-    }).toBe(2);
+    await expectLayoutSwitchEnded(electronApp, "sticky", 2);
 
     const firstStickyPage = await getStickyPageByNoteId(electronApp, "first-note");
     await firstStickyPage.bringToFront();
@@ -2424,11 +2410,7 @@ test("Electron returns to tab session mode after every sticky window is closed",
     await expect(page.getByRole("tab")).toHaveCount(2);
 
     await clickMenuItem(electronApp, "Toggle Tabs / Sticky Mode");
-    await expect.poll(async () => {
-      return await electronApp.evaluate(({ BrowserWindow }) => {
-        return BrowserWindow.getAllWindows().length;
-      });
-    }).toBe(2);
+    await expectLayoutSwitchEnded(electronApp, "sticky", 2);
 
     await electronApp.evaluate(({ BrowserWindow }) => {
       for (const window of BrowserWindow.getAllWindows()) {
@@ -3193,6 +3175,18 @@ async function readOpenPages(electronApp, read) {
 
 function getOpenPages(electronApp) {
   return electronApp.windows().filter((page) => !page.isClosed());
+}
+
+// Waits for a layout switch to end: `windowCount` windows, every one showing `layoutMode`. The
+// window count alone can pass mid-switch, while the windows the switch replaces and the ones it
+// opens are open together; those it replaces keep the old layout until they go, and the tabs
+// window that turns sticky does so last.
+async function expectLayoutSwitchEnded(electronApp, layoutMode, windowCount) {
+  await expect.poll(async () => ({
+    windows: await electronApp.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length),
+    layouts: await readOpenPages(electronApp, (page) =>
+      page.getByTestId("sticky-shell").getAttribute("data-layout-mode")),
+  })).toEqual({ windows: windowCount, layouts: Array(windowCount).fill(layoutMode) });
 }
 
 async function openStickySettings(page) {
