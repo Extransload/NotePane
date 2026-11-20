@@ -61,7 +61,10 @@ html:is([data-look-corners="sharp"], [data-look-corners="round"]) .bn-popover-co
   margin-top: calc(8px + var(--look-block-spacing, 0px));
 }
 
-.sticky-editor-surface.is-editor-reading-width .bn-editor {
+/* Text width (Settings › Editor). The tag row above the note takes the same width, or with a
+   wider text it would sit further right than the text's left edge. */
+.sticky-editor-surface.is-editor-reading-width .bn-editor,
+.sticky-editor-surface.is-editor-reading-width > .note-tags {
   width: min(var(--look-text-width, 820px), calc(100% - 96px));
   max-width: var(--look-text-width, 820px);
 }

@@ -235,3 +235,17 @@ test("More colors keeps the less used tab colors folded until one is set", async
   await expect(moreColors).toHaveAttribute("aria-expanded", "true");
   await expect(colors.locator("[data-setting-id='tabBlur']")).toBeVisible();
 });
+
+// The tag row above the note starts where the text does, whatever the text width.
+test("the tag row follows the text width", async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 800 });
+  await openLookPage(page, "Editor");
+  const textWidth = settings(page).getByRole("slider", { name: "Text width" });
+  await textWidth.focus();
+  await page.keyboard.press("End");
+  await settings(page).getByRole("button", { name: "Close preferences" }).click();
+  const left = (selector) => page.locator(selector).first()
+    .evaluate((element) => Math.round(element.getBoundingClientRect().left));
+  await expect.poll(async () => (await left(".note-tags")) - (await left(".bn-editor"))).toBe(0);
+  expect(await left(".bn-editor")).toBeLessThan(400);
+});
